@@ -1,0 +1,339 @@
+"use client";
+
+import {
+  useEffect,
+  useState
+}
+from "react";
+
+import {
+  signInWithEmailAndPassword
+} from "firebase/auth";
+
+import {
+  collection,
+  getDocs,
+  query,
+  where
+} from "firebase/firestore";
+
+import {
+  auth,
+  db
+} from "@/lib/firebase";
+
+import { useRouter }
+from "next/navigation";
+
+export default function VendorLoginPage(){
+
+  const router = useRouter();
+
+  const [email,setEmail] =
+    useState("");
+
+  const [password,setPassword] =
+    useState("");
+
+  const [loading,setLoading] =
+    useState(false);
+
+    useEffect(()=>{
+
+  const vendor =
+
+    localStorage.getItem(
+      "vendor"
+    );
+
+  if(vendor){
+
+    router.push(
+      "/seller"
+    );
+
+  }
+
+},[]);
+
+  const loginVendor = async ()=>{
+
+    if(!email || !password){
+
+      alert("Fill All Fields");
+
+      return;
+
+    }
+
+    try{
+
+      setLoading(true);
+
+      const userCredential =
+
+        await signInWithEmailAndPassword(
+
+          auth,
+
+          email.toLowerCase(),
+
+          password
+
+        );
+
+      const vendorQuery = query(
+
+        collection(
+          db,
+          "vendors"
+        ),
+
+        where(
+          "email",
+          "==",
+          userCredential.user.email
+        )
+
+      );
+
+      const snapshot =
+        await getDocs(vendorQuery);
+
+      if(snapshot.empty){
+
+        alert(
+          "Vendor Account Not Found"
+        );
+
+        return;
+
+      }
+
+      const vendorData =
+        snapshot.docs[0].data();
+
+      if(
+  vendorData.status ===
+  "Pending"
+){
+
+  alert(
+    "Vendor Approval Pending"
+  );
+
+  return;
+
+}
+
+if(
+  vendorData.status ===
+  "Rejected"
+){
+
+  alert(
+    "Vendor Account Rejected"
+  );
+
+  return;
+
+}
+      localStorage.setItem(
+
+  "vendor",
+
+  JSON.stringify({
+
+    uid:
+      userCredential.user.uid,
+
+    email:
+      userCredential.user.email,
+
+    vendorId:
+      snapshot.docs[0].id,
+
+    businessName:
+      vendorData.businessName,
+
+  })
+
+);
+      alert(
+        "Vendor Login Successful"
+      );
+
+      router.push("/seller");
+
+    }catch(err:any){
+
+      if(
+
+  err.message.includes(
+    "invalid-credential"
+  )
+
+){
+
+  alert(
+    "Invalid email or password"
+  );
+
+}else{
+
+  alert(
+    err.message
+  );
+
+}
+
+    }finally{
+
+      setLoading(false);
+
+    }
+
+  };
+
+  return (
+
+    <div
+      className="
+        min-h-screen
+        bg-gray-100
+        flex
+        items-center
+        justify-center
+        p-6
+      "
+    >
+
+      <div
+        className="
+          bg-white
+          p-10
+          rounded-3xl
+          shadow-xl
+          w-full
+          max-w-md
+        "
+      >
+
+        <h1
+          className="
+            text-4xl
+            font-bold
+            text-center
+            mb-3
+          "
+        >
+          Vendor Login
+        </h1>
+
+        <p
+          className="
+            text-center
+            text-gray-500
+            mb-8
+          "
+        >
+          Login to Seller Dashboard
+        </p>
+
+        <div className="space-y-5">
+
+          <input
+
+            type="email"
+
+            placeholder="Business Email"
+
+            value={email}
+
+            onChange={(e)=>
+              setEmail(e.target.value)
+            }
+
+            className="
+              w-full
+              p-4
+              border
+              rounded-2xl
+              outline-none
+            "
+          />
+
+          <input
+
+            type="password"
+
+            placeholder="Password"
+
+            value={password}
+
+            onChange={(e)=>
+              setPassword(e.target.value)
+            }
+
+            className="
+              w-full
+              p-4
+              border
+              rounded-2xl
+              outline-none
+            "
+          />
+
+        </div>
+
+        <button
+
+          onClick={loginVendor}
+
+          disabled={loading}
+
+          className={`
+  w-full
+  text-white
+  py-4
+  rounded-2xl
+  mt-8
+  text-lg
+  font-bold
+
+  ${
+    loading
+
+    ? "bg-gray-400"
+
+    : "bg-blue-600"
+  }
+`}
+        >
+
+          {loading
+            ? "Logging In..."
+            : "Vendor Login"}
+
+        </button>
+        <p className="text-center mt-5">
+
+  New Vendor?
+
+  <a
+    href="/vendor-register"
+    className="text-blue-600 font-bold ml-2"
+  >
+
+    Register Here
+
+  </a>
+
+</p>
+      </div>
+
+    </div>
+
+  );
+
+}

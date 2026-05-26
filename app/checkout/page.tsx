@@ -1,0 +1,1075 @@
+"use client";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  collection,
+  addDoc,
+  Timestamp,
+} from "firebase/firestore";
+
+import { db } from "@/lib/firebase";
+import {
+  useRouter
+} from "next/navigation";
+
+export default function CheckoutPage() {
+
+  const router =
+  useRouter();
+
+  const [items, setItems] =
+  useState<any[]>([]);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [name, setName] =
+    useState("");
+
+  const [phone, setPhone] =
+    useState("");
+
+  const [address, setAddress] =
+    useState("");
+
+    const [coupon,setCoupon] =
+  useState("");
+  const [shipping,setShipping] =
+  useState(0);
+
+const [paymentMethod,
+setPaymentMethod] =
+  useState("COD");
+
+const [deliveryDate,
+setDeliveryDate] =
+  useState("");
+
+const [discount,setDiscount] =
+  useState(0);
+
+const [couponApplied,
+setCouponApplied] =
+  useState(false);
+
+  useEffect(() => {
+
+    const storedItems =
+      JSON.parse(
+        localStorage.getItem(
+          "checkoutItems"
+        ) || "[]"
+      );
+
+    setItems(storedItems);
+
+  }, []);
+
+  const applyCoupon = ()=>{
+
+  if(couponApplied){
+
+    alert(
+      "Coupon already applied"
+    );
+
+    return;
+
+  }
+
+  /* SAMPLE COUPONS */
+
+  if(coupon === "YOGI10"){
+
+    setDiscount(
+      total * 0.10
+    );
+
+    setCouponApplied(true);
+
+    alert(
+      "10% discount applied"
+    );
+
+  }
+
+  else if(
+    coupon === "SAVE500"
+  ){
+
+    setDiscount(500);
+
+    setCouponApplied(true);
+
+    alert(
+      "₹500 discount applied"
+    );
+
+  }
+
+  else{
+
+    alert(
+      "Invalid coupon"
+    );
+
+  }
+
+};
+
+  const total =
+    items.reduce(
+
+      (sum, item) =>
+
+        sum +
+        item.price * item.qty,
+
+      0
+
+    );
+
+    const finalAmount =
+  total - discount;
+
+  const grandTotal =
+  finalAmount + shipping;
+
+  const loadRazorpayScript =
+()=>{
+
+  return new Promise((resolve)=>{
+
+    const script =
+      document.createElement(
+        "script"
+      );
+
+    script.src =
+
+      "https://checkout.razorpay.com/v1/checkout.js";
+
+    script.onload =
+      ()=>{
+
+        resolve(true);
+
+      };
+
+    script.onerror =
+      ()=>{
+
+        resolve(false);
+
+      };
+
+    document.body.appendChild(
+      script
+    );
+
+  });
+
+};
+
+  useEffect(()=>{
+    const user =
+  localStorage.getItem(
+    "user"
+  );
+
+if(!user){
+
+  alert(
+    "Please login first"
+  );
+
+  router.push("/login");
+
+  return;
+
+}
+
+  /* FREE DELIVERY */
+
+  if(finalAmount > 2000){
+
+    setShipping(0);
+
+  }else{
+
+    setShipping(99);
+
+  }
+
+  /* DELIVERY DATE */
+
+  const today =
+    new Date();
+
+  today.setDate(
+    today.getDate() + 5
+  );
+
+  setDeliveryDate(
+
+    today.toDateString()
+
+  );
+
+},[finalAmount]);
+
+const placeCODOrder =
+async()=>{
+
+  if(
+  !name ||
+  !phone ||
+  !address
+){
+
+  alert(
+    "Fill all checkout fields"
+  );
+
+  return;
+
+}
+
+if(items.length === 0){
+
+  alert(
+    "Cart is empty"
+  );
+
+  return;
+
+}
+
+  setLoading(true);
+
+  try{
+
+    await addDoc(
+
+      collection(
+        db,
+        "orders"
+      ),
+
+      {
+
+        customerName:name,
+
+        phone:phone,
+
+        address:address,
+
+        items:items,
+
+        total:total,
+
+        status:"Pending",
+
+        paymentMethod:"COD",
+
+        paymentStatus:
+  "Pending",
+
+        shippingCharge:
+          shipping,
+
+        finalTotal:
+          grandTotal,
+
+        deliveryDate:
+          deliveryDate,
+
+        createdAt:
+          Timestamp.now(),
+
+      }
+
+    );
+
+    localStorage.removeItem(
+      "checkoutItems"
+    );
+
+    localStorage.removeItem(
+      "cart"
+    );
+
+    alert(
+      "Order Placed Successfully"
+    );
+
+    window.location.href =
+      "/orders";
+
+  }catch(error){
+
+    console.log(error);
+
+    alert(
+      "Order Failed"
+    );
+
+  }
+
+  setLoading(false);
+
+};
+
+const payNow =
+async()=>{
+  if(
+  !name ||
+  !phone ||
+  !address
+){
+
+  alert(
+    "Fill all checkout fields"
+  );
+
+  return;
+
+}
+
+if(items.length === 0){
+
+  alert(
+    "Cart is empty"
+  );
+
+  return;
+
+}
+
+  const res:any =
+
+    await loadRazorpayScript();
+
+  if(!res){
+
+    alert(
+      "Razorpay failed"
+    );
+
+    return;
+
+  }
+
+  const response =
+    await fetch(
+
+      "/api/create-order",
+
+      {
+
+        method:"POST",
+
+        headers:{
+
+          "Content-Type":
+            "application/json"
+
+        },
+
+        body:JSON.stringify({
+
+          amount:grandTotal
+
+        })
+
+      }
+
+    );
+
+  const data =
+    await response.json();
+
+  const options = {
+
+    key:
+      process.env
+      .NEXT_PUBLIC_RAZORPAY_KEY,
+
+    amount:
+      data.amount,
+
+    currency:
+      data.currency,
+
+    name:
+      "Yogi Mart",
+
+    description:
+      "Marketplace Payment",
+
+    order_id:
+      data.id,
+
+    handler:
+      async function(
+        response:any
+      ){
+
+        const verifyResponse =
+          await fetch(
+
+            "/api/verify-payment",
+
+            {
+
+              method:"POST",
+
+              headers:{
+
+                "Content-Type":
+                  "application/json"
+
+              },
+
+               body:JSON.stringify({
+
+                razorpay_order_id:
+                  response
+                  .razorpay_order_id,
+
+                razorpay_payment_id:
+                  response
+                  .razorpay_payment_id,
+
+                razorpay_signature:
+                  response
+                  .razorpay_signature
+
+              })
+
+            }
+
+          );
+          
+
+        const verifyData =
+
+          await verifyResponse.json();
+
+        if(
+          verifyData.success
+        ){
+
+          setLoading(true);
+
+          try{
+
+            await addDoc(
+
+              collection(
+                db,
+                "orders"
+              ),
+
+              {
+
+                customerName:name,
+
+                phone:phone,
+
+                address:address,
+
+                items:items,
+
+                total:total,
+
+                status:"Pending",
+
+                paymentMethod:
+                  paymentMethod,
+
+                  paymentStatus:
+                  "Paid",
+
+                shippingCharge:
+                  shipping,
+
+                finalTotal:
+                  grandTotal,
+
+                deliveryDate:
+                  deliveryDate,
+
+                  userEmail:
+
+               JSON.parse(
+
+             localStorage.getItem(
+              "user"
+                ) || "{}"
+
+                 ).email,
+
+                createdAt:
+                  Timestamp.now(),
+
+              }
+
+            );
+
+            localStorage.removeItem(
+              "checkoutItems"
+            );
+
+            localStorage.removeItem(
+              "cart"
+            );
+
+            window.location.href =
+              "/payment-success";
+
+          }catch(error){
+
+            console.log(error);
+
+            alert(
+              "Order save failed"
+            );
+
+          }
+
+          setLoading(false);
+
+        }else{
+
+          alert(
+            "Payment Verification Failed"
+          );
+
+        }
+
+      },
+
+          modal:{
+
+      ondismiss:function(){
+
+        alert(
+          "Payment Cancelled"
+        );
+
+      }
+
+    },
+
+    theme:{
+
+      color:"#16a34a"
+
+    }
+
+  };
+
+  const paymentObject =
+
+    new (window as any)
+    .Razorpay(options);
+
+  paymentObject.open();
+
+};
+
+return (
+
+    <section className="
+      py-10
+      px-4
+    ">
+
+      <div className="
+        max-w-6xl
+        mx-auto
+        grid
+        grid-cols-1
+        lg:grid-cols-3
+        gap-10
+      ">
+
+        {/* LEFT */}
+
+        <div className="
+          lg:col-span-2
+          bg-white
+          rounded-3xl
+          shadow-md
+          p-8
+        ">
+
+          <h1 className="
+            text-3xl
+            font-bold
+            mb-8
+          ">
+            Checkout
+          </h1>
+
+          <div className="
+            space-y-5
+          ">
+
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={name}
+              onChange={(e) =>
+                setName(
+                  e.target.value
+                )
+              }
+              className="
+                w-full
+                border
+                rounded-xl
+                px-5
+                py-4
+                outline-none
+              "
+            />
+
+            <input
+              type="text"
+              placeholder="Phone Number"
+              value={phone}
+              onChange={(e) =>
+                setPhone(
+                  e.target.value
+                )
+              }
+              className="
+                w-full
+                border
+                rounded-xl
+                px-5
+                py-4
+                outline-none
+              "
+            />
+
+            <textarea
+              placeholder="
+                Delivery Address
+              "
+              value={address}
+              onChange={(e) =>
+                setAddress(
+                  e.target.value
+                )
+              }
+              rows={5}
+              className="
+                w-full
+                border
+                rounded-xl
+                px-5
+                py-4
+                outline-none
+              "
+            />
+        
+
+          </div>
+
+        </div>
+
+        {/* RIGHT */}
+
+        <div className="
+          bg-white
+          rounded-3xl
+          shadow-md
+          p-8
+          h-fit
+        ">
+
+          <h2 className="
+            text-2xl
+            font-bold
+            mb-6
+          ">
+            Order Summary
+          </h2>
+
+          <div className="
+            space-y-5
+          ">
+
+            {items.map((item: any, index) => (
+
+  <div
+    key={index}
+    className="
+      flex
+      items-center
+      gap-4
+    "
+  >
+
+    <img
+      src={
+        item?.image ||
+        "/no-image.png"
+      }
+      alt=""
+      className="
+        w-20
+        h-20
+        object-cover
+        rounded-xl
+      "
+    />
+
+    <div className="flex-1">
+
+      <h3 className="
+        font-semibold
+      ">
+        {item?.name}
+      </h3>
+
+      <p className="
+        text-gray-500
+        text-sm
+      ">
+        Qty:
+        {" "}
+        {item?.qty}
+      </p>
+
+    </div>
+
+    <p className="
+      font-bold
+    ">
+      ₹
+      {(item?.price || 0) *
+       (item?.qty || 0)}
+    </p>
+
+  </div>
+
+))}
+          </div>
+
+          <div className="
+  border-t
+  mt-8
+  pt-6
+">
+
+  {/* TOTAL */}
+
+  <div className="
+    flex
+    justify-between
+    text-xl
+    font-bold
+  ">
+
+    <span>
+      Total
+    </span>
+
+    <span>
+      ₹{total}
+    </span>
+
+  </div>
+
+  {/* DISCOUNT */}
+
+  <div className="
+    flex
+    justify-between
+    mt-4
+    text-green-600
+    font-semibold
+  ">
+
+    <span>
+      Discount
+    </span>
+
+    <span>
+      - ₹{discount}
+    </span>
+
+  </div>
+
+  <div className="
+  flex
+  justify-between
+  mt-4
+  text-blue-600
+  font-semibold
+">
+
+  <span>
+    Shipping
+  </span>
+
+  <span>
+
+    {shipping === 0
+      ? "FREE"
+      : `₹${shipping}`}
+
+  </span>
+
+</div>
+
+<div className="
+  flex
+  justify-between
+  mt-4
+  text-gray-600
+  text-sm
+">
+
+  <span>
+    Estimated Delivery
+  </span>
+
+  <span>
+    {deliveryDate}
+  </span>
+
+</div>
+
+  {/* FINAL TOTAL */}
+
+  <div className="
+    flex
+    justify-between
+    mt-5
+    text-2xl
+    font-bold
+  ">
+
+    <span>
+      Final Total
+    </span>
+
+    <span>
+      ₹{grandTotal}
+      
+    </span>
+
+  </div>
+
+  {/* BUTTON */}
+
+  <div className="
+  mt-8
+">
+
+  <h3 className="
+    text-xl
+    font-bold
+    mb-4
+  ">
+    Payment Method
+  </h3>
+
+  <div className="
+    space-y-3
+  ">
+
+    <label className="
+      flex
+      items-center
+      gap-3
+    ">
+
+      <input
+        type="radio"
+        value="COD"
+        checked={
+          paymentMethod === "COD"
+        }
+        onChange={(e)=>
+          setPaymentMethod(
+            e.target.value
+          )
+        }
+      />
+
+      Cash On Delivery
+
+    </label>
+
+    <label className="
+      flex
+      items-center
+      gap-3
+    ">
+
+      <input
+        type="radio"
+        value="ONLINE"
+        checked={
+          paymentMethod ===
+          "ONLINE"
+        }
+        onChange={(e)=>
+          setPaymentMethod(
+            e.target.value
+          )
+        }
+      />
+
+      Online Payment
+
+    </label>
+
+  </div>
+
+</div>
+
+  <button
+   onClick={()=>{
+
+  if(
+    paymentMethod ===
+    "ONLINE"
+  ){
+
+    payNow();
+
+  }else{
+
+    placeCODOrder();
+
+  }
+
+}}
+    disabled={loading}
+    className="
+      w-full
+      mt-6
+      bg-green-600
+      hover:bg-green-700
+      text-white
+      py-4
+      rounded-2xl
+      font-bold
+      text-lg
+      transition
+    "
+  >
+
+    {loading
+      ? "Processing..."
+      : "Place Order"}
+
+  </button>
+
+    <div className="
+  bg-white
+  rounded-3xl
+  shadow-md
+  p-6
+  mt-8
+">
+
+  <h2 className="
+    text-2xl
+    font-bold
+    mb-5
+  ">
+    Apply Coupon
+  </h2>
+
+  <div className="
+    flex
+    gap-4
+  ">
+
+    <input
+      type="text"
+      placeholder="Enter coupon code"
+      value={coupon}
+      onChange={(e)=>
+        setCoupon(
+          e.target.value
+        )
+      }
+      className="
+        flex-1
+        border
+        rounded-2xl
+        px-4
+        py-3
+      "
+    />
+
+    <button
+      onClick={applyCoupon}
+      className="
+        bg-green-600
+        hover:bg-green-700
+        text-white
+        px-6
+        rounded-2xl
+        font-semibold
+      "
+    >
+      Apply
+    </button>
+
+  </div>
+
+    {/* SAMPLE */}
+
+  <div className="
+    mt-5
+    text-sm
+    text-gray-500
+    leading-7
+  ">
+
+    Try:
+    {" "}
+
+    <span className="
+      font-bold
+    ">
+      YOGI10
+    </span>
+
+    {" "}or{" "}
+
+    <span className="
+      font-bold
+    ">
+      SAVE500
+    </span>
+
+  </div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+);
+
+}
