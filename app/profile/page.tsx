@@ -15,22 +15,23 @@ ProfilePage(){
 
 useEffect(()=>{
 
-  const savedUser =
+  if(typeof window !== "undefined"){
 
-    localStorage.getItem(
-      "user"
-    );
+    const savedUser =
+      localStorage.getItem("user");
 
-  if(savedUser){
+    if(savedUser){
 
-    setUser(
-      JSON.parse(savedUser)
-    );
+      setUser(
+        JSON.parse(savedUser)
+      );
 
-  }else{
+    }else{
 
-    window.location.href =
-      "/login";
+      window.location.href =
+        "/login";
+
+    }
 
   }
 
