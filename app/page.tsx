@@ -7,7 +7,7 @@ import ProductCard from "@/components/ProductCard";
 import CategoryStrip from "@/components/CategoryStrip";
 import DealStrip from "@/components/DealStrip";
 import Footer from "@/components/Footer";
-import HeroSlider from "@/components/HeroSlider";
+import HeroSlider from "@/components/heroSlider";
 
 import FeaturedProducts from "@/components/home/FeaturedProducts";
 import TopVendors from "@/components/home/TopVendors";
