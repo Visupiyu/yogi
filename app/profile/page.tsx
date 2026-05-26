@@ -27,6 +27,11 @@ useEffect(()=>{
       JSON.parse(savedUser)
     );
 
+  }else{
+
+    window.location.href =
+      "/login";
+
   }
 
 },[]);
