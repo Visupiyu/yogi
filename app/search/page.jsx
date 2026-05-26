@@ -5,15 +5,17 @@ import {
   useState,
 } from "react";
 
-import {
-  useSearchParams
-} from "next/navigation";
+
 
 import {
   Suspense
 } from "react";
 
 import Link from "next/link";
+
+import {
+  useSearchParams
+} from "next/navigation";
 
 import {
   collection,
@@ -23,7 +25,8 @@ import {
 import { db }
 from "@/lib/firebase";
 
-export default function SearchPage(){
+
+function SearchContent(){
 
   const searchParams =
     useSearchParams();
@@ -32,11 +35,9 @@ export default function SearchPage(){
     searchParams.get("q") || "";
 
   const [products,setProducts] =
-    useState([]);
-
+   useState<product>([]);
   const [filtered,setFiltered] =
-    useState([]);
-
+   useState<product>([]);
   const [loading,setLoading] =
     useState(true);
 
@@ -153,15 +154,7 @@ if(sort === "stock"){
 
   return (
 
-  <Suspense
-    fallback={
-      <div>
-        Loading...
-      </div>
-    }
-  >
-
-    <section className="
+     <section className="
       py-10
       px-4
     ">
@@ -423,11 +416,11 @@ if(sort === "stock"){
             gap-6
           ">
 
-            {filtered.map((product)=>(
+            {filtered.map((product)=>(  
 
               <Link
-                key={product.id}
-                href={`/product/${product.id}`}
+                key={product?.id}
+                href={`/product/${product?.id}`}
               >
 
                 <div className="
@@ -447,10 +440,10 @@ if(sort === "stock"){
 
                     <img
                       src={
-                        product.image ||
+                        product?.image ||
                         "/no-image.png"
                       }
-                      alt={product.name}
+                      alt={product?.name}
                       className="
                         w-full
                         h-full
@@ -467,7 +460,7 @@ if(sort === "stock"){
                       line-clamp-2
                       min-h-[48px]
                     ">
-                      {product.name}
+                      {product?.name}
                     </h3>
 
                     <p className="
@@ -476,10 +469,10 @@ if(sort === "stock"){
                       text-lg
                       mt-2
                     ">
-                      ₹{product.price}
+                      ₹{product?.price}
                     </p>
 
-                    {product.stock > 0 ? (
+                    {product?.stock > 0 ? (
 
                       <p className="
                         text-sm
@@ -517,8 +510,28 @@ if(sort === "stock"){
 
     </section>
 
+    );
+
+}
+
+
+       
+export default function SearchPage(){
+
+  return(
+
+    <Suspense
+      fallback={
+        <div>
+          Loading...
+        </div>
+      }
+    >
+
+      <SearchContent />
+
     </Suspense>
 
   );
 
-  }
+}
