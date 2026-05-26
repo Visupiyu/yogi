@@ -37,18 +37,8 @@ useEffect(()=>{
 
 },[]);
 
-if(
-  !localStorage.getItem(
-    "user"
-  )
-){
 
-  window.location.href =
-    "/login";
-
-}
-
-  return (
+ return (
 
     <section className="
       min-h-screen
