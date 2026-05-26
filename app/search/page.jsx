@@ -6,8 +6,12 @@ import {
 } from "react";
 
 import {
-  useSearchParams,
+  useSearchParams
 } from "next/navigation";
+
+import {
+  Suspense
+} from "react";
 
 import Link from "next/link";
 
@@ -147,7 +151,15 @@ if(sort === "stock"){
     stockOnly,
   ]);
 
-  return(
+  return (
+
+  <Suspense
+    fallback={
+      <div>
+        Loading...
+      </div>
+    }
+  >
 
     <section className="
       py-10
@@ -505,6 +517,8 @@ if(sort === "stock"){
 
     </section>
 
+    </Suspense>
+
   );
 
-}
+  }
