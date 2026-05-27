@@ -271,7 +271,7 @@ if(
       ">
 
         <div className="
-          h-20
+          h-16
           flex
           items-center
           justify-between
@@ -284,12 +284,12 @@ if(
           <Link href="/">
 
             <h1 className="
-              text-2xl
+              text-3xl
               font-extrabold
               text-green-600
               whitespace-nowrap
             ">
-              Yogi Mart
+              <img src="/logo.png" />
             </h1>
 
           </Link>
@@ -343,7 +343,7 @@ if(
                   border
                   border-gray-300
                   rounded-full
-                  py-3
+                  py-2.5
                   pl-5
                   pr-14
                   outline-none
@@ -482,11 +482,7 @@ if(
           
           {
 
-  user
-
-  ?
-
-  (
+    user && (
 
     <button
 
@@ -501,12 +497,14 @@ if(
         rounded-full
       "
     >
+
       Logout
+
     </button>
 
   )
 
-  :
+}
 
   (
 
@@ -530,7 +528,6 @@ if(
 
   )
 
-}
 
           {/* RIGHT */}
 
@@ -614,7 +611,7 @@ if(
               )}
 
             </Link>
-             <Link href="/vendor-register">
+             <Link href="/vendor-login">
 
   <button className="
     hidden
@@ -622,7 +619,7 @@ if(
     bg-orange-500
     hover:bg-orange-600
     text-white
-    px-5
+    px-4
     py-2
     rounded-full
     font-semibold

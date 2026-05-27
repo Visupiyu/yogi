@@ -60,7 +60,7 @@ export default function FlashSale(){
   return(
 
     <section className="
-      py-14
+      py-10
       px-4
     ">
 
@@ -70,13 +70,13 @@ export default function FlashSale(){
       ">
 
         <div className="
-          rounded-3xl
+          rounded-2xl
           overflow-hidden
           bg-gradient-to-r
           from-red-500
           to-orange-500
           text-white
-          p-10
+          p-7 md:p-8
           shadow-xl
         ">
 
@@ -86,7 +86,7 @@ export default function FlashSale(){
             lg:flex-row
             items-center
             justify-between
-            gap-10
+            gap-6
           ">
 
             {/* LEFT */}
@@ -103,8 +103,8 @@ export default function FlashSale(){
               </p>
 
               <h2 className="
-                text-4xl
-                md:text-5xl
+                text-3xl
+                md:text-4xl
                 font-extrabold
                 leading-tight
               ">
@@ -115,7 +115,7 @@ export default function FlashSale(){
 
               <p className="
                 mt-4
-                text-lg
+                text-base
                 text-white/90
               ">
                 Grab your favorite products
@@ -128,7 +128,7 @@ export default function FlashSale(){
                 text-red-500
                 px-6
                 py-3
-                rounded-full
+                rounded-x1
                 font-bold
                 hover:scale-105
                 transition
@@ -149,13 +149,13 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-5
+                p-4
                 min-w-[90px]
                 text-center
               ">
 
                 <h3 className="
-                  text-4xl
+                  text-3xl
                   font-bold
                 ">
                   {timeLeft.hours}
@@ -171,13 +171,13 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-5
+                p-4
                 min-w-[90px]
                 text-center
               ">
 
                 <h3 className="
-                  text-4xl
+                  text-3xl
                   font-bold
                 ">
                   {timeLeft.minutes}
@@ -193,13 +193,13 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-5
-                min-w-[90px]
+                p-4
+                min-w-[75px]
                 text-center
               ">
 
                 <h3 className="
-                  text-4xl
+                  text-3xl
                   font-bold
                 ">
                   {timeLeft.seconds}

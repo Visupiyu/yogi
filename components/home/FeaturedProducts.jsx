@@ -76,13 +76,13 @@ export default function FeaturedProducts() {
 
   return(
 
-    <section className="py-12 px-4">
+    <section className="py-10 px-4">
 
       <div className="max-w-7xl mx-auto">
 
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
 
-          <h2 className="text-3xl font-bold">
+          <h2 className="text-2xl md:text-3xl font-bold">
             Featured Products
           </h2>
 
@@ -113,7 +113,7 @@ export default function FeaturedProducts() {
               <div className="
                 bg-white
                 rounded-2xl
-                shadow-md
+                shadow-sm
                 overflow-hidden
                 hover:shadow-xl
                 transition
@@ -122,7 +122,7 @@ export default function FeaturedProducts() {
               ">
 
                 <div className="
-                  h-52
+                  h-44 md:h-52
                   bg-gray-100
                   overflow-hidden
                 ">
@@ -142,12 +142,12 @@ export default function FeaturedProducts() {
 
                 </div>
 
-                <div className="p-4">
+                <div className="p-3">
 
                   <h3 className="
                     font-semibold
                     line-clamp-2
-                    min-h-[48px]
+                    min-h-[42px]
                   ">
                     {product.name}
                   </h3>
@@ -155,7 +155,7 @@ export default function FeaturedProducts() {
                   <p className="
                     text-green-600
                     font-bold
-                    text-lg
+                    text-base md:text-lg
                     mt-2
                   ">
                     ₹{product.price}

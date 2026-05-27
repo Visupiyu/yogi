@@ -58,10 +58,10 @@ export default function HeroSlider(){
       className="
         relative
         w-full
-        h-[500px]
+       h-[260px] md:h-[420px]
         overflow-hidden
-        rounded-3xl
-        mb-10
+        rounded-2xl
+        mb-06
       "
     >
 
@@ -114,8 +114,8 @@ export default function HeroSlider(){
 
               <h1
                 className="
-                  text-5xl
-                  md:text-6xl
+                  text-3xl
+                  md:text-5xl
                   font-bold
                   mb-6
                 "
@@ -125,7 +125,7 @@ export default function HeroSlider(){
 
               <p
                 className="
-                  text-xl
+                  text-base md:text-lg
                   mb-8
                   text-gray-200
                 "
@@ -136,10 +136,10 @@ export default function HeroSlider(){
               <Link
                 href="/"
                 className="
-                  bg-blue-600
-                  hover:bg-blue-700
-                  px-8
-                  py-4
+                  bg-green-600
+                  hover:bg-green-700
+                  px-6
+                  py-3
                   rounded-2xl
                   text-lg
                   font-semibold
@@ -177,8 +177,8 @@ export default function HeroSlider(){
             onClick={()=>setCurrent(index)}
 
             className={`
-              w-4
-              h-4
+              w-3
+              h-3
               rounded-full
 
               ${current === index

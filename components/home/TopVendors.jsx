@@ -58,7 +58,7 @@ export default function TopVendors(){
   return(
 
     <section className="
-      py-12
+      py-10
       px-4
       bg-gray-50
     ">
@@ -72,11 +72,11 @@ export default function TopVendors(){
           flex
           justify-between
           items-center
-          mb-8
+          mb-6
         ">
 
           <h2 className="
-            text-3xl
+            text-2xl md:text-3xl
             font-bold
           ">
             Top Vendors
@@ -103,7 +103,7 @@ export default function TopVendors(){
               <div className="
                 bg-white
                 rounded-2xl
-                shadow-md
+                shadow-sm
                 overflow-hidden
                 hover:shadow-xl
                 transition
@@ -111,7 +111,7 @@ export default function TopVendors(){
               ">
 
                 <div className="
-                  h-32
+                  h-24
                   bg-gradient-to-r
                   from-green-400
                   to-green-600
@@ -120,17 +120,17 @@ export default function TopVendors(){
                 </div>
 
                 <div className="
-                  p-5
+                  p-4
                   text-center
                 ">
 
                   <div className="
-                    w-20
-                    h-20
+                    w-16
+                    h-16
                     rounded-full
                     bg-gray-200
                     mx-auto
-                    -mt-14
+                    -mt-10
                     border-4
                     border-white
                     overflow-hidden
@@ -154,7 +154,7 @@ export default function TopVendors(){
                   <h3 className="
                     mt-4
                     font-bold
-                    text-lg
+                    text-base md:text-lg
                   ">
                     {vendor.shopName}
                   </h3>
@@ -171,9 +171,9 @@ export default function TopVendors(){
                     mt-4
                     bg-green-600
                     text-white
-                    px-4
+                    px-5
                     py-2
-                    rounded-lg
+                    rounded-x1
                     hover:bg-green-700
                   ">
                     Visit Store

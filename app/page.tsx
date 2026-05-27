@@ -204,13 +204,8 @@ const [sortBy,setSortBy] =
       <CategoryStrip />
       <DealStrip />
       <HeroSlider />
-      <Hero />
-      <CategoriesGrid />
-      <FeaturedProducts />
-      <TopVendors />
-      <FlashSale />
 
-      <section className="max-w-7xl mx-auto px-6 py-14">
+      <section className="max-w-7xl mx-auto px-6 py-16">
 
         <div className="flex items-center justify-between mb-8">
 
@@ -218,7 +213,13 @@ const [sortBy,setSortBy] =
 
             Trending Products
 
-            <p className="
+            <FlashSale />
+
+      <FeaturedProducts />
+      <TopVendors />
+      
+
+        <p className="
   text-gray-500
   mt-2
 ">
@@ -253,7 +254,7 @@ const [sortBy,setSortBy] =
 
             className="
               w-full
-              p-4
+              p-3
               rounded-xl
               border
               outline-none
@@ -282,7 +283,7 @@ const [sortBy,setSortBy] =
     }
 
     className="
-      p-4
+      p-3
       rounded-xl
       border
       bg-white
@@ -419,7 +420,7 @@ const [sortBy,setSortBy] =
             sm:grid-cols-2
             md:grid-cols-3
             lg:grid-cols-4
-            gap-8
+            gap-6
           "
         >
 
