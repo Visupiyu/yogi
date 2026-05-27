@@ -202,9 +202,11 @@ export default function ProductCard({
             alt={name}
             className="
               w-full
-              h-52
+              h-56
               md:h-60
               object-cover
+              bg-white
+              p-1
               group-hover:scale-105
               transition
               duration-500
@@ -265,7 +267,7 @@ export default function ProductCard({
       {/* CONTENT */}
 
       <div className="
-        p-4
+        p-3
       ">
 
         {/* RATING */}
@@ -307,7 +309,7 @@ export default function ProductCard({
             text-base
             md:text-lg
             line-clamp-2
-            min-h-[52px]
+            min-h-[40px]
             hover:text-green-600
             transition
           ">
@@ -323,8 +325,8 @@ export default function ProductCard({
         <div className="
           flex
           items-center
-          gap-3
-          mt-3
+          gap-0
+          mt-0
         ">
 
           <p className="
@@ -349,24 +351,6 @@ export default function ProductCard({
 
         </div>
 
-        {/* STOCK */}
-
-        <p className="
-          text-sm
-          mt-2
-          text-gray-500
-        ">
-
-          {stock > 0
-
-            ? `${stock} in stock`
-
-            : "Out of stock"
-
-          }
-
-        </p>
-
         {/* BUTTON */}
 
         <button
@@ -379,13 +363,13 @@ export default function ProductCard({
 
           className={`
 
-            mt-4
+            mt-3
             w-full
             flex
             items-center
             justify-center
             gap-2
-            py-3
+            py-2.5
             rounded-xl
             font-semibold
             transition

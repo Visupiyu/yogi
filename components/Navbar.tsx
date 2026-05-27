@@ -257,14 +257,21 @@ if(
       
 
     <header className="
-      sticky
-      top-0
-      z-50
-      bg-white
-      shadow-md
-    ">
-
-      <div className="
+  sticky
+  top-0
+  z-50
+  bg-gradient-to-r
+  from-emerald-900
+  via-slate-900
+  to-blue-900
+  shadow-2xl
+  shadow-green-900/20
+  backdrop-blur-xl
+  border-b
+  border-slate-800
+  shadow-md
+">
+       <div className="
         max-w-7xl
         mx-auto
         px-4
@@ -349,7 +356,10 @@ if(
                 className="
                   w-full
                   border
-                  border-gray-300
+                  border-slate-700
+bg-slate-900
+text-white
+placeholder:text-gray-400
                   rounded-full
                   py-2.5
                   pl-5
@@ -368,7 +378,9 @@ if(
     top-full
     left-0
     w-full
-    bg-white
+    bg-slate-900
+border
+border-slate-800
     shadow-xl
     rounded-2xl
     mt-2
@@ -402,7 +414,7 @@ if(
           items-center
           gap-4
           p-4
-          hover:bg-gray-100
+          hover:bg-slate-800
           transition
         ">
 
@@ -453,8 +465,11 @@ if(
                   right-2
                   top-1/2
                   -translate-y-1/2
-                  bg-green-600
-                  hover:bg-green-700
+                  bg-gradient-to-r
+from-green-600
+to-blue-600
+hover:from-green-500
+hover:to-blue-500
                   text-white
                   p-2
                   rounded-full
@@ -486,35 +501,7 @@ if(
             </div>
 
           </div>
-
           
-          {
-
-  user ? (
-
-    <button
-
-      onClick={logout}
-
-      className="
-        bg-red-500
-        hover:bg-red-600
-        text-white
-        px-4
-        py-2
-        rounded-full
-      "
-    >
-
-      Logout
-
-    </button>
-
-  ) : null
-
-}
-
-
           {/* RIGHT */}
 
           <div className="
@@ -533,7 +520,7 @@ if(
   <Heart className="
     w-6
     h-6
-    text-gray-700
+    text-gray-200
   " />
 
   {wishlistCount > 0 && (
@@ -606,8 +593,11 @@ if(
                 flex
                 items-center
                 gap-2
-                bg-green-600
-                hover:bg-green-700
+                bg-gradient-to-r
+from-green-600
+to-blue-600
+hover:from-green-500
+hover:to-blue-500
                 text-white
                 px-4
                 py-2

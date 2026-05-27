@@ -112,7 +112,7 @@ export default function Home(){
 
       <main className="
         min-h-screen
-        bg-gray-100
+        bg-state-100
         flex
         items-center
         justify-center
@@ -272,9 +272,11 @@ export default function Home(){
 
         <div className="
           bg-white
-          rounded-2xl
+          rounded-3xl
           p-4
-          shadow-sm
+          shadow-lg
+          border
+          border-gray-100
           mb-8
         ">
 
@@ -300,12 +302,17 @@ export default function Home(){
               }
 
               className="
-                flex-1
-                p-3
-                rounded-xl
-                border
-                outline-none
-              "
+  flex-1
+  px-5
+  py-3
+  rounded-2xl
+  border
+  border-gray-200
+  outline-none
+  focus:ring-4
+  focus:ring-green-100
+  focus:border-green-500
+"
             />
 
             <select
@@ -319,11 +326,15 @@ export default function Home(){
               }
 
               className="
-                p-3
-                rounded-xl
-                border
-                bg-white
-              "
+  px-4
+  py-3
+  rounded-2xl
+  border
+  border-gray-200
+  bg-white
+  outline-none
+  focus:border-green-500
+"
             >
 
               <option>
@@ -397,8 +408,11 @@ export default function Home(){
               }}
 
               className="
-                bg-red-500
-                hover:bg-red-600
+               bg-gradient-to-r
+from-green-600
+to-blue-600
+hover:from-green-500
+hover:to-blue-500
                 text-white
                 px-5
                 py-3

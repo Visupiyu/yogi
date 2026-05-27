@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
+import ProductCard from "@/components/ProductCard";
+
 import {
   collection,
   getDocs,
@@ -95,7 +97,7 @@ export default function FeaturedProducts() {
 
         </div>
 
-        <div className="
+                <div className="
           grid
           grid-cols-2
           md:grid-cols-3
@@ -105,91 +107,14 @@ export default function FeaturedProducts() {
 
           {products.map((product)=>(
 
-            <Link
+            <ProductCard
               key={product.id}
-              href={`/product/${product.id}`}
-            >
-
-              <div className="
-                bg-white
-                rounded-2xl
-                shadow-sm
-                overflow-hidden
-                hover:shadow-xl
-                transition
-                duration-300
-                hover:-translate-y-1
-              ">
-
-                <div className="
-                  h-44 md:h-52
-                  bg-gray-100
-                  overflow-hidden
-                ">
-
-                  <img
-                    src={
-                      product.image ||
-                      "/no-image.png"
-                    }
-                    alt={product.name}
-                    className="
-                      w-full
-                      h-full
-                      object-cover
-                    "
-                  />
-
-                </div>
-
-                <div className="p-3">
-
-                  <h3 className="
-                    font-semibold
-                    line-clamp-2
-                    min-h-[42px]
-                  ">
-                    {product.name}
-                  </h3>
-
-                  <p className="
-                    text-green-600
-                    font-bold
-                    text-base md:text-lg
-                    mt-2
-                  ">
-                    ₹{product.price}
-                  </p>
-
-                  {product.stock <= 0 ? (
-
-                    <div className="
-                      mt-3
-                      text-red-500
-                      font-semibold
-                    ">
-                      Out of Stock
-                    </div>
-
-                  ) : (
-
-                    <div className="
-                      mt-3
-                      text-sm
-                      text-gray-500
-                    ">
-                      Stock:
-                      {" "}
-                      {product.stock}
-                    </div>
-
-                  )}
-
-                </div>
-
-              </div>
-
-            </Link>
+              id={product.id}
+              name={product.name}
+              price={product.price}
+              image={product.image}
+              stock={product.stock}
+            />
 
           ))}
 

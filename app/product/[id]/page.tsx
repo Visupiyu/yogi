@@ -506,9 +506,12 @@ async()=>{
   return (
 
     <section className="
-      py-10
-      px-4
-    ">
+  py-10
+  px-4
+  bg-slate-950
+  text-white
+  min-h-screen
+">
 
       <div className="
         max-w-7xl
@@ -522,7 +525,7 @@ async()=>{
         {/* IMAGE */}
 
         <div className="
-          bg-white
+          bg-slate-900
           rounded-3xl
           shadow-md
           overflow-hidden
@@ -668,7 +671,7 @@ async()=>{
   </p>
 
   <p className="
-    text-gray-600
+    text-gray-300
   ">
 
     {averageRating.toFixed(1)}
@@ -968,7 +971,7 @@ async()=>{
               }}
               className="
                 flex-1
-                bg-black
+                bg-blue-600 hover:bg-blue-700
                 hover:bg-gray-900
                 text-white
                 py-4
@@ -1008,7 +1011,8 @@ async()=>{
   <div className="
     bg-white
     rounded-3xl
-    shadow-md
+    shadow-2xl
+shadow-black/40
     p-8
     mb-10
   ">
