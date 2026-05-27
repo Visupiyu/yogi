@@ -2,6 +2,16 @@
 
 import Link from "next/link";
 
+import {
+
+  Heart,
+
+  ShoppingCart,
+
+  Star
+
+} from "lucide-react";
+
 type Props = {
 
   id:string;
@@ -19,9 +29,13 @@ type Props = {
 export default function ProductCard({
 
   id,
+
   name,
+
   price,
+
   image,
+
   stock
 
 }:Props){
@@ -29,17 +43,27 @@ export default function ProductCard({
   const addToWishlist = ()=>{
 
     const wishlist =
+
       JSON.parse(
-        localStorage.getItem("wishlist") || "[]"
+
+        localStorage.getItem(
+          "wishlist"
+        ) || "[]"
+
       );
 
     const exists = wishlist.find(
-      (item:any)=> id === id
+
+      (item:any)=>
+
+        item.id === id
+
     );
 
     if(exists){
 
       alert("Already In Wishlist");
+
       return;
 
     }
@@ -47,140 +71,36 @@ export default function ProductCard({
     wishlist.push({
 
       id,
+
       name,
+
       price,
+
       image
 
     });
 
     localStorage.setItem(
+
       "wishlist",
+
       JSON.stringify(wishlist)
+
     );
 
     window.dispatchEvent(
-      new Event("wishlistUpdated")
+
+      new Event(
+        "wishlistUpdated"
+      )
+
     );
 
     alert("Added To Wishlist");
 
   };
 
-  return (
-
-    <div
-      className="
-        bg-white
-        rounded-2xl
-        shadow-md
-        overflow-hidden
-        hover:scale-105
-        transition
-        duration-300
-      "
-    >
-
-      <Link
-  href={`/product/${id}`}
->
-
-  <img
-    src={
-      image ||
-      "/no-image.png"
-    }
-    alt={name}
-    className="
-      w-full
-      h-60
-      object-cover
-    "
-  />
-
-</Link>
-
-      <div className="p-4">
-
-        <Link href={`/product/${id}`}>
-
-          <h3
-            className="
-              text-xl
-              font-semibold
-              mb-2
-              cursor-pointer
-            "
-          >
-            {name}
-          </h3>
-
-        </Link>
-
-        <p
-          className="
-            text-green-600
-            text-lg
-            font-bold
-            mb-4
-          "
-        >
-          ₹{price}
-        </p>
-
-        <div className="flex gap-3">
-
-          <Link
-            href={`/product/${id}`}
-            className="
-              flex-1
-              bg-blue-600
-              text-white
-              text-center
-              py-2
-              rounded-lg
-            "
-          >
-            View
-          </Link>
-
-          <button
-
-            onClick={addToWishlist}
-
-            className="
-              bg-pink-500
-              text-white
-              px-4
-              rounded-lg
-            "
-          >
-            ❤️
-          </button>
-   <button
-
-  disabled={
-    stock <= 0
-  }
-
-  className={`
-
-    w-full
-    py-3
-    rounded-xl
-    text-white
-    font-semibold
-
-    ${stock <= 0
-
-      ? "bg-gray-400"
-
-      : "bg-blue-600"
-
-    }
-
-  `}
-
-  onClick={()=>{
+  const addToCart = ()=>{
 
     const existingCart =
 
@@ -194,34 +114,40 @@ export default function ProductCard({
 
     const existingIndex =
 
-  existingCart.findIndex(
+      existingCart.findIndex(
 
-    (cartItem:any)=>
+        (cartItem:any)=>
 
-      cartItem.id === id
+          cartItem.id === id
 
-  );
+      );
 
-if(existingIndex > -1){
+    if(existingIndex > -1){
 
-  existingCart[
-    existingIndex
-  ].quantity += 1;
+      existingCart[
+        existingIndex
+      ].quantity += 1;
 
-}else{
+    }else{
 
-  existingCart.push({
+      existingCart.push({
 
-    id,
-    name,
-    price,
-    image,
-    stock,
-    quantity:1
+        id,
 
-  });
+        name,
 
-}
+        price,
+
+        image,
+
+        stock,
+
+        quantity:1
+
+      });
+
+    }
+
     localStorage.setItem(
 
       "cart",
@@ -233,36 +159,259 @@ if(existingIndex > -1){
     );
 
     window.dispatchEvent(
+
       new Event(
         "cartUpdated"
       )
+
     );
 
-    
-window.dispatchEvent(
-  new Event(
-    "wishlistUpdated"
-  )
-);
+    alert("Added To Cart");
 
-    alert(
-      "Added To Cart"
-    );
+  };
 
-  }}
+  return(
 
->
+    <div className="
+      bg-white
+      rounded-2xl
+      overflow-hidden
+      shadow-sm
+      hover:shadow-xl
+      transition
+      duration-300
+      group
+    ">
 
-  {stock <= 0
+      {/* IMAGE */}
 
-    ? "Out Of Stock"
+      <div className="
+        relative
+        overflow-hidden
+      ">
 
-    : "Add To Cart"
+        <Link
+          href={`/product/${id}`}
+        >
 
-  }
+          <img
+            src={
+              image ||
+              "/no-image.png"
+            }
+            alt={name}
+            className="
+              w-full
+              h-52
+              md:h-60
+              object-cover
+              group-hover:scale-105
+              transition
+              duration-500
+            "
+          />
 
-</button>
+        </Link>
+
+        {/* DISCOUNT */}
+
+        <div className="
+          absolute
+          top-3
+          left-3
+          bg-red-500
+          text-white
+          text-xs
+          font-bold
+          px-3
+          py-1
+          rounded-full
+        ">
+
+          SALE
+
         </div>
+
+        {/* WISHLIST */}
+
+        <button
+
+          onClick={addToWishlist}
+
+          className="
+            absolute
+            top-3
+            right-3
+            bg-white
+            w-10
+            h-10
+            rounded-full
+            flex
+            items-center
+            justify-center
+            shadow-md
+            hover:bg-pink-500
+            hover:text-white
+            transition
+          "
+        >
+
+          <Heart size={18} />
+
+        </button>
+
+      </div>
+
+      {/* CONTENT */}
+
+      <div className="
+        p-4
+      ">
+
+        {/* RATING */}
+
+        <div className="
+          flex
+          items-center
+          gap-1
+          text-yellow-500
+          mb-2
+        ">
+
+          <Star size={14} fill="currentColor" />
+          <Star size={14} fill="currentColor" />
+          <Star size={14} fill="currentColor" />
+          <Star size={14} fill="currentColor" />
+          <Star size={14} fill="currentColor" />
+
+          <span className="
+            text-gray-500
+            text-sm
+            ml-1
+          ">
+
+            (4.9)
+
+          </span>
+
+        </div>
+
+        {/* NAME */}
+
+        <Link
+          href={`/product/${id}`}
+        >
+
+          <h3 className="
+            font-semibold
+            text-base
+            md:text-lg
+            line-clamp-2
+            min-h-[52px]
+            hover:text-green-600
+            transition
+          ">
+
+            {name}
+
+          </h3>
+
+        </Link>
+
+        {/* PRICE */}
+
+        <div className="
+          flex
+          items-center
+          gap-3
+          mt-3
+        ">
+
+          <p className="
+            text-green-600
+            font-bold
+            text-lg
+          ">
+
+            ₹{price}
+
+          </p>
+
+          <p className="
+            text-gray-400
+            line-through
+            text-sm
+          ">
+
+            ₹{price + 300}
+
+          </p>
+
+        </div>
+
+        {/* STOCK */}
+
+        <p className="
+          text-sm
+          mt-2
+          text-gray-500
+        ">
+
+          {stock > 0
+
+            ? `${stock} in stock`
+
+            : "Out of stock"
+
+          }
+
+        </p>
+
+        {/* BUTTON */}
+
+        <button
+
+          disabled={
+            stock <= 0
+          }
+
+          onClick={addToCart}
+
+          className={`
+
+            mt-4
+            w-full
+            flex
+            items-center
+            justify-center
+            gap-2
+            py-3
+            rounded-xl
+            font-semibold
+            transition
+
+            ${stock <= 0
+
+              ? "bg-gray-300 text-gray-500"
+
+              : "bg-green-600 hover:bg-green-700 text-white"
+
+            }
+
+          `}
+        >
+
+          <ShoppingCart size={18} />
+
+          {stock <= 0
+
+            ? "Out Of Stock"
+
+            : "Add To Cart"
+
+          }
+
+        </button>
 
       </div>
 

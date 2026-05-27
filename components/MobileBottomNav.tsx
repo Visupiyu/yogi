@@ -2,119 +2,162 @@
 
 import Link from "next/link";
 
+import { usePathname } from "next/navigation";
+
 import {
+
   Home,
+
   Search,
+
   Heart,
+
   ShoppingCart,
+
   User
+
 } from "lucide-react";
 
-export default function
-MobileBottomNav(){
+export default function MobileBottomNav(){
 
-  return (
+  const pathname = usePathname();
+
+  const navItems = [
+
+    {
+
+      name:"Home",
+
+      href:"/",
+
+      icon:Home
+
+    },
+
+    {
+
+      name:"Search",
+
+      href:"/search",
+
+      icon:Search
+
+    },
+
+    {
+
+      name:"Wishlist",
+
+      href:"/wishlist",
+
+      icon:Heart
+
+    },
+
+    {
+
+      name:"Cart",
+
+      href:"/cart",
+
+      icon:ShoppingCart
+
+    },
+
+    {
+
+      name:"Account",
+
+      href:"/profile",
+
+      icon:User
+
+    }
+
+  ];
+
+  return(
 
     <div className="
       md:hidden
       fixed
-      bottom-0
-      left-0
-      w-full
-      bg-white
-      border-t
+      bottom-3
+      left-1/2
+      -translate-x-1/2
+      w-[95%]
+      bg-white/95
+      backdrop-blur-lg
+      border
+      shadow-2xl
+      rounded-2xl
       z-50
-      flex
-      justify-around
-      items-center
-      py-3
-      shadow-lg
+      px-2
+      py-2
     ">
 
-      <Link
-        href="/"
-        className="
-          flex
-          flex-col
-          items-center
-          text-xs
-          text-gray-700
-        "
-      >
+      <div className="
+        flex
+        items-center
+        justify-between
+      ">
 
-        <Home size={22} />
+        {navItems.map((item,index)=>{
 
-        <span>Home</span>
+          const Icon = item.icon;
 
-      </Link>
+          const active =
 
-      <Link
-        href="/search"
-        className="
-          flex
-          flex-col
-          items-center
-          text-xs
-          text-gray-700
-        "
-      >
+            pathname === item.href;
 
-        <Search size={22} />
+          return(
 
-        <span>Search</span>
+            <Link
 
-      </Link>
+              key={index}
 
-      <Link
-        href="/wishlist"
-        className="
-          flex
-          flex-col
-          items-center
-          text-xs
-          text-gray-700
-        "
-      >
+              href={item.href}
 
-        <Heart size={22} />
+              className={`
 
-        <span>Wishlist</span>
+                flex
+                flex-col
+                items-center
+                justify-center
+                flex-1
+                py-2
+                rounded-xl
+                transition
 
-      </Link>
+                ${active
 
-      <Link
-        href="/cart"
-        className="
-          flex
-          flex-col
-          items-center
-          text-xs
-          text-gray-700
-        "
-      >
+                  ? "bg-green-600 text-white"
 
-        <ShoppingCart size={22} />
+                  : "text-gray-600"
 
-        <span>Cart</span>
+                }
 
-      </Link>
+              `}
+            >
 
-      <Link
-        href="/login"
-        className="
-          flex
-          flex-col
-          items-center
-          text-xs
-          text-gray-700
-        "
-      >
+              <Icon size={20} />
 
-        <User size={22} />
+              <span className="
+                text-[11px]
+                mt-1
+                font-medium
+              ">
 
-        <span>Account</span>
+                {item.name}
 
-      </Link>
+              </span>
+
+            </Link>
+
+          );
+
+        })}
+
+      </div>
 
     </div>
 

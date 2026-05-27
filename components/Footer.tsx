@@ -1,159 +1,263 @@
+"use client";
+
+import Link from "next/link";
+
 export default function Footer(){
 
-  return (
+  return(
 
-    <footer
-      style={{
-        background:"#000",
-        color:"#fff",
-        marginTop:"80px"
-      }}
-    >
+    <footer className="
+      bg-white
+      border-t
+      mt-16
+    ">
 
-      <div
-        className="
-          max-w-7xl
-          mx-auto
-          grid
-          md:grid-cols-4
-          gap-10
-          px-6
-          py-14
-        "
-      >
+      {/* TOP */}
+
+      <div className="
+        max-w-7xl
+        mx-auto
+        px-6
+        py-14
+        grid
+        grid-cols-1
+        md:grid-cols-2
+        lg:grid-cols-5
+        gap-10
+      ">
+
+        {/* BRAND */}
 
         <div>
 
-          <h2
-            style={{
-              fontSize:"32px",
-              fontWeight:"bold",
-              marginBottom:"20px"
-            }}
-          >
+          <img
+            src="/logo.png"
+            alt="Yogi Mart"
+            className="
+              h-14
+              mb-4
+            "
+          />
 
-            Yogi Mart
-
-          </h2>
-
-          <p
-            style={{
-              color:"#aaa",
-              lineHeight:"28px"
-            }}
-          >
+          <p className="
+            text-gray-600
+            leading-7
+          ">
 
             Modern ecommerce marketplace
-            for fashion, electronics,
-            grocery and more.
+            for grocery, fashion,
+            electronics and more.
 
           </p>
 
         </div>
 
+        {/* COMPANY */}
+
         <div>
 
-          <h3
-            style={{
-              fontSize:"22px",
-              fontWeight:"bold",
-              marginBottom:"20px"
-            }}
-          >
+          <h3 className="
+            text-lg
+            font-bold
+            mb-5
+          ">
 
-            About
+            Company
 
           </h3>
 
-          <ul
-            style={{
-              color:"#aaa",
-              lineHeight:"35px"
-            }}
-          >
+          <ul className="
+            space-y-3
+            text-gray-600
+          ">
 
-            <li>About Us</li>
+            <li>
+              <Link href="/">
+                About Us
+              </Link>
+            </li>
 
-            <li>Careers</li>
+            <li>
+              <Link href="/">
+                Careers
+              </Link>
+            </li>
 
-            <li>Press</li>
+            <li>
+              <Link href="/">
+                Press
+              </Link>
+            </li>
+
+            <li>
+              <Link href="/">
+                Blog
+              </Link>
+            </li>
 
           </ul>
 
         </div>
 
+        {/* HELP */}
+
         <div>
 
-          <h3
-            style={{
-              fontSize:"22px",
-              fontWeight:"bold",
-              marginBottom:"20px"
-            }}
-          >
+          <h3 className="
+            text-lg
+            font-bold
+            mb-5
+          ">
 
             Help
 
           </h3>
 
-          <ul
-            style={{
-              color:"#aaa",
-              lineHeight:"35px"
-            }}
-          >
+          <ul className="
+            space-y-3
+            text-gray-600
+          ">
 
-            <li>Contact</li>
+            <li>
+              <Link href="/">
+                Contact Us
+              </Link>
+            </li>
 
-            <li>Returns</li>
+            <li>
+              <Link href="/">
+                Returns
+              </Link>
+            </li>
 
-            <li>Privacy Policy</li>
+            <li>
+              <Link href="/">
+                Shipping
+              </Link>
+            </li>
+
+            <li>
+              <Link href="/">
+                Privacy Policy
+              </Link>
+            </li>
 
           </ul>
 
         </div>
 
+        {/* SELLER */}
+
         <div>
 
-          <h3
-            style={{
-              fontSize:"22px",
-              fontWeight:"bold",
-              marginBottom:"20px"
-            }}
-          >
+          <h3 className="
+            text-lg
+            font-bold
+            mb-5
+          ">
 
-            Follow Us
+            Seller
 
           </h3>
 
-          <ul
-            style={{
-              color:"#aaa",
-              lineHeight:"35px"
-            }}
-          >
+          <ul className="
+            space-y-3
+            text-gray-600
+          ">
 
-            <li>Instagram</li>
+            <li>
 
-            <li>Facebook</li>
+              <Link href="/vendor-login">
 
-            <li>Twitter</li>
+                Sell on Yogi Mart
+
+              </Link>
+
+            </li>
+
+            <li>
+
+              <Link href="/vendor-register">
+
+                Become a Seller
+
+              </Link>
+
+            </li>
+
+            <li>
+
+              <Link href="/vendor-login">
+
+                Seller Login
+
+              </Link>
+
+            </li>
 
           </ul>
+
+        </div>
+
+        {/* DOWNLOAD */}
+
+        <div>
+
+          <h3 className="
+            text-lg
+            font-bold
+            mb-5
+          ">
+
+            Download App
+
+          </h3>
+
+          <div className="
+            flex
+            flex-col
+            gap-4
+          ">
+
+            <button className="
+              bg-black
+              text-white
+              py-3
+              rounded-xl
+              font-semibold
+            ">
+
+              Google Play
+
+            </button>
+
+            <button className="
+              bg-black
+              text-white
+              py-3
+              rounded-xl
+              font-semibold
+            ">
+
+              App Store
+
+            </button>
+
+          </div>
 
         </div>
 
       </div>
 
-      <div
-        style={{
-          borderTop:"1px solid #222",
-          textAlign:"center",
-          padding:"20px",
-          color:"#777"
-        }}
-      >
+      {/* BOTTOM */}
+
+      <div className="
+        border-t
+        py-5
+        text-center
+        text-gray-500
+        text-sm
+      ">
 
         © 2026 Yogi Mart.
         All Rights Reserved.

@@ -289,7 +289,15 @@ if(
               text-green-600
               whitespace-nowrap
             ">
-              <img src="/logo.png" />
+              <img
+  src="/logo.png"
+  alt="Yogi-Mart"
+  className="
+    h-18
+      md:h-22
+    object-contain
+  "
+/>
             </h1>
 
           </Link>
@@ -482,7 +490,7 @@ if(
           
           {
 
-    user && (
+  user ? (
 
     <button
 
@@ -502,31 +510,9 @@ if(
 
     </button>
 
-  )
+  ) : null
 
 }
-
-  (
-
-    <button
-
-      onClick={()=>
-        router.push("/login")
-      }
-
-      className="
-        bg-black
-        hover:bg-gray-800
-        text-white
-        px-4
-        py-2
-        rounded-full
-      "
-    >
-      Login
-    </button>
-
-  )
 
 
           {/* RIGHT */}
@@ -611,24 +597,7 @@ if(
               )}
 
             </Link>
-             <Link href="/vendor-login">
-
-  <button className="
-    hidden
-    md:block
-    bg-orange-500
-    hover:bg-orange-600
-    text-white
-    px-4
-    py-2
-    rounded-full
-    font-semibold
-    transition
-  ">
-    Sell on Yogi Mart
-  </button>
-
-</Link>
+             
             {/* LOGIN */}
 
             <Link href="/profile">

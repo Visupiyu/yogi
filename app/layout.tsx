@@ -1,5 +1,6 @@
 "use client";
 
+import TopStrip from "@/components/TopStrip";
 import React from "react";
 
 import "./globals.css";
@@ -39,13 +40,23 @@ export default function RootLayout({
 
       <body>
 
-        {!isSellerPage && (
-          <Navbar />
-        )}
+  {!isSellerPage && (
 
-        {children}
-       <MobileBottomNav />
-      </body>
+    <>
+
+      <TopStrip />
+
+      <Navbar />
+
+    </>
+
+  )}
+
+  {children}
+
+  <MobileBottomNav />
+
+</body>
 
     </html>
 
