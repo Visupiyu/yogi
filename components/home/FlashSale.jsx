@@ -65,7 +65,7 @@ export default function FlashSale(){
   return(
 
     <section className="
-      py-10
+      py-5
       px-4
     ">
 
@@ -112,7 +112,7 @@ export default function FlashSale(){
             lg:flex-row
             items-center
             justify-between
-            gap-6
+            gap-2
           ">
 
       
@@ -170,7 +170,7 @@ export default function FlashSale(){
 
             <div className="
               flex
-              gap-5
+              gap-2
             ">
 
               <div className="

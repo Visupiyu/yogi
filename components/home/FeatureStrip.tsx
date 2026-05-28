@@ -74,7 +74,7 @@ export default function FeatureStrip(){
 
     <section className="
       bg-white
-      py-6
+      py-5
       border-b
     ">
 
@@ -86,7 +86,7 @@ export default function FeatureStrip(){
         grid-cols-2
         md:grid-cols-3
         lg:grid-cols-5
-        gap-5
+        gap-2
       ">
 
         {features.map((item,index)=>{
@@ -102,7 +102,7 @@ export default function FeatureStrip(){
               className="
                 flex
                 items-center
-                gap-4
+                gap-2
                 bg-gray-50
                 rounded-2xl
                 p-4

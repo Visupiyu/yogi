@@ -58,7 +58,7 @@ export default function TopVendors(){
   return(
 
     <section className="
-      py-10
+      py-3
       px-4
       bg-gray-50
     ">
@@ -72,7 +72,7 @@ export default function TopVendors(){
           flex
           justify-between
           items-center
-          mb-6
+          mb-2
         ">
 
           <h2 className="
@@ -90,7 +90,7 @@ export default function TopVendors(){
           sm:grid-cols-2
           md:grid-cols-3
           lg:grid-cols-4
-          gap-6
+          gap-1
         ">
 
           {vendors.map((vendor)=>(

@@ -6,13 +6,13 @@ export default function Hero() {
 
       <div className="max-w-7xl mx-auto px-6">
 
-        <h2 className="text-6xl font-bold mb-6">
+        <h2 className="text-6xl font-bold mb-2">
 
           Big Summer Sale 🔥
 
         </h2>
 
-        <p className="text-2xl mb-8">
+        <p className="text-2xl mb-2">
 
           Up To 70% OFF On Fashion,
           Electronics & Grocery
@@ -24,7 +24,7 @@ export default function Hero() {
             bg-white
             text-blue-600
             px-8
-            py-4
+            py-2
             rounded-2xl
             font-bold
             text-lg

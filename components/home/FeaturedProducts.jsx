@@ -78,7 +78,7 @@ export default function FeaturedProducts() {
 
   return(
 
-    <section className="py-10 px-4">
+    <section className="py-5 px-4">
 
       <div className="max-w-7xl mx-auto">
 
@@ -102,7 +102,7 @@ export default function FeaturedProducts() {
           grid-cols-2
           md:grid-cols-3
           lg:grid-cols-4
-          gap-6
+          gap-1
         ">
 
           {products.map((product)=>(

@@ -18,12 +18,12 @@ export default function Footer(){
         max-w-7xl
         mx-auto
         px-6
-        py-14
+        py-6
         grid
         grid-cols-1
         md:grid-cols-2
         lg:grid-cols-5
-        gap-10
+        gap-5
       ">
 
         {/* BRAND */}
@@ -35,7 +35,7 @@ export default function Footer(){
             alt="Yogi Mart"
             className="
               h-14
-              mb-4
+              mb-3
             "
           />
 
@@ -59,7 +59,7 @@ export default function Footer(){
           <h3 className="
             text-lg
             font-bold
-            mb-5
+            mb-4
           ">
 
             Company
@@ -106,7 +106,7 @@ export default function Footer(){
           <h3 className="
             text-lg
             font-bold
-            mb-5
+            mb-4
           ">
 
             Help
@@ -206,7 +206,7 @@ export default function Footer(){
           <h3 className="
             text-lg
             font-bold
-            mb-5
+            mb-4
           ">
 
             Download App
@@ -216,7 +216,7 @@ export default function Footer(){
           <div className="
             flex
             flex-col
-            gap-4
+            gap-2
           ">
 
             <button className="
