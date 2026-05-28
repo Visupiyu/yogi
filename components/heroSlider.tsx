@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
+import { motion } from "framer-motion";
+
 export default function HeroSlider(){
 
   const slides = [
@@ -90,28 +92,51 @@ export default function HeroSlider(){
 
         >
 
-          <img
-            src={slide.image}
-            alt={slide.title}
-            className="
-              w-full
-              h-full
-              object-cover
-            "
-          />
+         <motion.img
 
-          <div
-            className="
-              absolute
-              inset-0
-              bg-black/50
-              flex
-              items-center
-            "
-          >
+  animate={{
+    scale:[1,1.05,1]
+  }}
 
-            <div className="px-10 md:px-20 text-white max-w-2xl">
+  transition={{
+    repeat:Infinity,
+    duration:8
+  }}
 
+  src={slide.image}
+
+  alt={slide.title}
+
+  className="
+    w-full
+    h-full
+    object-cover
+  "
+/>
+
+            <motion.div
+
+  initial={{
+    opacity:0,
+    scale:0.95
+  }}
+
+  animate={{
+    opacity:1,
+    scale:1
+  }}
+
+  transition={{
+    duration:0.7
+  }}
+
+  className="
+    px-10
+    md:px-20
+    text-white
+    max-w-2xl
+  "
+>
               <h1
                 className="
                   text-3xl
@@ -133,28 +158,51 @@ export default function HeroSlider(){
                 {slide.subtitle}
               </p>
 
-              <Link
-                href="/"
-                className="
-                  bg-green-600
-                  hover:bg-green-700
-                  px-6
-                  py-3
-                  rounded-2xl
-                  text-lg
-                  font-semibold
-                  inline-block
-                "
-              >
-                {slide.button}
-              </Link>
+              <motion.div
 
-            </div>
+  animate={{
+    y:[0,-6,0]
+  }}
+
+  transition={{
+    repeat:Infinity,
+    duration:2
+  }}
+>
+  <Link
+                href="/"
+                className={`
+  relative
+  overflow-hidden
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  hover:from-green-500
+  hover:to-blue-500
+  px-8
+  py-4
+  rounded-2xl
+  text-lg
+  font-semibold
+  inline-block
+  shadow-xl
+  hover:shadow-2xl
+  transition-all
+  duration-300
+  hover:scale-105
+`}
+>
+               {slide.button}
+
+                </Link>
+
+              </motion.div>
+
+            </motion.div>
 
           </div>
 
-        </div>
-
+       
       ))}
 
       <div

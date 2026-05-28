@@ -34,6 +34,9 @@ import {
   useRouter
 } from "next/navigation";
 
+import { motion }
+from "framer-motion";
+
 export default function Navbar() {
 
   const router =
@@ -256,7 +259,14 @@ if(
     return (
       
 
-    <header className="
+    <motion.header className="
+    initial={{ y:-80 }}
+
+animate={{ y:0 }}
+
+transition={{
+  duration:0.5
+}}
   sticky
   top-0
   z-50
@@ -624,7 +634,7 @@ hover:to-blue-500
 
       </div>
 
-    </header>
+    </motion.header>
 
   );
 }

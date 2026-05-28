@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { motion } from "framer-motion";
+
 const categories = [
 
   {
@@ -76,22 +78,34 @@ export default function CategoryStrip(){
 
         {categories.map((cat)=>(
 
-          <Link
+        <motion.div
 
-            key={cat.name}
+  whileHover={{
+    y:-4,
+    scale:1.05
+  }}
 
-            href={`/category/${cat.name}`}
+  whileTap={{
+    scale:0.96
+  }}
 
-            className="
-              flex
-              flex-col
-              items-center
-              min-w-[90px]
-              group
-            "
-          >
+>
 
-            <div className="
+  <Link
+
+    key={cat.name}
+
+    href={`/category/${cat.name}`}
+
+    className="
+      flex
+      flex-col
+      items-center
+      min-w-[90px]
+      group
+    "
+  >
+             <div className="
               w-20
               h-20
               rounded-full
@@ -131,7 +145,9 @@ export default function CategoryStrip(){
 
             </p>
 
-          </Link>
+             </Link>
+
+          </motion.div>
 
         ))}
 

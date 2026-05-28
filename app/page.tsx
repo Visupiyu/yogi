@@ -22,13 +22,14 @@ import FeatureStrip from "@/components/home/FeatureStrip";
 
 import OfferCards from "@/components/home/OfferCards";
 
-import {
+import ProductSkeleton from "@/components/ProductSkeleton";
 
-  collection,
+import { useQuery } from "@tanstack/react-query";
 
-  getDocs
+import { motion } from "framer-motion";
 
-} from "firebase/firestore";
+
+import { collection, getDocs } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 
@@ -50,12 +51,6 @@ type Product = {
 
 export default function Home(){
 
-  const [products,setProducts] =
-    useState<Product[]>([]);
-
-  const [loading,setLoading] =
-    useState(true);
-
   const [search,setSearch] =
     useState("");
 
@@ -67,75 +62,92 @@ export default function Home(){
 
   async function loadProducts(){
 
-    try{
+  try{
 
-      const snapshot =
-        await getDocs(
-          collection(db,"products")
-        );
+    const snapshot =
+      await getDocs(
+        collection(db,"products")
+      );
 
-      const items:Product[] = [];
+    const items:Product[] = [];
 
-      snapshot.forEach((doc)=>{
+    snapshot.forEach((doc)=>{
 
-        items.push({
+      items.push({
 
-          id:doc.id,
+        id:doc.id,
 
-          ...doc.data()
+        ...doc.data()
 
-        } as Product);
+      } as Product);
 
-      });
+    });
 
-      setProducts(items);
+    return items;
 
-      setLoading(false);
+  }catch(err){
 
-    }catch(err){
+    console.log(err);
 
-      console.log(err);
-
-    }
+    return [];
 
   }
 
-  useEffect(()=>{
+}
 
-    loadProducts();
+const {
 
-  },[]);
+  data:filteredData = [],
 
-  if(loading){
+  isLoading,
+
+  error,
+
+} = useQuery({
+
+  queryKey:["products"],
+
+  queryFn:loadProducts,
+
+});
+
+ if(isLoading)
 
     return(
 
-      <main className="
-        min-h-screen
-        bg-state-100
-        flex
-        items-center
-        justify-center
-      ">
+  <main className="
+    min-h-screen
+    bg-slate-100
+    px-4
+    py-10
+  ">
 
-        <h1 className="
-          text-3xl
-          font-bold
-        ">
+    <div className="
+      max-w-7xl
+      mx-auto
+      grid
+      grid-cols-2
+      md:grid-cols-3
+      lg:grid-cols-4
+      gap-6
+    ">
 
-          Loading Products...
+      {[...Array(8)].map((_,i)=>(
 
-        </h1>
+        <ProductSkeleton
+          key={i}
+        />
 
-      </main>
+      ))}
 
-    );
+    </div>
 
-  }
+  </main>
+
+);
 
   const filteredProducts =
-
-    products
+  filteredData
 
       .filter((product)=>{
 
@@ -226,7 +238,21 @@ export default function Home(){
 
 </section>
 
-      <section className="
+      <motion.section className="
+      initial={{ opacity:0, y:40 }}
+
+whileInView={{
+  opacity:1,
+  y:0
+}}
+
+transition={{
+  duration:0.5
+}}
+
+viewport={{
+  once:true
+}}
         max-w-7xl
         mx-auto
         px-4
@@ -486,7 +512,7 @@ hover:to-blue-500
 
         </div>
 
-      </section>
+      </motion.section>
 
       <FlashSale />
 
@@ -500,4 +526,4 @@ hover:to-blue-500
 
   );
 
-}
+  }

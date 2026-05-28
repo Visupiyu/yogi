@@ -13,6 +13,13 @@ import {
 } from "next/navigation";
 import MobileBottomNav
 from "@/components/MobileBottomNav";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+import QueryProvider from "@/components/providers/QueryProvider";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+
 
 export default function RootLayout({
 
@@ -36,29 +43,33 @@ export default function RootLayout({
 
   return (
 
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
 
       <body>
 
-  {!isSellerPage && (
+  <QueryProvider>
 
-    <>
+    {!isSellerPage && (
 
-      <TopStrip />
+      <>
 
-      <Navbar />
+        <TopStrip />
 
-    </>
+        <Navbar />
 
-  )}
+      </>
 
-  {children}
+    )}
 
-  <MobileBottomNav />
+    {children}
+
+    <MobileBottomNav />
+
+  </QueryProvider>
 
 </body>
 
-    </html>
+</html>
 
   );
 

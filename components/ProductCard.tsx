@@ -12,6 +12,9 @@ import {
 
 } from "lucide-react";
 
+import { motion }
+from "framer-motion";
+
 type Props = {
 
   id:string;
@@ -172,20 +175,36 @@ export default function ProductCard({
 
   return(
 
-    <div className="
-      bg-white
-      rounded-2xl
-      overflow-hidden
-      shadow-sm
-      hover:shadow-xl
-      transition
-      duration-300
-      group
-    ">
+    <motion.div
+
+  initial={{ opacity:0, y:20 }}
+
+  animate={{ opacity:1, y:0 }}
+
+  whileHover={{
+    y:-8,
+    scale:1.02
+  }}
+
+  transition={{
+    duration:0.3
+  }}
+
+  className="
+    bg-white
+    rounded-2xl
+    overflow-hidden
+    shadow-sm
+    hover:shadow-xl
+    transition
+    duration-300
+    group
+  "
+>    
 
       {/* IMAGE */}
 
-      <div className="
+      <motion.div className="
         relative
         overflow-hidden
       ">
@@ -193,6 +212,7 @@ export default function ProductCard({
         <Link
           href={`/product/${id}`}
         >
+        
 
           <img
             src={
@@ -207,7 +227,8 @@ export default function ProductCard({
               object-cover
               bg-white
               p-1
-              group-hover:scale-105
+              group-hover:scale-110
+              ease-out
               transition
               duration-500
             "
@@ -217,7 +238,7 @@ export default function ProductCard({
 
         {/* DISCOUNT */}
 
-        <div className="
+        <motion.div className="
           absolute
           top-3
           left-3
@@ -232,11 +253,19 @@ export default function ProductCard({
 
           SALE
 
-        </div>
+      </motion.div>
 
         {/* WISHLIST */}
 
-        <button
+        <motion.button
+
+  whileTap={{
+    scale:0.95
+  }}
+
+  whileHover={{
+    scale:1.03
+  }}
 
           onClick={addToWishlist}
 
@@ -260,19 +289,19 @@ export default function ProductCard({
 
           <Heart size={18} />
 
-        </button>
+        </motion.button>
 
-      </div>
+     </motion.div>
 
       {/* CONTENT */}
 
-      <div className="
+      <motion.div className="
         p-3
       ">
 
         {/* RATING */}
 
-        <div className="
+        <motion.div className="
           flex
           items-center
           gap-1
@@ -296,7 +325,7 @@ export default function ProductCard({
 
           </span>
 
-        </div>
+     </motion.div>
 
         {/* NAME */}
 
@@ -322,7 +351,7 @@ export default function ProductCard({
 
         {/* PRICE */}
 
-        <div className="
+        <motion.div className="
           flex
           items-center
           gap-0
@@ -349,11 +378,11 @@ export default function ProductCard({
 
           </p>
 
-        </div>
+       </motion.div>
 
         {/* BUTTON */}
 
-        <button
+        <motion.button
 
           disabled={
             stock <= 0
@@ -395,11 +424,11 @@ export default function ProductCard({
 
           }
 
-        </button>
+        </motion.button>
 
-      </div>
+     </motion.div>
 
-    </div>
+   </motion.div>
 
   );
 

@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect,useState }
-from "react";
+import {
+  useEffect,
+  useState
+} from "react";
+
+import { motion }
+from "framer-motion";
 
 export default function FlashSale(){
 
@@ -64,10 +69,31 @@ export default function FlashSale(){
       px-4
     ">
 
-      <div className="
-        max-w-7xl
-        mx-auto
-      ">
+     <motion.div
+
+  initial={{
+    opacity:0,
+    y:50
+  }}
+
+  whileInView={{
+    opacity:1,
+    y:0
+  }}
+
+  transition={{
+    duration:0.6
+  }}
+
+  viewport={{
+    once:true
+  }}
+
+  className="
+    max-w-7xl
+    mx-auto
+  "
+>
 
         <div className="
           rounded-2xl
@@ -89,9 +115,11 @@ export default function FlashSale(){
             gap-6
           ">
 
+      
+
             {/* LEFT */}
 
-            <div>
+          
 
               <p className="
                 uppercase
@@ -211,13 +239,11 @@ export default function FlashSale(){
 
               </div>
 
-            </div>
+              </div>
 
           </div>
 
-        </div>
-
-      </div>
+        </motion.div>
 
     </section>
 
