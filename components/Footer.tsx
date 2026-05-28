@@ -23,7 +23,7 @@ export default function Footer(){
         grid-cols-1
         md:grid-cols-2
         lg:grid-cols-5
-        gap-5
+        gap-2
       ">
 
         {/* BRAND */}
@@ -34,8 +34,8 @@ export default function Footer(){
             src="/logo.png"
             alt="Yogi Mart"
             className="
-              h-14
-              mb-3
+              h-20
+              mb-6
             "
           />
 
@@ -45,9 +45,7 @@ export default function Footer(){
           ">
 
             Modern ecommerce marketplace
-            for grocery, fashion,
-            electronics and more.
-
+            
           </p>
 
         </div>
