@@ -515,10 +515,11 @@ hover:to-blue-500
           {/* RIGHT */}
 
           <div className="
-            flex
-            items-center
-            gap-5
-          ">
+  hidden
+  md:flex
+  items-center
+  gap-5
+">
 
             {/* WISHLIST */}
 
