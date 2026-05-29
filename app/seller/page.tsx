@@ -385,64 +385,35 @@ await updateDoc(
 
 if(imageFile){
 
-  const imageRef =
-
-    ref(
-
-      storage,
-
-      `products/${Date.now()}`
+  const imageRef =ref(storage,`products/${Date.now()}`
 
     );
 
-  await uploadBytes(
+  await uploadBytes(imageRef, imageFile );
 
-    imageRef,
-
-    imageFile
-
-  );
-
-  imageUrl =
-
-    await getDownloadURL(
-      imageRef
-    );
+  imageUrl = await getDownloadURL( imageRef);
 
 }
-      
-         
+             
 await addDoc(
   collection(db,"products"),
 
   {
-
     name,
-
     price:Number(price),
-
     stock:Number(stock),
-
     category,
-
     description,
-
     image:imageUrl,
-
-    vendorId:
-      auth.currentUser?.uid,
-
-    vendorName:
-  vendorName,
-
+    vendorId:auth.currentUser?.uid,
+    vendorName,
+     views: 0,
+     sales: 0,
     createdAt:new Date()
-
   }
 
 );
-
         alert("Product Added");
-
       }
 
       clearForm();

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useParams } from "next/navigation";
 
-import { doc, getDoc, collection, addDoc, getDocs, query, where, } from "firebase/firestore";
+import { doc, getDoc, collection, addDoc, getDocs, query, where, updateDoc, increment, } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 import Link from "next/link";
@@ -27,6 +27,12 @@ interface Product {
   vendorId?: string;
 
   vendorName?: string;
+
+  category?: string;
+
+  views?: number;
+
+  sales?: number;
 
 }
 
@@ -86,6 +92,13 @@ const [rating,setRating] =
           await getDoc(ref);
 
         if (snap.exists()) {
+
+          await updateDoc(
+  doc(db, "products", params.id as string),
+  {
+    views: increment(1),
+  }
+);
 
           setProduct({
 
@@ -268,40 +281,33 @@ setSelectedImage(
 
 },[product]);
 
-useEffect(()=>{
+useEffect(() => {
 
-  const loadRelated =
-  async()=>{
+  const loadRelated = async () => {
 
-    if(!product) return;
+    if (!product?.category) return;
+
+    const q = query(
+      collection(db, "products"),
+      where(
+        "category",
+        "==",
+        product.category
+      )
+    );
 
     const snapshot =
-      await getDocs(
-
-        collection(
-          db,
-          "products"
-        )
-
-      );
+      await getDocs(q);
 
     const items:any[] = [];
 
-    snapshot.forEach((doc)=>{
+    snapshot.forEach((doc) => {
 
-      const data:any =
-        doc.data();
-
-      if(
-        doc.id !== product.id
-      ){
+      if (doc.id !== product.id) {
 
         items.push({
-
-          id:doc.id,
-
-          ...data
-
+          id: doc.id,
+          ...doc.data(),
         });
 
       }
@@ -309,16 +315,14 @@ useEffect(()=>{
     });
 
     setRelatedProducts(
-
-      items.slice(0,4)
-
+      items.slice(0, 4)
     );
 
   };
 
   loadRelated();
 
-},[product]);
+}, [product]);
 
 useEffect(()=>{
 
@@ -519,8 +523,7 @@ async()=>{
         grid
         grid-cols-1
         md:grid-cols-2
-        gap-10
-      ">
+        gap-6     ">
 
         {/* IMAGE */}
 
@@ -560,8 +563,7 @@ async()=>{
           </div>
           <div className="
   flex
-  gap-4
-  p-4
+  gap-2  p-4
   overflow-x-auto
 ">
 
@@ -649,10 +651,16 @@ async()=>{
           ">
             ₹{product.price}
           </p>
+          <p className="
+           text-gray-400
+            mt-2
+            ">
+  👁️ {product.views || 0} views
+</p>
            <div className="
   flex
   items-center
-  gap-3
+  gap-2
   mt-4
 ">
 
@@ -757,7 +765,7 @@ async()=>{
             <div className="
               flex
               items-center
-              gap-4
+              gap-2
             ">
 
             <button
@@ -846,7 +854,7 @@ async()=>{
             flex
             flex-col
             sm:flex-row
-            gap-5
+            gap-2
           ">
 
             {/* ADD TO CART */}
@@ -1019,7 +1027,7 @@ shadow-black/40
 
     <div className="
       grid
-      gap-5
+      gap-2
     ">
 
       <input
@@ -1209,7 +1217,7 @@ shadow-black/40
     grid
     grid-cols-2
     md:grid-cols-4
-    gap-6
+    gap-2
   ">
 
     {relatedProducts.map(
@@ -1297,7 +1305,7 @@ shadow-black/40
     grid
     grid-cols-2
     md:grid-cols-4
-    gap-6
+    gap-2
   ">
 
     {recentProducts

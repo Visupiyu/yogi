@@ -288,12 +288,11 @@ transition={{
       ">
 
         <div className="
-          h-16
+          h-14
           flex
           items-center
           justify-between
           gap-4
-          flex-wrap
         ">
 
           {/* LOGO */}
@@ -310,8 +309,8 @@ transition={{
   src="/logo.png"
   alt="Yogi-Mart"
   className="
-    h-18
-      md:h-22
+    h-12
+      md:h-14
     object-contain
   "
 />

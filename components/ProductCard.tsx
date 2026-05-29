@@ -194,8 +194,8 @@ export default function ProductCard({
     bg-white
     rounded-2xl
     overflow-hidden
-    shadow-sm
-    hover:shadow-xl
+    shadow-md
+    hover:shadow-2xl
     transition
     duration-300
     group
@@ -222,8 +222,8 @@ export default function ProductCard({
             alt={name}
             className="
               w-full
-              h-56
-              md:h-60
+              h-44
+              md:h-52
               object-cover
               bg-white
               p-1
@@ -242,7 +242,7 @@ export default function ProductCard({
           absolute
           top-3
           left-3
-          bg-red-500
+          bg-orange-500
           text-white
           text-xs
           font-bold
@@ -338,7 +338,7 @@ export default function ProductCard({
             text-base
             md:text-lg
             line-clamp-2
-            min-h-[40px]
+            min-h-[36px]
             hover:text-green-600
             transition
           ">
@@ -354,7 +354,7 @@ export default function ProductCard({
         <motion.div className="
           flex
           items-center
-          gap-0
+          gap-2
           mt-0
         ">
 
@@ -392,27 +392,26 @@ export default function ProductCard({
 
           className={`
 
-            mt-3
-            w-full
-            flex
-            items-center
-            justify-center
-            gap-2
-            py-2.5
-            rounded-xl
-            font-semibold
-            transition
+  mt-3
+  w-full
+  flex
+  items-center
+  justify-center
+  gap-2
+  py-2.5
+  rounded-xl
+  font-semibold
+  transition
 
-            ${stock <= 0
+  ${stock <= 0
 
-              ? "bg-gray-300 text-gray-500"
+    ? "bg-gray-300 text-gray-500"
 
-              : "bg-green-600 hover:bg-green-700 text-white"
+    : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white"
 
-            }
+  }
 
-          `}
-        >
+`}        >
 
           <ShoppingCart size={18} />
 

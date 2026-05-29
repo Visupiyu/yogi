@@ -25,7 +25,6 @@ import {
 import { db }
 from "@/lib/firebase";
 
-
 function SearchContent(){
 
   const searchParams =
@@ -35,9 +34,10 @@ function SearchContent(){
     searchParams.get("q") || "";
 
   const [products,setProducts] =
-   useState<product>([]);
-  const [filtered,setFiltered] =
-   useState<product>([]);
+   useState([]);
+
+const [filtered,setFiltered] =
+   useState([]);
   const [loading,setLoading] =
     useState(true);
 

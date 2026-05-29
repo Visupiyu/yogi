@@ -28,8 +28,20 @@ import { useQuery } from "@tanstack/react-query";
 
 import { motion } from "framer-motion";
 
+import TrendingProducts from "@/components/TrendingProducts";
+
+import BestSellers from "@/components/BestSellers";
 
 import { collection, getDocs } from "firebase/firestore";
+
+import CustomerReviewsCarousel
+from "@/components/CustomerReviewsCarousel";
+
+import CouponPopup
+from "@/components/CouponPopup";
+
+import RecommendedProducts
+from "@/components/RecommendedProducts";
 
 import { db } from "@/lib/firebase";
 
@@ -119,7 +131,7 @@ const {
     min-h-screen
     bg-slate-100
     px-4
-    py-10
+    py-6
   ">
 
     <div className="
@@ -256,7 +268,7 @@ viewport={{
         max-w-7xl
         mx-auto
         px-4
-        py-10
+        py-6
       ">
 
         <div className="
@@ -266,7 +278,7 @@ viewport={{
           md:items-center
           md:justify-between
           gap-4
-          mb-6
+          mb-5
         ">
 
           <div>
@@ -303,7 +315,7 @@ viewport={{
           shadow-lg
           border
           border-gray-100
-          mb-8
+          mb-5
         ">
 
           <div className="
@@ -463,7 +475,7 @@ hover:to-blue-500
             shadow-sm
             p-10
             text-center
-            mb-8
+            mb-5
           ">
 
             <h3 className="
@@ -514,7 +526,15 @@ hover:to-blue-500
 
       </motion.section>
 
+       <CouponPopup />
+
       <FlashSale />
+
+      <TrendingProducts />
+
+      <BestSellers />
+
+      <CustomerReviewsCarousel />
 
       <FeaturedProducts />
 

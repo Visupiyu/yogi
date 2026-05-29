@@ -9,6 +9,9 @@ import {
   collection,
   addDoc,
   Timestamp,
+  doc,
+  updateDoc,
+  increment,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -295,6 +298,23 @@ if(items.length === 0){
 
     );
 
+    for (const item of items) {
+
+  await updateDoc(
+    doc(
+      db,
+      "products",
+      item.id
+    ),
+    {
+      sales: increment(
+        item.qty
+      ),
+    }
+  );
+
+}
+
     localStorage.removeItem(
       "checkoutItems"
     );
@@ -520,6 +540,23 @@ if(items.length === 0){
               }
 
             );
+
+            for (const item of items) {
+
+  await updateDoc(
+    doc(
+      db,
+      "products",
+      item.id
+    ),
+    {
+      sales: increment(
+        item.qty
+      ),
+    }
+  );
+
+}
 
             localStorage.removeItem(
               "checkoutItems"

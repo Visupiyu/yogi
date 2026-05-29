@@ -35,7 +35,16 @@ export default function StorePage() {
   const [vendorName, setVendorName] =
     useState("");
 
-  useEffect(() => {
+    const [search, setSearch] =
+  useState("");
+
+    const [totalProducts, setTotalProducts] =
+  useState(0);
+
+const [totalStock, setTotalStock] =
+  useState(0);
+
+    useEffect(() => {
 
     const fetchStore =
     async () => {
@@ -77,6 +86,18 @@ export default function StorePage() {
         });
 
         setProducts(items);
+
+        setTotalProducts(
+  items.length
+);
+
+setTotalStock(
+  items.reduce(
+    (sum, item) =>
+      sum + (item.stock || 0),
+    0
+  )
+);
 
         if(items.length > 0){
 
@@ -135,42 +156,119 @@ export default function StorePage() {
         {/* STORE HEADER */}
 
         <div className="
-          bg-gradient-to-r
-          from-green-500
-          to-green-700
-          rounded-3xl
-          p-10
-          text-white
-          mb-10
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  rounded-3xl
+  p-10
+  text-white
+  mb-10
+">
+
+  <div className="
+    flex
+    flex-col
+    md:flex-row
+    md:items-center
+    md:justify-between
+    gap-6
+  ">
+
+    <div>
+
+      <p className="
+        uppercase
+        tracking-widest
+        text-sm
+        opacity-80
+      ">
+        Verified Seller
+      </p>
+
+      <h1 className="
+        text-5xl
+        font-bold
+        mt-3
+      ">
+        {vendorName}
+      </h1>
+
+      <p className="
+        mt-3
+        opacity-90
+      ">
+        Trusted marketplace seller
+      </p>
+
+    </div>
+
+    <div className="
+      flex
+      gap-4
+    ">
+
+      <div className="
+        bg-white/20
+        rounded-2xl
+        p-4
+        min-w-[120px]
+        text-center
+      ">
+        <p>Products</p>
+        <h3 className="
+          text-3xl
+          font-bold
         ">
+          {totalProducts}
+        </h3>
+      </div>
 
-          <p className="
-            uppercase
-            tracking-widest
-            text-sm
-            opacity-80
-          ">
-            Vendor Store
-          </p>
+      <div className="
+        bg-white/20
+        rounded-2xl
+        p-4
+        min-w-[120px]
+        text-center
+      ">
+        <p>Stock</p>
+        <h3 className="
+          text-3xl
+          font-bold
+        ">
+          {totalStock}
+        </h3>
+      </div>
 
-          <h1 className="
-            text-5xl
-            font-bold
-            mt-3
-          ">
-            {vendorName}
-          </h1>
+    </div>
 
-          <p className="
-            mt-4
-            text-lg
-            opacity-90
-          ">
-            Browse products from this seller
-          </p>
+  </div>
 
-        </div>
+</div>
 
+{/* STORE SEARCH */}
+
+<div className="mb-6">
+
+  <input
+    type="text"
+    placeholder="🔍 Search products in this store..."
+    value={search}
+    onChange={(e) =>
+      setSearch(e.target.value)
+    }
+    className="
+      w-full
+      border
+      rounded-2xl
+      p-4
+      shadow-sm
+      outline-none
+      focus:ring-2
+      focus:ring-green-500
+    "
+  />
+
+</div>
         {/* PRODUCTS */}
 
         {products.length === 0 ? (
@@ -202,7 +300,15 @@ export default function StorePage() {
             gap-6
           ">
 
-            {products.map(
+            {products
+  .filter((product) =>
+    product.name
+      ?.toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+  )
+  .map(
               (
                 product:any,
                 index:number

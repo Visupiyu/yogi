@@ -71,6 +71,8 @@ export default function CategoryStrip(){
         px-4
         py-5
         flex
+        justify-center
+        items-center
         gap-6
         overflow-x-auto
         scrollbar-hide
@@ -106,8 +108,8 @@ export default function CategoryStrip(){
     "
   >
              <div className="
-              w-20
-              h-20
+              w-16
+              h-16
               rounded-full
               bg-gray-100
               flex
@@ -123,8 +125,8 @@ export default function CategoryStrip(){
                 src={cat.image}
                 alt={cat.name}
                 className="
-                  w-10
-                  h-10
+                  w-8
+                  h-8
                   object-contain
                 "
               />

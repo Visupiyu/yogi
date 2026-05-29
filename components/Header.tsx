@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import {
   ShoppingCart,
@@ -9,7 +10,86 @@ import {
   Search,
 } from "lucide-react";
 
+import {
+  collection,
+  getDocs,
+} from "firebase/firestore";
+
+import NotificationBell
+from "@/components/NotificationBell";
+
+import { db } from "@/lib/firebase";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  image?: string;
+}
+
 export default function Header() {
+
+  const [search, setSearch] =
+  useState("");
+
+const [suggestions, setSuggestions] =
+   useState<any[]>([]);
+
+  useEffect(() => {
+
+  const loadSuggestions =
+    async () => {
+
+      if (
+        search.trim().length < 2
+      ) {
+
+        setSuggestions([]);
+
+        return;
+
+      }
+
+      const snapshot =
+        await getDocs(
+          collection(
+            db,
+            "products"
+          )
+        );
+
+     const items:any[] = [];
+
+      snapshot.forEach((doc) => {
+
+        const data = doc.data();
+
+        if (
+          data.name
+            ?.toLowerCase()
+            .includes(
+              search.toLowerCase()
+            )
+        ) {
+
+          items.push({
+            id: doc.id,
+            ...data,
+          });
+
+        }
+
+      });
+
+      setSuggestions(
+        items.slice(0, 5)
+      );
+
+    };
+
+  loadSuggestions();
+
+}, [search]);
 
   return (
 
@@ -64,20 +144,26 @@ export default function Header() {
             ">
 
               <input
-                type="text"
-                placeholder="Search products..."
-                className="
-                  w-full
-                  border
-                  border-gray-300
-                  rounded-full
-                  py-3
-                  pl-5
-                  pr-12
-                  outline-none
-                  focus:border-green-500
-                "
-              />
+  type="text"
+  placeholder="Search products..."
+  value={search}
+  onChange={(e) =>
+    setSearch(
+      e.target.value
+    )
+  }
+  className="
+    w-full
+    border
+    border-gray-300
+    rounded-full
+    py-3
+    pl-5
+    pr-12
+    outline-none
+    focus:border-green-500
+  "
+/>
 
               <button className="
                 absolute
@@ -99,13 +185,87 @@ export default function Header() {
 
           </div>
 
+          {suggestions.length > 0 && (
+
+  <div className="
+    absolute
+    top-full
+    left-0
+    right-0
+    bg-white
+    rounded-2xl
+    shadow-xl
+    mt-2
+    overflow-hidden
+    z-50
+  ">
+
+    {suggestions.map(
+      (product) => (
+
+        
+
+      <Link
+        key={product.id}
+        href={`/product/${product.id}`}
+        className="
+          flex
+          items-center
+          gap-3
+          p-3
+          hover:bg-gray-100
+        "
+      >
+
+        <img
+          src={
+            product.image ||
+            "/no-image.png"
+          }
+          alt=""
+          className="
+            w-12
+            h-12
+            rounded-lg
+            object-cover
+          "
+        />
+
+        <div>
+
+          <p className="
+            font-medium
+          ">
+            {product.name}
+          </p>
+
+          <p className="
+            text-green-600
+            font-bold
+          ">
+            ₹{product.price}
+          </p>
+
+        </div>
+
+      </Link>
+
+    ))}
+
+  </div>
+
+)}
+
           {/* RIGHT SIDE */}
 
           <div className="
-            flex
-            items-center
-            gap-5
-          ">
+  flex
+  items-center
+  gap-5
+">
+
+  <NotificationBell />
+
 
             <Link
               href="/wishlist"
@@ -160,6 +320,8 @@ export default function Header() {
                 </span>
 
               </div>
+
+              
 
             </Link>
 

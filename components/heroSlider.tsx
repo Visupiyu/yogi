@@ -60,7 +60,7 @@ export default function HeroSlider(){
       className="
         relative
         w-full
-       h-[260px] md:h-[420px]
+       h-[220px] md:h-[420px]
         overflow-hidden
         rounded-2xl
         mb-06
@@ -134,13 +134,13 @@ export default function HeroSlider(){
     px-10
     md:px-20
     text-white
-    max-w-2xl
+    max-w-xl
   "
 >
               <h1
                 className="
-                  text-3xl
-                  md:text-5xl
+                  text-2xl
+                  md:text-4xl
                   font-bold
                   mb-6
                 "

@@ -102,7 +102,7 @@ export default function FlashSale(){
           from-red-500
           to-orange-500
           text-white
-          p-7 md:p-8
+          p-5 md:p-6
           shadow-xl
         ">
 
@@ -177,7 +177,7 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-4
+                p-3
                 min-w-[90px]
                 text-center
               ">
@@ -199,7 +199,7 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-4
+                p-3
                 min-w-[90px]
                 text-center
               ">
@@ -221,7 +221,7 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-4
+                p-3
                 min-w-[75px]
                 text-center
               ">

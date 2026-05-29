@@ -130,7 +130,7 @@ export default function TopVendors(){
                     rounded-full
                     bg-gray-200
                     mx-auto
-                    -mt-10
+                    -mt-4
                     border-4
                     border-white
                     overflow-hidden
