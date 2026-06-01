@@ -84,7 +84,7 @@ export default function TopStrip(){
         ">
 
           <Link
-            href="/track-order"
+            href="/order"
             className="
               flex
               items-center

@@ -96,10 +96,12 @@ const [discount,setDiscount] =
 ) =>
 
         sum +
-        item.price * item.qty,
 
-      0
+(Number(item.price) || 0) *
 
+(Number(item.qty) || 1)
+
+     
     );
 
     const shipping =
@@ -384,8 +386,10 @@ const [discount,setDiscount] =
                       text-2xl
                       font-bold
                     ">
-                      ₹
-                      {item.price * item.qty}
+                      ₹{
+  (Number(item.price) || 0) *
+  (Number(item.qty) || 1)
+}
                     </p>
 
                     <button

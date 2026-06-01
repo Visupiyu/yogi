@@ -1,1383 +1,433 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import { useParams } from "next/navigation";
-
-import { doc, getDoc, collection, addDoc, getDocs, query, where, updateDoc, increment, } from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
 import Link from "next/link";
 
-interface Product {
+import {
 
-  id: string;
+  Heart,
 
-  name: string;
+  ShoppingCart,
 
-  price: number;
+  Star
 
-  image?: string;
-  images?: string[];
+} from "lucide-react";
 
-  stock: number;
+import { motion }
+from "framer-motion";
 
-  description?: string;
+type Props = {
 
-  vendorId?: string;
+  id:string;
 
-  vendorName?: string;
+  name:string;
 
-  category?: string;
+  price:number;
 
-  views?: number;
+  image:string;
 
-  sales?: number;
+  stock:number;
 
-}
+};
 
-export default function ProductPage() {
+export default function ProductCard({
 
-  const params = useParams();
+  id,
 
-  const [product, setProduct] =
-    useState<Product | null>(null);
+  name,
 
-  const [loading, setLoading] =
-    useState(true);
+  price,
 
-  const [qty, setQty] =
-    useState(1);
-  
-  const [selectedImage,setSelectedImage] =
-  useState("");  
+  image,
 
-  const [wishlisted, setWishlisted] =
-    useState(false);
-   
-  const [reviews,setReviews] =
-  useState<any[]>([]);
+  stock
 
-  const [relatedProducts,setRelatedProducts] =
-  useState<any[]>([]);
-  const [recentProducts,setRecentProducts] =
-  useState<any[]>([]);
+}:Props){
 
-  const [averageRating,setAverageRating] =
-  useState(0);
-
-const [reviewName,setReviewName] =
-  useState("");
-
-const [reviewText,setReviewText] =
-  useState("");
-
-const [rating,setRating] =
-  useState(5);  
-  /* FETCH PRODUCT */
-
-  useEffect(() => {
-
-    const fetchProduct = async () => {
-
-      try {
-
-        const ref = doc(
-          db,
-          "products",
-          params.id as string
-        );
-
-        const snap =
-          await getDoc(ref);
-
-        if (snap.exists()) {
-
-          await updateDoc(
-  doc(db, "products", params.id as string),
-  {
-    views: increment(1),
-  }
-);
-
-          setProduct({
-
-            id: snap.id,
-
-            ...(snap.data() as Omit<Product, "id">),
-
-          });
-         const data =
-  snap.data() as Omit<
-    Product,
-    "id"
-  >;
-
-setSelectedImage(
-
-  data.images?.[0] ||
-
-  data.image ||
-
-  "/no-image.png"
-
-);
-        }
-
-      } catch (error) {
-
-        console.log(error);
-
-      }
-
-      setLoading(false);
-
-    };
-
-    if (params?.id) {
-
-      fetchProduct();
-
-    }
-
-  }, [params]);
-
-  /* CHECK WISHLIST */
-
-  useEffect(() => {
+  const addToWishlist = ()=>{
 
     const wishlist =
+
       JSON.parse(
+
         localStorage.getItem(
           "wishlist"
         ) || "[]"
+
       );
 
-    const exists =
-      wishlist.find(
-        (item: any) =>
-          item.id === product?.id
-      );
+    const exists = wishlist.find(
 
-    setWishlisted(!!exists);
+      (item:any)=>
 
-  }, [product]);
+        item.id === id
 
-  /* TOGGLE WISHLIST */
+    );
 
-  const toggleWishlist = () => {
+    if(exists){
 
-    if (!product) return;
+      alert("Already In Wishlist");
 
-    const wishlist =
-      JSON.parse(
-        localStorage.getItem(
-          "wishlist"
-        ) || "[]"
-      );
-
-    const exists =
-      wishlist.findIndex(
-        (item: any) =>
-          item.id === product.id
-      );
-
-    if (exists > -1) {
-
-      wishlist.splice(exists, 1);
-
-      setWishlisted(false);
-
-    } else {
-
-      wishlist.push({
-
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        image: product.image || "",
-
-      });
-
-      setWishlisted(true);
+      return;
 
     }
+
+    wishlist.push({
+
+      id,
+
+      name,
+
+      price,
+
+      image
+
+    });
 
     localStorage.setItem(
+
       "wishlist",
+
       JSON.stringify(wishlist)
+
     );
 
     window.dispatchEvent(
-      new Event("wishlistUpdated")
-    );
 
-  };
-  useEffect(()=>{
-
-  const loadReviews =
-  async()=>{
-
-    if(!product?.id) return;
-
-    const q = query(
-
-      collection(db,"reviews"),
-
-      where(
-        "productId",
-        "==",
-        product.id
+      new Event(
+        "wishlistUpdated"
       )
 
     );
 
-    const snapshot =
-      await getDocs(q);
-
-    const items:any[] = [];
-
-    snapshot.forEach((doc)=>{
-
-      items.push({
-
-        id:doc.id,
-
-        ...doc.data()
-
-      });
-
-    });
-
-    setReviews(items);
-
-    if(items.length > 0){
-
-      const total =
-        items.reduce(
-
-          (
-            sum:number,
-            review:any
-          ) =>
-
-            sum + review.rating,
-
-          0
-
-        );
-
-      setAverageRating(
-
-        total / items.length
-
-      );
-
-    }
+    alert("Added To Wishlist");
 
   };
 
-  loadReviews();
-
-},[product]);
-
-useEffect(() => {
-
-  const loadRelated = async () => {
-
-    if (!product?.category) return;
-
-    const q = query(
-      collection(db, "products"),
-      where(
-        "category",
-        "==",
-        product.category
-      )
-    );
-
-    const snapshot =
-      await getDocs(q);
-
-    const items:any[] = [];
-
-    snapshot.forEach((doc) => {
-
-      if (doc.id !== product.id) {
-
-        items.push({
-          id: doc.id,
-          ...doc.data(),
-        });
-
-      }
-
-    });
-
-    setRelatedProducts(
-      items.slice(0, 4)
-    );
-
-  };
-
-  loadRelated();
-
-}, [product]);
-
-useEffect(()=>{
-
-  if(!product) return;
-
-  const recent =
-    JSON.parse(
-      localStorage.getItem(
-        "recentProducts"
-      ) || "[]"
-    );
-
-  const filtered =
-    recent.filter(
-      (item:any)=>
-        item.id !== product.id
-    );
-
-    
-  filtered.unshift({
-
-    id: product.id,
-
-    name: product.name,
-
-    price: product.price,
-
-    image:
-      product.image || "",
-
-  });
-
-  localStorage.setItem(
-
-    "recentProducts",
-
-    JSON.stringify(
-      filtered.slice(0,8)
-    )
-
-  );
-
-  setRecentProducts(
-    filtered.slice(0,8)
-  );
-
-},[product]);
-
-useEffect(()=>{
-
-  const recent =
-    JSON.parse(
-      localStorage.getItem(
-        "recentProducts"
-      ) || "[]"
-    );
-
-  setRecentProducts(recent);
-
-},[]);
-
-  /* LOADING */
-  const submitReview =
-async()=>{
-
-  if(
-    !reviewName ||
-    !reviewText
-  ){
-
-    alert("Fill all fields");
-
-  
-
-    return;
-
-  }
-
-  try{
-
-    await addDoc(
-
-      collection(db,"reviews"),
-
-      {
-
-        productId:
-          product?.id,
-
-        name:
-          reviewName,
-
-        text:
-          reviewText,
-
-        rating,
-
-        createdAt:
-          new Date(),
-
-      }
-
-    );
-
-    setReviewName("");
-
-    setReviewText("");
-
-    setRating(5);
-
-    alert("Review Added");
-
-    const snapshot =
-      await getDocs(
-
-        query(
-
-          collection(db,"reviews"),
-
-          where(
-            "productId",
-            "==",
-            product?.id
-          )
-
-        )
-
-      );
-
-    const items:any[] = [];
-
-    snapshot.forEach((doc)=>{
-
-      items.push({
-
-        id:doc.id,
-
-        ...doc.data()
-
-      });
-
-    });
-
-    setReviews(items);
-
-  }catch(error){
-
-    console.log(error);
-
-  }
-
-};
-  if (loading) {
-
-    return (
-
-      <div className="
-        py-20
-        text-center
-      ">
-        Loading...
-      </div>
-
-    );
-
-  }
-
-  /* PRODUCT NOT FOUND */
-
-  if (!product) {
-
-    return (
-
-      <div className="
-        py-20
-        text-center
-      ">
-        Product not found
-      </div>
-
-    );
-
-  }
-
-  return (
-
-    <section className="
-  py-10
-  px-4
-  bg-slate-950
-  text-white
-  min-h-screen
-">
-
-      <div className="
-        max-w-7xl
-        mx-auto
-        grid
-        grid-cols-1
-        md:grid-cols-2
-        gap-6     ">
-
-        {/* IMAGE */}
-
-        <div className="
-          bg-slate-900
-          rounded-3xl
-          shadow-md
-          overflow-hidden
-        ">
-
-          <div className="
-            h-[500px]
-            bg-gray-100
-          ">
-
-            <div className="
-  overflow-hidden
-  group
-">
-
-  <img
-    src={selectedImage}
-    alt={product.name}
-    className="
-      w-full
-      h-full
-      object-cover
-      transition
-      duration-300
-      group-hover:scale-110
-      cursor-zoom-in
-    "
-  />
-
-</div>
-
-          </div>
-          <div className="
-  flex
-  gap-2  p-4
-  overflow-x-auto
-">
-
-  {(product.images?.length
-    ? product.images
-    : [product.image]
-  ).map(
-
-    (
-      img:any,
-      index:number
-    ) => (
-
-    <img
-      key={index}
-      src={
-        img ||
-        "/no-image.png"
-      }
-      alt=""
-      onClick={() =>
-        setSelectedImage(img)
-      }
-      className={`
-        w-24
-        h-24
-        object-cover
-        rounded-2xl
-        cursor-pointer
-        border-4
-        ${
-          selectedImage === img
-          ? "border-green-500"
-          : "border-transparent"
-        }
-      `}
-    />
-
-  ))}
-
-</div>
-        </div>
-
-        {/* DETAILS */}
-
-        <div>
-
-          <p className="
-            text-green-600
-            font-semibold
-            uppercase
-            tracking-widest
-            mb-3
-          ">
-            <Link
-  href={`/store/${product.vendorId}`}
-  className="
-    text-green-600
-    font-semibold
-    uppercase
-    tracking-widest
-    mb-3
-    inline-block
-    hover:underline
-  "
->
-  {product.vendorName ||
-   "Vendor Store"}
-</Link>
-          </p>
-
-          <h1 className="
-            text-4xl
-            font-bold
-            leading-tight
-          ">
-            {product.name}
-          </h1>
-
-          <p className="
-            text-3xl
-            font-bold
-            text-green-600
-            mt-5
-          ">
-            ₹{product.price}
-          </p>
-          <p className="
-           text-gray-400
-            mt-2
-            ">
-  👁️ {product.views || 0} views
-</p>
-           <div className="
-  flex
-  items-center
-  gap-2
-  mt-4
-">
-
-  <p className="
-    text-yellow-500
-    text-xl
-    font-bold
-  ">
-
-    {"⭐".repeat(
-      Math.round(
-        averageRating
-      )
-    )}
-
-  </p>
-
-  <p className="
-    text-gray-300
-  ">
-
-    {averageRating.toFixed(1)}
-    {" "}
-    (
-    {reviews.length}
-    {" "}
-    reviews
-    )
-
-  </p>
-
-</div>
-          {/* STOCK */}
-
-          <div className="mt-5">
-
-  {product.stock > 10 ? (
-
-    <span className="
-      bg-green-100
-      text-green-700
-      px-4
-      py-2
-      rounded-full
-      font-medium
-    ">
-      In Stock
-    </span>
-
-  ) : product.stock > 0 ? (
-
-    <span className="
-      bg-orange-100
-      text-orange-700
-      px-4
-      py-2
-      rounded-full
-      font-medium
-    ">
-      Only {product.stock} left 🔥
-    </span>
-
-  ) : (
-
-    <span className="
-      bg-red-100
-      text-red-700
-      px-4
-      py-2
-      rounded-full
-      font-medium
-    ">
-      Out Of Stock
-    </span>
-
-  )}
-
-</div>
-
-          {/* DESCRIPTION */}
-
-          <p className="
-            mt-8
-            text-gray-600
-            leading-8
-          ">
-            {product.description ||
-              "No description available"}
-          </p>
-
-          {/* QUANTITY */}
-
-          <div className="mt-8">
-
-            <p className="
-              font-semibold
-              mb-3
-            ">
-              Quantity
-            </p>
-
-            <div className="
-              flex
-              items-center
-              gap-2
-            ">
-
-            <button
-  onClick={() =>
-    setQty(
-      qty > 1
-        ? qty - 1
-        : 1
-    )
-  }
-  className="
-    w-12
-    h-12
-    rounded-full
-    bg-gray-200
-    text-xl
-  "
->
-  -
-</button>
-
-<span className="
-  text-2xl
-  font-bold
-">
-  {qty}
-</span>
-
-<button
-  onClick={() =>
-    setQty(
-
-      qty < product.stock
-
-      ? qty + 1
-
-      : qty
-
-    )
-  }
-  className="
-    w-12
-    h-12
-    rounded-full
-    bg-gray-200
-    text-xl
-  "
->
-  +
-</button>  
-
-            </div>
-
-          </div>
-
-          {/* WISHLIST */}
-
-          <button
-            onClick={toggleWishlist}
-            className={`
-              w-full
-              mt-8
-              py-4
-              rounded-2xl
-              font-bold
-              text-lg
-              transition
-              ${
-                wishlisted
-                  ? "bg-red-500 text-white"
-                  : "bg-gray-200 text-black"
-              }
-            `}
-          >
-
-            {wishlisted
-              ? "❤️ Wishlisted"
-              : "🤍 Add To Wishlist"}
-
-          </button>
-
-          {/* BUTTONS */}
-
-          <div className="
-            mt-5
-            flex
-            flex-col
-            sm:flex-row
-            gap-2
-          ">
-
-            {/* ADD TO CART */}
-
-            <button
-
-  disabled={
-    product.stock <= 0
-  }
-
-  onClick={() => {
+  const addToCart = ()=>{
 
     const existingCart =
+
       JSON.parse(
+
         localStorage.getItem(
           "cart"
         ) || "[]"
+
       );
 
     const existingIndex =
+
       existingCart.findIndex(
-        (item: any) =>
-          item.id === product.id
+
+        (cartItem:any)=>
+
+          cartItem.id === id
+
       );
 
-    if (existingIndex > -1) {
+    if(existingIndex > -1){
 
       existingCart[
         existingIndex
-      ].qty += qty;
+      ].quantity += 1;
 
-    } else {
+    }else{
 
       existingCart.push({
 
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        image:
-          product.image || "",
-        qty,
-        vendorId:
-          product.vendorId,
-        stock:
-          product.stock,
+        id,
+
+        name,
+
+        price,
+
+        image,
+
+        stock,
+
+        quantity:1
 
       });
 
     }
 
     localStorage.setItem(
+
       "cart",
-      JSON.stringify(existingCart)
+
+      JSON.stringify(
+        existingCart
+      )
+
     );
 
     window.dispatchEvent(
-      new Event("cartUpdated")
+
+      new Event(
+        "cartUpdated"
+      )
+
     );
 
-    alert("Added to cart");
+    alert("Added To Cart");
 
+  };
+
+  return(
+
+    <motion.div
+
+  initial={{ opacity:0, y:20 }}
+
+  animate={{ opacity:1, y:0 }}
+
+  whileHover={{
+    y:-8,
+    scale:1.02
   }}
 
-  className={`
-    flex-1
-    py-4
+  transition={{
+    duration:0.3
+  }}
+
+  className="
+    bg-white
     rounded-2xl
-    font-bold
-    text-lg
+    overflow-hidden
+    shadow-md
+    hover:shadow-2xl
     transition
+    duration-300
+    group
+  "
+>    
 
-    ${
-      product.stock <= 0
+      {/* IMAGE */}
 
-      ? "bg-gray-400 cursor-not-allowed text-white"
+      <motion.div className="
+        relative
+        overflow-hidden
+      ">
 
-      : "bg-green-600 hover:bg-green-700 text-white"
-    }
-  `}
->
+        <Link
+          href={`/product/${id}`}
+        >
+        
 
-  {product.stock <= 0
+          <img
+            src={
+              image ||
+              "/no-image.png"
+            }
+            alt={name}
+            className="
+              w-full
+              h-44
+              md:h-52
+              object-cover
+              bg-white
+              p-1
+              group-hover:scale-110
+              ease-out
+              transition
+              duration-500
+            "
+          />
 
-    ? "Out Of Stock"
+        </Link>
 
-    : "Add To Cart"
+        {/* DISCOUNT */}
+
+        <motion.div className="
+          absolute
+          top-3
+          left-3
+          bg-orange-500
+          text-white
+          text-xs
+          font-bold
+          px-3
+          py-1
+          rounded-full
+        ">
+
+          SALE
+
+      </motion.div>
+
+        {/* WISHLIST */}
+
+        <motion.button
+
+  whileTap={{
+    scale:0.95
+  }}
+
+  whileHover={{
+    scale:1.03
+  }}
+
+          onClick={addToWishlist}
+
+          className="
+            absolute
+            top-3
+            right-3
+            bg-white
+            w-10
+            h-10
+            rounded-full
+            flex
+            items-center
+            justify-center
+            shadow-md
+            hover:bg-pink-500
+            hover:text-white
+            transition
+          "
+        >
+
+          <Heart size={18} />
+
+        </motion.button>
+
+     </motion.div>
+
+      {/* CONTENT */}
+
+      <motion.div className="
+        p-3
+      ">
+
+        {/* RATING */}
+
+        <motion.div className="
+          flex
+          items-center
+          gap-1
+          text-yellow-500
+          mb-2
+        ">
+
+          <Star size={14} fill="currentColor" />
+          <Star size={14} fill="currentColor" />
+          <Star size={14} fill="currentColor" />
+          <Star size={14} fill="currentColor" />
+          <Star size={14} fill="currentColor" />
+
+          <span className="
+            text-gray-500
+            text-sm
+            ml-1
+          ">
+
+            (4.9)
+
+          </span>
+
+     </motion.div>
+
+        {/* NAME */}
+
+        <Link
+          href={`/product/${id}`}
+        >
+
+          <h3 className="
+            font-semibold
+            text-base
+            md:text-lg
+            line-clamp-2
+            min-h-[36px]
+            hover:text-green-600
+            transition
+          ">
+
+            {name}
+
+          </h3>
+
+        </Link>
+
+        {/* PRICE */}
+
+        <motion.div className="
+          flex
+          items-center
+          gap-2
+          mt-0
+        ">
+
+          <p className="
+            text-green-600
+            font-bold
+            text-lg
+          ">
+
+            ₹{price}
+
+          </p>
+
+          <p className="
+            text-gray-400
+            line-through
+            text-sm
+          ">
+
+            ₹{price + 300}
+
+          </p>
+
+       </motion.div>
+
+        {/* BUTTON */}
+
+        <motion.button
+
+          disabled={
+            stock <= 0
+          }
+
+          onClick={addToCart}
+
+          className={`
+
+  mt-3
+  w-full
+  flex
+  items-center
+  justify-center
+  gap-2
+  py-2.5
+  rounded-xl
+  font-semibold
+  transition
+
+  ${stock <= 0
+
+    ? "bg-gray-300 text-gray-500"
+
+    : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white"
 
   }
 
-</button>
-            
-            {/* BUY NOW */}
+`}        >
 
-            <button
-              onClick={() => {
+          <ShoppingCart size={18} />
 
-                const buyNowItem = [
+          {stock <= 0
 
-                  {
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
-                    image:
-                      product.image || "",
-                    qty,
-                    vendorId:
-                    product.vendorId,
-                    stock:
-                    product.stock,
-                  }
+            ? "Out Of Stock"
 
-                ];
+            : "Add To Cart"
 
-                localStorage.setItem(
-                  "checkoutItems",
-                  JSON.stringify(buyNowItem)
-                );
+          }
 
-                window.location.href =
-                  "/checkout";
+        </motion.button>
 
-              }}
-              className="
-                flex-1
-                bg-blue-600 hover:bg-blue-700
-                hover:bg-gray-900
-                text-white
-                py-4
-                rounded-2xl
-                font-bold
-                text-lg
-                transition
-              "
-            >
-              Buy Now
-            </button>
+     </motion.div>
 
-          </div>
-
-        </div>
-
-        </div>
-
-     {/* REVIEWS */}
-
-<div className="
-  max-w-7xl
-  mx-auto
-  mt-20
-">
-
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-10
-  ">
-    Customer Reviews
-  </h2>
-
-  {/* REVIEW FORM */}
-
-  <div className="
-    bg-white
-    rounded-3xl
-    shadow-2xl
-shadow-black/40
-    p-8
-    mb-10
-  ">
-
-    <div className="
-      grid
-      gap-2
-    ">
-
-      <input
-        type="text"
-        placeholder="Your Name"
-        value={reviewName}
-        onChange={(e)=>
-          setReviewName(
-            e.target.value
-          )
-        }
-        className="
-          border
-          p-4
-          rounded-2xl
-        "
-      />
-
-      <textarea
-        placeholder="Write review..."
-        value={reviewText}
-        onChange={(e)=>
-          setReviewText(
-            e.target.value
-          )
-        }
-        className="
-          border
-          p-4
-          rounded-2xl
-          h-32
-        "
-      />
-
-      <select
-        value={rating}
-        onChange={(e)=>
-          setRating(
-            Number(
-              e.target.value
-            )
-          )
-        }
-        className="
-          border
-          p-4
-          rounded-2xl
-        "
-      >
-
-        <option value={5}>
-          5 Stars
-        </option>
-
-        <option value={4}>
-          4 Stars
-        </option>
-
-        <option value={3}>
-          3 Stars
-        </option>
-
-        <option value={2}>
-          2 Stars
-        </option>
-
-        <option value={1}>
-          1 Star
-        </option>
-
-      </select>
-
-      <button
-        onClick={submitReview}
-        className="
-          bg-green-600
-          hover:bg-green-700
-          text-white
-          py-4
-          rounded-2xl
-          font-bold
-        "
-      >
-        Submit Review
-      </button>
-
-    </div>
-
-  </div>
-
-  {/* REVIEW LIST */}
-
-  <div className="
-    space-y-6
-  ">
-
-    {reviews.map(
-      (
-        review:any,
-        index:number
-      )=>(
-
-      <div
-        key={review.id}
-        className="
-          bg-white
-          rounded-3xl
-          shadow-md
-          p-8
-        "
-      >
-
-        <div className="
-          flex
-          justify-between
-          items-center
-          mb-4
-        ">
-
-          <h3 className="
-            text-xl
-            font-bold
-          ">
-            {review.name}
-          </h3>
-
-          <p className="
-            text-yellow-500
-            font-bold
-          ">
-            {"⭐".repeat(
-              review.rating
-            )}
-          </p>
-
-        </div>
-
-    <div className="
-  text-gray-600
-  leading-7
-">
-  {review.text}
-
-  <p className="
-    text-sm
-    text-gray-400
-    mt-4
-  ">
-
-    {review.createdAt?.toDate
-  ? review.createdAt
-      .toDate()
-      .toDateString()
-  : ""}
-  </p>
-
-</div>
-
-      </div>
-
-    ))}
-
-  </div>
-
-</div>
-
-{/* RELATED PRODUCTS */}
-
-<div className="
-  max-w-7xl
-  mx-auto
-  mt-20
-">
-
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-10
-  ">
-    Related Products
-  </h2>
-
-  <div className="
-    grid
-    grid-cols-2
-    md:grid-cols-4
-    gap-2
-  ">
-
-    {relatedProducts.map(
-      (
-        item:any,
-        index:number
-      )=>(
-
-      <Link
-        key={item.id}
-        href={`/product/${item.id}`}
-      >
-
-        <div className="
-          bg-white
-          rounded-3xl
-          shadow-md
-          overflow-hidden
-          hover:shadow-xl
-          transition
-        ">
-
-          <img
-            src={
-              item.image ||
-              "/no-image.png"
-            }
-            alt={item.name}
-            className="
-              w-full
-              h-52
-              object-cover
-            "
-          />
-
-          <div className="p-4">
-
-            <h3 className="
-              font-bold
-              line-clamp-2
-              min-h-[48px]
-            ">
-              {item.name}
-            </h3>
-
-            <p className="
-              text-green-600
-              text-xl
-              font-bold
-              mt-3
-            ">
-              ₹{item.price}
-            </p>
-
-          </div>
-
-        </div>
-
-      </Link>
-
-  ))}
-
-  </div>
-
-</div>
-{/* RECENTLY VIEWED */}
-
-{recentProducts.length > 1 && (
-
-<div className="
-  max-w-7xl
-  mx-auto
-  mt-20
-">
-
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-10
-  ">
-    Recently Viewed
-  </h2>
-
-  <div className="
-    grid
-    grid-cols-2
-    md:grid-cols-4
-    gap-2
-  ">
-
-    {recentProducts
-      .filter(
-        (item:any)=>
-          item.id !== product.id
-      )
-      .slice(0,4)
-      .map(
-
-      (
-        item:any,
-        index:number
-      )=>(
-
-      <Link
-       key={item.id}
-        href={`/product/${item.id}`}
-      >
-
-        <div className="
-          bg-white
-          rounded-3xl
-          shadow-md
-          overflow-hidden
-          hover:shadow-xl
-          transition
-        ">
-
-          <img
-            src={
-              item.image ||
-              "/no-image.png"
-            }
-            alt={item.name}
-            className="
-              w-full
-              h-52
-              object-cover
-            "
-          />
-
-          <div className="p-4">
-
-            <h3 className="
-              font-bold
-              line-clamp-2
-              min-h-[48px]
-            ">
-              {item.name}
-            </h3>
-
-            <p className="
-              text-green-600
-              text-xl
-              font-bold
-              mt-3
-            ">
-              ₹{item.price}
-            </p>
-
-          </div>
-
-        </div>
-
-      </Link>
-
-    ))}
-
-  </div>
-
-</div>
-
-)}
-    </section>
+   </motion.div>
 
   );
 
