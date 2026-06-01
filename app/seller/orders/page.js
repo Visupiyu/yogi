@@ -374,9 +374,31 @@ export default function SellerOrdersPage(){
 
         ${
           step === order.status
-          ? "bg-green-600 text-white"
-          : "bg-gray-200"
-        }
+
+          [
+  "Pending",
+  "Processing",
+  "Packed",
+  "Shipped",
+  "Out For Delivery",
+  "Delivered"
+].indexOf(step)
+
+<=
+
+[
+  "Pending",
+  "Processing",
+  "Packed",
+  "Shipped",
+  "Out For Delivery",
+  "Delivered"
+].indexOf(order.status)
+
+? "bg-green-600 text-white"
+
+: "bg-gray-200"
+          }
       `}
     >
 

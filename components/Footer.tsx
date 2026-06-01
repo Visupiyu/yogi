@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+
+
 export default function Footer(){
 
   return(
@@ -261,6 +263,10 @@ export default function Footer(){
         All Rights Reserved.
 
       </div>
+
+      <Link href="/contact">
+  Contact Us
+</Link>
 
     </footer>
 
