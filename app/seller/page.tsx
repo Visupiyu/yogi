@@ -76,6 +76,12 @@ const [pendingOrders,setPendingOrders] =
 const [earnings,setEarnings] =
   useState(0);
 
+  const [totalViews,setTotalViews] =
+  useState(0);
+
+  const [totalSales,setTotalSales] =
+  useState(0);
+
   const [products,setProducts] =
     useState<Product[]>([]);
 
@@ -109,6 +115,10 @@ const [earnings,setEarnings] =
 
   const [editingId,setEditingId] =
     useState("");
+
+    const [bestSeller,
+  setBestSeller] =
+  useState("None");
 
   const handleImage = (
     e:any
@@ -199,6 +209,7 @@ if(!vendor){
   loadProducts();
 
   fetchDashboardData();
+
   loadVendorOrders();
 
 },[]);
@@ -481,8 +492,7 @@ await addDoc(
 
   };
 
-  const updateOrderStatus =
-async (
+  const updateOrderStatus = async (
   id:string,
   status:string
 )=>{
@@ -490,36 +500,18 @@ async (
   try{
 
     await updateDoc(
-
-      doc(
-        db,
-        "orders",
-        id
-      ),
-
-      {
-
-        status
-
-      }
-
+      doc(db,"orders",id),
+      { status }
     );
 
     const updated =
-      orders.map(
+      orders.map((order:any)=>{
 
-        (order:any)=>{
-
-        if(
-          order.id === id
-        ){
+        if(order.id === id){
 
           return {
-
             ...order,
-
             status
-
           };
 
         }
@@ -571,16 +563,17 @@ async ()=>{
 
   );
 
-  const productSnap =
-    await getDocs(
-      productQuery
-    );
 
-  setTotalProducts(
-    productSnap.size
+  const productSnap =
+  await getDocs(
+    productQuery
   );
 
-  // ORDERS
+setTotalProducts(
+  productSnap.size
+);
+
+    // ORDERS
 
   const ordersSnap =
     await getDocs(
@@ -623,6 +616,8 @@ async ()=>{
         pendingCount++;
 
       }
+
+  
 
       sellerItems.forEach(
         (item: any)=>{
@@ -836,6 +831,7 @@ async ()=>{
 
         </div>
 
+  
         {/* MAIN */}
 
         <div
@@ -868,7 +864,7 @@ async ()=>{
 
             <div className="space-y-5">
 
-              <input
+             <input
                 type="text"
                 placeholder="Product Name"
                 value={name}
@@ -1185,6 +1181,7 @@ reader.readAsDataURL(
           </div>
 
         </div>
+        
 
         {/* ORDERS */}
 
@@ -1314,8 +1311,9 @@ reader.readAsDataURL(
 
       </div>
 
-    </div>
+       </div>
 
+          
   );
 
 }
