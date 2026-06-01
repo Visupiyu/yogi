@@ -1278,16 +1278,28 @@ reader.readAsDataURL(
                       >
 
                         <option>
-                          Pending
-                        </option>
+  Pending
+</option>
 
-                        <option>
-                          Shipped
-                        </option>
+<option>
+  Confirmed
+</option>
 
-                        <option>
-                          Delivered
-                        </option>
+<option>
+  Packed
+</option>
+
+<option>
+  Shipped
+</option>
+
+<option>
+  Delivered
+</option>
+
+<option>
+  Cancelled
+</option>
 
                       </select>
 

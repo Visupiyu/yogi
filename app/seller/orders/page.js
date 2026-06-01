@@ -262,7 +262,33 @@ export default function SellerOrdersPage(){
                 >
                   Status:
                   {" "}
-                  {order.status}
+                  <span
+  className={`
+    px-3
+    py-1
+    rounded-full
+    text-sm
+    font-semibold
+
+    ${
+      order.status === "Delivered"
+      ? "bg-green-100 text-green-700"
+
+      : order.status === "Cancelled"
+      ? "bg-red-100 text-red-700"
+
+      : order.status ===
+        "Out For Delivery"
+      ? "bg-blue-100 text-blue-700"
+
+      : "bg-yellow-100 text-yellow-700"
+    }
+  `}
+>
+
+  {order.status}
+
+</span>
                 </p>
 
                 <select
@@ -321,6 +347,46 @@ export default function SellerOrdersPage(){
                 </select>
 
               </div>
+
+              <div className="
+  mt-4
+  flex
+  flex-wrap
+  gap-2
+">
+
+  {[
+    "Pending",
+    "Processing",
+    "Packed",
+    "Shipped",
+    "Out For Delivery",
+    "Delivered"
+  ].map((step,index)=>(
+
+    <div
+      key={index}
+      className={`
+        px-3
+        py-1
+        rounded-full
+        text-xs
+
+        ${
+          step === order.status
+          ? "bg-green-600 text-white"
+          : "bg-gray-200"
+        }
+      `}
+    >
+
+      {step}
+
+    </div>
+
+  ))}
+
+</div>
 
               <hr className="my-4" />
 
