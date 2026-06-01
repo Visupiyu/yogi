@@ -236,6 +236,11 @@ if(
           agreed:
             formData.agreed,
 
+            storeLogo: "",
+            storeBanner: "",
+            rating: 0,
+            totalProducts: 0,
+
           status:"Pending",
 
           createdAt:new Date()

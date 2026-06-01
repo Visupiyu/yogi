@@ -1,33 +1,66 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
-const stores = [
+import {
+  collection,
+  getDocs,
+} from "firebase/firestore";
 
-  {
-    id: "store1",
-    name: "Fresh Grocery Store",
-    description:
-      "Daily grocery and household essentials."
-  },
-
-  {
-    id: "store2",
-    name: "Fashion Hub",
-    description:
-      "Latest fashion trends for men and women."
-  },
-
-  {
-    id: "store3",
-    name: "Electro World",
-    description:
-      "Electronics, gadgets and accessories."
-  }
-
-];
+import { db } from "@/lib/firebase";
 
 export default function StoresPage() {
+
+  const [stores,setStores] =
+    useState<any[]>([]);
+
+  const [loading,setLoading] =
+    useState(true);
+
+  useEffect(()=>{
+
+    const loadStores =
+      async ()=>{
+
+      try{
+
+        const snap =
+          await getDocs(
+            collection(
+              db,
+              "vendors"
+            )
+          );
+
+        const data =
+          snap.docs.map(
+            (doc)=>({
+
+              id: doc.id,
+
+              ...doc.data()
+
+            })
+          );
+
+        setStores(data);
+
+      }catch(error){
+
+        console.log(error);
+
+      }finally{
+
+        setLoading(false);
+
+      }
+
+    };
+
+    loadStores();
+
+  },[]);
 
   return (
 
@@ -43,15 +76,33 @@ export default function StoresPage() {
           Explore stores and discover products from trusted vendors.
         </p>
 
-        <div className="
-          grid
-          grid-cols-1
-          md:grid-cols-2
-          lg:grid-cols-3
-          gap-8
-        ">
+        {loading && (
 
-          {stores.map((store)=>(
+          <p className="text-center">
+            Loading stores...
+          </p>
+
+        )}
+
+        {!loading && stores.length === 0 && (
+
+          <p className="text-center text-gray-500">
+            No stores found.
+          </p>
+
+        )}
+
+        <div
+          className="
+            grid
+            grid-cols-1
+            md:grid-cols-2
+            lg:grid-cols-3
+            gap-8
+          "
+        >
+
+          {stores.map((store:any)=>(
 
             <div
               key={store.id}
@@ -65,23 +116,34 @@ export default function StoresPage() {
               "
             >
 
-              <h2 className="
-                text-2xl
-                font-bold
-                mb-3
-              ">
-                {store.name}
+              <h2
+                className="
+                  text-2xl
+                  font-bold
+                  mb-3
+                "
+              >
+                {store.businessName}
               </h2>
 
-              <p className="
-                text-gray-600
-                mb-6
-              ">
-                {store.description}
+              <p className="text-gray-600 mb-2">
+                Owner:
+                {" "}
+                {store.fullName}
+              </p>
+
+              <p className="text-gray-600 mb-2">
+                {store.city},
+                {" "}
+                {store.state}
+              </p>
+
+              <p className="text-gray-600 mb-6">
+                {store.email}
               </p>
 
               <Link
-                href={`/store/${store.id}`}
+                href={`/store/${store.uid}`}
                 className="
                   inline-block
                   bg-green-600

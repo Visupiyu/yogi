@@ -16,6 +16,8 @@ import {
   getDocs,
   query,
   where,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 
 import { db }
@@ -32,8 +34,11 @@ export default function StorePage() {
   const [loading, setLoading] =
     useState(true);
 
-  const [vendorName, setVendorName] =
-    useState("");
+  const [vendorName,setVendorName] =
+  useState("");
+
+const [vendorInfo,setVendorInfo] =
+  useState<any>(null);
 
     const [search, setSearch] =
   useState("");
@@ -86,6 +91,31 @@ const [totalStock, setTotalStock] =
         });
 
         setProducts(items);
+
+        const vendorQuery =
+  query(
+    collection(db,"vendors"),
+    where(
+      "uid",
+      "==",
+      params.id
+    )
+  );
+
+const vendorSnap =
+  await getDocs(
+    vendorQuery
+  );
+
+if(
+  !vendorSnap.empty
+){
+
+  setVendorInfo(
+    vendorSnap.docs[0].data()
+  );
+
+}
 
         setTotalProducts(
   items.length
@@ -153,6 +183,21 @@ setTotalStock(
         mx-auto
       ">
 
+        <Link
+  href="/stores"
+  className="
+    inline-block
+    mb-6
+    bg-gray-200
+    hover:bg-gray-300
+    px-4
+    py-2
+    rounded-xl
+  "
+>
+  ← Back to Stores
+</Link>
+
         {/* STORE HEADER */}
 
         <div className="
@@ -194,12 +239,47 @@ setTotalStock(
       </h1>
 
       <p className="
-        mt-3
-        opacity-90
-      ">
-        Trusted marketplace seller
-      </p>
+  mt-3
+  opacity-90
+">
+  Trusted marketplace seller
+</p>
 
+{vendorInfo && (
+
+  <div className="
+    mt-5
+    space-y-1
+  ">
+
+    <p>
+      👤 {vendorInfo.fullName}
+    </p>
+
+    <p>
+      📧 {vendorInfo.email}
+    </p>
+
+    <p>
+      📞 {vendorInfo.businessPhone}
+    </p>
+
+    <p>
+      📍 {vendorInfo.city},
+      {" "}
+      {vendorInfo.state}
+    </p>
+
+  </div>
+
+)}
+
+        <p className="mt-2">
+  {products.length}
+  {" "}
+  Products Available
+</p>
+      
     </div>
 
     <div className="
@@ -315,7 +395,7 @@ setTotalStock(
               ) => (
 
               <Link
-                key={index}
+                key={product.id}
                 href={`/product/${product.id}`}
               >
 

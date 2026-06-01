@@ -47,6 +47,18 @@ type Product = {
 
 };
 
+type Notification = {
+
+  id:string;
+
+  title:string;
+
+  message:string;
+
+  read:boolean;
+
+};
+
 type Order = {
 
   id:string;
@@ -119,6 +131,13 @@ const [earnings,setEarnings] =
     const [bestSeller,
   setBestSeller] =
   useState("None");
+
+  const [
+  notifications,
+  setNotifications
+] = useState<
+  Notification[]
+>([]);
 
   const handleImage = (
     e:any
@@ -207,6 +226,11 @@ if(!vendor){
 }
 
   loadProducts();
+  setTimeout(()=>{
+
+  loadNotifications();
+
+},1000);
 
   fetchDashboardData();
 
@@ -538,6 +562,67 @@ await addDoc(
 
 };
 
+const loadNotifications =
+async ()=>{
+
+  const alerts:any[] = [];
+
+  products.forEach(
+    (product:any)=>{
+
+      if(
+        product.stock === 0
+      ){
+
+        alerts.push({
+
+          id:
+            product.id +
+            "-out",
+
+          title:
+            "Out Of Stock",
+
+          message:
+            `${product.name} is out of stock`,
+
+          read:false
+
+        });
+
+      }
+
+      else if(
+        product.stock <= 5
+      ){
+
+        alerts.push({
+
+          id:
+            product.id +
+            "-low",
+
+          title:
+            "Low Stock",
+
+          message:
+            `${product.name} has only ${product.stock} left`,
+
+          read:false
+
+        });
+
+      }
+
+    }
+  );
+
+  setNotifications(
+    alerts
+  );
+
+};
+
 const fetchDashboardData =
 async ()=>{
 
@@ -571,6 +656,52 @@ async ()=>{
 
 setTotalProducts(
   productSnap.size
+);
+
+let views = 0;
+
+let sales = 0;
+
+let topProduct = "";
+
+let topSales = 0;
+
+productSnap.forEach((docSnap)=>{
+
+  const product =
+    docSnap.data();
+
+  views +=
+    product.views || 0;
+
+  sales +=
+    product.sales || 0;
+
+  if(
+    (product.sales || 0)
+    > topSales
+  ){
+
+    topSales =
+      product.sales || 0;
+
+    topProduct =
+      product.name;
+
+  }
+
+});
+
+setTotalViews(
+  views
+);
+
+setTotalSales(
+  sales
+);
+
+setBestSeller(
+  topProduct || "None"
 );
 
     // ORDERS
@@ -830,6 +961,135 @@ setTotalProducts(
           </div>
 
         </div>
+
+        <div
+  className="
+    grid
+    grid-cols-1
+    md:grid-cols-3
+    gap-6
+    mb-10
+  "
+>
+
+  <div className="
+    bg-white
+    p-8
+    rounded-2xl
+    shadow
+  ">
+    <h2 className="text-xl font-bold mb-2">
+      Total Views
+    </h2>
+
+    <p className="
+      text-4xl
+      font-bold
+      text-indigo-600
+    ">
+      {totalViews}
+    </p>
+  </div>
+
+  <div className="
+    bg-white
+    p-8
+    rounded-2xl
+    shadow
+  ">
+    <h2 className="text-xl font-bold mb-2">
+      Units Sold
+    </h2>
+
+    <p className="
+      text-4xl
+      font-bold
+      text-green-600
+    ">
+      {totalSales}
+    </p>
+  </div>
+
+  <div className="
+    bg-white
+    p-8
+    rounded-2xl
+    shadow
+  ">
+    <h2 className="text-xl font-bold mb-2">
+      Best Seller
+    </h2>
+
+    <p className="
+      text-xl
+      font-bold
+      text-orange-600
+    ">
+      {bestSeller}
+    </p>
+  </div>
+
+</div>
+
+<div
+  className="
+    bg-white
+    rounded-2xl
+    shadow
+    p-8
+    mb-8
+  "
+>
+
+  <h2
+    className="
+      text-2xl
+      font-bold
+      mb-5
+    "
+  >
+    Notifications
+  </h2>
+
+  {notifications.length === 0 ? (
+
+    <p className="text-gray-500">
+      No notifications
+    </p>
+
+  ) : (
+
+    <div className="space-y-4">
+
+      {notifications.map(
+        (note)=>(
+
+        <div
+          key={note.id}
+          className="
+            border
+            p-4
+            rounded-xl
+          "
+        >
+
+          <h3 className="font-bold">
+            {note.title}
+          </h3>
+
+          <p>
+            {note.message}
+          </p>
+
+        </div>
+
+      ))}
+
+    </div>
+
+  )}
+
+</div>
 
   
         {/* MAIN */}

@@ -1131,7 +1131,7 @@ shadow-black/40
       )=>(
 
       <div
-        key={index}
+        key={review.id}
         className="
           bg-white
           rounded-3xl
@@ -1177,14 +1177,11 @@ shadow-black/40
     mt-4
   ">
 
-    {review.createdAt
-      ? new Date(
-          review.createdAt
-        ).toDateString()
-
-      : ""
-    }
-
+    {review.createdAt?.toDate
+  ? review.createdAt
+      .toDate()
+      .toDateString()
+  : ""}
   </p>
 
 </div>
@@ -1227,7 +1224,7 @@ shadow-black/40
       )=>(
 
       <Link
-        key={index}
+        key={item.id}
         href={`/product/${item.id}`}
       >
 
@@ -1322,7 +1319,7 @@ shadow-black/40
       )=>(
 
       <Link
-        key={index}
+       key={item.id}
         href={`/product/${item.id}`}
       >
 
