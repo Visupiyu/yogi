@@ -12,6 +12,9 @@ import {
   doc,
   updateDoc,
   increment,
+  getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -72,7 +75,8 @@ setCouponApplied] =
 
   }, []);
 
-  const applyCoupon = ()=>{
+  const applyCoupon =
+async ()=>{
 
   if(couponApplied){
 
@@ -84,40 +88,78 @@ setCouponApplied] =
 
   }
 
-  /* SAMPLE COUPONS */
+  try{
 
-  if(coupon === "YOGI10"){
+    const q = query(
+
+      collection(
+        db,
+        "coupons"
+      ),
+
+      where(
+        "code",
+        "==",
+        coupon.toUpperCase()
+      )
+
+    );
+
+    const snapshot =
+      await getDocs(q);
+
+    if(snapshot.empty){
+
+      alert(
+        "Invalid coupon"
+      );
+
+      return;
+
+    }
+
+    const couponData =
+      snapshot.docs[0].data();
+
+    if(
+      !couponData.active
+    ){
+
+      alert(
+        "Coupon inactive"
+      );
+
+      return;
+
+    }
+
+    const discountAmount =
+
+      total *
+
+      (
+        couponData.discount
+        / 100
+      );
 
     setDiscount(
-      total * 0.10
+      discountAmount
     );
 
-    setCouponApplied(true);
-
-    alert(
-      "10% discount applied"
+    setCouponApplied(
+      true
     );
 
-  }
-
-  else if(
-    coupon === "SAVE500"
-  ){
-
-    setDiscount(500);
-
-    setCouponApplied(true);
-
     alert(
-      "₹500 discount applied"
+      `${couponData.discount}% discount applied`
     );
 
-  }
+  }catch(error){
 
-  else{
+    console.log(error);
 
     alert(
-      "Invalid coupon"
+      "Coupon check failed"
     );
 
   }
@@ -291,6 +333,14 @@ if(items.length === 0){
         deliveryDate:
           deliveryDate,
 
+          couponCode:
+  couponApplied
+    ? coupon
+    : "",
+
+discount:
+  discount,
+  
         createdAt:
           Timestamp.now(),
 
