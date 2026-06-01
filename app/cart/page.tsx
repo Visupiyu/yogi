@@ -87,22 +87,23 @@ const [discount,setDiscount] =
 
   /* TOTAL */
 
-  const total =
-    cart.reduce(
+ const total =
+  cart.reduce(
 
-     (
-  sum: number,
-  item: any
-) =>
+    (
+      sum:number,
+      item:any
+    ) =>
 
-        sum +
+      sum +
 
-(Number(item.price) || 0) *
+      (Number(item.price) || 0) *
 
-(Number(item.qty) || 1)
+      (Number(item.qty) || 1),
 
-     
-    );
+    0
+
+  );
 
     const shipping =
 

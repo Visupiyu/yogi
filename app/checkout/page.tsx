@@ -90,7 +90,13 @@ async ()=>{
 
   try{
 
+    console.log(
+  "Entered Coupon:",
+  coupon
+);
+
     const q = query(
+      
 
       collection(
         db,
@@ -108,6 +114,11 @@ async ()=>{
     const snapshot =
       await getDocs(q);
 
+      console.log(
+  "Found docs:",
+  snapshot.size
+);
+
     if(snapshot.empty){
 
       alert(
@@ -120,6 +131,19 @@ async ()=>{
 
     const couponData =
       snapshot.docs[0].data();
+
+      alert(
+  JSON.stringify(
+    couponData
+  )
+);
+
+      console.log(
+  "Coupon Data JSON:",
+  JSON.stringify(
+    couponData
+  )
+);
 
     if(
       !couponData.active
