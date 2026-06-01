@@ -1473,14 +1473,15 @@ if(
                       ₹{product.price}
                     </p>
 
-                    <p>
-                    <p className={`font-semibold ${ product.stock <= 5 ? "text-red-500" : "text-green-600" } 
-`}>
-
-  Stock: {" "} {product.stock}
-
-</p>
-                    </p>
+                    <div
+  className={`font-semibold ${
+    product.stock <= 5
+      ? "text-red-500"
+      : "text-green-600"
+  }`}
+>
+  Stock: {product.stock}
+</div>
 
                   </div>
 
