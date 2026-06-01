@@ -958,32 +958,9 @@ if(
 
 </div>
 
-        </div>
-
-        <div className="
-  bg-white
-  p-8
-  rounded-2xl
-  shadow
-">
-
-  <h2 className="
-    text-2xl
-    font-bold
-    mb-4
-  ">
-    Customers
-  </h2>
-
-  <p className="
-    text-5xl
-    font-bold
-    text-purple-600
-  ">
-    {customers.length}
-  </p>
-
 </div>
+
+    
 {/* NOTIFICATIONS */}
 
 <div className="
