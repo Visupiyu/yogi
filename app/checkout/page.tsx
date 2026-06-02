@@ -516,7 +516,7 @@ if(items.length === 0){
         const verifyResponse =
           await fetch(
 
-            "/api/verify-payment",
+            "/api/verify-payments",
 
             {
 
