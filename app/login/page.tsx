@@ -45,6 +45,18 @@ export default function LoginPage(){
 
       );
 
+      localStorage.setItem(
+
+  "user",
+
+  JSON.stringify({
+
+    email
+
+  })
+
+);
+
       alert("Login Successful");
 
       router.push("/");
