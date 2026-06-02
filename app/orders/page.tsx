@@ -122,7 +122,7 @@ async()=>{
   },[]);
 
   const getStep = (
-  status: string = ""
+  status:string = ""
 ) => {
 
   switch(status){
@@ -130,17 +130,20 @@ async()=>{
     case "Pending":
       return 1;
 
-    case "Processing":
+    case "Confirmed":
       return 2;
 
-    case "Shipped":
+    case "Packed":
       return 3;
 
-    case "Out For Delivery":
+    case "Shipped":
       return 4;
 
-    case "Delivered":
+    case "Out For Delivery":
       return 5;
+
+    case "Delivered":
+      return 6;
 
     default:
       return 1;
@@ -264,6 +267,20 @@ async()=>{
                       ₹{order.total}
                     </p>
 
+                    <a
+  href={`/invoice/${order.id}`}
+  target="_blank"
+  className="
+    bg-blue-600
+    text-white
+    px-4
+    py-2
+    rounded-lg
+  "
+>
+  Download Invoice
+</a>
+
                     <span className={`
   px-4
   py-2
@@ -311,10 +328,11 @@ async()=>{
 
     {[
       "Pending",
-      "Processing",
-      "Shipped",
-      "Out For Delivery",
-      "Delivered"
+  "Confirmed",
+  "Packed",
+  "Shipped",
+  "Out For Delivery",
+  "Delivered"
     ].map(
 
       (
@@ -341,7 +359,7 @@ async()=>{
           text-white
           font-bold
           ${
-            getStep(
+           getStep( 
               order.status
             ) >= index + 1
 

@@ -487,12 +487,15 @@ if(items.length === 0){
   const data =
     await response.json();
 
+    console.log(
+  "Razorpay Key:",
+  process.env.NEXT_PUBLIC_RAZORPAY_KEY
+);
+
   const options = {
 
     key:
-      process.env
-      .NEXT_PUBLIC_RAZORPAY_KEY,
-
+  "rzp_test_So0I1FDtAqLeWe",
     amount:
       data.amount,
 

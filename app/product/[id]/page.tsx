@@ -129,7 +129,7 @@ export default function ProductCard({
 
       existingCart[
         existingIndex
-      ].quantity += 1;
+      ].qty += 1;
 
     }else{
 
@@ -145,7 +145,7 @@ export default function ProductCard({
 
         stock,
 
-        quantity:1
+        qty:1
 
       });
 

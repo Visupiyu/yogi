@@ -102,6 +102,26 @@ export default function AdminOrdersPage(){
 
   };
 
+  const totalOrders =
+  orders.length;
+
+const pendingOrders =
+  orders.filter(
+    o => o.status === "Pending"
+  ).length;
+
+const deliveredOrders =
+  orders.filter(
+    o => o.status === "Delivered"
+  ).length;
+
+const totalRevenue =
+  orders.reduce(
+    (sum,o)=>
+      sum + o.total,
+    0
+  );
+
   const updateStatus =
     async (
       orderId:string,
@@ -279,6 +299,10 @@ export default function AdminOrdersPage(){
                         </option>
 
                         <option>
+                     Out For Delivery
+                        </option>
+
+                        <option>
                           Delivered
                         </option>
 
@@ -298,6 +322,7 @@ export default function AdminOrdersPage(){
 
                 ))}
 
+                
               </tbody>
 
             </table>
@@ -309,6 +334,7 @@ export default function AdminOrdersPage(){
       </div>
 
     </div>
+    
 
   );
 

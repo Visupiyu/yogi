@@ -9,7 +9,8 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  doc
+  doc,
+  setDoc
 } from "firebase/firestore";
 import {
 
@@ -162,6 +163,17 @@ setNotifications] =
   const [loading,setLoading] =
     useState(true);
 
+    const [vendorPayouts,
+setVendorPayouts] =
+  useState<any[]>([]);
+
+    const pendingOrders =
+  orders.filter(
+    order =>
+      order.status ===
+      "Pending"
+  ).length;
+
     const adminEmails = [
 
   "adminyogimart@gmail.com"
@@ -311,6 +323,82 @@ setNotifications] =
     );
 
     setOrders(orderItems);
+
+    const payouts:any = {};
+
+ordersSnapshot.forEach(
+  (docItem)=>{
+
+    const order =
+      docItem.data();
+
+    if(order.items){
+
+      order.items.forEach(
+        (item:any)=>{
+
+          const vendor =
+
+            item.vendorEmail ||
+            "Unknown";
+
+          if(
+            !payouts[vendor]
+          ){
+
+            payouts[vendor] = {
+
+              vendor,
+
+              orders:0,
+
+              sales:0,
+
+              commission:0,
+
+              payout:0
+
+            };
+
+          }
+
+          const amount =
+
+            item.price *
+            item.qty;
+
+          const commission =
+
+            amount * 0.10;
+
+          payouts[vendor]
+            .orders += 1;
+
+          payouts[vendor]
+            .sales += amount;
+
+          payouts[vendor]
+            .commission +=
+              commission;
+
+          payouts[vendor]
+            .payout +=
+              amount -
+              commission;
+
+        }
+      );
+
+    }
+
+  }
+);
+
+setVendorPayouts(
+  Object.values(
+    payouts
+  )
+);
 
     const customerMap:any = {};
 
@@ -583,15 +671,23 @@ async (
   const createCoupon =
 async()=>{
 
-  if(
+ if(
 
-    !couponCode ||
-    !couponValue ||
-    !couponExpiry
+  !couponCode ||
+  !couponValue ||
+  !couponExpiry
 
-  ){
+){
 
-    const today =
+  alert(
+    "Fill all coupon fields"
+  );
+
+  return;
+
+}
+
+const today =
 
   new Date()
   .toISOString()
@@ -609,14 +705,7 @@ if(
 
 }
 
-    alert(
-      "Fill all coupon fields"
-    );
-
-    return;
-
-  }
-
+ 
   await addDoc(
 
     collection(
@@ -686,17 +775,53 @@ if(
 
   };
 
+  const markVendorPaid =
+async (
+  vendorEmail:string,
+  amount:number
+)=>{
+
+  await setDoc(
+
+    doc(
+      db,
+      "vendor_payouts",
+      vendorEmail
+    ),
+
+    {
+
+      vendorEmail,
+
+      amount,
+
+      status:"Paid",
+
+      createdAt:
+        new Date(),
+
+      paidAt:
+        new Date()
+
+    }
+
+  );
+
+  alert(
+    "Vendor marked paid"
+  );
+
+};
+
   if(loading){
 
     return(
-
-      <div className="
+<div className="
         p-10
       ">
         Loading Admin Dashboard...
       </div>
 
-      
 
     );
 
@@ -898,6 +1023,31 @@ if(
             ">
               Total Orders
             </h2>
+
+            <div className="
+  bg-white
+  p-8
+  rounded-2xl
+  shadow
+">
+
+  <h2 className="
+    text-2xl
+    font-bold
+    mb-4
+  ">
+    Pending Orders
+  </h2>
+
+  <p className="
+    text-5xl
+    font-bold
+    text-yellow-600
+  ">
+    {pendingOrders}
+  </p>
+
+</div>
 
             <p className="
               text-5xl
@@ -1473,6 +1623,16 @@ if(
                       ₹{product.price}
                     </p>
 
+                    <p>
+  Views:
+  {(product as any).views || 0}
+</p>
+
+<p>
+  Sales:
+  {(product as any).sales || 0}
+</p>
+
                     <div
   className={`font-semibold ${
     product.stock <= 5
@@ -1524,6 +1684,136 @@ if(
           </div>
 
         </div>
+
+        <div className="
+  bg-white
+  rounded-2xl
+  shadow
+  p-8
+  mb-10
+">
+
+  <h2 className="
+    text-3xl
+    font-bold
+    mb-8
+  ">
+    Vendor Payout Report
+  </h2>
+
+  <table className="
+    w-full
+  ">
+
+    <thead>
+
+      <tr>
+
+        <th>Vendor</th>
+
+        <th>Orders</th>
+
+        <th>Sales</th>
+
+        <th>Commission</th>
+
+      <th>Payout</th>
+      <th>Status</th>
+      <th>Action</th>
+
+      </tr>
+
+    </thead>
+
+    <tbody>
+
+      {vendorPayouts.map(
+        (vendor:any)=>(
+
+        <tr
+          key={vendor.vendor}
+          className="
+            border-b
+          "
+        >
+
+          <td>
+            {vendor.vendor}
+          </td>
+
+          <td>
+            {vendor.orders}
+          </td>
+
+          <td>
+            ₹{vendor.sales}
+          </td>
+
+          <td>
+            ₹{
+              Math.round(
+                vendor.commission
+              )
+            }
+          </td>
+
+          <td className="
+  text-green-600
+  font-bold
+">
+  ₹{
+    Math.round(
+      vendor.payout
+    )
+  }
+</td>
+
+<td>
+  Pending
+</td>
+
+<td>
+
+  <button
+
+    onClick={()=>
+
+      markVendorPaid(
+
+        vendor.vendor,
+
+        Math.round(
+          vendor.payout
+        )
+
+      )
+
+    }
+
+    className="
+      bg-green-600
+      text-white
+      px-4
+      py-2
+      rounded-lg
+    "
+  >
+
+    Mark Paid
+
+  </button>
+
+</td>
+
+</tr>
+
+      ))}
+
+    </tbody>
+
+  </table>
+
+</div>
 
         {/* ORDERS */}
 
@@ -1636,7 +1926,7 @@ if(
 
     updateOrderStatus(
 
-      order.id,
+       order.id,
 
       e.target.value
 
@@ -1670,8 +1960,12 @@ if(
                         </option>
 
                         <option>
-                          Processing
+                        Confirmed
                         </option>
+
+                          <option>
+                           Packed
+                          </option>
 
                         <option>
                           Shipped
