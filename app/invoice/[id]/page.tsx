@@ -103,62 +103,141 @@ export default function InvoicePage(){
       bg-white
     ">
 
-      <h1 className="
-        text-4xl
-        font-bold
-        mb-6
-      ">
-        GST Invoice
-      </h1>
+      <div className="
+  flex
+  justify-between
+  items-start
+  mb-8
+">
 
-      <p>
-        Invoice No:
-        {order.id}
-      </p>
+  <div>
 
-      <p>
-        Customer:
-        {order.customer}
-      </p>
+    <h1 className="
+      text-4xl
+      font-bold
+    ">
+      YOGI MART
+    </h1>
 
-      <p>
-        Email:
-        {order.userEmail}
-      </p>
+    <p className="text-gray-600">
+      Ahmedabad, Gujarat
+    </p>
 
-      <p>
-        Phone:
-        {order.phone}
-      </p>
+    <p className="text-gray-600">
+      GSTIN: 24ABCDE1234F1Z5
+    </p>
 
-      <p>
-        Address:
-        {order.address}
-      </p>
+  </div>
 
-      <hr className="my-6"/>
+  <div className="text-right">
 
+    <h2 className="
+      text-3xl
+      font-bold
+    ">
+      TAX INVOICE
+    </h2>
+
+    <p>
+      #{order.id}
+    </p>
+
+  </div>
+
+</div>
+
+      <div className="
+  bg-gray-50
+  border
+  rounded-2xl
+  p-6
+  mb-8
+">
+
+  <h3 className="
+    text-xl
+    font-bold
+    mb-4
+  ">
+    Billing Details
+  </h3>
+
+  <p>
+    <strong>Invoice No:</strong>
+    {" "}
+    {order.id}
+  </p>
+
+  <p>
+    <strong>Name:</strong>
+    {" "}
+    {order.customerName}
+  </p>
+
+  <p>
+    <strong>Email:</strong>
+    {" "}
+    {order.userEmail}
+  </p>
+
+  <p>
+    <strong>Phone:</strong>
+    {" "}
+    {order.phone}
+  </p>
+
+  <p>
+    <strong>Address:</strong>
+    {" "}
+    {order.address}
+  </p>
+
+</div>
       <table className="
-        w-full
-        border
-      ">
+  w-full
+  border
+  border-gray-300
+">
 
         <thead>
 
-          <tr>
+  <tr>
 
-            <th>Name</th>
+    <th className="
+      border
+      p-3
+      bg-gray-100
+    ">
+      Name
+    </th>
 
-            <th>Qty</th>
+    <th className="
+      border
+      p-3
+      bg-gray-100
+    ">
+      Qty
+    </th>
 
-            <th>Price</th>
+    <th className="
+      border
+      p-3
+      bg-gray-100
+    ">
+      Price
+    </th>
 
-            <th>Total</th>
+    <th className="
+      border
+      p-3
+      bg-gray-100
+    ">
+      Total
+    </th>
 
-          </tr>
+  </tr>
 
-        </thead>
-
+</thead>
         <tbody>
 
           {order.items?.map(
@@ -169,24 +248,36 @@ export default function InvoicePage(){
 
             <tr key={index}>
 
-              <td>
-                {item.name}
-              </td>
+              <td className="
+  border
+  p-3
+">
+  {item.name}
+</td>
 
-              <td>
-                {item.qty}
-              </td>
+<td className="
+  border
+  p-3
+  text-center
+">
+  {item.qty}
+</td>
 
-              <td>
-                ₹{item.price}
-              </td>
+<td className="
+  border
+  p-3
+  text-center
+">
+  ₹{item.price}
+</td>
 
-              <td>
-                ₹{
-                  item.price *
-                  item.qty
-                }
-              </td>
+<td className="
+  border
+  p-3
+  text-center
+">
+  ₹{item.price * item.qty}
+</td>
 
             </tr>
 

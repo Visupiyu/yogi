@@ -887,8 +887,12 @@ async (
 
     await signOut(auth);
 
-    window.location.href =
-      "/login";
+localStorage.removeItem(
+  "user"
+);
+
+window.location.href =
+  "/login";
 
   }}
 
@@ -1010,21 +1014,31 @@ async (
           </div>
 
           <div className="
-            bg-white
-            p-8
-            rounded-2xl
-            shadow
-          ">
+  bg-white
+  p-8
+  rounded-2xl
+  shadow
+">
 
-            <h2 className="
-              text-2xl
-              font-bold
-              mb-4
-            ">
-              Total Orders
-            </h2>
+  <h2 className="
+    text-2xl
+    font-bold
+    mb-4
+  ">
+    Total Orders
+  </h2>
 
-            <div className="
+  <p className="
+    text-5xl
+    font-bold
+    text-orange-600
+  ">
+    {totalOrders}
+  </p>
+
+</div>
+
+<div className="
   bg-white
   p-8
   rounded-2xl
@@ -1048,17 +1062,7 @@ async (
   </p>
 
 </div>
-
-            <p className="
-              text-5xl
-              font-bold
-              text-orange-600
-            ">
-              {totalOrders}
-            </p>
-
-          </div>
-
+            
           <div className="
             bg-white
             p-8
@@ -1511,45 +1515,93 @@ async (
                 </div>
 
                 <div className="
-                  flex
-                  gap-4
-                ">
+  flex
+  gap-4
+">
 
-                  <button
-                    onClick={()=>
-                      approveVendor(
-                        vendor.id
-                      )
-                    }
-                    className="
-                      bg-green-600
-                      text-white
-                      px-6
-                      py-3
-                      rounded-xl
-                    "
-                  >
-                    Approve
-                  </button>
+  {vendor.status === "Pending" && (
 
-                  <button
-                    onClick={()=>
-                      rejectVendor(
-                        vendor.id
-                      )
-                    }
-                    className="
-                      bg-red-500
-                      text-white
-                      px-6
-                      py-3
-                      rounded-xl
-                    "
-                  >
-                    Reject
-                  </button>
+    <>
 
-                </div>
+      <button
+
+        onClick={()=>
+          approveVendor(
+            vendor.id
+          )
+        }
+
+        className="
+          bg-green-600
+          text-white
+          px-6
+          py-3
+          rounded-xl
+        "
+      >
+
+        Approve
+
+      </button>
+
+      <button
+
+        onClick={()=>
+          rejectVendor(
+            vendor.id
+          )
+        }
+
+        className="
+          bg-red-500
+          text-white
+          px-6
+          py-3
+          rounded-xl
+        "
+      >
+
+        Reject
+
+      </button>
+
+    </>
+
+  )}
+
+  {vendor.status ===
+    "Approved" && (
+
+    <span
+      className="
+        text-green-600
+        font-bold
+      "
+    >
+
+      Approved
+
+    </span>
+
+  )}
+
+  {vendor.status ===
+    "Rejected" && (
+
+    <span
+      className="
+        text-red-600
+        font-bold
+      "
+    >
+
+      Rejected
+
+    </span>
+
+  )}
+
+</div>
 
               </div>
 

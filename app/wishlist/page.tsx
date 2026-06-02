@@ -30,27 +30,33 @@ export default function WishlistPage() {
   /* REMOVE ITEM */
 
   const removeItem = (
-    index: number
-  ) => {
+  index:number
+)=>{
 
-    const updatedWishlist =
-      wishlist.filter(
-        (_: any, i: number) =>
-          i !== index
-      );
-
-    setWishlist(updatedWishlist);
-
-    localStorage.setItem(
-      "wishlist",
-      JSON.stringify(updatedWishlist)
+  const updatedWishlist =
+    wishlist.filter(
+      (_,i)=>
+        i !== index
     );
 
-    window.dispatchEvent(
-      new Event("wishlistUpdated")
-    );
+  setWishlist(
+    updatedWishlist
+  );
 
-  };
+  localStorage.setItem(
+    "wishlist",
+    JSON.stringify(
+      updatedWishlist
+    )
+  );
+
+  window.dispatchEvent(
+    new Event(
+      "wishlistUpdated"
+    )
+  );
+
+};
 
   /* MOVE TO CART */
 
@@ -200,29 +206,40 @@ stock:
                 "
               >
 
-                <img
-                  src={
-                    item.image ||
-                    "/no-image.png"
-                  }
-                  alt={item.name}
-                  className="
-                    w-full
-                    h-60
-                    object-cover
-                  "
-                />
+                <Link href={`/product/${item.id}`}>
+
+  <img
+    src={
+      item.image ||
+      "/no-image.png"
+    }
+    alt={item.name}
+    className="
+      w-full
+      h-60
+      object-cover
+      cursor-pointer
+    "
+  />
+
+</Link>
 
                 <div className="p-5">
 
-                  <h2 className="
-                    text-lg
-                    font-bold
-                    line-clamp-2
-                    min-h-[56px]
-                  ">
-                    {item.name}
-                  </h2>
+                  <Link href={`/product/${item.id}`}>
+
+  <h2 className="
+    text-lg
+    font-bold
+    line-clamp-2
+    min-h-[56px]
+    hover:text-green-600
+    cursor-pointer
+  ">
+    {item.name}
+  </h2>
+
+</Link>
 
                   <p className="
                     text-green-600
@@ -266,17 +283,16 @@ stock:
                       onClick={() =>
                         removeItem(index)
                       }
-                     className={`
-                     text-white
-                     py-3
-                     rounded-xl
-                     font-semibold
-                      transition
-
-                     ${ item.stock <= 0 ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
-                       }
-                      `}
-                    >
+                     className="
+    bg-red-500
+    hover:bg-red-600
+    text-white
+    py-3
+    rounded-xl
+    font-semibold
+    transition
+  "
+>
                       Remove
                     </button>
 

@@ -112,8 +112,7 @@ const [earnings,setEarnings] =
   const [category,setCategory] =
     useState("Grocery");
   const [vendorName,setVendorName] =
-  useState("");  
-
+  useState("");
   const [image,setImage] =
     useState("");
     const [imageFile,setImageFile] =
@@ -224,6 +223,14 @@ if(!vendor){
   return;
 
 }
+
+const vendorData =
+    JSON.parse(vendor);
+
+  setVendorName(
+    vendorData.businessName || ""
+  );
+
 
   loadProducts();
   setTimeout(()=>{
@@ -338,17 +345,13 @@ const clearForm = ()=>{
     async ()=>{
 
     if(
-      !name ||
-      !price ||
-      !stock ||
-      !imageFile
-    ){
-
-      alert("Fill All Fields");
-
-      return;
-
-    }
+  !name ||
+  !price ||
+  !stock
+){
+  alert("Fill All Fields");
+  return;
+}
 
     try{
 
@@ -505,16 +508,33 @@ await addDoc(
   };
 
   const deleteProduct = async (
-    id:string
-  )=>{
+  id:string
+)=>{
 
-    await deleteDoc(
-      doc(db,"products",id)
+  const confirmed =
+    confirm(
+      "Delete this product?"
     );
 
-    loadProducts();
+  if(!confirmed){
+    return;
+  }
 
-  };
+  await deleteDoc(
+    doc(
+      db,
+      "products",
+      id
+    )
+  );
+
+  loadProducts();
+
+  alert(
+    "Product deleted successfully"
+  );
+
+};
 
   const updateOrderStatus = async (
   id:string,
@@ -747,19 +767,16 @@ setBestSeller(
         pendingCount++;
 
       }
-
-  
-
+      
       sellerItems.forEach(
-        (item: any)=>{
+  (item:any)=>{
 
-          totalEarnings +=
+    totalEarnings +=
+      item.price *
+      item.qty;
 
-            item.price *
-            item.qty;
-
-        }
-      );
+  }
+);
 
     }
 
@@ -883,8 +900,12 @@ setBestSeller(
 
       await signOut(auth);
 
-      window.location.href =
-        "/vendor-login";
+localStorage.removeItem(
+  "vendor"
+);
+
+window.location.href =
+  "/vendor-login";
 
     }}
 
@@ -1589,3 +1610,4 @@ reader.readAsDataURL(
   );
 
 }
+

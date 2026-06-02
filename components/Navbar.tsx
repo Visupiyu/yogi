@@ -170,19 +170,23 @@ async()=>{
 };
 
 useEffect(()=>{
- 
- const savedUser =
-  localStorage.getItem(
-    "user"
-  );
 
-if(savedUser){
+  const savedUser =
+    localStorage.getItem(
+      "user"
+    );
 
-  setUser(
-    JSON.parse(savedUser)
-  );
+  if(savedUser){
 
-}
+    setUser(
+      JSON.parse(savedUser)
+    );
+
+  }
+
+},[]);
+
+useEffect(()=>{
 
   const loadSuggestions =
   async()=>{
@@ -599,34 +603,40 @@ hover:to-blue-500
 
             <Link href="/profile">
 
-              <div className="
-                flex
-                items-center
-                gap-2
-                bg-gradient-to-r
-from-green-600
-to-blue-600
-hover:from-green-500
-hover:to-blue-500
-                text-white
-                px-4
-                py-2
-                rounded-full
-                transition
-              ">
+  <div className="
+    flex
+    items-center
+    gap-2
+    bg-gradient-to-r
+    from-green-600
+    to-blue-600
+    hover:from-green-500
+    hover:to-blue-500
+    text-white
+    px-4
+    py-2
+    rounded-full
+    transition
+  ">
 
-                <User size={18} />
+    <User size={18} />
 
-                <span className="
-                  hidden
-                  md:block
-                ">
-                  Login
-                </span>
+    <span className="
+  hidden
+  md:block
+">
 
-              </div>
+  {
+    user?.email
+      ? user.email.split("@")[0]
+      : "Login"
+  }
 
-            </Link>
+</span>
+
+  </div>
+
+</Link>
 
           </div>
 

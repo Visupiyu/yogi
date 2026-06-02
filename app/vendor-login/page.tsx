@@ -156,6 +156,21 @@ if(
     businessName:
       vendorData.businessName,
 
+    commissionRate:
+      vendorData.commissionRate || 10,
+
+    pendingPayout:
+      vendorData.pendingPayout || 0,
+
+    totalSales:
+      vendorData.totalSales || 0,
+
+    totalOrders:
+      vendorData.totalOrders || 0,
+
+    totalRevenue:
+      vendorData.totalRevenue || 0,
+
   })
 
 );

@@ -13,6 +13,11 @@ import {
 } from "firebase/firestore";
 
 import {
+  serverTimestamp
+}
+from "firebase/firestore";
+
+import {
   auth,
   db
 } from "@/lib/firebase";
@@ -34,6 +39,8 @@ export default function VendorRegisterPage(){
       businessPhone:"",
 
       businessName:"",
+
+      gstNumber:"",
 
       businessType:
         "Sole Proprietorship",
@@ -138,20 +145,15 @@ export default function VendorRegisterPage(){
 }
 
 if(
-
-  formData.businessPhone
-  .length < 10
-
+  !/^\d{10}$/.test(
+    formData.businessPhone
+  )
 ){
-
   alert(
-    "Invalid phone number"
+    "Enter valid 10 digit phone number"
   );
-
   return;
-
 }
-
     if(!formData.agreed){
 
       alert(
@@ -195,7 +197,7 @@ if(
             formData.fullName,
 
           email:
-            formData.email,
+            formData.email.toLowerCase(),
 
           businessPhone:
             formData.businessPhone,
@@ -203,10 +205,13 @@ if(
           businessName:
             formData.businessName,
 
-          businessType:
-            formData.businessType,
+           gstNumber:
+  formData.gstNumber,
 
-          street:
+businessType:
+  formData.businessType,
+
+                   street:
             formData.street,
 
           unit:
@@ -243,7 +248,18 @@ if(
 
           status:"Pending",
 
-          createdAt:new Date()
+          commissionRate:10,
+
+           totalSales:0,
+
+              totalOrders:0,
+
+          totalRevenue:0,
+
+           pendingPayout:0,
+
+
+          createdAt: serverTimestamp()
 
         }
 
@@ -256,42 +272,33 @@ if(
       window.location.href =
   "/vendor-login";
 
-      setFormData({
+    setFormData({
 
-        fullName:"",
+  fullName:"",
+  email:"",
+  password:"",
+  businessPhone:"",
+  businessName:"",
 
-        email:"",
+  gstNumber:"",
 
-        password:"",
+  businessType:
+    "Sole Proprietorship",
 
-        businessPhone:"",
+  street:"",
+  unit:"",
+  zipCode:"",
+  city:"",
+  state:"",
 
-        businessName:"",
+  accountHolder:"",
+  bankName:"",
+  accountNumber:"",
+  ifsc:"",
 
-        businessType:
-          "Sole Proprietorship",
+  agreed:false
 
-        street:"",
-
-        unit:"",
-
-        zipCode:"",
-
-        city:"",
-
-        state:"",
-
-        accountHolder:"",
-
-        bankName:"",
-
-        accountNumber:"",
-
-        ifsc:"",
-
-        agreed:false
-
-      });
+});
 
     }catch(err:any){
 
@@ -471,6 +478,19 @@ if(
                 rounded-2xl
               "
             />
+
+            <input
+  type="text"
+  name="gstNumber"
+  placeholder="GST Number (Optional)"
+  value={formData.gstNumber}
+  onChange={handleChange}
+  className="
+    p-4
+    border
+    rounded-2xl
+  "
+/>
 
             <select
               name="businessType"

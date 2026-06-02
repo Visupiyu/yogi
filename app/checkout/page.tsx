@@ -337,6 +337,16 @@ if(items.length === 0){
 
         address:address,
 
+        userEmail:
+
+  JSON.parse(
+
+    localStorage.getItem(
+      "user"
+    ) || "{}"
+
+  ).email,
+
         items:items,
 
         total:total,

@@ -127,11 +127,32 @@ export default function ProductCard({
 
     if(existingIndex > -1){
 
-      existingCart[
-        existingIndex
-      ].qty += 1;
+  if(
 
-    }else{
+    existingCart[
+      existingIndex
+    ].qty < stock
+
+  ){
+
+    existingCart[
+      existingIndex
+    ].qty += 1;
+
+  }else{
+
+    alert(
+      "Maximum stock reached"
+    );
+
+    return;
+
+  }
+
+}
+    
+    
+    else{
 
       existingCart.push({
 
@@ -250,8 +271,7 @@ export default function ProductCard({
           py-1
           rounded-full
         ">
-
-          SALE
+            25% OFF
 
       </motion.div>
 
@@ -374,7 +394,7 @@ export default function ProductCard({
             text-sm
           ">
 
-            ₹{price + 300}
+           ₹{Math.round(price * 1.25)}
 
           </p>
 

@@ -7,11 +7,26 @@ import {
   useState
 } from "react";
 
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy
+} from "firebase/firestore";
+
+import { db }
+from "@/lib/firebase";
+
 export default function
 ProfilePage(){
 
   const [user,setUser] =
   useState<any>(null);
+
+  const [recentOrders,
+setRecentOrders] =
+useState<any[]>([]);
 
 useEffect(()=>{
 
@@ -25,6 +40,65 @@ useEffect(()=>{
       setUser(
         JSON.parse(savedUser)
       );
+
+      const userData =
+  JSON.parse(savedUser);
+
+const loadOrders =
+async()=>{
+
+  try{
+
+    const q = query(
+
+      collection(
+        db,
+        "orders"
+      ),
+
+      where(
+        "userEmail",
+        "==",
+        userData.email
+      ),
+
+      orderBy(
+        "createdAt",
+        "desc"
+      )
+
+    );
+
+    const snapshot =
+      await getDocs(q);
+
+    const data:any[] = [];
+
+    snapshot.forEach((doc)=>{
+
+      data.push({
+
+        id:doc.id,
+
+        ...doc.data()
+
+      });
+
+    });
+
+    setRecentOrders(
+      data.slice(0,3)
+    );
+
+  }catch(error){
+
+    console.log(error);
+
+  }
+
+};
+
+loadOrders();
 
     }else{
 
@@ -410,9 +484,78 @@ useEffect(()=>{
 
         </div>
 
+        <div className="
+  bg-white
+  rounded-3xl
+  shadow-md
+  p-10
+  mt-10
+">
+
+  <h2 className="
+    text-3xl
+    font-bold
+    mb-6
+  ">
+    Recent Orders
+  </h2>
+
+  {
+    recentOrders.length === 0 ?
+
+    (
+
+      <p className="
+        text-gray-500
+      ">
+        No orders found
+      </p>
+
+    )
+
+    :
+
+    recentOrders.map(
+      (order:any)=>(
+        <div
+          key={order.id}
+          className="
+            border-b
+            py-4
+          "
+        >
+
+          <p className="
+            font-semibold
+          ">
+            Order ID:
+            {" "}
+            {order.id}
+          </p>
+
+          <p>
+            Status:
+            {" "}
+            {order.status}
+          </p>
+
+          <p>
+            Total:
+            {" "}
+            ₹{order.finalTotal}
+          </p>
+
+        </div>
+      )
+    )
+  }
+
+</div>
+
       </div>
 
     </section>
+
 
   );
 
