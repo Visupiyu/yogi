@@ -12,9 +12,16 @@ ProductSkeleton(){
       p-3
       shadow-sm
     ">
+      <div className="
+  bg-white
+  rounded-2xl
+  p-3
+  shadow-sm
+  animate-pulse
+"></div>
 
       <Skeleton className="
-        h-52
+      h-44 md:h-52
         w-full
         rounded-xl
       " />

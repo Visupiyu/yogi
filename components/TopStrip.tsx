@@ -19,10 +19,12 @@ export default function TopStrip(){
   return(
 
     <div className="
-      bg-green-600
-      text-white
-      text-sm
-    ">
+  hidden
+  md:block
+  bg-green-600
+  text-white
+  text-sm
+">
 
       <div className="
         max-w-7xl
@@ -84,7 +86,7 @@ export default function TopStrip(){
         ">
 
           <Link
-            href="/order"
+           href="/track-order"
             className="
               flex
               items-center
@@ -101,11 +103,11 @@ export default function TopStrip(){
           </Link>
 
           <Link
-            href="/download-app"
+           href="/"
             className="
               flex
               items-center
-              gap-2
+              gap-2ss
               hover:text-yellow-200
               transition
             "

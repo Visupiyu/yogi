@@ -9,10 +9,13 @@ export default function Footer(){
   return(
 
     <footer className="
-      bg-white
-      border-t
-      mt-16
-    ">
+  bg-gradient-to-r
+  from-green-50
+  via-white
+  to-blue-50
+  border-t
+  mt-16
+">
 
       {/* TOP */}
 
@@ -36,8 +39,10 @@ export default function Footer(){
             src="/logo.png"
             alt="Yogi Mart"
             className="
-              h-20
-              mb-6
+            h-16
+md:h-20
+w-auto
+object-contain
             "
           />
 
@@ -46,7 +51,7 @@ export default function Footer(){
             leading-7
           ">
 
-            Modern ecommerce marketplace
+           India's growing multi-vendor marketplace for groceries, fashion, electronics, beauty and more.
             
           </p>
 
@@ -72,9 +77,9 @@ export default function Footer(){
           ">
 
             <li>
-              <Link href="/">
-                About Us
-              </Link>
+              <Link href="/about">
+  About Us
+</Link>
             </li>
 
             <li>
@@ -119,9 +124,9 @@ export default function Footer(){
           ">
 
             <li>
-              <Link href="/">
-                Contact Us
-              </Link>
+              <Link href="/contact">
+  Contact Us
+</Link>
             </li>
 
             <li>
@@ -137,10 +142,16 @@ export default function Footer(){
             </li>
 
             <li>
-              <Link href="/">
-                Privacy Policy
-              </Link>
+              <Link href="/privacy-policy">
+  Privacy Policy
+</Link>
             </li>
+
+            <li>
+  <Link href="/terms">
+    Terms & Conditions
+  </Link>
+</li>
 
           </ul>
 
@@ -227,7 +238,7 @@ export default function Footer(){
               font-semibold
             ">
 
-              Google Play
+              Coming Soon
 
             </button>
 
@@ -239,7 +250,7 @@ export default function Footer(){
               font-semibold
             ">
 
-              App Store
+            Coming Soon
 
             </button>
 
@@ -264,10 +275,7 @@ export default function Footer(){
 
       </div>
 
-      <Link href="/contact">
-  Contact Us
-</Link>
-
+      
     </footer>
 
   );

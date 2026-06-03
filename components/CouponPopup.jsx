@@ -7,49 +7,65 @@ export default function CouponPopup() {
   const [show, setShow] =
     useState(false);
 
+    const couponCode =
+  "YOGI10";
+
   useEffect(() => {
 
-    const alreadyShown =
-      localStorage.getItem(
-        "couponShown"
-      );
+  const alreadyShown =
+    localStorage.getItem(
+      "couponShown"
+    );
 
-    if (!alreadyShown) {
+let timer;
+  ReturnType<typeof setTimeout> undefined;
 
-      setTimeout(() => {
+  if (!alreadyShown) {
 
-        setShow(true);
+    timer = setTimeout(() => {
 
-      }, 2000);
+      setShow(true);
+
+    }, 2000);
+
+  }
+
+  return () => {
+
+    if (timer) {
+
+      clearTimeout(timer);
 
     }
 
-  }, []);
+  };
+
+}, []);
 
   const closePopup = () => {
 
-    localStorage.setItem(
-      "couponShown",
-      "true"
-    );
+   localStorage.setItem(
+  "couponShown",
+  new Date().toDateString()
+);
 
     setShow(false);
 
   };
 
-  const copyCoupon = () => {
+  const copyCoupon = async () => {
 
-    navigator.clipboard.writeText(
-      "YOGI10"
-    );
+   await navigator.clipboard.writeText(
+   couponCode
+);
 
     alert(
-      "Coupon copied: YOGI10"
+      `Coupon copied: ${couponCode}`
     );
 
     localStorage.setItem(
       "couponShown",
-      "true"
+       new Date().toDateString()
     );
 
     setShow(false);
@@ -140,15 +156,22 @@ export default function CouponPopup() {
             font-bold
             text-green-600
           ">
-            YOGI10
+            {couponCode}
           </h3>
 
           <p className="
             text-sm
             mt-2
           ">
-            Get 10% OFF
-          </p>
+           Get 10% OFF
+            </p>
+          <p className="
+  text-xs
+  text-gray-500
+  mt-1
+">
+  Valid on first order only
+</p>
 
         </div>
 

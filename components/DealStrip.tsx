@@ -3,15 +3,20 @@ export default function DealStrip(){
   return (
 
     <div
-      style={{
-        background:"#f97316",
-        color:"#fff"
-      }}
+      className="
+  bg-orange-500
+  text-white
+"
     >
 
       <div
         className="
-          max-w-7xl
+        bg-gradient-to-r
+  from-green-600
+  via-green-500
+  to-blue-600
+  text-white
+          max-w-screen-2xl
           mx-auto
           flex
           gap-10
@@ -24,11 +29,11 @@ export default function DealStrip(){
       >
 
         <span>
-          🔥 Big Summer Sale
+          "🔥 Welcome Offer 10% OFF",
         </span>
 
         <span>
-          🚚 Free Delivery
+          "🚚 Free Delivery Above ₹499",
         </span>
 
         <span>
@@ -36,11 +41,11 @@ export default function DealStrip(){
         </span>
 
         <span>
-          ⚡ 50% OFF Electronics
+          "🛍 Multi-Vendor Marketplace",
         </span>
 
         <span>
-          🛍 Trending Fashion Deals
+          "⭐ Trusted Sellers",
         </span>
 
       </div>

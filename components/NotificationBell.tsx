@@ -23,16 +23,24 @@ export default function NotificationBell() {
 
   useEffect(() => {
 
-    const stored =
-      JSON.parse(
-        localStorage.getItem(
-          "notifications"
-        ) || "[]"
-      );
+    try {
 
-    setNotifications(stored);
+  const stored =
+    JSON.parse(
+      localStorage.getItem(
+        "notifications"
+      ) || "[]"
+    );
 
-  }, []);
+  setNotifications(stored);
+
+} catch {
+
+  setNotifications([]);
+
+}
+
+   }, []);
 
   const unreadCount =
     notifications.filter(
@@ -93,7 +101,9 @@ export default function NotificationBell() {
             items-center
             justify-center
           ">
-            {unreadCount}
+           {unreadCount > 99
+  ? "99+"
+  : unreadCount}
           </span>
 
         )}
@@ -153,7 +163,7 @@ export default function NotificationBell() {
                 text-center
                 text-gray-500
               ">
-                No Notifications
+               🔔 No Notifications
               </div>
 
             ) : (
@@ -199,6 +209,7 @@ export default function NotificationBell() {
 
           <Link
             href="/notifications"
+            onClick={() => setOpen(false)}
             className="
               block
               text-center

@@ -61,12 +61,16 @@ export default function CategoryStrip(){
   return(
 
     <section className="
-      bg-white
-      border-b
-    ">
+  bg-gradient-to-r
+  from-green-50
+  via-white
+  to-blue-50
+  border-b
+  border-gray-200
+">
 
       <div className="
-        max-w-7xl
+       max-w-screen-2xl
         mx-auto
         px-4
         py-5
@@ -81,6 +85,7 @@ export default function CategoryStrip(){
         {categories.map((cat)=>(
 
         <motion.div
+         key={cat.name}
 
   whileHover={{
     y:-4,
@@ -95,9 +100,7 @@ export default function CategoryStrip(){
 
   <Link
 
-    key={cat.name}
-
-    href={`/category/${cat.name}`}
+   href={`/category/${cat.name}`}
 
     className="
       flex
@@ -108,8 +111,8 @@ export default function CategoryStrip(){
     "
   >
              <div className="
-              w-16
-              h-16
+              w-20
+              h-20
               rounded-full
               bg-gray-100
               flex
@@ -125,8 +128,8 @@ export default function CategoryStrip(){
                 src={cat.image}
                 alt={cat.name}
                 className="
-                  w-8
-                  h-8
+                  w-10
+                  h-10
                   object-contain
                 "
               />

@@ -263,33 +263,21 @@ if(
     return (
       
 
-    <motion.header className="
-    initial={{ y:-80 }}
-
-animate={{ y:0 }}
-
-transition={{
-  duration:0.5
-}}
+   <motion.header
+className="
   sticky
   top-0
   z-50
   bg-gradient-to-r
-  from-emerald-900
-  via-slate-900
-  to-blue-900
-  shadow-2xl
-  shadow-green-900/20
-  backdrop-blur-xl
+  from-green-200
+  via-green-50
+to-blue-100
   border-b
-  border-slate-800
+  border-gray-200
   shadow-md
-">
-       <div className="
-        max-w-7xl
-        mx-auto
-        px-4
-      ">
+"
+>
+      <div className="max-w-screen-2xl mx-auto px-4">
 
         <div className="
           h-14
@@ -309,16 +297,20 @@ transition={{
               text-green-600
               whitespace-nowrap
             ">
-              <img
-  src="/logo.png"
-  alt="Yogi-Mart"
-  className="
-    h-12
-      md:h-14
-    object-contain
-  "
-/>
-            </h1>
+
+             
+  <img
+    src="/logo.png"
+    alt="Yogi-Mart"
+    className="
+      h-20
+      md:h-24
+      w-auto
+      object-contain
+    "
+  />
+
+              </h1>
 
           </Link>
 
@@ -369,9 +361,9 @@ transition={{
                 className="
                   w-full
                   border
-                  border-slate-700
-bg-slate-900
-text-white
+                 border-gray-300
+bg-white
+text-gray-800
 placeholder:text-gray-400
                   rounded-full
                   py-2.5
@@ -391,9 +383,9 @@ placeholder:text-gray-400
     top-full
     left-0
     w-full
-    bg-slate-900
+    bg-white
 border
-border-slate-800
+border-slate-200
     shadow-xl
     rounded-2xl
     mt-2
@@ -427,7 +419,7 @@ border-slate-800
           items-center
           gap-4
           p-4
-          hover:bg-slate-800
+         hover:bg-gray-100
           transition
         ">
 
@@ -534,7 +526,7 @@ hover:to-blue-500
   <Heart className="
     w-6
     h-6
-    text-gray-200
+    text-gray-700
   " />
 
   {wishlistCount > 0 && (

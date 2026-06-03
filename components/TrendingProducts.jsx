@@ -16,7 +16,7 @@ import ProductCard from "./ProductCard";
 async function fetchTrendingProducts() {
   const q = query(
     collection(db, "products"),
-    orderBy("createdAt", "desc"),
+    orderBy("createdAt: serverTimestamp()", "desc"),
     limit(8)
   );
 
@@ -51,7 +51,7 @@ export default function TrendingProducts() {
   });
 
   return (
-    <section className="max-w-7xl mx-auto px-4 py-4">
+    <section className="max-w-screen-2xl mx-auto px-4 py-4">
 
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-3xl font-bold">
@@ -74,16 +74,35 @@ export default function TrendingProducts() {
       )}
 
       {!isLoading && products?.length > 0 && (
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 
           {products.map((product) => (
 
             <ProductCard
-              key={product.id}
-              product={product}
-            />
+  key={product.id}
+  id={product.id}
+  name={product.name}
+  price={product.price}
+  image={product.image}
+  stock={product.stock}
+/>
 
           ))}
+
+          {!isLoading && products?.length === 0 && (
+
+  <div className="
+    text-center
+    py-10
+    text-gray-500
+  ">
+
+    No Trending Products Found
+
+  </div>
+
+)}
 
         </div>
       )}

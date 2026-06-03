@@ -11,10 +11,11 @@ import { db } from "@/lib/firebase";
 
 import ProductCard from "./ProductCard";
 
+
 export default function RecommendedProducts() {
 
   const [products, setProducts] =
-    useState([]);
+  useState([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -56,7 +57,7 @@ export default function RecommendedProducts() {
               )
             );
 
-          const items = [];
+   const items = [];
 
           snapshot.forEach((doc) => {
 
@@ -69,10 +70,19 @@ export default function RecommendedProducts() {
               )
             ) {
 
-              items.push({
-                id: doc.id,
-                ...data,
-              });
+             items.push({
+
+  id: doc.id,
+
+  name: data.name || "",
+
+  price: Number(data.price || 0),
+
+  image: data.image || "",
+
+  stock: Number(data.stock || 0),
+
+});
 
             }
 
@@ -96,12 +106,18 @@ export default function RecommendedProducts() {
 
   }, []);
 
-  if (
-    loading ||
-    products.length === 0
-  ) {
-    return null;
-  }
+  if (loading) {
+
+  return (
+    <div className="py-10 text-center">
+      Loading recommendations...
+    </div>
+  );
+
+}
+if (products.length === 0) {
+  return null;
+}
 
   return (
 
@@ -130,10 +146,14 @@ export default function RecommendedProducts() {
         {products.map(
           (product) => (
 
-          <ProductCard
-            key={product.id}
-            product={product}
-          />
+         <ProductCard
+  key={product.id}
+  id={product.id}
+  name={product.name}
+  price={product.price}
+  image={product.image}
+  stock={product.stock}
+/>
 
         ))}
 

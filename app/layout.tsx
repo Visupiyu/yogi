@@ -45,7 +45,16 @@ export default function RootLayout({
 
     <html lang="en" className={cn("font-sans", geist.variable)}>
 
-      <body>
+
+<body
+  className="
+    bg-gradient-to-br
+    from-green-50
+    via-white
+    to-blue-50
+    min-h-screen
+  "
+>
 
   <QueryProvider>
 

@@ -56,7 +56,7 @@ export default function CustomerReviewsCarousel() {
     ">
 
       <div className="
-        max-w-4xl
+        max-w-5xl
         mx-auto
       ">
 
@@ -70,10 +70,14 @@ export default function CustomerReviewsCarousel() {
         </h2>
 
         <div className="
-          bg-white
+          bg-gradient-to-r
+from-green-50
+via-white
+to-blue-50
           rounded-3xl
           shadow-xl
-          p-10
+         p-6
+md:p-10
           text-center
           transition-all
           duration-500
@@ -101,11 +105,19 @@ export default function CustomerReviewsCarousel() {
           </p>
 
           <h3 className="
-            font-bold
-            text-xl
-          ">
-            {reviews[current].name}
-          </h3>
+  font-bold
+  text-xl
+">
+  {reviews[current].name}
+</h3>
+
+<p className="
+  text-green-600
+  text-sm
+  mt-1
+">
+  Verified Customer
+</p>
 
         </div>
 

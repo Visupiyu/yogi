@@ -22,6 +22,13 @@ export default function MobileBottomNav(){
 
   const pathname = usePathname();
 
+if (
+  pathname.startsWith("/seller") ||
+  pathname.startsWith("/admin")
+) {
+  return null;
+}
+
   const navItems = [
 
     {
@@ -81,11 +88,11 @@ export default function MobileBottomNav(){
     <div className="
       md:hidden
       fixed
-      bottom-3
+      bottom-4
       left-1/2
       -translate-x-1/2
       w-[95%]
-      bg-white/95
+      bg-white/90
       backdrop-blur-lg
       border
       shadow-2xl

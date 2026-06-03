@@ -100,7 +100,7 @@ export default function BestSellers() {
   return (
 
     <section className="
-      max-w-7xl
+     max-w-screen-2xl
       mx-auto
       px-4
       py-2
@@ -138,7 +138,7 @@ export default function BestSellers() {
           grid
           grid-cols-2
           md:grid-cols-4
-          gap-2
+          gap-4
         ">
 
           {[...Array(8)].map(
@@ -157,6 +157,8 @@ export default function BestSellers() {
       {!isLoading &&
        products?.length > 0 && (
 
+        
+
         <div className="
           grid
           grid-cols-2
@@ -164,15 +166,35 @@ export default function BestSellers() {
           gap-2
         ">
 
+
           {products.map(
             (product) => (
 
             <ProductCard
-              key={product.id}
-              product={product}
-            />
+  key={product.id}
+  id={product.id}
+  name={product.name}
+  price={product.price}
+  image={product.image}
+  stock={product.stock}
+/>
 
           ))}
+
+          {!isLoading &&
+ products?.length === 0 && (
+
+  <div className="
+    text-center
+    py-10
+    text-gray-500
+  ">
+
+    No Best Sellers Found
+
+  </div>
+
+)}
 
         </div>
 

@@ -25,6 +25,7 @@ interface Product {
   name: string;
   price: number;
   image?: string;
+  stock?: number;
 }
 
 export default function Header() {
@@ -33,7 +34,7 @@ export default function Header() {
   useState("");
 
 const [suggestions, setSuggestions] =
-   useState<any[]>([]);
+  useState<Product[]>([]);
 
   useEffect(() => {
 
@@ -58,7 +59,7 @@ const [suggestions, setSuggestions] =
           )
         );
 
-     const items:any[] = [];
+     const items:Product[] = [];
 
       snapshot.forEach((doc) => {
 
@@ -72,10 +73,30 @@ const [suggestions, setSuggestions] =
             )
         ) {
 
-          items.push({
-            id: doc.id,
-            ...data,
-          });
+         items.push({
+
+  id: doc.id,
+
+  name: data.name || "",
+
+  price: Number(data.price || 0),
+
+  image: data.image || "",
+
+});
+items.push({
+
+  id: doc.id,
+
+  name: data.name || "",
+
+  price: Number(data.price || 0),
+
+  image: data.image || "",
+
+  stock: Number(data.stock || 0),
+
+});
 
         }
 
@@ -180,6 +201,8 @@ const [suggestions, setSuggestions] =
                 <Search size={18} />
 
               </button>
+
+              
 
             </div>
 

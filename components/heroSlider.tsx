@@ -7,35 +7,35 @@ import { motion } from "framer-motion";
 
 export default function HeroSlider(){
 
-  const slides = [
+ const slides = [
 
-    {
-      title:"Fresh Grocery Delivered",
-      subtitle:"Daily essentials at best prices",
-      image:
-        "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1600&auto=format&fit=crop",
-      button:"Shop Grocery"
-    },
+  {
+    title:"Fresh Grocery Delivered",
+    subtitle:"Daily essentials at best prices",
+    image:"...",
+    button:"Shop Grocery",
+    link:"/category/Grocery"
+  },
 
-    {
-      title:"Latest Fashion Collection",
-      subtitle:"Trending styles for everyone",
-      image:
-        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1600&auto=format&fit=crop",
-      button:"Explore Fashion"
-    },
+  {
+    title:"Latest Fashion Collection",
+    subtitle:"Trending styles for everyone",
+    image:"...",
+    button:"Explore Fashion",
+    link:"/category/Fashion"
+  },
 
-    {
-      title:"Beauty & Electronics",
-      subtitle:"Everything you need in one marketplace",
-      image:
-        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1600&auto=format&fit=crop",
-      button:"Shop Now"
-    }
+  {
+    title:"Beauty & Electronics",
+    subtitle:"Everything you need in one marketplace",
+    image:"...",
+    button:"Shop Now",
+    link:"/search"
+  }
 
-  ];
+];
 
-  const [current,setCurrent] =
+ const [current,setCurrent] =
     useState(0);
 
   useEffect(()=>{
@@ -112,40 +112,39 @@ export default function HeroSlider(){
     h-full
     object-cover
   "
+
 />
 
-            <motion.div
-
-  initial={{
-    opacity:0,
-    scale:0.95
-  }}
-
-  animate={{
-    opacity:1,
-    scale:1
-  }}
-
-  transition={{
-    duration:0.7
-  }}
-
+<div
   className="
-    px-10
-    md:px-20
-    text-white
-    max-w-xl
+    absolute
+    inset-0
+    bg-black/40
   "
->
-              <h1
-                className="
-                  text-2xl
-                  md:text-4xl
-                  font-bold
-                  mb-6
-                "
-              >
-                {slide.title}
+/>
+
+<motion.div
+  initial={{
+    opacity: 0,
+    scale: 0.95,
+  }}
+  animate={{
+    opacity: 1,
+    scale: 1,
+  }}
+  transition={{
+    duration: 0.7,
+  }}
+  className="absolute inset-0 flex flex-col justify-center px-10 md:px-20 text-white max-w-xl z-10"
+>  <h1
+    className="
+      text-2xl
+      md:text-4xl
+      font-bold
+      mb-6
+    "
+  >
+             {slide.title}
               </h1>
 
               <p
@@ -169,8 +168,8 @@ export default function HeroSlider(){
     duration:2
   }}
 >
-  <Link
-                href="/"
+           <Link
+  href={slide.link}
                 className={`
   relative
   overflow-hidden
@@ -200,7 +199,7 @@ export default function HeroSlider(){
 
             </motion.div>
 
-          </div>
+        </div>
 
        
 

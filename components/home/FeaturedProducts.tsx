@@ -15,10 +15,24 @@ import {
 
 import { db } from "@/lib/firebase";
 
+type Product = {
+
+  id:string;
+
+  name:string;
+
+  price:number;
+
+  image:string;
+
+  stock:number;
+
+};
+
 export default function FeaturedProducts() {
 
-  const [products,setProducts] =
-    useState([]);
+ const [products,setProducts] =
+  useState<Product[]>([]);
 
   const [loading,setLoading] =
     useState(true);
@@ -37,16 +51,27 @@ export default function FeaturedProducts() {
         const snapshot =
           await getDocs(q);
 
-        const items = [];
+        const items: Product[] = [];
 
-        snapshot.forEach((doc)=>{
+snapshot.forEach((doc)=>{
 
-          items.push({
-            id:doc.id,
-            ...doc.data(),
-          });
+  const data = doc.data();
 
-        });
+  items.push({
+
+    id: doc.id,
+
+    name: data.name || "",
+
+    price: Number(data.price || 0),
+
+    image: data.image || "",
+
+    stock: Number(data.stock || 0),
+
+  });
+
+});
 
         setProducts(items);
 
@@ -89,7 +114,7 @@ export default function FeaturedProducts() {
           </h2>
 
           <Link
-            href="/products"
+            href="/store"
             className="text-green-600 font-semibold"
           >
             View All
@@ -102,7 +127,7 @@ export default function FeaturedProducts() {
           grid-cols-2
           md:grid-cols-3
           lg:grid-cols-4
-          gap-1
+          gap-4
         ">
 
           {products.map((product)=>(
@@ -115,12 +140,27 @@ export default function FeaturedProducts() {
               image={product.image}
               stock={product.stock}
             />
-
+            
           ))}
 
-        </div>
+        {products.length === 0 && (
+
+  <div className="
+    col-span-full
+    text-center
+    py-10
+    text-gray-500
+  ">
+
+    No Featured Products Found
+
+  </div>
+
+)}
 
       </div>
+
+          </div>
 
     </section>
 
