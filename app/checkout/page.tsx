@@ -90,12 +90,7 @@ async ()=>{
 
   try{
 
-    console.log(
-  "Entered Coupon:",
-  coupon
-);
-
-    const q = query(
+   const q = query(
       
 
       collection(
@@ -106,7 +101,9 @@ async ()=>{
       where(
         "code",
         "==",
-        coupon.toUpperCase()
+        coupon
+.trim()
+.toUpperCase()
       )
 
     );
@@ -114,12 +111,7 @@ async ()=>{
     const snapshot =
       await getDocs(q);
 
-      console.log(
-  "Found docs:",
-  snapshot.size
-);
-
-    if(snapshot.empty){
+      if(snapshot.empty){
 
       alert(
         "Invalid coupon"
@@ -132,20 +124,8 @@ async ()=>{
     const couponData =
       snapshot.docs[0].data();
 
-      alert(
-  JSON.stringify(
-    couponData
-  )
-);
-
-      console.log(
-  "Coupon Data JSON:",
-  JSON.stringify(
-    couponData
-  )
-);
-
-    if(
+      
+      if(
       !couponData.active
     ){
 
@@ -302,6 +282,18 @@ async()=>{
 
   alert(
     "Fill all checkout fields"
+  );
+
+  return;
+
+}
+
+if(
+  !/^\d{10}$/.test(phone)
+){
+
+  alert(
+    "Enter valid 10 digit phone number"
   );
 
   return;
@@ -497,15 +489,11 @@ if(items.length === 0){
   const data =
     await response.json();
 
-    console.log(
-  "Razorpay Key:",
-  process.env.NEXT_PUBLIC_RAZORPAY_KEY
-);
-
   const options = {
 
     key:
-  "rzp_test_So0I1FDtAqLeWe",
+  process.env
+.NEXT_PUBLIC_RAZORPAY_KEY,
     amount:
       data.amount,
 
@@ -610,6 +598,14 @@ if(items.length === 0){
 
                 deliveryDate:
                   deliveryDate,
+
+                  couponCode:
+  couponApplied
+    ? coupon
+    : "",
+
+discount:
+  discount,
 
                   userEmail:
 

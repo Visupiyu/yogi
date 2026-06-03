@@ -244,7 +244,7 @@ async()=>{
                       text-2xl
                       font-bold
                     ">
-                      Order #{index + 1}
+                      Order ID: {order.id.slice(0,8)}
                     </h2>
 
                     <p className="
@@ -264,12 +264,16 @@ async()=>{
                       text-xl
                       font-bold
                     ">
-                      ₹{order.total}
+                     ₹{
+  order.finalTotal ||
+  order.total
+}
                     </p>
 
                     <a
   href={`/invoice/${order.id}`}
   target="_blank"
+  rel="noopener noreferrer"
   className="
     bg-blue-600
     text-white

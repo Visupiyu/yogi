@@ -22,8 +22,7 @@ const [discount,setDiscount] =
         localStorage.getItem("cart") || "[]"
       );
 
-      
-
+     
     setCart(storedCart);
 
   }, []);
@@ -31,40 +30,42 @@ const [discount,setDiscount] =
   /* UPDATE QTY */
 
   const updateQty = (
-  index: number,
-  type: string
-) => {
+  index:number,
+  type:string
+)=>{
 
-    const updatedCart = [...cart];
+  const updatedCart =
+    [...cart];
 
-    if(
+  if(
+    type === "inc" &&
+    updatedCart[index].qty <
+    updatedCart[index].stock
+  ){
 
-  updatedCart[index].qty <
+    updatedCart[index].qty += 1;
 
-  updatedCart[index].stock
+  }
 
-){
+  if(
+    type === "dec" &&
+    updatedCart[index].qty > 1
+  ){
 
-  updatedCart[index].qty += 1;
+    updatedCart[index].qty -= 1;
 
-}
-    if (
-      type === "dec" &&
-      updatedCart[index].qty > 1
-    ) {
+  }
 
-      updatedCart[index].qty -= 1;
+  setCart(updatedCart);
 
-    }
+  localStorage.setItem(
+    "cart",
+    JSON.stringify(
+      updatedCart
+    )
+  );
 
-    setCart(updatedCart);
-
-    localStorage.setItem(
-      "cart",
-      JSON.stringify(updatedCart)
-    );
-
-  };
+};
 
   /* REMOVE ITEM */
 
@@ -288,34 +289,22 @@ const [discount,setDiscount] =
                       mt-2
                     ">
                       ₹{item.price}
-                      <p className="
-  mt-2
-  text-sm
-">
 
-  {
-
-    item.stock > 0
-
-    ? `Stock: ${item.stock}`
-
-    : "Out Of Stock"
-
+                       </p>
+                      <p className=" mt-2 text-sm ">
+  { item.stock > 0 
+    ? `Stock: ${item.stock}` 
+    : "Out Of Stock" 
   }
-
 </p>
-                    </p>
-
-                    <div className="
+                          <div className="
                       flex
                       items-center
                       gap-4
                       mt-4
                     ">
-
                       <button
-                      
-                        onClick={() =>
+                       onClick={() =>
                           updateQty(
                             index,
                             "dec"
@@ -338,10 +327,7 @@ const [discount,setDiscount] =
                       ">
                         {item.qty}
                       </span>
-
-                      
-  <button
-
+                  <button
   disabled={
     item.qty >= item.stock
   }
@@ -368,11 +354,9 @@ const [discount,setDiscount] =
     }
   `}
 >
-
   +
 
 </button>
-
                     </div>
 
                   </div>
@@ -425,15 +409,18 @@ const [discount,setDiscount] =
             ">
 
               <h2 className="
-                text-2xl
-                font-bold
-                mb-6
-              ">
-                Order Summary
-                <p className="
+  text-2xl
+  font-bold
+">
+  Order Summary
+</h2>
+
+<p className="
   text-gray-500
   mt-2
+  mb-6
 ">
+
 
   Total Items:
   {" "}
@@ -452,9 +439,7 @@ const [discount,setDiscount] =
   )}
 
 </p>
-              </h2>
-
-              <div className="
+                <div className="
   flex
   gap-3
   mt-5
@@ -528,17 +513,11 @@ const [discount,setDiscount] =
       {
 
         shipping === 0
-
         ?
-
         "FREE"
-
         :
-
         `₹${shipping}`
-
       }
-
     </span>
 
   </div>
@@ -548,15 +527,11 @@ const [discount,setDiscount] =
     justify-between
     text-green-600
   ">
-
     <span>Discount</span>
-
     <span>
       -₹{discount}
     </span>
-
   </div>
-
   <div className="
     flex
     justify-between
@@ -565,18 +540,12 @@ const [discount,setDiscount] =
     border-t
     pt-4
   ">
-
     <span>Total</span>
-
     <span>
       ₹{grandTotal}
     </span>
-
   </div>
-
 </div>
-
-     
 
               <button
                 onClick={proceedCheckout}
@@ -594,7 +563,10 @@ const [discount,setDiscount] =
                 "
               >
                 Proceed To Checkout
+              </button>
+                
                 <button
+
 
   onClick={()=>{
 
@@ -622,7 +594,7 @@ const [discount,setDiscount] =
   Clear Cart
 
 </button>
-              </button>
+    
 
             </div>
 

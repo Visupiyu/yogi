@@ -446,6 +446,8 @@ loadOrders();
                 Yogi Mart
               </h3>
 
+              </div>
+
               <div className="
   bg-white
   rounded-3xl
@@ -459,26 +461,20 @@ loadOrders();
     font-bold
     mb-6
   ">
-
     Saved Address
-
   </h2>
 
   <p className="
     text-gray-500
     leading-8
   ">
-
     Add your delivery
     addresses during
     checkout for faster
     shopping experience.
-
   </p>
 
 </div>
-
-            </div>
 
           </div>
 
@@ -530,7 +526,7 @@ loadOrders();
           ">
             Order ID:
             {" "}
-            {order.id}
+            {order.id.slice(0,8)}
           </p>
 
           <p>
@@ -542,7 +538,10 @@ loadOrders();
           <p>
             Total:
             {" "}
-            ₹{order.finalTotal}
+           ₹{
+  order.finalTotal ||
+  order.total
+}
           </p>
 
         </div>

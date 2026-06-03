@@ -61,7 +61,7 @@ type Product = {
 
 };
 
-export default function Home(){
+export default function Home() {
 
   const [search,setSearch] =
     useState("");
@@ -123,6 +123,23 @@ const {
 
 });
 
+if(error){
+
+  return(
+
+    <div className="
+      p-10
+      text-center
+    ">
+
+      Failed to load products
+
+    </div>
+
+  );
+
+}
+
  if(isLoading)
 
     return(
@@ -143,6 +160,8 @@ const {
       lg:grid-cols-4
       gap-6
     ">
+
+      
 
       {[...Array(8)].map((_,i)=>(
 
@@ -224,6 +243,8 @@ const {
     ">
 
       <CategoryStrip />
+
+      <TopStrip />
 
       <FeatureStrip />
 
@@ -534,6 +555,8 @@ hover:to-blue-500
 
       <BestSellers />
 
+      <RecommendedProducts />
+
       <CustomerReviewsCarousel />
 
       <FeaturedProducts />
@@ -546,4 +569,4 @@ hover:to-blue-500
 
   );
 
-  }
+}

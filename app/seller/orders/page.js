@@ -231,7 +231,7 @@ export default function SellerOrdersPage(){
               >
                 Order ID:
                 {" "}
-                {order.id}
+                {order.id.slice(0,8)}
               </h2>
 
               <p>
@@ -245,6 +245,11 @@ export default function SellerOrdersPage(){
                 {" "}
                 {order.phone}
               </p>
+              <p>
+  Email:
+  {" "}
+  {order.userEmail}
+</p>
 
               <p>
                 Address:
@@ -321,7 +326,7 @@ export default function SellerOrdersPage(){
                   </option>
 
                   <option>
-                  Processing
+                  Confirmed
                   </option>
 
                   <option>
@@ -357,7 +362,7 @@ export default function SellerOrdersPage(){
 
   {[
     "Pending",
-    "Processing",
+    "Confirmed",
     "Packed",
     "Shipped",
     "Out For Delivery",
@@ -373,32 +378,30 @@ export default function SellerOrdersPage(){
         text-xs
 
         ${
-          step === order.status
+  [
+    "Pending",
+    "Confirmed",
+    "Packed",
+    "Shipped",
+    "Out For Delivery",
+    "Delivered"
+  ].indexOf(step)
 
-          [
-  "Pending",
-  "Processing",
-  "Packed",
-  "Shipped",
-  "Out For Delivery",
-  "Delivered"
-].indexOf(step)
+  <=
 
-<=
+  [
+    "Pending",
+    "Confirmed",
+    "Packed",
+    "Shipped",
+    "Out For Delivery",
+    "Delivered"
+  ].indexOf(order.status)
 
-[
-  "Pending",
-  "Processing",
-  "Packed",
-  "Shipped",
-  "Out For Delivery",
-  "Delivered"
-].indexOf(order.status)
+  ? "bg-green-600 text-white"
 
-? "bg-green-600 text-white"
-
-: "bg-gray-200"
-          }
+  : "bg-gray-200"
+}
       `}
     >
 
@@ -433,11 +436,12 @@ export default function SellerOrdersPage(){
                     </p>
 
                     <p>
-                      ₹
-                      {item.price}
-                      {" × "}
-                      {item.qty}
-                    </p>
+  ₹{item.price}
+  {" × "}
+  {item.qty}
+  {" = "}
+  ₹{item.price * item.qty}
+</p>
 
                   </div>
 

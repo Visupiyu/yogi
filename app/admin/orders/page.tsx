@@ -77,6 +77,10 @@ export default function AdminOrdersPage(){
               data.status ||
               "Pending",
 
+              finalTotal:
+  data.finalTotal ||
+  data.total,
+
             createdAt:
               data.createdAt
               ?.toDate?.()
@@ -186,6 +190,44 @@ const totalRevenue =
 
         </h1>
 
+        <div className="
+  grid
+  grid-cols-1
+  md:grid-cols-4
+  gap-6
+  mb-8
+">
+
+  <div className="bg-white p-6 rounded-2xl shadow">
+    <h3>Total Orders</h3>
+    <p className="text-3xl font-bold">
+      {totalOrders}
+    </p>
+  </div>
+
+  <div className="bg-white p-6 rounded-2xl shadow">
+    <h3>Pending</h3>
+    <p className="text-3xl font-bold text-yellow-600">
+      {pendingOrders}
+    </p>
+  </div>
+
+  <div className="bg-white p-6 rounded-2xl shadow">
+    <h3>Delivered</h3>
+    <p className="text-3xl font-bold text-green-600">
+      {deliveredOrders}
+    </p>
+  </div>
+
+  <div className="bg-white p-6 rounded-2xl shadow">
+    <h3>Revenue</h3>
+    <p className="text-3xl font-bold text-blue-600">
+      ₹{totalRevenue}
+    </p>
+  </div>
+
+</div>
+
         {loading ? (
 
           <p>
@@ -228,6 +270,11 @@ const totalRevenue =
                     Date
                   </th>
 
+                  <th className="text-left py-4">
+  Invoice
+</th>
+
+
                 </tr>
 
               </thead>
@@ -244,7 +291,7 @@ const totalRevenue =
                   >
 
                     <td className="py-4">
-                      {order.id}
+                      {order.id.slice(0,8)}
                     </td>
 
                     <td>
@@ -252,7 +299,10 @@ const totalRevenue =
                     </td>
 
                     <td>
-                      ₹{order.total}
+                     ₹{
+  (order as any).finalTotal ||
+  order.total
+}
                     </td>
 
                     <td>
@@ -318,10 +368,34 @@ const totalRevenue =
                       {order.createdAt}
                     </td>
 
+                    <td>
+
+  <a
+    href={`/invoice/${order.id}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="
+      bg-blue-600
+      text-white
+      px-3
+      py-2
+      rounded-lg
+    "
+  >
+
+    Invoice
+
+  </a>
+
+</td>
+
                   </tr>
 
                 ))}
 
+               
+
+  
                 
               </tbody>
 
