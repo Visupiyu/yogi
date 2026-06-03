@@ -35,7 +35,7 @@ export default function ContactPage() {
                 <Phone className="text-green-600" />
 
                 <span>
-                  +91 XXXXX XXXXX
+                  +91 6358761569
                 </span>
 
               </div>
@@ -45,7 +45,7 @@ export default function ContactPage() {
                 <Mail className="text-blue-600" />
 
                 <span>
-                  support@yogimart.com
+                  yogimart.help@gmail.com
                 </span>
 
               </div>
@@ -77,6 +77,7 @@ export default function ContactPage() {
               <input
                 type="text"
                 placeholder="Your Name"
+                  required
                 className="
                   w-full
                   border
@@ -88,6 +89,7 @@ export default function ContactPage() {
               <input
                 type="email"
                 placeholder="Your Email"
+                  required
                 className="
                   w-full
                   border
@@ -99,6 +101,7 @@ export default function ContactPage() {
               <input
                 type="text"
                 placeholder="Subject"
+                  required
                 className="
                   w-full
                   border
@@ -110,6 +113,7 @@ export default function ContactPage() {
               <textarea
                 placeholder="Your Message"
                 rows={5}
+                required
                 className="
                   w-full
                   border

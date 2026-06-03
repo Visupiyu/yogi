@@ -16,9 +16,7 @@ import {
   getDocs,
   query,
   where,
-  doc,
-  getDoc,
-} from "firebase/firestore";
+ } from "firebase/firestore";
 
 import { db }
 from "@/lib/firebase";
@@ -195,7 +193,7 @@ setTotalStock(
     rounded-xl
   "
 >
-  ← Back to Stores
+  ← Back to Store
 </Link>
 
         {/* STORE HEADER */}
@@ -257,9 +255,8 @@ setTotalStock(
     </p>
 
     <p>
-      📧 {vendorInfo.email}
-    </p>
-
+  ✅ Verified Marketplace Seller
+</p>
     <p>
       📞 {vendorInfo.businessPhone}
     </p>
@@ -382,11 +379,13 @@ setTotalStock(
 
             {products
   .filter((product) =>
-    product.name
-      ?.toLowerCase()
-      .includes(
-        search.toLowerCase()
-      )
+    (
+  product.name || ""
+)
+.toLowerCase()
+.includes(
+  search.trim().toLowerCase()
+)
   )
   .map(
               (

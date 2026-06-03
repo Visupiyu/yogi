@@ -8,9 +8,24 @@ export default function TrackOrderPage() {
         Track Order
       </h1>
 
-      <p className="text-gray-600">
-        Please visit your Orders page to track order status.
-      </p>
+      <p className="text-gray-600 mb-6">
+  Please visit your Orders page to track order status.
+</p>
+
+<a
+  href="/orders"
+  className="
+    inline-block
+    bg-blue-600
+    text-white
+    px-6
+    py-3
+    rounded-xl
+    font-semibold
+  "
+>
+  View My Orders
+</a>
 
     </div>
 

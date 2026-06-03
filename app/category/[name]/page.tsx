@@ -49,10 +49,14 @@ export default function CategoryPage({
 
   const [category,setCategory] =
     useState("");
+    const [loading,setLoading] =
+  useState(true);
 
   useEffect(()=>{
 
     async function loadProducts(){
+
+        setLoading(true);
 
       const { name } =
         await params;
@@ -99,12 +103,32 @@ export default function CategoryPage({
 });
 
       setProducts(items);
+      setLoading(false);
 
     }
 
     loadProducts();
 
   },[params]);
+
+  if(loading){
+
+  return(
+
+    <div className="
+      min-h-screen
+      flex
+      items-center
+      justify-center
+    ">
+
+      Loading Products...
+
+    </div>
+
+  );
+
+}
 
   return (
 
@@ -114,9 +138,38 @@ export default function CategoryPage({
 
         <h1 className="text-5xl font-bold mb-10 capitalize">
 
-          {category}
+          {category} Products
 
         </h1>
+        </div>
+
+        {products.length === 0 && (
+
+  <div className="
+    bg-white
+    rounded-3xl
+    shadow-md
+    p-10
+    text-center
+  ">
+
+    <h2 className="
+      text-2xl
+      font-bold
+      mb-3
+    ">
+      No Products Found
+    </h2>
+
+    <p className="
+      text-gray-500
+    ">
+      No products available in this category.
+    </p>
+
+  </div>
+
+)}
 
         <div
           className="
@@ -128,6 +181,8 @@ export default function CategoryPage({
             gap-8
           "
         >
+          {products.length > 0 && (
+  <div className="grid ...">
 
           {products.map((product)=>(
 
@@ -143,6 +198,8 @@ export default function CategoryPage({
           ))}
 
         </div>
+
+          )}
 
       </div>
 

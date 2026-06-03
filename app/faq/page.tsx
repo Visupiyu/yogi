@@ -36,7 +36,31 @@ export default function FAQPage() {
       question: "Can I cancel an order?",
       answer:
         "Orders can be cancelled before they are shipped."
-    }
+    },
+
+ {
+  question:
+    "Can I return a product?",
+
+  answer:
+    "Yes. Eligible products can be returned according to our return policy."
+},
+
+{
+  question:
+    "When do vendors receive payouts?",
+
+  answer:
+    "Vendor payouts are processed according to the Yogi-Mart payout schedule."
+},
+
+{
+  question:
+    "Do I need an account to place an order?",
+
+  answer:
+    "Yes. Please create an account and login before checkout."
+},
 
   ];
 

@@ -1,87 +1,172 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { useParams } from "next/navigation";
 
 import {
+  doc,
+  getDoc
+} from "firebase/firestore";
 
-  Heart,
+import { db } from "@/lib/firebase";
 
-  ShoppingCart,
+import Link from "next/link";
 
-  Star
+export default function ProductPage() {
 
-} from "lucide-react";
+  const params = useParams();
 
-import { motion }
-from "framer-motion";
+  const [product,setProduct] =
+    useState<any>(null);
 
-type Props = {
+  const [loading,setLoading] =
+    useState(true);
 
-  id:string;
+  useEffect(()=>{
 
-  name:string;
+    async function loadProduct(){
 
-  price:number;
+      try{
 
-  image:string;
+        const snap =
+          await getDoc(
 
-  stock:number;
+            doc(
+              db,
+              "products",
+              params.id as string
+            )
 
-};
+          );
 
-export default function ProductCard({
+        if(
+          snap.exists()
+        ){
 
-  id,
+          setProduct({
 
-  name,
+            id:snap.id,
 
-  price,
+            ...snap.data()
 
-  image,
+          });
 
-  stock
+        }
 
-}:Props){
+      }catch(error){
+
+        console.log(error);
+
+      }finally{
+
+        setLoading(false);
+
+      }
+
+    }
+
+    if(params?.id){
+
+      loadProduct();
+
+    }
+
+  },[params]);
+
+  const addToCart = ()=>{
+
+    const cart = JSON.parse(
+
+      localStorage.getItem(
+        "cart"
+      ) || "[]"
+
+    );
+
+    const index = cart.findIndex(
+
+      (item:any)=>
+
+        item.id === product.id
+
+    );
+
+    if(index > -1){
+
+      cart[index].qty += 1;
+
+    }else{
+
+      cart.push({
+
+        id:product.id,
+
+        name:product.name,
+
+        price:product.price,
+
+        image:product.image,
+
+        stock:product.stock,
+
+        qty:1
+
+      });
+
+    }
+
+    localStorage.setItem(
+
+      "cart",
+
+      JSON.stringify(cart)
+
+    );
+
+    window.dispatchEvent(
+
+      new Event(
+        "cartUpdated"
+      )
+
+    );
+
+    alert(
+      "Added To Cart"
+    );
+
+  };
 
   const addToWishlist = ()=>{
 
-    const wishlist =
+    const wishlist = JSON.parse(
 
-      JSON.parse(
+      localStorage.getItem(
+        "wishlist"
+      ) || "[]"
 
-        localStorage.getItem(
-          "wishlist"
-        ) || "[]"
-
-      );
+    );
 
     const exists = wishlist.find(
 
       (item:any)=>
 
-        item.id === id
+        item.id === product.id
 
     );
 
     if(exists){
 
-      alert("Already In Wishlist");
+      alert(
+        "Already In Wishlist"
+      );
 
       return;
 
     }
 
-    wishlist.push({
-
-      id,
-
-      name,
-
-      price,
-
-      image
-
-    });
+    wishlist.push(product);
 
     localStorage.setItem(
 
@@ -99,355 +184,277 @@ export default function ProductCard({
 
     );
 
-    alert("Added To Wishlist");
+    alert(
+      "Added To Wishlist"
+    );
 
   };
 
-  const addToCart = ()=>{
+  if(loading){
 
-    const existingCart =
+    return(
 
-      JSON.parse(
+      <div className="
+        min-h-screen
+        flex
+        items-center
+        justify-center
+      ">
 
-        localStorage.getItem(
-          "cart"
-        ) || "[]"
+        Loading Product...
 
-      );
+      </div>
 
-    const existingIndex =
-
-      existingCart.findIndex(
-
-        (cartItem:any)=>
-
-          cartItem.id === id
-
-      );
-
-    if(existingIndex > -1){
-
-  if(
-
-    existingCart[
-      existingIndex
-    ].qty < stock
-
-  ){
-
-    existingCart[
-      existingIndex
-    ].qty += 1;
-
-  }else{
-
-    alert(
-      "Maximum stock reached"
     );
-
-    return;
 
   }
 
-}
-    
-    else{
+  if(!product){
 
-      existingCart.push({
+    return(
 
-        id,
+      <div className="
+        min-h-screen
+        flex
+        items-center
+        justify-center
+      ">
 
-        name,
+        Product Not Found
 
-        price,
-
-        image,
-
-        stock,
-
-        qty:1
-
-      });
-
-    }
-
-    localStorage.setItem(
-
-      "cart",
-
-      JSON.stringify(
-        existingCart
-      )
+      </div>
 
     );
 
-    window.dispatchEvent(
-
-      new Event(
-        "cartUpdated"
-      )
-
-    );
-
-    alert("Added To Cart");
-
-  };
+  }
 
   return(
 
-    <motion.div
+    <div className="
+      min-h-screen
+      bg-gray-100
+      p-6
+    ">
 
-  initial={{ opacity:0, y:20 }}
-
-  animate={{ opacity:1, y:0 }}
-
-  whileHover={{
-    y:-8,
-    scale:1.02
-  }}
-
-  transition={{
-    duration:0.3
-  }}
-
-  className="
-    bg-white
-    rounded-2xl
-    overflow-hidden
-    shadow-md
-    hover:shadow-2xl
-    transition
-    duration-300
-    group
-  "
->    
-
-      {/* IMAGE */}
-
-      <motion.div className="
-        relative
-        overflow-hidden
+      <div className="
+        max-w-7xl
+        mx-auto
+        bg-white
+        rounded-3xl
+        shadow
+        p-8
       ">
 
-        <Link
-          href={`/product/${id}`}
-        >
-        
-
-          <img
-            src={
-              image ||
-              "/no-image.png"
-            }
-            alt={name}
-            className="
-              w-full
-              h-44
-              md:h-52
-              object-cover
-              bg-white
-              p-1
-              group-hover:scale-110
-              ease-out
-              transition
-              duration-500
-            "
-          />
-
-        </Link>
-
-        {/* DISCOUNT */}
-
-        <motion.div className="
-          absolute
-          top-3
-          left-3
-          bg-orange-500
-          text-white
-          text-xs
-          font-bold
-          px-3
-          py-1
-          rounded-full
+        <div className="
+          grid
+          md:grid-cols-2
+          gap-10
         ">
 
-      25% OFF
+          {/* IMAGE */}
 
-      </motion.div>
+          <div>
 
-        {/* WISHLIST */}
+            <img
+              src={
+                product.image ||
+                "/no-image.png"
+              }
+              alt={product.name}
+              className="
+                w-full
+                rounded-2xl
+                object-cover
+              "
+            />
 
-        <motion.button
+          </div>
 
-  whileTap={{
-    scale:0.95
-  }}
+          {/* DETAILS */}
 
-  whileHover={{
-    scale:1.03
-  }}
+          <div>
 
-          onClick={addToWishlist}
+            <h1 className="
+              text-4xl
+              font-bold
+              mb-4
+            ">
 
-          className="
-            absolute
-            top-3
-            right-3
-            bg-white
-            w-10
-            h-10
-            rounded-full
-            flex
-            items-center
-            justify-center
-            shadow-md
-            hover:bg-pink-500
-            hover:text-white
-            transition
-          "
-        >
+              {product.name}
 
-          <Heart size={18} />
+            </h1>
 
-        </motion.button>
+            <p className="
+              text-green-600
+              text-3xl
+              font-bold
+              mb-4
+            ">
 
-     </motion.div>
+              ₹{product.price}
 
-      {/* CONTENT */}
+            </p>
 
-      <motion.div className="
-        p-3
-      ">
+            <p className="
+              text-gray-600
+              mb-4
+            ">
 
-        {/* RATING */}
+              Category:
+              {" "}
+              {product.category}
+            </p>
 
-        <motion.div className="
-          flex
-          items-center
-          gap-1
-          text-yellow-500
-          mb-2
-        ">
+            <p className="
+              text-gray-600
+              mb-6
+            ">
 
-          <Star size={14} fill="currentColor" />
-          <Star size={14} fill="currentColor" />
-          <Star size={14} fill="currentColor" />
-          <Star size={14} fill="currentColor" />
-          <Star size={14} fill="currentColor" />
+              Stock:
+              {" "}
+              {product.stock}
+            </p>
 
-          <span className="
-            text-gray-500
-            text-sm
-            ml-1
-          ">
+            <div className="
+              flex
+              gap-4
+              mb-8
+            ">
 
-            (4.9)
+              <button
 
-          </span>
+                onClick={addToCart}
 
-     </motion.div>
+                className="
+                  bg-green-600
+                  text-white
+                  px-6
+                  py-3
+                  rounded-xl
+                  font-bold
+                "
+              >
 
-        {/* NAME */}
+                Add To Cart
 
-        <Link
-          href={`/product/${id}`}
-        >
+              </button>
 
-          <h3 className="
-            font-semibold
-            text-base
-            md:text-lg
-            line-clamp-2
-            min-h-[36px]
-            hover:text-green-600
-            transition
-          ">
+              <button
 
-            {name}
+                onClick={addToWishlist}
 
-          </h3>
+                className="
+                  bg-pink-600
+                  text-white
+                  px-6
+                  py-3
+                  rounded-xl
+                  font-bold
+                "
+              >
 
-        </Link>
+                Wishlist
 
-        {/* PRICE */}
+              </button>
 
-        <motion.div className="
-          flex
-          items-center
-          gap-2
-          mt-0
-        ">
+            </div>
 
-          <p className="
-            text-green-600
+            <Link
+              href="/checkout"
+              className="
+                inline-block
+                bg-blue-600
+                text-white
+                px-6
+                py-3
+                rounded-xl
+                font-bold
+              "
+            >
+
+              Buy Now
+
+            </Link>
+
+          </div>
+
+        </div>
+
+        {/* DESCRIPTION */}
+
+        <div className="mt-12">
+
+          <h2 className="
+            text-2xl
             font-bold
-            text-lg
+            mb-4
           ">
 
-            ₹{price}
+            Product Description
 
-          </p>
+          </h2>
 
           <p className="
-            text-gray-400
-            line-through
-            text-sm
+            text-gray-700
+            leading-8
           ">
 
-          ₹{Math.round(price * 1.25)}
+            {
+              product.description ||
+              "No description available."
+            }
 
           </p>
 
-       </motion.div>
+        </div>
 
-        {/* BUTTON */}
+        {/* REVIEWS */}
 
-        <motion.button
+        <div className="mt-12">
 
-          disabled={
-            stock <= 0
-          }
+          <h2 className="
+            text-2xl
+            font-bold
+            mb-4
+          ">
 
-          onClick={addToCart}
+            Reviews & Ratings
 
-          className={`
+          </h2>
 
-  mt-3
-  w-full
-  flex
-  items-center
-  justify-center
-  gap-2
-  py-2.5
-  rounded-xl
-  font-semibold
-  transition
+          <p className="text-gray-500">
 
-  ${stock <= 0
+            Reviews feature coming soon.
 
-    ? "bg-gray-300 text-gray-500"
+          </p>
 
-    : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white"
+        </div>
 
-  }
+        {/* RELATED PRODUCTS */}
 
-`}        >
+        <div className="mt-12">
 
-          <ShoppingCart size={18} />
+          <h2 className="
+            text-2xl
+            font-bold
+            mb-4
+          ">
 
-          {stock <= 0
+            Related Products
 
-            ? "Out Of Stock"
+          </h2>
 
-            : "Add To Cart"
+          <p className="text-gray-500">
 
-          }
+            Related products section coming soon.
 
-        </motion.button>
+          </p>
 
-     </motion.div>
+        </div>
 
-   </motion.div>
+      </div>
+
+    </div>
 
   );
 

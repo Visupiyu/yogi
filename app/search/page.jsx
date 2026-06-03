@@ -65,15 +65,19 @@ const [filtered,setFiltered] =
 
           const data = doc.data();
 
-          if(
-            data.name
-            ?.toLowerCase()
-            .includes(
-              query
-.trim()
-.toLowerCase()
-            )
-          ){
+         const searchText =
+`
+${data.name || ""}
+${data.category || ""}
+${data.description || ""}
+`
+.toLowerCase();
+
+if(
+  searchText.includes(
+    query.trim().toLowerCase()
+  )
+){
 
             items.push({
               id:doc.id,
@@ -342,9 +346,12 @@ if(sort === "stock"){
 
         {loading ? (
 
-          <div>
-            Loading...
-          </div>
+          <div className="
+  text-center
+  py-20
+">
+  Loading Products...
+</div>
 
         ) : filtered.length === 0 ? (
 
@@ -469,7 +476,12 @@ if(sort === "stock"){
                       text-lg
                       mt-2
                     ">
-                      ₹{product?.price}
+                      <p className="
+  text-gray-400
+  line-through
+">
+  ₹{Math.round(product.price * 1.25)}
+</p>
                     </p>
 
                     {product?.stock > 0 ? (

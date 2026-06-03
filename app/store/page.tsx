@@ -33,16 +33,17 @@ export default function StoresPage() {
             )
           );
 
-        const data =
-          snap.docs.map(
-            (doc)=>({
-
-              id: doc.id,
-
-              ...doc.data()
-
-            })
-          );
+       const data =
+  snap.docs
+    .map((doc)=>({
+      id: doc.id,
+      ...doc.data()
+    }))
+    .filter(
+      (vendor:any)=>
+        vendor.status ===
+        "Approved"
+    );
 
         setStores(data);
 
@@ -139,8 +140,22 @@ export default function StoresPage() {
               </p>
 
               <p className="text-gray-600 mb-6">
-                {store.email}
+                Vendor Verified Seller
               </p>
+
+              <span className="
+  inline-block
+  bg-green-100
+  text-green-700
+  px-3
+  py-1
+  rounded-full
+  text-sm
+  font-semibold
+  mb-3
+">
+  Verified Store
+</span>
 
               <Link
                 href={`/store/${store.uid}`}

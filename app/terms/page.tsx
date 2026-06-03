@@ -17,6 +17,10 @@ export default function TermsPage() {
             these Terms & Conditions.
           </p>
 
+          <p className="text-center text-gray-500 mb-8">
+  Last Updated: June 2026
+</p>
+
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
@@ -80,9 +84,21 @@ export default function TermsPage() {
               activities, or violate any applicable laws.
             </p>
 
-          </div>
+          </div> 
 
           <div>
+
+            <div>
+
+  <h2 className="text-2xl font-bold mb-2">
+    Limitation of Liability
+  </h2>
+
+  <p>
+    Yogi-Mart shall not be liable for indirect, incidental, or consequential damages arising from the use of the platform.
+  </p>
+
+</div>
 
             <h2 className="text-2xl font-bold mb-2">
               Changes to Terms
@@ -93,6 +109,18 @@ export default function TermsPage() {
               time. Continued use of the platform constitutes acceptance
               of any changes.
             </p>
+
+            <div>
+
+  <h2 className="text-2xl font-bold mb-2">
+    Contact Information
+  </h2>
+
+  <p>
+    For questions regarding these Terms & Conditions, please contact us through the Contact Us page.
+  </p>
+
+</div>
 
           </div>
 

@@ -19,6 +19,8 @@ type User = {
 
   role:string;
 
+   status?:string;
+
 };
 
 export default function AdminUsersPage(){
@@ -60,6 +62,10 @@ export default function AdminUsersPage(){
 
             id:docSnap.id,
 
+            status:
+  data.status ||
+  "Pending",
+
             name:
               data.fullName ||
               "Vendor",
@@ -97,7 +103,7 @@ export default function AdminUsersPage(){
 
         <h1 className="text-4xl font-bold mb-8">
 
-          Admin Users
+        User Management
 
         </h1>
 
@@ -217,6 +223,10 @@ export default function AdminUsersPage(){
                     Role
                   </th>
 
+                  <th className="text-left py-4">
+                    Status
+                  </th>
+
                 </tr>
 
               </thead>
@@ -240,6 +250,10 @@ export default function AdminUsersPage(){
 
                     <td>
                       {user.role}
+                    </td>
+
+                    <td>
+                      {user.status}
                     </td>
 
                   </tr>

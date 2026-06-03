@@ -10,6 +10,10 @@ export default function PrivacyPolicyPage() {
           Privacy Policy
         </h1>
 
+        <p className="text-center text-gray-500 mb-8">
+  Last Updated: June 2026
+</p>
+
         <div className="bg-white p-8 rounded-2xl shadow space-y-6">
 
           <p>
@@ -61,7 +65,7 @@ export default function PrivacyPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              Third-Party Services
+              trusted third-party providers such as Razorpay, Firebase, payment gateways, and logistics partners.
             </h2>
 
             <p>
@@ -72,6 +76,18 @@ export default function PrivacyPolicyPage() {
           </div>
 
           <div>
+
+            <div>
+
+  <h2 className="text-2xl font-bold mb-2">
+    Cookies
+  </h2>
+
+  <p>
+    Yogi-Mart may use cookies and similar technologies to improve user experience and website performance.
+  </p>
+
+</div>
 
             <h2 className="text-2xl font-bold mb-2">
               Contact Us

@@ -1,3 +1,5 @@
+ import Link from "next/link";
+
 export default function AboutPage() {
 
   return (
@@ -88,6 +90,35 @@ export default function AboutPage() {
           </div>
 
         </div>
+        <div className="
+  bg-white
+  p-8
+  rounded-2xl
+  shadow
+  mt-10
+">
+
+  <h2 className="
+    text-3xl
+    font-bold
+    mb-4
+  ">
+    Our Values
+  </h2>
+
+  <p className="
+    text-gray-600
+    leading-8
+  ">
+    Transparency,
+    customer satisfaction,
+    seller growth,
+    and secure online
+    shopping are at the
+    core of Yogi-Mart.
+  </p>
+
+</div>
 
         <div className="bg-green-600 text-white p-10 rounded-2xl mt-10 text-center">
 
@@ -99,19 +130,20 @@ export default function AboutPage() {
             Join Yogi-Mart and start growing your business today.
           </p>
 
-          <a
-            href="/vendor-register"
-            className="
-              bg-white
-              text-green-600
-              px-6
-              py-3
-              rounded-xl
-              font-bold
-            "
-          >
-            Register as Seller
-          </a>
+          
+          <Link
+  href="/vendor-register"
+  className="
+    bg-white
+    text-green-600
+    px-6
+    py-3
+    rounded-xl
+    font-bold
+  "
+>
+  Register as Seller
+</Link>
 
         </div>
 

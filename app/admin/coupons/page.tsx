@@ -71,15 +71,44 @@ export default function AdminCouponsPage(){
       return;
 
     }
+    if(
 
-    await addDoc(
+  Number(discount) <= 0 ||
 
-      collection(
+  Number(discount) > 100
+
+){
+
+  alert(
+    "Discount must be between 1 and 100"
+  );
+
+  return;
+
+}
+
+const exists = coupons.find(
+  (coupon)=>
+    coupon.code ===
+    code.toUpperCase()
+);
+
+if(exists){
+
+  alert(
+    "Coupon already exists"
+  );
+
+  return;
+
+}
+
+    await addDoc( 
+            collection(
         db,
         "coupons"
       ),
-
-      {
+     {
 
         code:
           code.toUpperCase(),
@@ -87,10 +116,12 @@ export default function AdminCouponsPage(){
         discount:
           Number(discount),
 
+          
         active:true,
 
         createdAt:
           new Date()
+          
 
       }
 
@@ -111,6 +142,14 @@ export default function AdminCouponsPage(){
       <h1 className="text-4xl font-bold mb-8">
         Coupon Management
       </h1>
+
+      <p className="mb-6 text-gray-600">
+
+  Total Coupons:
+  {" "}
+  {coupons.length}
+
+</p>
 
       <div className="
         bg-white

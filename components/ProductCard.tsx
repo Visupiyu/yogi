@@ -79,7 +79,8 @@ export default function ProductCard({
 
       price,
 
-      image
+      image, stock
+
 
     });
 
@@ -190,7 +191,15 @@ export default function ProductCard({
 
     );
 
-    alert("Added To Cart");
+   alert(
+
+  existingIndex > -1
+
+    ? "Cart Updated"
+
+    : "Added To Cart"
+
+);
 
   };
 
