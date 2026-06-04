@@ -12,7 +12,7 @@ export default function HeroSlider(){
   {
     title:"Fresh Grocery Delivered",
     subtitle:"Daily essentials at best prices",
-    image:"...",
+    image:"https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1600&auto=format&fit=crop",
     button:"Shop Grocery",
     link:"/category/Grocery"
   },
@@ -20,7 +20,7 @@ export default function HeroSlider(){
   {
     title:"Latest Fashion Collection",
     subtitle:"Trending styles for everyone",
-    image:"...",
+    image:"https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1600&auto=format&fit=crop",
     button:"Explore Fashion",
     link:"/category/Fashion"
   },
@@ -28,7 +28,7 @@ export default function HeroSlider(){
   {
     title:"Beauty & Electronics",
     subtitle:"Everything you need in one marketplace",
-    image:"...",
+    image:"https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1600&auto=format&fit=crop",
     button:"Shop Now",
     link:"/search"
   }

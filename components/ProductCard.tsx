@@ -31,6 +31,8 @@ type Props = {
 
 export default function ProductCard({
 
+  
+
   id,
 
   name,
@@ -41,7 +43,11 @@ export default function ProductCard({
 
   stock
 
-}:Props){
+}:Props){ console.log(
+  "CARD:",
+  name,
+  image
+);
 
   const addToWishlist = ()=>{
 
@@ -243,26 +249,18 @@ export default function ProductCard({
           href={`/product/${id}`}
         >
         
-
-          <img
-            src={
-              image ||
-              "/no-image.png"
-            }
-            alt={name}
-            className="
-              w-full
-              h-44
-              md:h-52
-              object-cover
-              bg-white
-              p-1
-              group-hover:scale-110
-              ease-out
-              transition
-              duration-500
-            "
-          />
+<img
+  src={image}
+  alt={name}
+  className="
+    w-full
+    h-48
+    md:h-56
+    object-contain
+    bg-white
+  "
+/>
+          
 
         </Link>
 

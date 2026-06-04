@@ -360,130 +360,49 @@ const clearForm = ()=>{
 
       if(editingId){
 
-       let imageUrl = "";
+  let imageUrl = "/2.jpeg";
 
-if(imageFile){
+  await updateDoc(
 
-  try{
+    doc(
+      db,
+      "products",
+      editingId
+    ),
 
-    const imageRef = ref(
-      storage,
-      `products/${Date.now()}`
-    );
+    {
+      name,
+      price:Number(price),
+      stock:Number(stock),
+      category,
+      description,
+      image:imageUrl
+    }
 
-    await uploadBytes(
-      imageRef,
-      imageFile
-    );
+  );
 
-    imageUrl =
-      await getDownloadURL(
-        imageRef
-      );
+  alert("Product Updated");
 
-    console.log(
-      "Image Uploaded:",
-      imageUrl
-    );
+}else{
 
-  }catch(error){
-
-    console.error(
-      "Storage Error:",
-      error
-    );
-
-    alert(
-      "Image upload failed"
-    );
-
-    return;
-
-  }
-
-}
-      
-      
-await updateDoc(
-
-  doc(
-    db,
-    "products",
-    editingId
-  ),
-
-  {
-
-    name,
-
-    price:Number(price),
-
-    stock:Number(stock),
-
-    category,
-
-    description,
-
-    image:imageUrl
-
-  }
-
-);
-
-        alert("Product Updated");
-
-      }else{
-
-  let imageUrl = "";
-
-  if(imageFile){
-
-    const imageRef = ref(
-      storage,
-      `products/${Date.now()}`
-    );
-
-    await uploadBytes(
-      imageRef,
-      imageFile
-    );
-
-    imageUrl =
-      await getDownloadURL(
-        imageRef
-      );
-
-  }
-
+  let imageUrl = "/2.jpeg";
+ 
   await addDoc(
 
     collection(db,"products"),
 
     {
-
       name,
-
       price:Number(price),
-
       stock:Number(stock),
-
       category,
-
       description,
-
       image:imageUrl,
-
-      vendorId:
-        auth.currentUser?.uid,
-
+      vendorId:auth.currentUser?.uid,
       vendorName,
-
       views:0,
-
       sales:0,
-
       createdAt:new Date()
-
     }
 
   );
@@ -1320,21 +1239,23 @@ reader.readAsDataURL(
     rounded-xl
   "
 />
-           {image && (
-
-                <img
-                  src={image}
-                  alt="Preview"
-                  className="
-                    w-40
-                    h-40
-                    object-cover
-                    rounded-xl
-                  "
-                />
-
-              )}
-
+           <div
+  style={{
+    width: "100%",
+    height: "200px",
+    background: "red"
+  }}
+>
+  <img
+    src={image}
+    alt={name}
+    style={{
+      width: "100%",
+      height: "100%",
+      objectFit: "contain"
+    }}
+  />
+</div>
               <button
 
                 onClick={
