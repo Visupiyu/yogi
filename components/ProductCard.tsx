@@ -260,7 +260,7 @@ export default function ProductCard({
     bg-white
   "
 />
-          
+ 
 
         </Link>
 
