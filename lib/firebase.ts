@@ -38,16 +38,6 @@ const firebaseConfig = {
 
 };
 
-console.log(
-  "Firebase Project:",
-  firebaseConfig.projectId
-);
-
-console.log(
-  "Storage Bucket:",
-  firebaseConfig.storageBucket
-);
-
 const app =
   initializeApp(firebaseConfig);
 
