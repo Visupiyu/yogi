@@ -18,9 +18,7 @@ export default function CouponPopup() {
     );
 
 let timer;
-  ReturnType<typeof setTimeout> undefined;
-
-  if (!alreadyShown) {
+    if (!alreadyShown) {
 
     timer = setTimeout(() => {
 

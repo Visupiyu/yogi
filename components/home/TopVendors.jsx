@@ -45,10 +45,12 @@ export default function TopVendors(){
 
       }catch(error){
 
-        console.log(error);
+  console.error(
+    "Vendor Fetch Error:",
+    error
+  );
 
-      }
-
+}
     };
 
     fetchVendors();

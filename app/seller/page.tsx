@@ -115,8 +115,8 @@ const [earnings,setEarnings] =
   useState("");
   const [image,setImage] =
     useState("");
-    const [imageFile,setImageFile] =
-  useState<any>(null);
+   const [imageFile,setImageFile] =
+  useState<File | null>(null);
 
   const [description,setDescription] =
   useState("");  
@@ -138,14 +138,14 @@ const [earnings,setEarnings] =
   Notification[]
 >([]);
 
-  const handleImage = (
-    e:any
-  )=>{
+ const handleImage = (
+  e: React.ChangeEvent<HTMLInputElement>
+)=>{
 
-    const file =
-      e.target.files[0];
+   const file =
+  e.target.files?.[0];
 
-    if(!file) return;
+if(!file) return;
 
     const reader =
       new FileReader();
@@ -266,8 +266,9 @@ async()=>{
 
     );
 
-  const vendorOrders:any[] =
-    [];
+    const vendorOrders:Order[] =
+  [];
+  
 
   snapshot.forEach((docSnap)=>{
 
@@ -359,36 +360,50 @@ const clearForm = ()=>{
 
       if(editingId){
 
-        let imageUrl = image;
+       let imageUrl = "";
 
 if(imageFile){
 
-  const imageRef =
+  try{
 
-    ref(
-
+    const imageRef = ref(
       storage,
-
       `products/${Date.now()}`
-
     );
 
-  await uploadBytes(
-
-    imageRef,
-
-    imageFile
-
-  );
-
-  imageUrl =
-
-    await getDownloadURL(
-      imageRef
+    await uploadBytes(
+      imageRef,
+      imageFile
     );
+
+    imageUrl =
+      await getDownloadURL(
+        imageRef
+      );
+
+    console.log(
+      "Image Uploaded:",
+      imageUrl
+    );
+
+  }catch(error){
+
+    console.error(
+      "Storage Error:",
+      error
+    );
+
+    alert(
+      "Image upload failed"
+    );
+
+    return;
+
+  }
 
 }
-
+      
+      
 await updateDoc(
 
   doc(
@@ -419,56 +434,79 @@ await updateDoc(
 
       }else{
 
-        let imageUrl = "";
+  let imageUrl = "";
 
-if(imageFile){
+  if(imageFile){
 
-  const imageRef =ref(storage,`products/${Date.now()}`
-
+    const imageRef = ref(
+      storage,
+      `products/${Date.now()}`
     );
 
-  await uploadBytes(imageRef, imageFile );
+    await uploadBytes(
+      imageRef,
+      imageFile
+    );
 
-  imageUrl = await getDownloadURL( imageRef);
+    imageUrl =
+      await getDownloadURL(
+        imageRef
+      );
 
-}
-             
-await addDoc(
-  collection(db,"products"),
-
-  {
-    name,
-    price:Number(price),
-    stock:Number(stock),
-    category,
-    description,
-    image:imageUrl,
-    vendorId:auth.currentUser?.uid,
-    vendorName,
-     views: 0,
-     sales: 0,
-    createdAt:new Date()
   }
 
-);
-        alert("Product Added");
-      }
+  await addDoc(
 
-      clearForm();
+    collection(db,"products"),
 
-      loadProducts();
+    {
 
-    }catch(err:any){
+      name,
 
-      alert(err.message);
+      price:Number(price),
 
-    }finally{
+      stock:Number(stock),
 
-      setLoading(false);
+      category,
+
+      description,
+
+      image:imageUrl,
+
+      vendorId:
+        auth.currentUser?.uid,
+
+      vendorName,
+
+      views:0,
+
+      sales:0,
+
+      createdAt:new Date()
 
     }
 
-  };
+  );
+
+  alert("Product Added");
+
+}
+
+clearForm();
+
+loadProducts();
+
+} catch(error){
+
+  console.log(error);
+
+} finally {
+
+  setLoading(false);
+
+}
+
+};
 
   const editProduct = (
     product:Product
@@ -570,16 +608,18 @@ await addDoc(
       "Order status updated"
     );
 
-  }catch(error){
-
-    console.log(error);
-
-    alert(
-      "Failed to update"
-    );
-
   }
+  catch(error){
 
+  console.error(
+    "Add Product Error:",
+    error
+  );
+
+  alert(
+    String(error)
+  );
+ }
 };
 
 const loadNotifications =
@@ -1610,4 +1650,3 @@ reader.readAsDataURL(
   );
 
 }
-
