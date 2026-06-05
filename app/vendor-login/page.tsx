@@ -37,6 +37,8 @@ export default function VendorLoginPage(){
 
   const [loading,setLoading] =
     useState(false);
+   const [showPassword,setShowPassword] =
+  useState(false);    
 
     useEffect(()=>{
 
@@ -215,7 +217,10 @@ if(
     <div
       className="
         min-h-screen
-        bg-gray-100
+       bg-gradient-to-br
+from-green-50
+via-white
+to-blue-50
         flex
         items-center
         justify-center
@@ -225,7 +230,10 @@ if(
 
       <div
         className="
-          bg-white
+        bg-white
+backdrop-blur-sm
+border
+border-gray-100
           p-10
           rounded-3xl
           shadow-xl
@@ -234,16 +242,43 @@ if(
         "
       >
 
-        <h1
-          className="
-            text-4xl
-            font-bold
-            text-center
-            mb-3
-          "
-        >
-          Vendor Login
-        </h1>
+        <div className="
+  text-center
+  mb-5
+">
+
+  <img
+    src="/logo.png"
+    alt="Yogi Mart"
+    className="
+      w-20
+      mx-auto
+      mb-3
+    "
+  />
+
+</div>
+
+<p className="
+  text-center
+  text-green-600
+  font-semibold
+  text-sm
+  mb-2
+">
+  Yogi Mart Seller Portal
+</p>
+
+<h1
+  className="
+    text-4xl
+    font-bold
+    text-center
+    mb-3
+  "
+>
+  Vendor Login
+</h1>
 
         <p
           className="
@@ -252,7 +287,7 @@ if(
             mb-8
           "
         >
-          Login to Seller Dashboard
+        Manage products, orders and sales
         </p>
 
         <div className="space-y-5">
@@ -278,26 +313,75 @@ if(
             "
           />
 
-          <input
+        <input
 
-            type="password"
+  type={
+    showPassword
+      ? "text"
+      : "password"
+  }
 
-            placeholder="Password"
+  placeholder="Password"
 
-            value={password}
+  value={password}
 
-            onChange={(e)=>
-              setPassword(e.target.value)
-            }
+  onChange={(e)=>
+    setPassword(e.target.value)
+  }
 
-            className="
-              w-full
-              p-4
-              border
-              rounded-2xl
-              outline-none
-            "
-          />
+  className="
+    w-full
+    p-4
+    border
+    rounded-2xl
+    outline-none
+  "
+/>
+
+<div className="
+  flex
+  items-center
+  justify-between
+  mt-2
+">
+
+  <label className="
+    flex
+    items-center
+    gap-2
+  ">
+
+    <input
+      type="checkbox"
+      checked={showPassword}
+      onChange={()=>
+        setShowPassword(
+          !showPassword
+        )
+      }
+    />
+
+    <span className="
+      text-sm
+      text-gray-600
+    ">
+      Show Password
+    </span>
+
+  </label>
+
+  <a
+    href="/vendor-forgot-password"
+    className="
+      text-blue-600
+      font-semibold
+      text-sm
+    "
+  >
+    Forgot Password?
+  </a>
+
+</div>
 
         </div>
 
@@ -321,7 +405,7 @@ if(
 
     ? "bg-gray-400"
 
-    : "bg-blue-600"
+    : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500"
   }
 `}
         >

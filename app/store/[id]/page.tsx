@@ -182,7 +182,7 @@ setTotalStock(
       ">
 
         <Link
-  href="/stores"
+  href="/store"
   className="
     inline-block
     mb-6
@@ -203,7 +203,7 @@ setTotalStock(
   from-green-600
   to-blue-600
   rounded-3xl
-  p-10
+  p-12 md:p-16
   text-white
   mb-10
 ">
@@ -219,22 +219,98 @@ setTotalStock(
 
     <div>
 
-      <p className="
-        uppercase
-        tracking-widest
-        text-sm
-        opacity-80
-      ">
-        Verified Seller
-      </p>
+     <div className="
+  flex
+  items-center
+  gap-5
+">
 
-      <h1 className="
-        text-5xl
-        font-bold
-        mt-3
-      ">
-        {vendorName}
-      </h1>
+  <div className="
+    w-24
+    h-24
+    rounded-full
+    bg-white
+    overflow-hidden
+    border-4
+    border-white
+  ">
+
+    <img
+      src={
+        vendorInfo?.logo ||
+        "/user.png"
+      }
+      alt=""
+      className="
+        w-full
+        h-full
+        object-cover
+      "
+    />
+
+  </div>
+
+  <div>
+
+    <div className="
+  flex
+  items-center
+  gap-5
+">
+
+  <div className="
+    w-24
+    h-24
+    rounded-full
+    bg-white
+    overflow-hidden
+    border-4
+    border-white
+    shadow-lg
+  ">
+
+    <img
+      src={
+        vendorInfo?.logo ||
+        "/user.png"
+      }
+      alt="Vendor Logo"
+      className="
+        w-full
+        h-full
+        object-cover
+      "
+    />
+
+  </div>
+
+  <div>
+
+    <p className="
+      uppercase
+      tracking-widest
+      text-sm
+      opacity-80
+    ">
+      Verified Seller
+    </p>
+
+    <h1 className="
+      text-4xl
+      md:text-5xl
+      font-bold
+      mt-2
+    ">
+      {vendorName}
+    </h1>
+
+  </div>
+
+</div>
+
+  </div>
+
+</div>
 
       <p className="
   mt-3
@@ -270,6 +346,71 @@ setTotalStock(
   </div>
 
 )}
+
+<div className="
+  flex
+  flex-wrap
+  gap-3
+  mt-4
+">
+
+  <span className="
+    bg-white/20
+    px-4
+    py-2
+    rounded-full
+    text-sm
+  ">
+    ✅ Verified Store
+  </span>
+
+  <span className="
+    bg-white/20
+    px-4
+    py-2
+    rounded-full
+    text-sm
+  ">
+    🚚 Fast Delivery
+  </span>
+
+  <span className="
+    bg-white/20
+    px-4
+    py-2
+    rounded-full
+    text-sm
+  ">
+    🔒 Secure Seller
+  </span>
+
+</div>
+
+<div className="
+  flex
+  gap-4
+  mt-4
+">
+
+  <span className="
+    bg-white/20
+    px-3
+    py-1
+    rounded-full
+  ">
+    {totalProducts} 📦 Products
+  </span>
+
+  <span className="
+    bg-white/20
+    px-3
+    py-1
+    rounded-full
+  ">
+    {totalStock} 📊 Total Stock
+  </span>
+
+</div>
 
         <p className="mt-2">
   {products.length}
@@ -416,7 +557,7 @@ setTotalStock(
                     alt={product.name}
                     className="
                       w-full
-                      h-60
+                      h-72
                       object-cover
                     "
                   />

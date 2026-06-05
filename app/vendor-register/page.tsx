@@ -22,6 +22,40 @@ import {
   db
 } from "@/lib/firebase";
 
+const citiesByState = {
+
+  Gujarat:[
+    "Ahmedabad",
+    "Surat",
+    "Vadodara",
+    "Rajkot"
+  ],
+
+  Maharashtra:[
+    "Mumbai",
+    "Pune",
+    "Nagpur",
+    "Nashik"
+  ],
+
+  Rajasthan:[
+    "Jaipur",
+    "Jodhpur",
+    "Udaipur"
+  ],
+
+  Delhi:[
+    "New Delhi"
+  ],
+
+  Karnataka:[
+    "Bengaluru",
+    "Mysuru",
+    "Hubli"
+  ]
+
+};
+
 export default function VendorRegisterPage(){
 
   const [loading,setLoading] =
@@ -591,31 +625,67 @@ businessType:
               "
             />
 
-            <input
-              type="text"
-              name="city"
-              placeholder="City"
-              value={formData.city}
-              onChange={handleChange}
-              className="
-                p-4
-                border
-                rounded-2xl
-              "
-            />
+            <select
+  name="state"
+  value={formData.state}
+  onChange={handleChange}
+  className="
+    p-4
+    border
+    rounded-2xl
+  "
+>
+  <option value="">
+    Select State
+  </option>
 
-            <input
-              type="text"
-              name="state"
-              placeholder="State"
-              value={formData.state}
-              onChange={handleChange}
-              className="
-                p-4
-                border
-                rounded-2xl
-              "
-            />
+  <option value="Gujarat">
+    Gujarat
+  </option>
+
+  <option value="Maharashtra">
+    Maharashtra
+  </option>
+
+  <option value="Rajasthan">
+    Rajasthan
+  </option>
+
+  <option value="Delhi">
+    Delhi
+  </option>
+
+</select>
+
+<select
+  name="city"
+  value={formData.city}
+  onChange={handleChange}
+  className="
+    p-4
+    border
+    rounded-2xl
+  "
+>
+
+  <option value="">
+    Select City
+  </option>
+
+  {(citiesByState[
+    formData.state as keyof typeof citiesByState
+  ] || []).map((city)=>(
+
+    <option
+      key={city}
+      value={city}
+    >
+      {city}
+    </option>
+
+  ))}
+
+</select>
 
           </div>
 
