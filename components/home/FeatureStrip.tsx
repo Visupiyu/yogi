@@ -17,53 +17,43 @@ import {
 const features = [
 
   {
-
     title:"Free Delivery",
-
     subtitle:"On orders above ₹499",
-
-    icon:Truck
-
+    icon:Truck,
+    bg:"bg-green-100",
+    iconColor:"text-green-600"
   },
 
   {
-
     title:"Secure Payment",
-
     subtitle:"100% protected payments",
-
-    icon:ShieldCheck
-
+    icon:ShieldCheck,
+    bg:"bg-blue-100",
+    iconColor:"text-blue-600"
   },
 
   {
-
     title:"Easy Returns",
-
     subtitle:"7 days return policy",
-
-    icon:RotateCcw
-
+    icon:RotateCcw,
+    bg:"bg-orange-100",
+    iconColor:"text-orange-600"
   },
 
   {
-
     title:"Best Quality",
-
     subtitle:"Trusted branded products",
-
-    icon:BadgeCheck
-
+    icon:BadgeCheck,
+    bg:"bg-purple-100",
+    iconColor:"text-purple-600"
   },
 
   {
-
     title:"24/7 Support",
-
     subtitle:"Dedicated customer support",
-
-    icon:Headphones
-
+    icon:Headphones,
+    bg:"bg-red-100",
+    iconColor:"text-red-600"
   }
 
 ];
@@ -74,19 +64,19 @@ export default function FeatureStrip(){
 
     <section className="
       bg-white
-      py-5
+      py-*
       border-b
     ">
 
       <div className="
         max-w-7xl
         mx-auto
-        px-4
+        px-*
         grid
         grid-cols-2
         md:grid-cols-3
         lg:grid-cols-5
-        gap-2
+        gap-*
       ">
 
         {features.map((item,index)=>{
@@ -97,36 +87,34 @@ export default function FeatureStrip(){
 
             <div
 
-              key={index}
+  key={index}
 
-              className="
-                flex
-                items-center
-                gap-2
-                bg-gray-50
-                rounded-2xl
-                p-4
-                hover:shadow-md
-                transition
-              "
-            >
+  className={`
+    flex
+    items-center
+    gap-*
+    ${item.bg}
+    rounded-2xl
+    p-2
+    hover:shadow-md
+    transition
+  `}
+>
 
-              <div className="
-                w-12
-                h-12
-                rounded-full
-                bg-green-100
-                flex
-                items-center
-                justify-center
-              ">
+              <div className={`
+  w-12
+  h-12
+  rounded-full
+  ${item.bg}
+  flex
+  items-center
+  justify-center
+`}>
 
                 <Icon
-                  size={24}
-                  className="
-                    text-green-600
-                  "
-                />
+  size={24}
+  className={item.iconColor}
+/>
 
               </div>
 

@@ -103,7 +103,7 @@ snapshot.forEach((doc)=>{
 
   return(
 
-    <section className="py-5 px-4">
+    <section className="py-* px-*">
 
       <div className="max-w-7xl mx-auto">
 
@@ -127,7 +127,7 @@ snapshot.forEach((doc)=>{
           grid-cols-2
           md:grid-cols-3
           lg:grid-cols-4
-          gap-4
+          gap-*
         ">
 
           {products.map((product)=>(
@@ -148,7 +148,7 @@ snapshot.forEach((doc)=>{
   <div className="
     col-span-full
     text-center
-    py-10
+    py-*
     text-gray-500
   ">
 

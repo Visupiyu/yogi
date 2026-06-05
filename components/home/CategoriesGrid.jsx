@@ -8,36 +8,42 @@ const categories = [
     name:"Fashion",
     image:"https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200",
     slug:"fashion",
-  },
+    bg:"bg-green-100",
+    },
 
   {
     name:"Electronics",
     image:"https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1200",
     slug:"electronics",
+    bg:"bg-blue-100",
   },
 
   {
     name:"Grocery",
     image:"https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1200",
     slug:"grocery",
+    bg:"bg-orange-100",
   },
 
   {
     name:"Beauty",
     image:"https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1200",
     slug:"beauty",
+    bg:"bg-pink-100",
   },
 
   {
     name:"Furniture",
     image:"https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200",
     slug:"furniture",
+    bg:"bg-yellow-100",
   },
 
   {
     name:"Sports",
     image:"https://images.unsplash.com/photo-1517649763962-0c623066013b?q=80&w=1200",
     slug:"sports",
+    bg:"bg-red-100",
   },
 
 ];
@@ -47,8 +53,8 @@ export default function CategoriesGrid(){
   return(
 
     <section className="
-      py-12
-      px-4
+      py-*
+      px-*
       bg-white
     ">
 
@@ -61,7 +67,7 @@ export default function CategoriesGrid(){
           flex
           items-center
           justify-between
-          mb-8
+          mb-*
         ">
 
           <h2 className="
@@ -78,7 +84,7 @@ export default function CategoriesGrid(){
           grid-cols-2
           md:grid-cols-3
           lg:grid-cols-6
-          gap-6
+          gap-*
         ">
 
           {categories.map((category,index)=>(
@@ -88,20 +94,22 @@ export default function CategoriesGrid(){
               href={`/category/${category.slug}`}
             >
 
-              <div className="
-                group
-                bg-gray-100
-                rounded-2xl
-                overflow-hidden
-                shadow-md
-                hover:shadow-xl
-                transition
-                duration-300
-                cursor-pointer
-              ">
+              <div
+  className={`
+    group
+    ${category.bg}
+    rounded-2xl
+    overflow-hidden
+    shadow-md
+    hover:shadow-xl
+    transition
+    duration-300
+    cursor-pointer
+  `}
+>
 
                 <div className="
-                  h-40
+                  h-20
                   overflow-hidden
                 ">
 
@@ -121,7 +129,7 @@ export default function CategoriesGrid(){
                 </div>
 
                 <div className="
-                  p-4
+                  p-2
                   text-center
                 ">
 

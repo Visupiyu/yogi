@@ -14,7 +14,7 @@ export default function Footer(){
   via-white
   to-blue-50
   border-t
-  mt-16
+  mt-*
 ">
 
       {/* TOP */}
@@ -22,13 +22,13 @@ export default function Footer(){
       <div className="
         max-w-7xl
         mx-auto
-        px-6
-        py-6
+        px-3
+        py-3
         grid
         grid-cols-1
         md:grid-cols-2
         lg:grid-cols-5
-        gap-2
+        gap-*
       ">
 
         {/* BRAND */}
@@ -39,8 +39,8 @@ export default function Footer(){
             src="/logo.png"
             alt="Yogi Mart"
             className="
-            h-16
-md:h-20
+            h-20
+md:h-24
 w-auto
 object-contain
             "
@@ -64,8 +64,7 @@ object-contain
           <h3 className="
             text-lg
             font-bold
-            mb-4
-          ">
+            mb-2          ">
 
             Company
 
@@ -111,7 +110,7 @@ object-contain
           <h3 className="
             text-lg
             font-bold
-            mb-4
+            mb-2
           ">
 
             Help
@@ -164,7 +163,7 @@ object-contain
           <h3 className="
             text-lg
             font-bold
-            mb-5
+            mb-2
           ">
 
             Seller
@@ -217,7 +216,7 @@ object-contain
           <h3 className="
             text-lg
             font-bold
-            mb-4
+            mb-2
           ">
 
             Download App
@@ -227,7 +226,7 @@ object-contain
           <div className="
             flex
             flex-col
-            gap-2
+            gap-3
           ">
 
             <button className="
@@ -264,7 +263,7 @@ object-contain
 
       <div className="
         border-t
-        py-5
+        py-2
         text-center
         text-gray-500
         text-sm
@@ -273,9 +272,7 @@ object-contain
         © 2026 Yogi Mart.
         All Rights Reserved.
 
-      </div>
-
-      
+      </div>    
     </footer>
 
   );

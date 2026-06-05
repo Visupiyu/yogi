@@ -7,21 +7,25 @@ const reviews = [
     name: "Rahul Sharma",
     rating: 5,
     text: "Excellent products and super fast delivery. Highly recommended!",
+    bg:"bg-green-100"
   },
   {
     name: "Priya Patel",
     rating: 5,
     text: "Very smooth shopping experience. Customer support was amazing.",
+    bg:"bg-blue-100"
   },
   {
     name: "Amit Kumar",
     rating: 4,
     text: "Good quality products and reasonable prices.",
+      bg:"bg-yellow-100"
   },
   {
     name: "Sneha Gupta",
     rating: 5,
     text: "Best marketplace I've used recently. Easy checkout process.",
+      bg:"bg-pink-100"
   },
 ];
 
@@ -51,8 +55,8 @@ export default function CustomerReviewsCarousel() {
   return (
 
     <section className="
-      py-1
-      px-4
+      py-*
+      px-*
     ">
 
       <div className="
@@ -64,24 +68,22 @@ export default function CustomerReviewsCarousel() {
           text-3xl
           font-bold
           text-center
-          mb-3
+          mb-*
         ">
           ⭐ Customer Reviews
         </h2>
 
-        <div className="
-          bg-gradient-to-r
-from-green-50
-via-white
-to-blue-50
-          rounded-3xl
-          shadow-xl
-         p-6
-md:p-10
-          text-center
-          transition-all
-          duration-500
-        ">
+        <div
+  className={`
+    ${reviews[current].bg}
+    rounded-3xl
+    shadow-xl
+    p-2 md:p-6
+    text-center
+    transition-all
+    duration-500
+  `}
+>
 
           <div className="
             text-yellow-500
@@ -124,8 +126,8 @@ md:p-10
         <div className="
           flex
           justify-center
-          gap-2
-          mt-6
+          gap-1
+          mt-2
         ">
 
           {reviews.map(

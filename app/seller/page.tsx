@@ -360,7 +360,7 @@ const clearForm = ()=>{
 
       if(editingId){
 
-  let imageUrl = "/2.jpeg";
+  let imageUrl = image;
 
   await updateDoc(
 
@@ -385,7 +385,7 @@ const clearForm = ()=>{
 
 }else{
 
-  let imageUrl = "/2.jpeg";
+  let imageUrl = image;
  
   await addDoc(
 
@@ -1239,21 +1239,24 @@ reader.readAsDataURL(
     rounded-xl
   "
 />
-           <div
-  style={{
-    width: "100%",
-    height: "200px",
-    background: "red"
-  }}
+           
+<div
+  className="
+    w-full
+    h-48
+    bg-gray-100
+    rounded-xl
+    overflow-hidden
+  "
 >
   <img
     src={image}
     alt={name}
-    style={{
-      width: "100%",
-      height: "100%",
-      objectFit: "contain"
-    }}
+    className="
+      w-full
+      h-full
+      object-contain
+    "
   />
 </div>
               <button

@@ -124,14 +124,14 @@ if (products.length === 0) {
     <section className="
       max-w-7xl
       mx-auto
-      px-4
-      py-12
+      px-2
+      py-2
     ">
 
       <h2 className="
         text-3xl
         font-bold
-        mb-8
+        mb-4
       ">
         🎯 Recommended For You
       </h2>
@@ -140,7 +140,7 @@ if (products.length === 0) {
         grid
         grid-cols-2
         md:grid-cols-4
-        gap-4
+        gap-2
       ">
 
         {products.map(

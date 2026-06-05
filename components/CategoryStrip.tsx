@@ -9,49 +9,57 @@ const categories = [
   {
     name:"Grocery",
     image:
-      "https://cdn-icons-png.flaticon.com/512/3082/3082037.png"
+      "https://cdn-icons-png.flaticon.com/512/3082/3082037.png",
+       bg:"bg-green-100"
   },
 
   {
     name:"Fashion",
     image:
-      "https://cdn-icons-png.flaticon.com/512/892/892458.png"
+      "https://cdn-icons-png.flaticon.com/512/892/892458.png",
+      bg:"bg-purple-100"
   },
 
   {
     name:"Beauty",
     image:
-      "https://cdn-icons-png.flaticon.com/512/3050/3050153.png"
+      "https://cdn-icons-png.flaticon.com/512/3050/3050153.png",
+      bg:"bg-pink-100"
   },
 
   {
     name:"Electronics",
     image:
-      "https://cdn-icons-png.flaticon.com/512/1041/1041916.png"
+      "https://cdn-icons-png.flaticon.com/512/1041/1041916.png",
+      bg:"bg-blue-100"
   },
 
   {
     name:"Furniture",
     image:
-      "https://cdn-icons-png.flaticon.com/512/3081/3081559.png"
+      "https://cdn-icons-png.flaticon.com/512/3081/3081559.png",
+      bg:"bg-yellow-100"
   },
 
   {
     name:"Mobiles",
     image:
-      "https://cdn-icons-png.flaticon.com/512/545/545245.png"
+      "https://cdn-icons-png.flaticon.com/512/545/545245.png",
+      bg:"bg-red-100"
   },
 
   {
     name:"Appliances",
     image:
-      "https://cdn-icons-png.flaticon.com/512/3659/3659898.png"
+      "https://cdn-icons-png.flaticon.com/512/3659/3659898.png",
+      bg:"bg-gray-100"
   },
 
   {
     name:"Books",
     image:
-      "https://cdn-icons-png.flaticon.com/512/3145/3145765.png"
+      "https://cdn-icons-png.flaticon.com/512/3145/3145765.png",
+      bg:"bg-indigo-100"
   }
 
 ];
@@ -110,19 +118,21 @@ export default function CategoryStrip(){
       group
     "
   >
-             <div className="
-              w-20
-              h-20
-              rounded-full
-              bg-gray-100
-              flex
-              items-center
-              justify-center
-              shadow-sm
-              group-hover:shadow-lg
-              transition
-              overflow-hidden
-            ">
+             <div
+  className={`
+    w-20
+    h-20
+    rounded-full
+    ${cat.bg}
+    flex
+    items-center
+    justify-center
+    shadow-sm
+    group-hover:shadow-lg
+    transition
+    overflow-hidden
+  `}
+>
 
               <img
                 src={cat.image}

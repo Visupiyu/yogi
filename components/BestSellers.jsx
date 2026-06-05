@@ -50,14 +50,14 @@ function ProductSkeleton() {
         h-40
         bg-gray-200
         rounded-xl
-        mb-3
+        mb-*
       " />
 
       <div className="
         h-4
         bg-gray-200
         rounded
-        mb-2
+        mb-*
       " />
 
       <div className="
@@ -65,7 +65,7 @@ function ProductSkeleton() {
         bg-gray-200
         rounded
         w-2/3
-        mb-2
+        mb-*
       " />
 
       <div className="
@@ -102,15 +102,15 @@ export default function BestSellers() {
     <section className="
      max-w-screen-2xl
       mx-auto
-      px-4
-      py-2
+      px-*
+      py-*
     ">
 
       <div className="
         flex
         items-center
         justify-between
-        mb-3
+        mb-*
       ">
 
         <h2 className="
@@ -138,7 +138,7 @@ export default function BestSellers() {
           grid
           grid-cols-2
           md:grid-cols-4
-          gap-4
+          gap-*
         ">
 
           {[...Array(8)].map(
@@ -163,7 +163,7 @@ export default function BestSellers() {
           grid
           grid-cols-2
           md:grid-cols-4
-          gap-2
+          gap-*
         ">
 
 
@@ -186,7 +186,7 @@ export default function BestSellers() {
 
   <div className="
     text-center
-    py-10
+    py-*
     text-gray-500
   ">
 

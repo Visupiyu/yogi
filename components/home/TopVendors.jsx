@@ -60,15 +60,16 @@ export default function TopVendors(){
   return(
 
     <section className="
-      py-3
+      py-4
       px-4
       bg-gray-50
     ">
 
       <div className="
-        max-w-7xl
-        mx-auto
-      ">
+  max-w-7xl
+  mx-auto
+  px-4
+">
 
         <div className="
           flex
@@ -92,7 +93,7 @@ export default function TopVendors(){
           sm:grid-cols-2
           md:grid-cols-3
           lg:grid-cols-4
-          gap-1
+          gap-*
         ">
 
           {vendors.map((vendor)=>(
@@ -102,10 +103,12 @@ export default function TopVendors(){
               href={`/vendor/${vendor.id}`}
             >
 
-              <div className="
-                bg-white
-                rounded-2xl
-                shadow-sm
+             <div className="
+  bg-gradient-to-br
+  from-white
+  to-green-50
+  rounded-2xl
+  shadow-md
                 overflow-hidden
                 hover:shadow-xl
                 transition
@@ -132,7 +135,7 @@ export default function TopVendors(){
                     rounded-full
                     bg-gray-200
                     mx-auto
-                    -mt-4
+                    -mt-*
                     border-4
                     border-white
                     overflow-hidden
@@ -154,7 +157,7 @@ export default function TopVendors(){
                   </div>
 
                   <h3 className="
-                    mt-4
+                    mt-3
                     font-bold
                     text-base md:text-lg
                   ">
@@ -170,12 +173,12 @@ export default function TopVendors(){
                   </p>
 
                   <button className="
-                    mt-4
+                    mt-3
                     bg-green-600
                     text-white
-                    px-5
-                    py-2
-                    rounded-x1
+                    px-4
+                    py-4
+                   rounded-xl
                     hover:bg-green-700
                   ">
                     Visit Store

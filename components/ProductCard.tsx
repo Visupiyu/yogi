@@ -43,12 +43,7 @@ export default function ProductCard({
 
   stock
 
-}:Props){ console.log(
-  "CARD:",
-  name,
-  image
-);
-
+}:Props){
   const addToWishlist = ()=>{
 
     const wishlist =
@@ -218,19 +213,21 @@ export default function ProductCard({
   animate={{ opacity:1, y:0 }}
 
   whileHover={{
-    y:-8,
-    scale:1.02
+    y:-10,
+    scale:1.03
   }}
 
   transition={{
     duration:0.3
   }}
 
-  className="
-    bg-white
-    rounded-2xl
-    overflow-hidden
-    shadow-md
+ className="
+  bg-gradient-to-b
+  from-white
+  to-gray-50
+  rounded-3xl
+  overflow-hidden
+  shadow-1g
     hover:shadow-2xl
     transition
     duration-300
@@ -241,9 +238,10 @@ export default function ProductCard({
       {/* IMAGE */}
 
       <motion.div className="
-        relative
-        overflow-hidden
-      ">
+  relative
+  overflow-hidden
+  bg-slate-50
+">
 
         <Link
           href={`/product/${id}`}
@@ -254,10 +252,12 @@ export default function ProductCard({
   alt={name}
   className="
     w-full
-    h-48
-    md:h-56
-    object-contain
-    bg-white
+    h-64
+    md:h-72
+    object-cover
+    group-hover:scale-105
+    transition
+    duration-500
   "
 />
  
@@ -270,7 +270,9 @@ export default function ProductCard({
           absolute
           top-3
           left-3
-          bg-orange-500
+        bg-gradient-to-r
+        from-orange-500
+         to-red-500
           text-white
           text-xs
           font-bold
@@ -300,9 +302,11 @@ export default function ProductCard({
             absolute
             top-3
             right-3
-            bg-white
-            w-10
-            h-10
+            bg-gradient-to-b
+from-white
+to-gray-50
+            w-11
+            h-11
             rounded-full
             flex
             items-center
@@ -323,7 +327,7 @@ export default function ProductCard({
       {/* CONTENT */}
 
       <motion.div className="
-        p-3
+        p-2
       ">
 
         {/* RATING */}
@@ -333,7 +337,7 @@ export default function ProductCard({
           items-center
           gap-1
           text-yellow-500
-          mb-2
+          mb-1
         ">
 
           <Star size={14} fill="currentColor" />
@@ -365,7 +369,7 @@ export default function ProductCard({
             text-base
             md:text-lg
             line-clamp-2
-            min-h-[36px]
+            min-h-[48px]
             hover:text-green-600
             transition
           ">
@@ -419,7 +423,7 @@ export default function ProductCard({
 
           className={`
 
-  mt-3
+  mt-1
   w-full
   flex
   items-center

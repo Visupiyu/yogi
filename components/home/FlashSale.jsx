@@ -65,8 +65,8 @@ export default function FlashSale(){
   return(
 
     <section className="
-      py-5
-      px-4
+      py-*
+      px-2
     ">
 
      <motion.div
@@ -112,7 +112,7 @@ export default function FlashSale(){
             lg:flex-row
             items-center
             justify-between
-            gap-2
+            gap-*
           ">
 
       
@@ -125,7 +125,7 @@ export default function FlashSale(){
                 uppercase
                 tracking-widest
                 text-sm
-                mb-3
+                mb-*
               ">
                 Limited Time Offer
               </p>
@@ -142,7 +142,7 @@ export default function FlashSale(){
               </h2>
 
               <p className="
-                mt-4
+                mt-*
                 text-base
                 text-white/90
               ">
@@ -151,11 +151,11 @@ export default function FlashSale(){
               </p>
 
               <button className="
-                mt-6
+                mt-*
                 bg-white
                 text-red-500
-                px-6
-                py-3
+                px-*
+                py-*
                 rounded-x1
                 font-bold
                 hover:scale-105
@@ -170,7 +170,7 @@ export default function FlashSale(){
 
             <div className="
               flex
-              gap-2
+              gap-*
             ">
 
               <div className="

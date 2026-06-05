@@ -123,10 +123,10 @@ export default function OfferCards(){
             </p>
 
             <button className="
-              mt-4
+              mt-*
               bg-white
               text-black
-              px-5
+              px-*
               py-2
               rounded-xl
               font-semibold

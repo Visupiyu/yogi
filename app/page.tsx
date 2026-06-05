@@ -147,8 +147,8 @@ if(error){
   <main className="
     min-h-screen
     bg-slate-100
-    px-4
-    py-6
+    px-2
+    py-*
   ">
 
     <div className="
@@ -158,7 +158,7 @@ if(error){
       grid-cols-2
       md:grid-cols-3
       lg:grid-cols-4
-      gap-6
+      gap-*
     ">
 
       
@@ -251,12 +251,12 @@ if(error){
       <section className="
   max-w-7xl
   mx-auto
-  px-4
-  py-6
+  px-2
+  py-*
   grid
   grid-cols-1
   lg:grid-cols-4
-  gap-6
+  gap-*
 ">
 
   <div className="
@@ -288,8 +288,8 @@ viewport={{
 }}
         max-w-7xl
         mx-auto
-        px-4
-        py-6
+        px-2
+        py-*
       ">
 
         <div className="
@@ -298,8 +298,8 @@ viewport={{
           md:flex-row
           md:items-center
           md:justify-between
-          gap-4
-          mb-5
+          gap-*
+          mb-*
         ">
 
           <div>
@@ -316,7 +316,7 @@ viewport={{
 
             <p className="
               text-gray-500
-              mt-1
+              mt-*
             ">
 
               {filteredProducts.length}
@@ -336,14 +336,14 @@ viewport={{
           shadow-lg
           border
           border-gray-100
-          mb-5
+          mb-*
         ">
 
           <div className="
             flex
             flex-col
             md:flex-row
-            gap-4
+            gap-*
           ">
 
             <input
@@ -362,8 +362,8 @@ viewport={{
 
               className="
   flex-1
-  px-5
-  py-3
+  px-2
+  py-*
   rounded-2xl
   border
   border-gray-200
@@ -385,8 +385,8 @@ viewport={{
               }
 
               className="
-  px-4
-  py-3
+  px-2
+  py-*
   rounded-2xl
   border
   border-gray-200
@@ -429,7 +429,7 @@ viewport={{
               }
 
               className="
-                p-3
+                p-2
                 rounded-xl
                 border
                 bg-white
@@ -474,7 +474,7 @@ hover:from-green-500
 hover:to-blue-500
                 text-white
                 px-5
-                py-3
+                py-*
                 rounded-xl
                 font-semibold
               "
@@ -496,7 +496,7 @@ hover:to-blue-500
             shadow-sm
             p-10
             text-center
-            mb-5
+            mb-*
           ">
 
             <h3 className="
@@ -527,7 +527,7 @@ hover:to-blue-500
           grid-cols-2
           md:grid-cols-3
           lg:grid-cols-4
-          gap-6
+          gap-*
         ">
 
           {filteredProducts.map((product)=>(
