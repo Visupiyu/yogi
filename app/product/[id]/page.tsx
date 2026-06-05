@@ -6,7 +6,11 @@ import { useParams } from "next/navigation";
 
 import {
   doc,
-  getDoc
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  where
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -19,6 +23,8 @@ export default function ProductPage() {
 
   const [product,setProduct] =
     useState<any>(null);
+    const [relatedProducts,setRelatedProducts] =
+  useState<any[]>([]);
 
   const [loading,setLoading] =
     useState(true);
@@ -40,19 +46,47 @@ export default function ProductPage() {
 
           );
 
-        if(
-          snap.exists()
-        ){
+        if (snap.exists()) {
 
-          setProduct({
+  const productData = snap.data();
 
-            id:snap.id,
+  setProduct({
+    id: snap.id,
+    ...productData
+  });
 
-            ...snap.data()
+  const q = query(
+    collection(db, "products"),
+    where(
+      "category",
+      "==",
+      productData.category
+    )
+  );
 
-          });
+  const relatedSnap =
+    await getDocs(q);
 
-        }
+  const related: any[] = [];
+
+  relatedSnap.forEach((doc) => {
+
+    if (doc.id !== snap.id) {
+
+      related.push({
+        id: doc.id,
+        ...doc.data()
+      });
+
+    }
+
+  });
+
+  setRelatedProducts(
+    related.slice(0, 4)
+  );
+
+}
 
       }catch(error){
 
@@ -228,32 +262,38 @@ export default function ProductPage() {
 
   }
 
-  return(
+ return (
+
+  <div className="
+    min-h-screen
+    bg-gray-100
+    p-3
+  ">
 
     <div className="
-      min-h-screen
-      bg-gray-100
-      p-6
+      max-w-7xl
+      mx-auto
+      bg-white
+      rounded-3xl
+      shadow
+      p-4
     ">
 
       <div className="
-        max-w-7xl
-        mx-auto
-        bg-white
-        rounded-3xl
-        shadow
-        p-8
+        grid
+        md:grid-cols-2
+        gap-10
       ">
 
-        <div className="
-          grid
-          md:grid-cols-2
-          gap-10
-        ">
+        {/* IMAGE */}
 
-          {/* IMAGE */}
+        <div>
 
-          <div>
+          <div className="
+            bg-slate-50
+            rounded-3xl
+            p-4
+          ">
 
             <img
               src={
@@ -263,192 +303,317 @@ export default function ProductPage() {
               alt={product.name}
               className="
                 w-full
-                rounded-2xl
+                h-[500px]
                 object-cover
+                rounded-2xl
               "
             />
 
           </div>
 
-          {/* DETAILS */}
+        </div>
 
-          <div>
+        {/* DETAILS */}
 
-            <h1 className="
-              text-4xl
-              font-bold
-              mb-4
+        <div>
+
+          <h1 className="
+            text-4xl
+            font-bold
+            mb-2
+          ">
+            {product.name}
+          </h1>
+
+          <div className="
+            flex
+            items-center
+            gap-1
+            mb-2
+          ">
+            <span className="text-yellow-500">
+              ⭐⭐⭐⭐⭐
+            </span>
+
+            <span className="
+              text-gray-500
+              text-sm
             ">
+              (4.9 Rating)
+            </span>
+          </div>
 
-              {product.name}
-
-            </h1>
+          <div className="
+            flex
+            items-center
+            gap-3
+            mb-3
+          ">
 
             <p className="
               text-green-600
               text-3xl
               font-bold
-              mb-4
             ">
-
               ₹{product.price}
-
             </p>
 
             <p className="
-              text-gray-600
-              mb-4
+              text-gray-400
+              line-through
+              text-lg
             ">
-
-              Category:
-              {" "}
-              {product.category}
+              ₹{Math.round(product.price * 1.25)}
             </p>
+
+            <span className="
+              bg-red-100
+              text-red-600
+              px-2
+              py-1
+              rounded-full
+              text-sm
+              font-semibold
+            ">
+              25% OFF
+            </span>
+
+          </div>
+
+          <p className="
+            text-gray-600
+            mb-2
+          ">
+            Category: {product.category}
+          </p>
+
+          <div className="mb-4">
+
+            <span
+              className={`
+                px-3
+                py-1
+                rounded-full
+                text-sm
+                font-semibold
+
+                ${
+                  product.stock > 0
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+                }
+              `}
+            >
+              {
+                product.stock > 0
+                  ? "In Stock"
+                  : "Out Of Stock"
+              }
+            </span>
+
+          </div>
+
+          {/* VENDOR */}
+
+          <div className="
+            bg-slate-50
+            rounded-2xl
+            p-4
+            mb-4
+          ">
 
             <p className="
-              text-gray-600
-              mb-6
+              text-sm
+              text-gray-500
             ">
-
-              Stock:
-              {" "}
-              {product.stock}
+              Sold By
             </p>
 
-            <div className="
-              flex
-              gap-4
-              mb-8
+            <h3 className="
+              font-bold
+              text-lg
             ">
-
-              <button
-
-                onClick={addToCart}
-
-                className="
-                  bg-green-600
-                  text-white
-                  px-6
-                  py-3
-                  rounded-xl
-                  font-bold
-                "
-              >
-
-                Add To Cart
-
-              </button>
-
-              <button
-
-                onClick={addToWishlist}
-
-                className="
-                  bg-pink-600
-                  text-white
-                  px-6
-                  py-3
-                  rounded-xl
-                  font-bold
-                "
-              >
-
-                Wishlist
-
-              </button>
-
-            </div>
+              {product.vendorName}
+            </h3>
 
             <Link
-              href="/checkout"
+              href={`/store?vendor=${product.vendorId}`}
               className="
-                inline-block
-                bg-blue-600
+                text-green-600
+                font-semibold
+                text-sm
+              "
+            >
+              Visit Store →
+            </Link>
+
+          </div>
+
+          {/* BUTTONS */}
+
+          <div className="
+            flex
+            gap-2
+            mb-4
+          ">
+
+            <button
+              onClick={addToCart}
+              className="
+                bg-green-600
                 text-white
-                px-6
-                py-3
+                px-4
+                py-2
                 rounded-xl
                 font-bold
               "
             >
+              Add To Cart
+            </button>
 
-              Buy Now
+            <button
+              onClick={addToWishlist}
+              className="
+                bg-pink-600
+                text-white
+                px-4
+                py-2
+                rounded-xl
+                font-bold
+              "
+            >
+              Wishlist
+            </button>
 
-            </Link>
+          </div>
+
+          <Link
+            href="/checkout"
+            className="
+              inline-block
+              bg-blue-600
+              text-white
+              px-4
+              py-2
+              rounded-xl
+              font-bold
+            "
+          >
+            Buy Now
+          </Link>
+
+          {/* DESCRIPTION */}
+
+          <div className="mt-8">
+
+            <h2 className="
+              text-xl
+              font-bold
+              mb-3
+            ">
+              Product Description
+            </h2>
+
+            <p className="
+              text-gray-600
+              leading-7
+            ">
+              {
+                product.description ||
+                "No description available."
+              }
+            </p>
 
           </div>
 
         </div>
 
-        {/* DESCRIPTION */}
+      </div>
 
-        <div className="mt-12">
+      {/* REVIEWS */}
 
-          <h2 className="
-            text-2xl
-            font-bold
-            mb-4
-          ">
+      <div className="mt-8">
 
-            Product Description
+        <h2 className="
+          text-2xl
+          font-bold
+          mb-2
+        ">
+          Reviews & Ratings
+        </h2>
 
-          </h2>
+        <p className="text-gray-500">
+          Reviews feature coming soon.
+        </p>
 
-          <p className="
-            text-gray-700
-            leading-8
-          ">
+      </div>
 
-            {
-              product.description ||
-              "No description available."
-            }
+      {/* RELATED PRODUCTS */}
 
-          </p>
+      <div className="mt-8">
 
-        </div>
+        <h2 className="
+          text-2xl
+          font-bold
+          mb-4
+        ">
+          Related Products
+        </h2>
 
-        {/* REVIEWS */}
+        <div className="
+          grid
+          grid-cols-2
+          md:grid-cols-4
+          gap-4
+        ">
 
-        <div className="mt-12">
+          {relatedProducts.map((item) => (
 
-          <h2 className="
-            text-2xl
-            font-bold
-            mb-4
-          ">
+            <Link
+              key={item.id}
+              href={`/product/${item.id}`}
+            >
 
-            Reviews & Ratings
+              <div className="
+                bg-white
+                rounded-xl
+                shadow
+                overflow-hidden
+              ">
 
-          </h2>
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  className="
+                    w-full
+                    h-40
+                    object-cover
+                  "
+                />
 
-          <p className="text-gray-500">
+                <div className="p-2">
 
-            Reviews feature coming soon.
+                  <h3 className="
+                    font-semibold
+                    line-clamp-2
+                  ">
+                    {item.name}
+                  </h3>
 
-          </p>
+                  <p className="
+                    text-green-600
+                    font-bold
+                  ">
+                    ₹{item.price}
+                  </p>
 
-        </div>
+                </div>
 
-        {/* RELATED PRODUCTS */}
+              </div>
 
-        <div className="mt-12">
+            </Link>
 
-          <h2 className="
-            text-2xl
-            font-bold
-            mb-4
-          ">
-
-            Related Products
-
-          </h2>
-
-          <p className="text-gray-500">
-
-            Related products section coming soon.
-
-          </p>
+          ))}
 
         </div>
 
@@ -456,6 +621,7 @@ export default function ProductPage() {
 
     </div>
 
-  );
+  </div>
 
+);
 }
