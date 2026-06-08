@@ -252,8 +252,7 @@ export default function ProductCard({
   alt={name}
   className="
     w-full
-    h-64
-    md:h-72
+    h-40
     object-cover
     group-hover:scale-105
     transition
@@ -305,8 +304,8 @@ export default function ProductCard({
             bg-gradient-to-b
 from-white
 to-gray-50
-            w-11
-            h-11
+            w-9
+            h-9
             rounded-full
             flex
             items-center
@@ -327,7 +326,7 @@ to-gray-50
       {/* CONTENT */}
 
       <motion.div className="
-        p-2
+        p-1.5
       ">
 
         {/* RATING */}
@@ -366,10 +365,9 @@ to-gray-50
 
           <h3 className="
             font-semibold
-            text-base
-            md:text-lg
+           text-sm
             line-clamp-2
-            min-h-[48px]
+            min-h-[38px]
             hover:text-green-600
             transition
           ">
@@ -392,7 +390,7 @@ to-gray-50
           <p className="
             text-green-600
             font-bold
-            text-lg
+            text-base
           ">
 
             ₹{price}
@@ -429,7 +427,7 @@ to-gray-50
   items-center
   justify-center
   gap-2
-  py-2.5
+  py-2
   rounded-xl
   font-semibold
   transition

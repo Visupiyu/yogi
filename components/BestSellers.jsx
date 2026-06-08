@@ -19,7 +19,7 @@ async function fetchBestSellers() {
   const q = query(
     collection(db, "products"),
     orderBy("sales", "desc"),
-    limit(8)
+    limit(12)
   );
 
   const snapshot =
@@ -100,7 +100,7 @@ export default function BestSellers() {
   return (
 
     <section className="
-     max-w-screen-2xl
+    max-w-7xl
       mx-auto
       px-*
       py-*
@@ -114,7 +114,7 @@ export default function BestSellers() {
       ">
 
         <h2 className="
-          text-3xl
+          text-2xl
           font-bold
         ">
           🏆 Best Sellers
@@ -135,12 +135,14 @@ export default function BestSellers() {
       {isLoading && (
 
         <div className="
-          grid
-          grid-cols-2
-          md:grid-cols-4
-          gap-*
-        ">
-
+  grid
+  grid-cols-2
+  sm:grid-cols-3
+  md:grid-cols-4
+  lg:grid-cols-5
+  xl:grid-cols-6
+  gap-*
+">
           {[...Array(8)].map(
             (_, index) => (
 
@@ -160,11 +162,14 @@ export default function BestSellers() {
         
 
         <div className="
-          grid
-          grid-cols-2
-          md:grid-cols-4
-          gap-*
-        ">
+  grid
+  grid-cols-2
+  sm:grid-cols-3
+  md:grid-cols-4
+  lg:grid-cols-5
+  xl:grid-cols-6
+  gap-*
+">
 
 
           {products.map(

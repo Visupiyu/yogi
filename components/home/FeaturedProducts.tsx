@@ -107,9 +107,9 @@ snapshot.forEach((doc)=>{
 
       <div className="max-w-7xl mx-auto">
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
 
-          <h2 className="text-2xl md:text-3xl font-bold">
+          <h2 className="text-2xl md:text-2xl font-bold">
             Featured Products
           </h2>
 
@@ -125,8 +125,10 @@ snapshot.forEach((doc)=>{
                 <div className="
           grid
           grid-cols-2
-          md:grid-cols-3
-          lg:grid-cols-4
+sm:grid-cols-3
+md:grid-cols-4
+lg:grid-cols-5
+xl:grid-cols-6
           gap-*
         ">
 

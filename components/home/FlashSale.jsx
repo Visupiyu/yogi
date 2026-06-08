@@ -131,8 +131,8 @@ export default function FlashSale(){
               </p>
 
               <h2 className="
-                text-3xl
-                md:text-4xl
+                text-2xl
+                md:text-2xl
                 font-extrabold
                 leading-tight
               ">
@@ -177,8 +177,7 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-3
-                min-w-[90px]
+                p-2                min-w-[90px]
                 text-center
               ">
 
@@ -199,7 +198,7 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-3
+                p-2
                 min-w-[90px]
                 text-center
               ">
@@ -221,13 +220,13 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-3
+                p-2
                 min-w-[75px]
                 text-center
               ">
 
                 <h3 className="
-                  text-3xl
+                  text-2xl
                   font-bold
                 ">
                   {timeLeft.seconds}

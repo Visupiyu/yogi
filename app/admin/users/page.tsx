@@ -30,6 +30,8 @@ export default function AdminUsersPage(){
 
   const [loading,setLoading] =
     useState(true);
+    const [search,setSearch] =
+  useState("");
 
   useEffect(()=>{
 
@@ -101,11 +103,28 @@ export default function AdminUsersPage(){
 
       <div className="max-w-7xl mx-auto p-8">
 
-        <h1 className="text-4xl font-bold mb-8">
+       <div className="
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  text-white
+  p-8
+  rounded-3xl
+  mb-8
+">
 
-        User Management
+  <h1 className="
+    text-4xl
+    font-bold
+  ">
+    User Management
+  </h1>
 
-        </h1>
+  <p className="opacity-90">
+    Manage vendors and marketplace users
+  </p>
+
+</div>
 
         <div className="
           grid
@@ -188,12 +207,35 @@ export default function AdminUsersPage(){
           </div>
 
         </div>
+        <input
+  type="text"
+  placeholder="Search Name or Email..."
+  value={search}
+  onChange={(e)=>
+    setSearch(e.target.value)
+  }
+  className="
+    w-full
+    border
+    p-4
+    rounded-2xl
+    mb-6
+  "
+/>
 
         {loading ? (
 
-          <p>
-            Loading...
-          </p>
+          <div className="
+  bg-white
+  rounded-2xl
+  shadow
+  p-10
+  text-center
+">
+
+  Loading Users...
+
+</div>
 
         ) : (
 
@@ -231,10 +273,49 @@ export default function AdminUsersPage(){
 
               </thead>
 
+              {users.length === 0 && (
+
+  <tr>
+
+    <td
+      colSpan={4}
+      className="
+        text-center
+        py-10
+        text-gray-500
+      "
+    >
+
+      No Users Found
+
+    </td>
+
+  </tr>
+
+)}
+
               <tbody>
 
-                {users.map(
-                  (user)=>(
+               {users
+  .filter((user)=>
+
+    user.name
+      .toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+
+    ||
+
+    user.email
+      .toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+
+  )
+  .map(
+    (user)=>(
                   <tr
                     key={user.id}
                     className="border-b"
@@ -252,9 +333,33 @@ export default function AdminUsersPage(){
                       {user.role}
                     </td>
 
-                    <td>
-                      {user.status}
-                    </td>
+                   <td>
+
+  <span
+    className={`
+      px-3
+      py-1
+      rounded-full
+      text-sm
+      font-semibold
+
+      ${
+        user.status === "Approved"
+        ? "bg-green-100 text-green-700"
+
+        : user.status === "Rejected"
+        ? "bg-red-100 text-red-700"
+
+        : "bg-yellow-100 text-yellow-700"
+      }
+    `}
+  >
+
+    {user.status}
+
+  </span>
+
+</td>
 
                   </tr>
 
