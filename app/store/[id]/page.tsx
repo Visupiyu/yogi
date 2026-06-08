@@ -193,7 +193,7 @@ setTotalStock(
     rounded-xl
   "
 >
-  ← Back to Store
+  ← Back to Stores
 </Link>
 
         {/* STORE HEADER */}
@@ -224,6 +224,11 @@ setTotalStock(
   items-center
   gap-5
 ">
+  <div className="
+  flex
+  items-center
+  gap-5
+"></div>
 
   <div className="
     w-24
@@ -316,7 +321,7 @@ setTotalStock(
   mt-3
   opacity-90
 ">
-  Trusted marketplace seller
+Trusted marketplace seller serving customers across India
 </p>
 
 {vendorInfo && (
@@ -342,6 +347,9 @@ setTotalStock(
       {" "}
       {vendorInfo.state}
     </p>
+    <p>
+  ⭐ 4.8 Store Rating
+</p>
 
   </div>
 
@@ -503,7 +511,7 @@ setTotalStock(
               text-gray-500
               text-lg
             ">
-              No products found
+            This store has not added products yet.
             </p>
 
           </div>
@@ -540,27 +548,49 @@ setTotalStock(
               >
 
                 <div className="
-                  bg-white
-                  rounded-3xl
-                  shadow-md
-                  overflow-hidden
-                  hover:shadow-xl
-                  transition
-                  duration-300
-                ">
+  bg-white
+  rounded-3xl
+  shadow-md
+  overflow-hidden
+  hover:shadow-xl
+  transition
+  duration-300
+">
 
-                  <img
-                    src={
-                      product.image ||
-                      "/no-image.png"
-                    }
-                    alt={product.name}
-                    className="
-                      w-full
-                      h-72
-                      object-cover
-                    "
-                  />
+  <div className="
+    relative
+  ">
+
+    <div className="
+      absolute
+      top-3
+      left-3
+      bg-red-500
+      text-white
+      text-xs
+      font-bold
+      px-3
+      py-1
+      rounded-full
+      z-10
+    ">
+      25% OFF
+    </div>
+
+    <img
+      src={
+        product.image ||
+        "/no-image.png"
+      }
+      alt={product.name}
+      className="
+        w-full
+        h-72
+        object-cover
+      "
+    />
+
+  </div>
 
                   <div className="p-5">
 

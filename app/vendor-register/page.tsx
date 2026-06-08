@@ -125,6 +125,9 @@ export default function VendorRegisterPage(){
 
   };
 
+  const [showPassword,setShowPassword] =
+  useState(false);
+
   const registerVendor =
     async ()=>{
 
@@ -366,7 +369,10 @@ businessType:
 
   return (
 
-    <div className="min-h-screen bg-gray-100 py-12 px-6">
+    <div className="min-h-screen bg-gradient-to-br
+from-green-50
+via-white
+to-blue-50 py-12 px-6">
 
       <div
         className="
@@ -389,6 +395,29 @@ businessType:
               mb-3
             "
           >
+            <div className="
+  text-center
+  mb-6
+">
+
+  <img
+    src="/logo.png"
+    alt="Yogi Mart"
+    className="
+      w-20
+      mx-auto
+      mb-3
+    "
+  />
+
+  <p className="
+    text-green-600
+    font-semibold
+  ">
+    Yogi Mart Seller Portal
+  </p>
+
+</div>
             Become a Vendor
           </h1>
 
@@ -448,7 +477,11 @@ businessType:
             />
 
             <input
-              type="password"
+             type={
+  showPassword
+    ? "text"
+    : "password"
+}
               name="password"
               placeholder="Password"
               value={formData.password}
@@ -472,6 +505,26 @@ businessType:
                 rounded-2xl
               "
             />
+
+            <label className="
+  flex
+  items-center
+  gap-2
+">
+
+  <input
+    type="checkbox"
+    checked={showPassword}
+    onChange={()=>
+      setShowPassword(
+        !showPassword
+      )
+    }
+  />
+
+  Show Password
+
+</label>
 
           </div>
 
@@ -810,6 +863,24 @@ businessType:
 
         </div>
 
+        <div className="
+  bg-green-50
+  border
+  border-green-200
+  rounded-2xl
+  p-4
+  mb-6
+">
+
+  <p className="
+    text-green-700
+    text-sm
+  ">
+    Your application will be reviewed by Yogi Mart before approval.
+  </p>
+
+</div>
+
         <button
 
           onClick={registerVendor}
@@ -829,7 +900,7 @@ businessType:
 
     ? "bg-gray-400"
 
-    : "bg-blue-600"
+    : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500"
   }
 `} 
 >

@@ -65,7 +65,13 @@ export default function StoresPage() {
 
   return (
 
-    <div className="min-h-screen bg-gray-50">
+   <div className="
+  min-h-screen
+  bg-gradient-to-br
+  from-green-50
+  via-white
+  to-blue-50
+">
 
       <div className="max-w-7xl mx-auto px-4 py-12">
 
@@ -76,6 +82,14 @@ export default function StoresPage() {
         <p className="text-center text-gray-600 mb-12">
           Explore stores and discover products from trusted vendors.
         </p>
+        <p className="
+  text-center
+  text-green-600
+  font-semibold
+  mb-10
+">
+  {stores.length} Stores Available
+</p>
 
         {loading && (
 
@@ -117,15 +131,49 @@ export default function StoresPage() {
               "
             >
 
-              <h2
-                className="
-                  text-2xl
-                  font-bold
-                  mb-3
-                "
-              >
-                {store.businessName}
-              </h2>
+              <div className="
+  flex
+  items-center
+  gap-4
+  mb-4
+">
+
+  <img
+    src={
+      store.logo ||
+      "/user.png"
+    }
+    alt=""
+    className="
+      w-16
+      h-16
+      rounded-full
+      object-cover
+      border
+    "
+  />
+
+  <div>
+
+    <h2
+      className="
+        text-2xl
+        font-bold
+      "
+    >
+      {store.businessName}
+    </h2>
+
+    <p className="
+      text-sm
+      text-gray-500
+    ">
+      Verified Seller
+    </p>
+
+  </div>
+
+</div>
 
               <p className="text-gray-600 mb-2">
                 Owner:
@@ -157,12 +205,29 @@ export default function StoresPage() {
   Verified Store
 </span>
 
+<span className="
+  inline-block
+  bg-yellow-100
+  text-yellow-700
+  px-3
+  py-1
+  rounded-full
+  text-sm
+  font-semibold
+  ml-2
+">
+  ⭐ 4.8
+</span>
+
               <Link
                 href={`/store/${store.uid}`}
                 className="
                   inline-block
-                  bg-green-600
-                  hover:bg-green-700
+                 bg-gradient-to-r
+from-green-600
+to-blue-600
+hover:from-green-500
+hover:to-blue-500
                   text-white
                   px-5
                   py-3
