@@ -23,6 +23,9 @@ export default function SellerOrdersPage(){
   const [loading,setLoading] =
     useState(true);
 
+    const [search,setSearch] =
+  useState("");
+
   useEffect(()=>{
 
     const fetchOrders =
@@ -188,27 +191,104 @@ export default function SellerOrdersPage(){
 
     <div className="p-5">
 
-      <h1
-        className="
-          text-3xl
-          font-bold
-          mb-6
-        "
-      >
-        Seller Orders
-      </h1>
+      <div className="
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  text-white
+  p-6
+  rounded-3xl
+  mb-6
+">
+
+  <h1 className="
+    text-4xl
+    font-bold
+  ">
+    Seller Orders
+  </h1>
+
+  <p className="opacity-90">
+    Manage customer orders and delivery status
+  </p>
+
+</div>
+
+<div className="
+  mb-6
+  bg-white
+  p-4
+  rounded-2xl
+  shadow
+">
+
+  <p className="
+    text-lg
+    font-semibold
+  ">
+    Total Orders: {orders.length}
+  </p>
+
+</div>
+
+<input
+  type="text"
+  placeholder="Search Order ID / Customer..."
+  value={search}
+  onChange={(e)=>
+    setSearch(e.target.value)
+  }
+  className="
+    w-full
+    border
+    p-4
+    rounded-2xl
+    mb-6
+  "
+/>
 
       {orders.length === 0 ? (
 
-        <p>
-          No Orders Found
-        </p>
+      <div className="
+  bg-white
+  p-10
+  rounded-3xl
+  text-center
+  shadow
+">
+
+  <p className="
+    text-gray-500
+    text-lg
+  ">
+    No orders available yet.
+  </p>
+
+</div>
 
       ) : (
 
         <div className="space-y-5">
 
-          {orders.map((order)=>(
+         {orders
+  .filter((order)=>
+
+    order.id
+      .toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+
+    ||
+
+    order.customerName
+      ?.toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+
+  )
+  .map((order)=>(
 
             <div
 
@@ -239,6 +319,18 @@ export default function SellerOrdersPage(){
                 {" "}
                 {order.customerName}
               </p>
+
+              <p>
+  Date:
+  {" "}
+  {
+    order.createdAt?.toDate
+      ? order.createdAt
+          .toDate()
+          .toLocaleDateString()
+      : "-"
+  }
+</p>
 
               <p>
                 Phone:

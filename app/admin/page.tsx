@@ -165,6 +165,14 @@ setNotifications] =
   const [loading,setLoading] =
     useState(true);
 
+    const [vendorSearch,setVendorSearch] =
+  useState("");
+
+  const [productSearch,setProductSearch] =
+  useState("");
+  const [customerSearch,setCustomerSearch] =
+  useState("");
+
     const [vendorPayouts,
 setVendorPayouts] =
   useState<any[]>([]);
@@ -839,7 +847,9 @@ async (
       {/* HEADER */}
 
       <div className="
-        bg-black
+      bg-gradient-to-r
+from-green-600
+to-blue-600
         text-white
         px-8
         py-5
@@ -850,16 +860,40 @@ async (
 
         <div>
 
-          <h1 className="
-            text-4xl
-            font-bold
-          ">
-            Yogi Mart
-          </h1>
+          <div className="
+  flex
+  items-center
+  gap-4
+">
 
-          <p>
-            👑 Admin Dashboard
-          </p>
+  <img
+    src="/logo.png"
+    alt="Yogi Mart"
+    className="
+      w-16
+      h-16
+      rounded-full
+      bg-white
+      p-2
+    "
+  />
+
+  <div>
+
+    <h1 className="
+      text-4xl
+      font-bold
+    ">
+      Yogi Mart
+    </h1>
+
+    <p>
+      👑 Admin Dashboard
+    </p>
+
+  </div>
+
+</div>
 
           <div className="
   mt-4
@@ -1104,6 +1138,24 @@ window.location.href =
     Customers
   </h2>
 
+  <input
+  type="text"
+  placeholder="Search Customer Email..."
+  value={customerSearch}
+  onChange={(e)=>
+    setCustomerSearch(
+      e.target.value
+    )
+  }
+  className="
+    border
+    p-4
+    rounded-xl
+    w-full
+    mb-6
+  "
+/>
+
   <p className="
     text-5xl
     font-bold
@@ -1190,6 +1242,13 @@ window.location.href =
   ">
     Marketplace Analytics
   </h2>
+
+  <p className="
+  text-gray-500
+  mb-6
+">
+  Real-time marketplace performance overview
+</p>
 
   <div className="
     w-full
@@ -1330,13 +1389,15 @@ window.location.href =
     onClick={createCoupon}
 
     className="
-      bg-black
-      text-white
-      px-8
-      py-4
-      rounded-xl
-      mb-10
-    "
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  text-white
+  px-8
+  py-4
+  rounded-xl
+  mb-10
+"
   >
     Create Coupon
   </button>
@@ -1476,11 +1537,40 @@ window.location.href =
             Vendor Approvals
           </h2>
 
+          <input
+  type="text"
+  placeholder="Search Vendor..."
+  value={vendorSearch}
+  onChange={(e)=>
+    setVendorSearch(
+      e.target.value
+    )
+  }
+  className="
+    border
+    p-4
+    rounded-xl
+    w-full
+    mb-6
+  "
+/>
+
           <div className="
             space-y-6
           ">
 
-            {vendors.map((vendor)=>(
+           {vendors
+  .filter((vendor)=>
+
+    vendor.businessName
+      .toLowerCase()
+      .includes(
+        vendorSearch
+          .toLowerCase()
+      )
+
+  )
+  .map((vendor)=>(
 
               <div
                 key={vendor.id}
@@ -1631,11 +1721,40 @@ window.location.href =
             Marketplace Products
           </h2>
 
+          <input
+  type="text"
+  placeholder="Search Product..."
+  value={productSearch}
+  onChange={(e)=>
+    setProductSearch(
+      e.target.value
+    )
+  }
+  className="
+    border
+    p-4
+    rounded-xl
+    w-full
+    mb-6
+  "
+/>
+
           <div className="
             space-y-6
           ">
 
-            {products.map((product)=>(
+           {products
+  .filter((product)=>
+
+    product.name
+      .toLowerCase()
+      .includes(
+        productSearch
+          .toLowerCase()
+      )
+
+  )
+  .map((product)=>(
 
               <div
                 key={product.id}
@@ -2104,8 +2223,18 @@ window.location.href =
 
       <tbody>
 
-        {customers.map((customer)=>(
+       {customers
+  .filter((customer)=>
 
+    (customer.email || "")
+      .toLowerCase()
+      .includes(
+        customerSearch
+          .toLowerCase()
+      )
+
+  )
+  .map((customer)=>(
           <tr
             key={customer.id}
             className="

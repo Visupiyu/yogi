@@ -14,21 +14,36 @@ export default function SellerLayout({
         className="
           w-64
           min-h-screen
-          bg-black
+         bg-gradient-to-b
+from-green-700
+to-blue-700
           text-white
           p-5
         "
       >
 
-        <h1
-          className="
-            text-2xl
-            font-bold
-            mb-8
-          "
-        >
-          Seller Panel
-        </h1>
+        <div className="mb-8 text-center">
+
+  <img
+    src="/logo.png"
+    alt="Yogi Mart"
+    className="
+      w-16
+      mx-auto
+      mb-3
+    "
+  />
+
+  <h1
+    className="
+      text-2xl
+      font-bold
+    "
+  >
+    Seller Panel
+  </h1>
+
+</div>
 
         <div className="space-y-4">
 
@@ -48,7 +63,14 @@ export default function SellerLayout({
 
           <Link
             href="/seller/add-product"
-            className="block"
+           className="
+  block
+  px-4
+  py-3
+  rounded-xl
+  hover:bg-white/20
+  transition
+"
           >
             Add Product
           </Link>
@@ -59,6 +81,42 @@ export default function SellerLayout({
           >
             Products
           </Link>
+
+          <Link
+  href="/store"
+  className="
+    block
+    px-4
+    py-3
+    rounded-xl
+    hover:bg-white/20
+    transition
+  "
+>
+  View Stores
+</Link>
+
+<button
+  onClick={()=>{
+    localStorage.removeItem(
+      "vendor"
+    );
+
+    window.location.href =
+      "/vendor-login";
+  }}
+  className="
+    w-full
+    text-left
+    px-4
+    py-3
+    rounded-xl
+    hover:bg-red-500
+    transition
+  "
+>
+  Logout
+</button>
 
         </div>
 

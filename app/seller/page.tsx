@@ -96,6 +96,8 @@ const [earnings,setEarnings] =
 
   const [products,setProducts] =
     useState<Product[]>([]);
+    const [search,setSearch] =
+  useState("");
 
   const [orders,setOrders] =
     useState<Order[]>([]);
@@ -761,121 +763,117 @@ setBestSeller(
 
       {/* HEADER */}
 
-      <div
-        className="
-          bg-blue-600
-          text-white
-          px-8
-          py-5
-          flex
-          justify-between
-          items-center
-        "
+<div
+  className="
+    bg-gradient-to-r
+    from-green-600
+    to-blue-600
+    text-white
+    px-8
+    py-6
+  "
+>
+
+  <div className="
+    max-w-7xl
+    mx-auto
+    flex
+    flex-col
+    md:flex-row
+    justify-between
+    items-center
+    gap-6
+  ">
+
+    <div>
+
+      <p className="
+        text-sm
+        uppercase
+        tracking-wider
+        opacity-80
+      ">
+        Yogi Mart Seller Dashboard
+      </p>
+
+      <h1 className="
+        text-4xl
+        font-bold
+      ">
+        {vendorName}
+      </h1>
+
+      <p className="opacity-90">
+        Manage Products, Orders and Revenue
+      </p>
+
+    </div>
+
+    <div className="flex gap-6">
+
+      <button
+        onClick={()=>
+          window.scrollTo({
+            top:0,
+            behavior:"smooth"
+          })
+        }
       >
+        Dashboard
+      </button>
 
-        <div>
+      <button
+        onClick={()=>{
+          document
+            .getElementById("orders")
+            ?.scrollIntoView({
+              behavior:"smooth"
+            });
+        }}
+      >
+        Orders
+      </button>
 
-          <h1 className="text-4xl font-bold">
-            Yogi Mart
-          </h1>
+      <button
+        onClick={()=>{
+          document
+            .getElementById("products")
+            ?.scrollIntoView({
+              behavior:"smooth"
+            });
+        }}
+      >
+        Products
+      </button>
 
-          <p>
+      <button
+        onClick={async ()=>{
 
-  Welcome,
+          const {
+            signOut
+          } = await import(
+            "firebase/auth"
+          );
 
-  {" "}
+          await signOut(auth);
 
-  {auth.currentUser?.email}
+          localStorage.removeItem(
+            "vendor"
+          );
 
-</p>
+          window.location.href =
+            "/vendor-login";
 
-        </div>
+        }}
+      >
+        Logout
+      </button>
 
-        <div className="flex gap-8">
+    </div>
 
-  <button
-
-    onClick={()=>
-
-      window.scrollTo({
-
-        top:0,
-
-        behavior:"smooth"
-
-      })
-
-    }
-
-  >
-    Dashboard
-  </button>
-
-  <button
-
-    onClick={()=>{
-
-      document
-        .getElementById("orders")
-        ?.scrollIntoView({
-
-          behavior:"smooth"
-
-        });
-
-    }}
-
-  >
-    Orders
-  </button>
-
-  <button
-
-    onClick={()=>{
-
-      document
-        .getElementById("products")
-        ?.scrollIntoView({
-
-          behavior:"smooth"
-
-        });
-
-    }}
-
-  >
-    Products
-  </button>
-
-  <button
-
-    onClick={async ()=>{
-
-      const {
-        signOut
-      } = await import(
-        "firebase/auth"
-      );
-
-      await signOut(auth);
-
-localStorage.removeItem(
-  "vendor"
-);
-
-window.location.href =
-  "/vendor-login";
-
-    }}
-
-  >
-    Logout
-  </button>
+  </div>
 
 </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto p-8">
 
         {/* STATS */}
 
@@ -1268,14 +1266,18 @@ reader.readAsDataURL(
                 disabled={loading}
 
                 className="
-                  w-full
-                  bg-blue-600
-                  text-white
-                  py-4
-                  rounded-xl
-                  text-lg
-                  font-semibold
-                "
+  w-full
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  hover:from-green-500
+  hover:to-blue-500
+  text-white
+  py-4
+  rounded-xl
+  text-lg
+  font-semibold
+"
               >
 
                 {loading
@@ -1303,13 +1305,68 @@ reader.readAsDataURL(
             "
           >
 
-            <h2 className="text-3xl font-bold mb-8">
-              Products
-            </h2>
+            
+            <div className="
+  flex
+  flex-col
+  md:flex-row
+  md:justify-between
+  md:items-center
+  gap-4
+  mb-8
+">
+
+  <h2 className="text-3xl font-bold">
+    Products ({products.length})
+  </h2>
+
+  <input
+    type="text"
+    placeholder="Search Products..."
+    value={search}
+    onChange={(e)=>
+      setSearch(e.target.value)
+    }
+    className="
+      border
+      p-3
+      rounded-xl
+      w-full
+      md:w-72
+    "
+  />
+
+</div>
 
             <div className="space-y-6">
 
-              {products.map((product)=>(
+              {products.length === 0 && (
+
+  <div className="
+    text-center
+    py-10
+  ">
+
+    <p className="
+      text-gray-500
+      text-lg
+    ">
+      No products added yet.
+    </p>
+
+  </div>
+
+)}
+
+             {products
+  .filter((product)=>
+    product.name
+      .toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+  )
+  .map((product)=>(
 
                 <div
 
@@ -1568,9 +1625,7 @@ reader.readAsDataURL(
 
       </div>
 
-       </div>
-
-          
+                 
   );
 
 }

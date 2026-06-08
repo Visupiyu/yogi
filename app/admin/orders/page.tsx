@@ -32,6 +32,8 @@ export default function AdminOrdersPage(){
 
   const [loading,setLoading] =
     useState(true);
+    const [search,setSearch] =
+  useState("");
 
   useEffect(()=>{
 
@@ -184,11 +186,28 @@ const totalRevenue =
 
       <div className="max-w-7xl mx-auto p-8">
 
-        <h1 className="text-4xl font-bold mb-8">
+        <div className="
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  text-white
+  p-8
+  rounded-3xl
+  mb-8
+">
 
-          Admin Orders
+  <h1 className="
+    text-4xl
+    font-bold
+  ">
+    Admin Orders
+  </h1>
 
-        </h1>
+  <p className="opacity-90">
+    Manage marketplace orders and delivery status
+  </p>
+
+</div>
 
         <div className="
   grid
@@ -228,12 +247,40 @@ const totalRevenue =
 
 </div>
 
+<input
+  type="text"
+  placeholder="Search Order ID or Customer..."
+  value={search}
+  onChange={(e)=>
+    setSearch(e.target.value)
+  }
+  className="
+    w-full
+    border
+    p-4
+    rounded-2xl
+    mb-6
+  "
+/>
+
         {loading ? (
 
-          <p>
-            Loading...
-          </p>
+          <div className="
+  bg-white
+  rounded-3xl
+  shadow
+  p-10
+  text-center
+">
 
+  <p className="
+    text-lg
+    text-gray-500
+  ">
+    Loading Orders...
+  </p>
+
+</div>
         ) : (
 
           <div className="
@@ -281,8 +328,64 @@ const totalRevenue =
 
               <tbody>
 
-                {orders.map(
-                  (order)=>(
+                {orders.length === 0 && (
+
+  <tr>
+
+    <div className="
+  bg-white
+  rounded-3xl
+  shadow
+  p-10
+  text-center
+">
+
+  <p className="
+    text-gray-500
+    text-lg
+  ">
+    No Orders Found
+  </p>
+
+</div>
+
+    <td
+      colSpan={6}
+      className="
+        text-center
+        py-10
+        text-gray-500
+      "
+    >
+
+      No Orders Found
+
+    </td>
+
+  </tr>
+
+)}
+
+               {orders
+  .filter((order)=>
+
+    order.id
+      .toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+
+    ||
+
+    order.customerName
+      .toLowerCase()
+      .includes(
+        search.toLowerCase()
+      )
+
+  )
+  .map(
+    (order)=>(
                   <tr
                     key={order.id}
                     className="
@@ -307,30 +410,61 @@ const totalRevenue =
 
                     <td>
 
-                      <select
+  <div className="mb-2">
 
-                        value={
-                          order.status
-                        }
+    <span
+      className={`
+        px-3
+        py-1
+        rounded-full
+        text-sm
+        font-semibold
 
-                        onChange={(e)=>
+        ${
+          order.status === "Delivered"
+          ? "bg-green-100 text-green-700"
 
-                          updateStatus(
+          : order.status === "Cancelled"
+          ? "bg-red-100 text-red-700"
 
-                            order.id,
+          : order.status === "Out For Delivery"
+          ? "bg-blue-100 text-blue-700"
 
-                            e.target.value
+          : "bg-yellow-100 text-yellow-700"
+        }
+      `}
+    >
 
-                          )
+      {order.status}
 
-                        }
+    </span>
 
-                        className="
-                          border
-                          p-2
-                          rounded-lg
-                        "
-                      >
+  </div>
+
+  <select
+
+    value={
+      order.status
+    }
+
+    onChange={(e)=>
+
+      updateStatus(
+
+        order.id,
+
+        e.target.value
+
+      )
+
+    }
+
+    className="
+      border
+      p-2
+      rounded-lg
+    "
+  >
 
                         <option>
                           Pending
@@ -375,7 +509,9 @@ const totalRevenue =
     target="_blank"
     rel="noopener noreferrer"
     className="
-      bg-blue-600
+     bg-gradient-to-r
+from-green-600
+to-blue-600
       text-white
       px-3
       py-2
