@@ -77,6 +77,7 @@ export default function FeatureStrip(){
         md:grid-cols-3
         lg:grid-cols-5
         gap-1
+
       ">
 
         {features.map((item,index)=>{
@@ -92,10 +93,10 @@ export default function FeatureStrip(){
   className={`
     flex
     items-center
-    gap-1
+    gap-4
     ${item.bg}
     rounded-2xl
-    p-2
+    p-4
     hover:shadow-md
     transition
   `}
