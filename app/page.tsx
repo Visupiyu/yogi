@@ -165,7 +165,7 @@ xl:grid-cols-6
 
       
 
-      {[...Array(8)].map((_,i)=>(
+      {[...Array(10)].map((_,i)=>(
 
         <ProductSkeleton
           key={i}
@@ -306,11 +306,12 @@ viewport={{
 
           <div>
 
-            <h2 className="
-              text-2xl
-              md:text-3xl
-              font-bold
-            ">
+           <h2 className="
+  text-2xl
+  md:text-3xl
+  font-bold
+  text-gray-800
+">
 
               Trending Products
 
@@ -332,14 +333,13 @@ viewport={{
         </div>
 
         <div className="
-          bg-white
-          rounded-3xl
-          p-4
-          shadow-lg
-          border
-          border-gray-100
-          mb-*
-        ">
+  bg-white
+  rounded-3xl
+  p-6
+  shadow-md
+  border
+  border-gray-100
+">
 
           <div className="
             flex
@@ -475,8 +475,8 @@ to-blue-600
 hover:from-green-500
 hover:to-blue-500
                 text-white
-                px-5
-                py-*
+                px-6
+                py-1
                 rounded-xl
                 font-semibold
               "
@@ -526,12 +526,12 @@ hover:to-blue-500
 
        <div className="
   grid
-  grid-cols-2
-  sm:grid-cols-3
-  md:grid-cols-4
-  lg:grid-cols-5
-  xl:grid-cols-6
-  gap-1
+ grid-cols-2
+sm:grid-cols-3
+md:grid-cols-4
+lg:grid-cols-5
+xl:grid-cols-6
+  gap-2
 ">
 
           {filteredProducts.map((product)=>(

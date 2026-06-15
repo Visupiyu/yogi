@@ -252,7 +252,7 @@ export default function ProductCard({
   alt={name}
   className="
     w-full
-    h-40
+    h-32
     object-cover
     group-hover:scale-105
     transition
@@ -304,8 +304,8 @@ export default function ProductCard({
             bg-gradient-to-b
 from-white
 to-gray-50
-            w-9
-            h-9
+            w-8
+            h-8
             rounded-full
             flex
             items-center
@@ -317,7 +317,7 @@ to-gray-50
           "
         >
 
-          <Heart size={18} />
+          <Heart size={16} />
 
         </motion.button>
 
@@ -326,7 +326,7 @@ to-gray-50
       {/* CONTENT */}
 
       <motion.div className="
-        p-1.5
+        p-1
       ">
 
         {/* RATING */}
@@ -347,7 +347,7 @@ to-gray-50
 
           <span className="
             text-gray-500
-            text-sm
+            text-xs
             ml-1
           ">
 
@@ -367,7 +367,7 @@ to-gray-50
             font-semibold
            text-sm
             line-clamp-2
-            min-h-[38px]
+            min-h-[30px]
             hover:text-green-600
             transition
           ">
@@ -390,7 +390,7 @@ to-gray-50
           <p className="
             text-green-600
             font-bold
-            text-base
+            text-sm
           ">
 
             ₹{price}
@@ -427,7 +427,7 @@ to-gray-50
   items-center
   justify-center
   gap-2
-  py-2
+  py-1.5
   rounded-xl
   font-semibold
   transition
@@ -442,7 +442,7 @@ to-gray-50
 
 `}        >
 
-          <ShoppingCart size={18} />
+          <ShoppingCart size={16} />
 
           {stock <= 0
 
