@@ -160,7 +160,7 @@ sm:grid-cols-3
 md:grid-cols-4
 lg:grid-cols-5
 xl:grid-cols-6
-      gap-*
+      gap-1
     ">
 
       
@@ -258,7 +258,7 @@ xl:grid-cols-6
   grid
   grid-cols-1
   lg:grid-cols-4
-  gap-*
+  gap-1
 ">
 
   <div className="
@@ -300,7 +300,7 @@ viewport={{
           md:flex-row
           md:items-center
           md:justify-between
-          gap-*
+          gap-1
           mb-*
         ">
 
@@ -345,7 +345,7 @@ viewport={{
             flex
             flex-col
             md:flex-row
-            gap-*
+            gap-1
           ">
 
             <input
@@ -531,7 +531,7 @@ hover:to-blue-500
   md:grid-cols-4
   lg:grid-cols-5
   xl:grid-cols-6
-  gap-*
+  gap-1
 ">
 
           {filteredProducts.map((product)=>(

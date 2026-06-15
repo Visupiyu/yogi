@@ -31,6 +31,9 @@ export default function LoginPage(){
   const [loading,setLoading] =
     useState(false);
 
+    const [showPassword,setShowPassword] =
+  useState(false);
+
    const login = async ()=>{
 
     try{
@@ -75,29 +78,79 @@ export default function LoginPage(){
 
   return (
 
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+   <div
+  className="
+    min-h-screen
+    bg-gradient-to-br
+    from-green-50
+    via-white
+    to-blue-50
+    flex
+    items-center
+    justify-center
+    p-6
+  "
+>
 
       <div
-        className="
-          bg-white
-          p-10
-          rounded-2xl
-          shadow-lg
-          w-full
-          max-w-md
-        "
-      >
+  className="
+    bg-white
+    backdrop-blur-sm
+    border
+    border-gray-100
+    p-10
+    rounded-3xl
+    shadow-xl
+    w-full
+    max-w-md
+  "
+>
 
-        <h1
-          className="
-            text-4xl
-            font-bold
-            mb-8
-            text-center
-          "
-        >
-          Login 
-        </h1>
+        <div className="
+  text-center
+  mb-5
+">
+
+  <img
+    src="/logo.png"
+    alt="Yogi Mart"
+    className="
+      w-20
+      mx-auto
+      mb-3
+    "
+  />
+
+</div>
+
+<p className="
+  text-center
+  text-green-600
+  font-semibold
+  text-sm
+  mb-2
+">
+  Yogi Mart Customer Portal
+</p>
+
+<h1
+  className="
+    text-4xl
+    font-bold
+    text-center
+    mb-3
+  "
+>
+  Customer Login
+</h1>
+
+<p className="
+  text-center
+  text-gray-500
+  mb-8
+">
+  Login to your Yogi Mart account
+</p>
 
         <div className="space-y-5">
 
@@ -124,24 +177,73 @@ export default function LoginPage(){
 
           <input
 
-            type="password"
+  type={
+    showPassword
+      ? "text"
+      : "password"
+  }
 
-            placeholder="Password"
+  placeholder="Password"
 
-            value={password}
+  value={password}
 
-            onChange={(e)=>
-              setPassword(e.target.value)
-            }
+  onChange={(e)=>
+    setPassword(e.target.value)
+  }
 
-            className="
-              w-full
-              p-4
-              border
-              rounded-xl
-              outline-none
-            "
-          />
+  className="
+    w-full
+    p-4
+    border
+    rounded-2xl
+    outline-none
+  "
+/>
+
+<div className="
+  flex
+  items-center
+  justify-between
+  mt-2
+">
+
+  <label className="
+    flex
+    items-center
+    gap-2
+  ">
+
+    <input
+      type="checkbox"
+      checked={showPassword}
+      onChange={()=>
+        setShowPassword(
+          !showPassword
+        )
+      }
+    />
+
+    <span className="
+      text-sm
+      text-gray-600
+    ">
+      Show Password
+    </span>
+
+  </label>
+
+  <a
+    href="/forgot-password"
+    className="
+      text-blue-600
+      font-semibold
+      text-sm
+    "
+  >
+    Forgot Password?
+  </a>
+
+</div>
 
         </div>
 
@@ -154,13 +256,20 @@ export default function LoginPage(){
             disabled={loading}
 
             className="
-              w-full
-              bg-blue-600
-              text-white
-              py-4
-              rounded-xl
-              text-lg
-            "
+  w-full
+  text-white
+  py-4
+  rounded-2xl
+  mt-8
+  text-lg
+  font-bold
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  hover:from-green-500
+  hover:to-blue-500
+"
+            
           >
             Login
           </button>

@@ -143,7 +143,7 @@ if (products.length === 0) {
 md:grid-cols-4
 lg:grid-cols-5
 xl:grid-cols-6
-        gap-0
+        gap-1
       ">
 
         {products.map(

@@ -112,7 +112,7 @@ export default function FlashSale(){
             lg:flex-row
             items-center
             justify-between
-            gap-*
+            gap-1
           ">
 
       
@@ -170,7 +170,7 @@ export default function FlashSale(){
 
             <div className="
               flex
-              gap-*
+              gap-1
             ">
 
               <div className="

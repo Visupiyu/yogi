@@ -141,7 +141,7 @@ export default function BestSellers() {
   md:grid-cols-4
   lg:grid-cols-5
   xl:grid-cols-6
-  gap-*
+  gap-1
 ">
           {[...Array(8)].map(
             (_, index) => (
@@ -168,7 +168,7 @@ export default function BestSellers() {
   md:grid-cols-4
   lg:grid-cols-5
   xl:grid-cols-6
-  gap-*
+  gap-1
 ">
 
 

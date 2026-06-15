@@ -287,7 +287,7 @@ border-gray-100
             mb-8
           "
         >
-        Manage products, orders and sales
+       Manage products, orders and grow your business
         </p>
 
         <div className="space-y-5">

@@ -76,7 +76,7 @@ export default function FeatureStrip(){
         grid-cols-2
         md:grid-cols-3
         lg:grid-cols-5
-        gap-*
+        gap-1
       ">
 
         {features.map((item,index)=>{
@@ -92,7 +92,7 @@ export default function FeatureStrip(){
   className={`
     flex
     items-center
-    gap-*
+    gap-1
     ${item.bg}
     rounded-2xl
     p-2
