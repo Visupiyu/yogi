@@ -100,7 +100,7 @@ export default function CategoryStrip(){
         px-4
         py-5
         flex
-        justify-center
+        justify-start
         items-center
         gap-6
         overflow-x-auto

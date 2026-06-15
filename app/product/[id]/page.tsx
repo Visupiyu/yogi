@@ -302,11 +302,12 @@ export default function ProductPage() {
               }
               alt={product.name}
               className="
-                w-full
-                h-[500px]
-                object-cover
-                rounded-2xl
-              "
+  w-full
+  h-[300px]
+  md:h-[500px]
+  object-contain
+  rounded-2xl
+"
             />
 
           </div>
@@ -318,7 +319,8 @@ export default function ProductPage() {
         <div>
 
           <h1 className="
-            text-4xl
+           text-2xl
+md:text-4xl
             font-bold
             mb-2
           ">
@@ -328,7 +330,7 @@ export default function ProductPage() {
           <div className="
             flex
             items-center
-            gap-1
+            gap-3
             mb-2
           ">
             <span className="text-yellow-500">
@@ -437,7 +439,7 @@ export default function ProductPage() {
             </h3>
 
             <Link
-              href={`/store?vendor=${product.vendorId}`}
+             href={`/store/${product.vendorId}`}
               className="
                 text-green-600
                 font-semibold
@@ -451,22 +453,24 @@ export default function ProductPage() {
 
           {/* BUTTONS */}
 
-          <div className="
-            flex
-            gap-2
-            mb-4
-          ">
+         <div className="
+  flex
+  flex-col
+  sm:flex-row
+  gap-3
+  mb-4
+">
 
             <button
               onClick={addToCart}
               className="
-                bg-green-600
-                text-white
-                px-4
-                py-2
-                rounded-xl
-                font-bold
-              "
+  flex-1
+  bg-green-600
+  text-white
+  py-4
+  rounded-2xl
+  font-bold
+"
             >
               Add To Cart
             </button>
@@ -474,13 +478,13 @@ export default function ProductPage() {
             <button
               onClick={addToWishlist}
               className="
-                bg-pink-600
-                text-white
-                px-4
-                py-2
-                rounded-xl
-                font-bold
-              "
+  flex-1
+  bg-pink-600
+  text-white
+  py-4
+  rounded-2xl
+  font-bold
+"
             >
               Wishlist
             </button>
@@ -489,15 +493,16 @@ export default function ProductPage() {
 
           <Link
             href="/checkout"
-            className="
-              inline-block
-              bg-blue-600
-              text-white
-              px-4
-              py-2
-              rounded-xl
-              font-bold
-            "
+           className="
+  block
+  w-full
+  bg-blue-600
+  text-white
+  py-4
+  rounded-2xl
+  font-bold
+  text-center
+"
           >
             Buy Now
           </Link>
@@ -509,6 +514,7 @@ export default function ProductPage() {
             <h2 className="
               text-xl
               font-bold
+              leading-snug
               mb-3
             ">
               Product Description
@@ -587,7 +593,7 @@ export default function ProductPage() {
                   className="
                     w-full
                     h-40
-                    object-cover
+                    object-contain
                   "
                 />
 
