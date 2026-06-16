@@ -13,6 +13,8 @@ import {
   getStorage
 } from "firebase/storage";
 
+
+
 const firebaseConfig = {
 
   apiKey:
@@ -38,14 +40,20 @@ const firebaseConfig = {
 
 };
 
-const app =
-  initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 
-export const db =
-  getFirestore(app);
+export const auth = getAuth(app);
 
-export const auth =
-  getAuth(app);
+export const db = getFirestore(app);
 
 export const storage =
   getStorage(app);
+console.log(
+  "PROJECT:",
+  firebaseConfig.projectId
+);
+
+console.log(
+  "BUCKET:",
+  firebaseConfig.storageBucket
+);

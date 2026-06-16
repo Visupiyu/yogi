@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState }
-from "react";
+  from "react";
 
 import {
   collection,
@@ -18,6 +18,10 @@ import {
   auth,
   db
 } from "@/lib/firebase";
+
+import {
+  onAuthStateChanged
+} from "firebase/auth";
 import {
   useRouter
 } from "next/navigation";
@@ -29,130 +33,128 @@ import {
 } from "firebase/storage";
 
 import { storage }
-from "@/lib/firebase";
+  from "@/lib/firebase";
 
 type Product = {
-
-  id:string;
-
-  name:string;
-
-  price:number;
-
-  image:string;
-
-  stock:number;
-
-  category:string;
-
+  id: string;
+  name: string;
+  price: number;
+  image: string;
+  images?: string[];
+  stock: number;
+  category: string;
 };
 
 type Notification = {
 
-  id:string;
+  id: string;
 
-  title:string;
+  title: string;
 
-  message:string;
+  message: string;
 
-  read:boolean;
+  read: boolean;
 
 };
 
 type Order = {
 
-  id:string;
+  id: string;
 
-  customer:string;
+  customer: string;
 
-  amount:number;
+  amount: number;
 
-  status:string;
+  status: string;
 
-  date:string;
+  date: string;
 
 };
 
-export default function SellerPage(){
+export default function SellerPage() {
   const router =
-  useRouter();
-  const [totalProducts,setTotalProducts] =
-  useState(0);
+    useRouter();
+  const [totalProducts, setTotalProducts] =
+    useState(0);
 
-const [totalOrders,setTotalOrders] =
-  useState(0);
+  const [totalOrders, setTotalOrders] =
+    useState(0);
 
-const [pendingOrders,setPendingOrders] =
-  useState(0);
+  const [pendingOrders, setPendingOrders] =
+    useState(0);
 
-const [earnings,setEarnings] =
-  useState(0);
+  const [earnings, setEarnings] =
+    useState(0);
 
-  const [totalViews,setTotalViews] =
-  useState(0);
+  const [totalViews, setTotalViews] =
+    useState(0);
 
-  const [totalSales,setTotalSales] =
-  useState(0);
+  const [totalSales, setTotalSales] =
+    useState(0);
 
-  const [products,setProducts] =
+  const [products, setProducts] =
     useState<Product[]>([]);
-    const [search,setSearch] =
-  useState("");
+  const [search, setSearch] =
+    useState("");
 
-  const [orders,setOrders] =
+  const [orders, setOrders] =
     useState<Order[]>([]);
 
-  const [name,setName] =
+  const [name, setName] =
     useState("");
 
-  const [price,setPrice] =
+  const [price, setPrice] =
     useState("");
 
-  const [stock,setStock] =
+  const [stock, setStock] =
     useState("");
 
-  const [category,setCategory] =
+  const [category, setCategory] =
     useState("Grocery");
-  const [vendorName,setVendorName] =
-  useState("");
-  const [image,setImage] =
+  const [vendorName, setVendorName] =
     useState("");
-   const [imageFile,setImageFile] =
-  useState<File | null>(null);
+  const [image, setImage] =
+    useState("");
 
-  const [description,setDescription] =
-  useState("");  
+  const [images, setImages] =
+    useState<string[]>([]);
 
-  const [loading,setLoading] =
+  const [imageFiles, setImageFiles] =
+    useState<File[]>([]);
+
+  const [description, setDescription] =
+    useState("");
+
+  const [loading, setLoading] =
     useState(false);
 
-  const [editingId,setEditingId] =
+  const [editingId, setEditingId] =
     useState("");
 
-    const [bestSeller,
-  setBestSeller] =
-  useState("None");
+  const [bestSeller,
+    setBestSeller] =
+    useState("None");
 
   const [
-  notifications,
-  setNotifications
-] = useState<
-  Notification[]
->([]);
+    notifications,
+    setNotifications
+  ] = useState<
+    Notification[]
+  >([]);
 
- const handleImage = (
-  e: React.ChangeEvent<HTMLInputElement>
-)=>{
+  const handleImage = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
 
-   const file =
-  e.target.files?.[0];
+    const file =
+      e.target.files?.[0];
 
-if(!file) return;
+    if (!file) return;
 
     const reader =
       new FileReader();
-      
-    reader.onloadend = ()=>{
+
+    reader.onloadend = () => {
 
       setImage(
         reader.result as string
@@ -163,275 +165,370 @@ if(!file) return;
     reader.readAsDataURL(file);
 
   };
-   async function loadProducts(){
+  async function loadProducts() {
 
-  if(!auth.currentUser) return;
+    if (!auth.currentUser) return;
 
-  const q = query(
-
-    collection(
-      db,
-      "products"
-    ),
-
-    where(
-
-      "vendorId",
-
-      "==",
-
-      auth.currentUser.uid
-
-    )
-
-  );
-
-  const productSnapshot =
-    await getDocs(q);
-
-  const items:Product[] = [];
-
-  productSnapshot.forEach((docItem)=>{
-
-    items.push({
-
-      id:docItem.id,
-
-      ...docItem.data()
-
-    } as Product);
-
-  });
-
-  setProducts(items);
-
-}
-
-  useEffect(()=>{
-    const vendor =
-  localStorage.getItem(
-    "vendor"
-  );
-
-if(!vendor){
-
-   alert(
-    "Please login as vendor"
-  );
-   router.push(
-    "/vendor-login"
-  );
-
-  return;
-
-}
-
-const vendorData =
-    JSON.parse(vendor);
-
-  setVendorName(
-    vendorData.businessName || ""
-  );
-
-
-  loadProducts();
-  setTimeout(()=>{
-
-  loadNotifications();
-
-},1000);
-
-  fetchDashboardData();
-
-  loadVendorOrders();
-
-},[]);
-
-const loadVendorOrders =
-async()=>{
-
-  const user =
-    auth.currentUser;
-
-  if(!user) return;
-
-  const vendorId =
-    user.uid;
-
-  const snapshot =
-    await getDocs(
+    const q = query(
 
       collection(
         db,
-        "orders"
+        "products"
+      ),
+
+      where(
+
+        "vendorId",
+
+        "==",
+
+        auth.currentUser.uid
+
       )
 
     );
 
-    const vendorOrders:Order[] =
-  [];
-  
+    const productSnapshot =
+      await getDocs(q);
 
-  snapshot.forEach((docSnap)=>{
+    const items: Product[] = [];
 
-    const order =
-      docSnap.data();
+    productSnapshot.forEach((docItem) => {
 
-    const sellerItems =
+      items.push({
 
-      order.items.filter(
+        id: docItem.id,
 
-        (item:any)=>
+        ...docItem.data()
 
-          item.vendorId ===
-          vendorId
+      } as Product);
 
-      );
+    });
 
-    if(
-      sellerItems.length > 0
-    ){
+    setProducts(items);
 
-      vendorOrders.push({
+  }
 
-        id:docSnap.id,
+ useEffect(() => {
 
-        customer:
-          order.customerName,
+  const unsubscribe =
+    onAuthStateChanged(
+      auth,
+      async (user) => {
 
-        amount:
-          sellerItems.reduce(
+        if (!user) {
 
-            (
-              sum:number,
-              item:any
-            )=>
+          router.push(
+            "/vendor-login"
+          );
 
-              sum +
-              item.price *
-              item.qty,
+          return;
+        }
 
-            0
+        const vendor =
+          localStorage.getItem(
+            "vendor"
+          );
 
-          ),
+        if (vendor) {
 
-        status:
-          order.status,
+          const vendorData =
+            JSON.parse(vendor);
 
-        date:
-          order.createdAt
-          ?.toDate()
-          ?.toLocaleDateString()
+          setVendorName(
+            vendorData.businessName || ""
+          );
+
+        }
+
+       await loadProducts();
+
+        fetchDashboardData();
+
+        loadVendorOrders();
+
+      }
+    );
+
+  return () => unsubscribe();
+
+}, []);
+
+  const loadVendorOrders =
+    async () => {
+
+      const user =
+        auth.currentUser;
+
+      if (!user) return;
+
+      const vendorId =
+        user.uid;
+
+      const snapshot =
+        await getDocs(
+
+          collection(
+            db,
+            "orders"
+          )
+
+        );
+
+      const vendorOrders: Order[] =
+        [];
+
+
+      snapshot.forEach((docSnap) => {
+
+        const order =
+          docSnap.data();
+
+        const sellerItems =
+
+          (order.items || []).filter(
+
+            (item: any) =>
+
+              item.vendorId ===
+              vendorId
+
+          );
+
+        if (
+          sellerItems.length > 0
+        ) {
+
+          vendorOrders.push({
+
+            id: docSnap.id,
+
+            customer:
+              order.customerName,
+
+            amount:
+              sellerItems.reduce(
+
+                (
+                  sum: number,
+                  item: any
+                ) =>
+
+                  sum +
+                  item.price *
+                  item.qty,
+
+                0
+
+              ),
+
+            status:
+              order.status,
+
+            date:
+              order.createdAt
+                ?.toDate()
+                ?.toLocaleDateString()
+
+          });
+
+        }
 
       });
 
-    }
+      setOrders(vendorOrders);
 
-  });
+    };
 
-  setOrders(vendorOrders);
-
-};
-
-const clearForm = ()=>{
+  const clearForm = () => {
 
     setName("");
     setPrice("");
     setStock("");
     setCategory("Grocery");
+
     setImage("");
+    setImages([]);
+    setImageFiles([]);
+
+    setDescription("");
+
     setEditingId("");
 
   };
 
   const addOrUpdateProduct =
-    async ()=>{
+    async () => {
 
-    if(
-  !name ||
-  !price ||
-  !stock
-){
-  alert("Fill All Fields");
-  return;
-}
+      if (
+        !name ||
+        !price ||
+        !stock
+      ) {
+        alert("Fill All Fields");
+        return;
+      }
 
-    try{
+      try {
 
-      setLoading(true);
+        setLoading(true);
 
-      if(editingId){
+        console.log(
+  "editingId:",
+  editingId
+);
 
-  let imageUrl = image;
+        if (editingId) {
 
-  await updateDoc(
+          const uploadedImages: string[] = [];
 
-    doc(
-      db,
-      "products",
-      editingId
-    ),
+          
+          console.log("Current User:", auth.currentUser);
 
-    {
-      name,
-      price:Number(price),
-      stock:Number(stock),
-      category,
-      description,
-      image:imageUrl
-    }
+          for (const file of imageFiles) {
 
+          const storageRef = ref(
+  storage,
+  `products/${Date.now()}-${file.name}`
+);
+            await uploadBytes(
+              storageRef,
+              file
+            );
+
+            const url =
+              await getDownloadURL(
+                storageRef
+              );
+
+            uploadedImages.push(url);
+
+          }
+
+          await updateDoc(
+
+            doc(
+              db,
+              "products",
+              editingId
+            ),
+
+            {
+              name,
+              price: Number(price),
+              stock: Number(stock),
+              category,
+              description,
+
+              image:
+                uploadedImages[0] || image,
+
+              images:
+                uploadedImages.length > 0
+                  ? uploadedImages
+                  : images
+            }
+
+          );
+
+          alert("Product Updated");
+
+        } else {
+
+          const uploadedImages: string[] = [];
+
+          for (const file of imageFiles) {
+
+  const storageRef = ref(
+    storage,
+    `products/${Date.now()}-${file.name}`
   );
 
-  alert("Product Updated");
-
-}else{
-
-  let imageUrl = image;
- 
-  await addDoc(
-
-    collection(db,"products"),
-
-    {
-      name,
-      price:Number(price),
-      stock:Number(stock),
-      category,
-      description,
-      image:imageUrl,
-      vendorId:auth.currentUser?.uid,
-      vendorName,
-      views:0,
-      sales:0,
-      createdAt:new Date()
-    }
-
+  await uploadBytes(
+    storageRef,
+    file
   );
 
-  alert("Product Added");
+  const url =
+    await getDownloadURL(
+      storageRef
+    );
+
+  uploadedImages.push(url);
 
 }
+console.log(
+  "Firestore Data:",
+  {
+    name,
+    price: Number(price),
+    stock: Number(stock),
+    category,
+    description,
+    image: uploadedImages[0],
+    images: uploadedImages,
+    vendorId: auth.currentUser?.uid,
+    vendorName,
+    views: 0,
+    sales: 0,
+    createdAt: new Date()
+  }
+);
 
-clearForm();
+console.log("BEFORE addDoc");
 
-loadProducts();
+await addDoc(
 
-} catch(error){
+  collection(db,"products"),
 
-  console.log(error);
+  {
+    name,
+    price: Number(price),
+    stock: Number(stock),
+    category,
+    description,
+    image: uploadedImages[0],
+    images: uploadedImages,
+    vendorId: auth.currentUser!.uid,
+    vendorName,
+    views: 0,
+    sales: 0,
+    createdAt: new Date()
+  }
 
-} finally {
+);
 
-  setLoading(false);
+console.log("AFTER addDoc");
 
-}
+ alert("Product Added");
 
-};
+        }
+
+        clearForm();
+
+        await loadProducts();
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          error instanceof Error
+            ? error.message
+            : String(error)
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
 
   const editProduct = (
-    product:Product
-  )=>{
+    product: Product
+  ) => {
 
     setName(product.name);
 
@@ -449,322 +546,327 @@ loadProducts();
 
     setImage(product.image);
 
+    setImages(
+
+      product.images ||
+
+      [product.image]
+
+    );
+
     setDescription(
-  (product as any)
-  .description || ""
-);
+      (product as any)
+        .description || ""
+    );
 
     setEditingId(product.id);
 
     window.scrollTo({
 
-      top:0,
+      top: 0,
 
-      behavior:"smooth"
+      behavior: "smooth"
 
     });
 
   };
-
   const deleteProduct = async (
-  id:string
-)=>{
-
-  const confirmed =
-    confirm(
-      "Delete this product?"
-    );
-
-  if(!confirmed){
-    return;
-  }
-
-  await deleteDoc(
-    doc(
-      db,
-      "products",
-      id
-    )
-  );
-
-  loadProducts();
-
-  alert(
-    "Product deleted successfully"
-  );
-
-};
-
-  const updateOrderStatus = async (
-  id:string,
-  status:string
-)=>{
-
-  try{
-
-    await updateDoc(
-      doc(db,"orders",id),
-      { status }
-    );
-
-    const updated =
-      orders.map((order:any)=>{
-
-        if(order.id === id){
-
-          return {
-            ...order,
-            status
-          };
-
-        }
-
-        return order;
-
-      });
-
-    setOrders(updated);
-
-    alert(
-      "Order status updated"
-    );
-
-  }
-  catch(error){
-
-  console.error(
-    "Add Product Error:",
-    error
-  );
-
-  alert(
-    String(error)
-  );
- }
-};
-
-const loadNotifications =
-async ()=>{
-
-  const alerts:any[] = [];
-
-  products.forEach(
-    (product:any)=>{
-
-      if(
-        product.stock === 0
-      ){
-
-        alerts.push({
-
-          id:
-            product.id +
-            "-out",
-
-          title:
-            "Out Of Stock",
-
-          message:
-            `${product.name} is out of stock`,
-
-          read:false
-
-        });
-
-      }
-
-      else if(
-        product.stock <= 5
-      ){
-
-        alerts.push({
-
-          id:
-            product.id +
-            "-low",
-
-          title:
-            "Low Stock",
-
-          message:
-            `${product.name} has only ${product.stock} left`,
-
-          read:false
-
-        });
-
-      }
-
-    }
-  );
-
-  setNotifications(
-    alerts
-  );
-
-};
-
-const fetchDashboardData =
-async ()=>{
-
-  const user =
-    auth.currentUser;
-
-  if(!user) return;
-
-  const vendorId =
-    user.uid;
-
-  // PRODUCTS
-
-  const productQuery = query(
-
-    collection(db,"products"),
-
-    where(
-      "vendorId",
-      "==",
-      vendorId
-    )
-
-  );
-
-
-  const productSnap =
-  await getDocs(
-    productQuery
-  );
-
-setTotalProducts(
-  productSnap.size
-);
-
-let views = 0;
-
-let sales = 0;
-
-let topProduct = "";
-
-let topSales = 0;
-
-productSnap.forEach((docSnap)=>{
-
-  const product =
-    docSnap.data();
-
-  views +=
-    product.views || 0;
-
-  sales +=
-    product.sales || 0;
-
-  if(
-    (product.sales || 0)
-    > topSales
-  ){
-
-    topSales =
-      product.sales || 0;
-
-    topProduct =
-      product.name;
-
-  }
-
-});
-
-setTotalViews(
-  views
-);
-
-setTotalSales(
-  sales
-);
-
-setBestSeller(
-  topProduct || "None"
-);
-
-    // ORDERS
-
-  const ordersSnap =
-    await getDocs(
-      collection(db,"orders")
-    );
-
-  let ordersCount = 0;
-
-  let pendingCount = 0;
-
-  let totalEarnings = 0;
-
-  ordersSnap.forEach((docSnap)=>{
-
-    const order =
-  docSnap.data();
-
-    const sellerItems =
-
-      order.items.filter(
-
-        (item: any)=>
-
-          item.vendorId ===
-          vendorId
-
+    id: string
+  ) => {
+
+    const confirmed =
+      confirm(
+        "Delete this product?"
       );
 
-    if(
-      sellerItems.length > 0
-    ){
-
-      ordersCount++;
-
-      if(
-        order.status ===
-        "Pending"
-      ){
-
-        pendingCount++;
-
-      }
-      
-      sellerItems.forEach(
-  (item:any)=>{
-
-    totalEarnings +=
-      item.price *
-      item.qty;
-
-  }
-);
-
+    if (!confirmed) {
+      return;
     }
 
-  });
+    await deleteDoc(
+      doc(
+        db,
+        "products",
+        id
+      )
+    );
 
-  setTotalOrders(
-    ordersCount
-  );
+   await loadProducts();
 
-  setPendingOrders(
-    pendingCount
-  );
+    alert(
+      "Product deleted successfully"
+    );
 
-  setEarnings(
-    totalEarnings
-  );
+  };
+  const updateOrderStatus = async (
+    id: string,
+    status: string
+  ) => {
 
-};
+    try {
 
- return (
+      await updateDoc(
+        doc(db, "orders", id),
+        { status }
+      );
 
-    <div className="min-h-screen bg-gray-100">
+      const updated =
+        orders.map((order: any) => {
 
-      {/* HEADER */}
+          if (order.id === id) {
 
-<div
-  className="
+            return {
+              ...order,
+              status
+            };
+
+          }
+
+          return order;
+
+        });
+
+      setOrders(updated);
+
+      alert(
+        "Order status updated"
+      );
+
+    }
+    catch (error) {
+
+      console.error("Add Product Error:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : String(error)
+      );
+    }
+  };
+
+    const loadNotifications =
+      async () => {
+
+        const alerts: any[] = [];
+
+        products.forEach(
+          (product: any) => {
+
+            if (
+              product.stock === 0
+            ) {
+
+              alerts.push({
+
+                id:
+                  product.id +
+                  "-out",
+
+                title:
+                  "Out Of Stock",
+
+                message:
+                  `${product.name} is out of stock`,
+
+                read: false
+
+              });
+
+            }
+
+            else if (
+              product.stock <= 5
+            ) {
+
+              alerts.push({
+
+                id:
+                  product.id +
+                  "-low",
+
+                title:
+                  "Low Stock",
+
+                message:
+                  `${product.name} has only ${product.stock} left`,
+
+                read: false
+
+              });
+
+            }
+
+          }
+        );
+
+        setNotifications(
+          alerts
+        );
+
+      };
+
+    const fetchDashboardData =
+      async () => {
+
+        const user =
+          auth.currentUser;
+
+        if (!user) return;
+
+        const vendorId =
+          user.uid;
+
+        // PRODUCTS
+
+        const productQuery = query(
+
+          collection(db, "products"),
+
+          where(
+            "vendorId",
+            "==",
+            vendorId
+          )
+
+        );
+
+
+        const productSnap =
+          await getDocs(
+            productQuery
+          );
+
+        setTotalProducts(
+          productSnap.size
+        );
+
+        let views = 0;
+
+        let sales = 0;
+
+        let topProduct = "";
+
+        let topSales = 0;
+
+        productSnap.forEach((docSnap) => {
+
+          const product =
+            docSnap.data();
+
+          views +=
+            product.views || 0;
+
+          sales +=
+            product.sales || 0;
+
+          if (
+            (product.sales || 0)
+            > topSales
+          ) {
+
+            topSales =
+              product.sales || 0;
+
+            topProduct =
+              product.name;
+
+          }
+
+        });
+
+        setTotalViews(
+          views
+        );
+
+        setTotalSales(
+          sales
+        );
+
+        setBestSeller(
+          topProduct || "None"
+        );
+
+        // ORDERS
+
+        const ordersSnap =
+          await getDocs(
+            collection(db, "orders")
+          );
+
+        let ordersCount = 0;
+
+        let pendingCount = 0;
+
+        let totalEarnings = 0;
+
+        ordersSnap.forEach((docSnap) => {
+
+          const order =
+            docSnap.data();
+
+          const sellerItems =
+
+            (order.items || []).filter(
+
+              (item: any) =>
+
+                item.vendorId ===
+                vendorId
+
+            );
+
+          if (
+            sellerItems.length > 0
+          ) {
+
+            ordersCount++;
+
+            if (
+              order.status ===
+              "Pending"
+            ) {
+
+              pendingCount++;
+
+            }
+
+            sellerItems.forEach(
+              (item: any) => {
+
+                totalEarnings +=
+                  item.price *
+                  item.qty;
+
+              }
+            );
+
+          }
+
+        });
+
+        setTotalOrders(
+          ordersCount
+        );
+
+        setPendingOrders(
+          pendingCount
+        );
+
+        setEarnings(
+          totalEarnings
+        );
+
+      };
+
+    return (
+
+      <div className="min-h-screen bg-gray-100">
+
+        {/* HEADER */}
+
+        <div
+          className="
     bg-gradient-to-r
     from-green-600
     to-blue-600
@@ -772,9 +874,9 @@ setBestSeller(
     px-8
     py-6
   "
->
+        >
 
-  <div className="
+          <div className="
     max-w-7xl
     mx-auto
     flex
@@ -785,95 +887,95 @@ setBestSeller(
     gap-6
   ">
 
-    <div>
+            <div>
 
-      <p className="
+              <p className="
         text-sm
         uppercase
         tracking-wider
         opacity-80
       ">
-        Yogi Mart Seller Dashboard
-      </p>
+                Yogi Mart Seller Dashboard
+              </p>
 
-      <h1 className="
+              <h1 className="
         text-4xl
         font-bold
       ">
-        {vendorName}
-      </h1>
+                {vendorName}
+              </h1>
 
-      <p className="opacity-90">
-        Manage Products, Orders and Revenue
-      </p>
+              <p className="opacity-90">
+                Manage Products, Orders and Revenue
+              </p>
 
-    </div>
+            </div>
 
-    <div className="flex gap-6">
+            <div className="flex gap-6">
 
-      <button
-        onClick={()=>
-          window.scrollTo({
-            top:0,
-            behavior:"smooth"
-          })
-        }
-      >
-        Dashboard
-      </button>
+              <button
+                onClick={() =>
+                  window.scrollTo({
+                    top: 0,
+                    behavior: "smooth"
+                  })
+                }
+              >
+                Dashboard
+              </button>
 
-      <button
-        onClick={()=>{
-          document
-            .getElementById("orders")
-            ?.scrollIntoView({
-              behavior:"smooth"
-            });
-        }}
-      >
-        Orders
-      </button>
+              <button
+                onClick={() => {
+                  document
+                    .getElementById("orders")
+                    ?.scrollIntoView({
+                      behavior: "smooth"
+                    });
+                }}
+              >
+                Orders
+              </button>
 
-      <button
-        onClick={()=>{
-          document
-            .getElementById("products")
-            ?.scrollIntoView({
-              behavior:"smooth"
-            });
-        }}
-      >
-        Products
-      </button>
+              <button
+                onClick={() => {
+                  document
+                    .getElementById("products")
+                    ?.scrollIntoView({
+                      behavior: "smooth"
+                    });
+                }}
+              >
+                Products
+              </button>
 
-      <button
-        onClick={async ()=>{
+              <button
+                onClick={async () => {
 
-          const {
-            signOut
-          } = await import(
-            "firebase/auth"
-          );
+                  const {
+                    signOut
+                  } = await import(
+                    "firebase/auth"
+                  );
 
-          await signOut(auth);
+                  await signOut(auth);
 
-          localStorage.removeItem(
-            "vendor"
-          );
+                  localStorage.removeItem(
+                    "vendor"
+                  );
 
-          window.location.href =
-            "/vendor-login";
+                  window.location.href =
+                    "/vendor-login";
 
-        }}
-      >
-        Logout
-      </button>
+                }}
+              >
+                Logout
+              </button>
 
-    </div>
+            </div>
 
-  </div>
+          </div>
 
-</div>
+        </div>
 
         {/* STATS */}
 
@@ -934,142 +1036,142 @@ setBestSeller(
             <p className="text-5xl font-bold text-pink-600">
 
               ₹{earnings}
-              </p>
+            </p>
 
           </div>
 
         </div>
 
         <div
-  className="
+          className="
     grid
     grid-cols-1
     md:grid-cols-3
     gap-6
     mb-10
   "
->
+        >
 
-  <div className="
+          <div className="
     bg-white
     p-8
     rounded-2xl
     shadow
   ">
-    <h2 className="text-xl font-bold mb-2">
-      Total Views
-    </h2>
+            <h2 className="text-xl font-bold mb-2">
+              Total Views
+            </h2>
 
-    <p className="
+            <p className="
       text-4xl
       font-bold
       text-indigo-600
     ">
-      {totalViews}
-    </p>
-  </div>
+              {totalViews}
+            </p>
+          </div>
 
-  <div className="
+          <div className="
     bg-white
     p-8
     rounded-2xl
     shadow
   ">
-    <h2 className="text-xl font-bold mb-2">
-      Units Sold
-    </h2>
+            <h2 className="text-xl font-bold mb-2">
+              Units Sold
+            </h2>
 
-    <p className="
+            <p className="
       text-4xl
       font-bold
       text-green-600
     ">
-      {totalSales}
-    </p>
-  </div>
+              {totalSales}
+            </p>
+          </div>
 
-  <div className="
+          <div className="
     bg-white
     p-8
     rounded-2xl
     shadow
   ">
-    <h2 className="text-xl font-bold mb-2">
-      Best Seller
-    </h2>
+            <h2 className="text-xl font-bold mb-2">
+              Best Seller
+            </h2>
 
-    <p className="
+            <p className="
       text-xl
       font-bold
       text-orange-600
     ">
-      {bestSeller}
-    </p>
-  </div>
+              {bestSeller}
+            </p>
+          </div>
 
-</div>
+        </div>
 
-<div
-  className="
+        <div
+          className="
     bg-white
     rounded-2xl
     shadow
     p-8
     mb-8
   "
->
+        >
 
-  <h2
-    className="
+          <h2
+            className="
       text-2xl
       font-bold
       mb-5
     "
-  >
-    Notifications
-  </h2>
+          >
+            Notifications
+          </h2>
 
-  {notifications.length === 0 ? (
+          {notifications.length === 0 ? (
 
-    <p className="text-gray-500">
-      No notifications
-    </p>
+            <p className="text-gray-500">
+              No notifications
+            </p>
 
-  ) : (
+          ) : (
 
-    <div className="space-y-4">
+            <div className="space-y-4">
 
-      {notifications.map(
-        (note)=>(
+              {notifications.map(
+                (note) => (
 
-        <div
-          key={note.id}
-          className="
+                  <div
+                    key={note.id}
+                    className="
             border
             p-4
             rounded-xl
           "
-        >
+                  >
 
-          <h3 className="font-bold">
-            {note.title}
-          </h3>
+                    <h3 className="font-bold">
+                      {note.title}
+                    </h3>
 
-          <p>
-            {note.message}
-          </p>
+                    <p>
+                      {note.message}
+                    </p>
+
+                  </div>
+
+                ))}
+
+            </div>
+
+          )}
 
         </div>
 
-      ))}
 
-    </div>
-
-  )}
-
-</div>
-
-  
         {/* MAIN */}
 
         <div
@@ -1102,11 +1204,11 @@ setBestSeller(
 
             <div className="space-y-5">
 
-             <input
+              <input
                 type="text"
                 placeholder="Product Name"
                 value={name}
-                onChange={(e)=>
+                onChange={(e) =>
                   setName(e.target.value)
                 }
                 className="
@@ -1121,7 +1223,7 @@ setBestSeller(
                 type="number"
                 placeholder="Price"
                 value={price}
-                onChange={(e)=>
+                onChange={(e) =>
                   setPrice(e.target.value)
                 }
                 className="
@@ -1136,7 +1238,7 @@ setBestSeller(
                 type="number"
                 placeholder="Stock"
                 value={stock}
-                onChange={(e)=>
+                onChange={(e) =>
                   setStock(e.target.value)
                 }
                 className="
@@ -1147,24 +1249,24 @@ setBestSeller(
                 "
               />
               <textarea
-  placeholder="Product Description"
-  value={description}
-  onChange={(e)=>
-    setDescription(
-      e.target.value
-    )
-  }
-  className="
+                placeholder="Product Description"
+                value={description}
+                onChange={(e) =>
+                  setDescription(
+                    e.target.value
+                  )
+                }
+                className="
     w-full
     p-4
     border
     rounded-2xl
     h-32
   "
-/>
+              />
               <select
                 value={category}
-                onChange={(e)=>
+                onChange={(e) =>
                   setCategory(e.target.value)
                 }
                 className="
@@ -1194,69 +1296,68 @@ setBestSeller(
               </select>
 
               <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => {
 
-  type="file"
+                  const files =
+                    Array.from(
+                      e.target.files || []
+                    );
 
-  accept="image/*"
+                  if (files.length > 5) {
 
-  onChange={(e)=>{
+                    alert(
+                      "Maximum 5 images allowed"
+                    );
 
-    if(
-      e.target.files
-    ){
+                    return;
 
-      setImageFile(
-        e.target.files[0]
-      );
+                  }
 
-      const reader =
-  new FileReader();
+                  setImageFiles(files);
 
-reader.onloadend = ()=>{
+                  const previews =
+                    files.map((file) =>
 
-  setImage(
-    reader.result as string
-  );
+                      URL.createObjectURL(file)
 
-};
+                    );
 
-reader.readAsDataURL(
+                  setImages(previews);
 
-  e.target.files[0]
+                  setImage(previews[0] || "");
 
-);
+                }}
 
-    }
-
-  }}
-
-  className="
+                className="
     w-full
     border
     p-4
     rounded-xl
   "
-/>
-           
-<div
-  className="
-    w-full
-    h-48
-    bg-gray-100
-    rounded-xl
-    overflow-hidden
-  "
->
-  <img
-    src={image}
-    alt={name}
-    className="
-      w-full
-      h-full
-      object-contain
-    "
-  />
-</div>
+              />
+
+              <div className="grid grid-cols-5 gap-2">
+
+                {images.map((img, index) => (
+
+                  <img
+                    key={index}
+                    src={img}
+                    alt=""
+                    className="
+        w-20
+        h-20
+        object-cover
+        rounded-xl
+      "
+                  />
+
+                ))}
+
+              </div>
               <button
 
                 onClick={
@@ -1283,8 +1384,8 @@ reader.readAsDataURL(
                 {loading
                   ? "Saving..."
                   : editingId
-                  ? "Update Product"
-                  : "Add Product"}
+                    ? "Update Product"
+                    : "Add Product"}
 
               </button>
 
@@ -1295,7 +1396,7 @@ reader.readAsDataURL(
           {/* PRODUCTS */}
 
           <div
-          id="products"
+            id="products"
             className="
               lg:col-span-2
               bg-white
@@ -1305,7 +1406,7 @@ reader.readAsDataURL(
             "
           >
 
-            
+
             <div className="
   flex
   flex-col
@@ -1316,179 +1417,179 @@ reader.readAsDataURL(
   mb-8
 ">
 
-  <h2 className="text-3xl font-bold">
-    Products ({products.length})
-  </h2>
+              <h2 className="text-3xl font-bold">
+                Products ({products.length})
+              </h2>
 
-  <input
-    type="text"
-    placeholder="Search Products..."
-    value={search}
-    onChange={(e)=>
-      setSearch(e.target.value)
-    }
-    className="
+              <input
+                type="text"
+                placeholder="Search Products..."
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                className="
       border
       p-3
       rounded-xl
       w-full
       md:w-72
     "
-  />
+              />
 
-</div>
+            </div>
 
             <div className="space-y-6">
 
               {products.length === 0 && (
 
-  <div className="
+                <div className="
     text-center
     py-10
   ">
 
-    <p className="
+                  <p className="
       text-gray-500
       text-lg
     ">
-      No products added yet.
-    </p>
+                    No products added yet.
+                  </p>
 
-  </div>
+                </div>
 
-)}
+              )}
 
-             {products
-  .filter((product)=>
-    product.name
-      .toLowerCase()
-      .includes(
-        search.toLowerCase()
-      )
-  )
-  .map((product)=>(
+              {products
+                .filter((product) =>
+                  product.name
+                    .toLowerCase()
+                    .includes(
+                      search.toLowerCase()
+                    )
+                )
+                .map((product) => (
 
-                <div
+                  <div
 
-                  key={product.id}
+                    key={product.id}
 
-                  className="
+                    className="
                     flex
                     items-center
                     justify-between
                     border-b
                     pb-6
                   "
-                >
+                  >
 
-                  <div className="flex gap-5">
+                    <div className="flex gap-5">
 
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="
                         w-24
                         h-24
                         object-cover
                         rounded-xl
                       "
-                    />
+                      />
 
-                    <div>
+                      <div>
 
-                      <h3 className="text-2xl font-bold">
-                        {product.name}
-                      </h3>
+                        <h3 className="text-2xl font-bold">
+                          {product.name}
+                        </h3>
 
-                      <p className="text-lg">
-                        ₹{product.price}
-                      </p>
+                        <p className="text-lg">
+                          ₹{product.price}
+                        </p>
 
-                      <p className="text-sm text-gray-500">
-                        {product.category}
-                      </p>
+                        <p className="text-sm text-gray-500">
+                          {product.category}
+                        </p>
 
-                      <p className="text-sm">
+                        <p className="text-sm">
 
-                       Stock:
-                        {" "}
-                        {product.stock}
+                          Stock:
+                          {" "}
+                          {product.stock}
 
                         </p>
 
-                      {product.stock > 0 &&
-                      product.stock <= 5 && (
+                        {product.stock > 0 &&
+                          product.stock <= 5 && (
 
-                     <p
-                    className=" text-red-500
+                            <p
+                              className=" text-red-500
                     font-semibold
                    text-sm
                     mt-1
                      "
-                    >
+                            >
 
-                  Low Stock
+                              Low Stock
 
-                   </p>
+                            </p>
 
-                  )}
+                          )}
+                      </div>
+
                     </div>
 
-                  </div>
+                    <div className="flex gap-3">
 
-                  <div className="flex gap-3">
+                      <button
 
-                    <button
+                        onClick={() =>
+                          editProduct(product)
+                        }
 
-                      onClick={()=>
-                        editProduct(product)
-                      }
-
-                      className="
+                        className="
                         bg-blue-600
                         text-white
                         px-5
                         py-3
                         rounded-xl
                       "
-                    >
-                      Edit
-                    </button>
+                      >
+                        Edit
+                      </button>
 
-                    <button
+                      <button
 
-                      onClick={()=>
-                        deleteProduct(product.id)
-                      }
+                        onClick={() =>
+                          deleteProduct(product.id)
+                        }
 
-                      className="
+                        className="
                         bg-red-500
                         text-white
                         px-5
                         py-3
                         rounded-xl
                       "
-                    >
-                      Delete
-                    </button>
+                      >
+                        Delete
+                      </button>
+
+                    </div>
 
                   </div>
 
-                </div>
-
-              ))}
+                ))}
 
             </div>
 
           </div>
 
         </div>
-        
+
 
         {/* ORDERS */}
 
         <div
-        id="orders"
+          id="orders"
           className="
             bg-white
             p-8
@@ -1536,7 +1637,7 @@ reader.readAsDataURL(
 
               <tbody>
 
-                {orders.map((order)=>(
+                {orders.map((order) => (
 
                   <tr
                     key={order.id}
@@ -1561,7 +1662,7 @@ reader.readAsDataURL(
 
                         value={order.status}
 
-                        onChange={(e)=>
+                        onChange={(e) =>
 
                           updateOrderStatus(
 
@@ -1580,28 +1681,28 @@ reader.readAsDataURL(
                       >
 
                         <option>
-  Pending
-</option>
+                          Pending
+                        </option>
 
-<option>
-  Confirmed
-</option>
+                        <option>
+                          Confirmed
+                        </option>
 
-<option>
-  Packed
-</option>
+                        <option>
+                          Packed
+                        </option>
 
-<option>
-  Shipped
-</option>
+                        <option>
+                          Shipped
+                        </option>
 
-<option>
-  Delivered
-</option>
+                        <option>
+                          Delivered
+                        </option>
 
-<option>
-  Cancelled
-</option>
+                        <option>
+                          Cancelled
+                        </option>
 
                       </select>
 
@@ -1625,7 +1726,7 @@ reader.readAsDataURL(
 
       </div>
 
-                 
-  );
 
-}
+    );
+
+  }
