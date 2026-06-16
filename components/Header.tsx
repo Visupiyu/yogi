@@ -234,7 +234,7 @@ items.push({
         className="
           flex
           items-center
-          gap-3
+          gap-4
           p-3
           hover:bg-gray-100
         "
@@ -323,7 +323,7 @@ items.push({
               <div className="
                 flex
                 items-center
-                gap-2
+                gap-4
                 bg-green-600
                 hover:bg-green-700
                 text-white

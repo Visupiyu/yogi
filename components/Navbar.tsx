@@ -284,7 +284,7 @@ to-blue-100
           flex
           items-center
           justify-between
-          gap-4
+          gap-6
         ">
 
           {/* LOGO */}
@@ -417,7 +417,7 @@ border-slate-200
         <div className="
           flex
           items-center
-          gap-4
+          gap-6
           p-4
          hover:bg-gray-100
           transition
@@ -484,7 +484,7 @@ hover:to-blue-500
                 <div className="
   flex
   items-center
-  gap-2
+  gap-6
 ">
 
   <Search size={18} />
@@ -513,7 +513,7 @@ hover:to-blue-500
   hidden
   md:flex
   items-center
-  gap-5
+  gap-6
 ">
 
             {/* WISHLIST */}
@@ -598,7 +598,7 @@ hover:to-blue-500
   <div className="
     flex
     items-center
-    gap-2
+    gap-6
     bg-gradient-to-r
     from-green-600
     to-blue-600

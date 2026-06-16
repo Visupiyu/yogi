@@ -19,7 +19,7 @@ export default function DealStrip(){
           max-w-screen-2xl
           mx-auto
           flex
-          gap-2
+          gap-6
           overflow-x-auto
           px-4
           py-2

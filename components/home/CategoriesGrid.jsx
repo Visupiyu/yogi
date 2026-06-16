@@ -84,7 +84,7 @@ export default function CategoriesGrid(){
           grid-cols-2
           md:grid-cols-3
           lg:grid-cols-6
-          gap-*
+          gap-3
         ">
 
           {categories.map((category,index)=>(

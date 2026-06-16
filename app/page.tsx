@@ -160,7 +160,7 @@ sm:grid-cols-3
 md:grid-cols-4
 lg:grid-cols-5
 xl:grid-cols-6
-      gap-1
+      gap-3
     ">
 
       
@@ -258,7 +258,7 @@ xl:grid-cols-6
   grid
   grid-cols-1
   lg:grid-cols-4
-  gap-1
+  gap-3
 ">
 
   <div className="
@@ -300,7 +300,7 @@ viewport={{
           md:flex-row
           md:items-center
           md:justify-between
-          gap-1
+          gap-3
           mb-*
         ">
 
@@ -345,7 +345,7 @@ viewport={{
             flex
             flex-col
             md:flex-row
-            gap-1
+            gap-3
           ">
 
             <input
@@ -531,7 +531,7 @@ sm:grid-cols-3
 md:grid-cols-4
 lg:grid-cols-5
 xl:grid-cols-6
-  gap-2
+  gap-3
 ">
 
           {filteredProducts.map((product)=>(

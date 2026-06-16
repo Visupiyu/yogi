@@ -212,7 +212,7 @@ export default function HeroSlider(){
           left-1/2
           -translate-x-1/2
           flex
-          gap-3
+          gap-4
         "
       >
 
