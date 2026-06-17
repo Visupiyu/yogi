@@ -165,8 +165,10 @@ export default function SellerPage() {
     reader.readAsDataURL(file);
 
   };
-  async function loadProducts() {
-
+  async function loadProducts(
+  businessName?: string
+) {
+    
     if (!auth.currentUser) return;
 
     const q = query(
@@ -175,17 +177,15 @@ export default function SellerPage() {
         db,
         "products"
       ),
+where(
 
-      where(
+  "vendorName",
 
-        "vendorId",
+  "==",
 
-        "==",
+  businessName || vendorName
 
-        auth.currentUser.uid
-
-      )
-
+)
     );
 
     const productSnapshot =
@@ -230,19 +230,24 @@ export default function SellerPage() {
             "vendor"
           );
 
-        if (vendor) {
+       if (vendor) {
 
-          const vendorData =
-            JSON.parse(vendor);
+  const vendorData =
+    JSON.parse(vendor);
 
-          setVendorName(
-            vendorData.businessName || ""
-          );
+ const businessName =
+  vendorData.businessName || "";
 
-        }
+setVendorName(
+  businessName
+);
 
-       await loadProducts();
+await loadProducts(
+    vendorData.businessName
+  );
 
+}
+        
         fetchDashboardData();
 
         loadVendorOrders();
@@ -1460,14 +1465,22 @@ console.log("AFTER addDoc");
               )}
 
               {products
-                .filter((product) =>
-                  product.name
-                    .toLowerCase()
-                    .includes(
-                      search.toLowerCase()
-                    )
-                )
-                .map((product) => (
+  .filter((product) => {
+
+    if (!search.trim()) {
+      return true;
+    }
+
+    return (
+      product.name || ""
+    )
+      .toLowerCase()
+      .includes(
+        search.toLowerCase()
+      );
+
+  })
+  .map((product) => (
 
                   <div
 
@@ -1498,8 +1511,8 @@ console.log("AFTER addDoc");
                       <div>
 
                         <h3 className="text-2xl font-bold">
-                          {product.name}
-                        </h3>
+  {product.name}
+</h3>
 
                         <p className="text-lg">
                           ₹{product.price}
