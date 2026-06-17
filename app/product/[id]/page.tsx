@@ -30,6 +30,8 @@ export default function ProductPage() {
     useState(true);
     const [selectedImage,setSelectedImage] =
   useState("");
+  const [selectedSize,setSelectedSize] =
+  useState("");
 
   useEffect(()=>{
 
@@ -403,33 +405,73 @@ md:text-4xl
             mb-3
           ">
 
-            <p className="
-              text-green-600
-              text-3xl
-              font-bold
-            ">
-              ₹{product.price}
-            </p>
+            <div>
 
-            <p className="
-              text-gray-400
-              line-through
-              text-lg
-            ">
-              ₹{Math.round(product.price * 1.25)}
-            </p>
+  <p className="
+    text-green-600
+    text-4xl
+    font-bold
+  ">
+    ₹{product.price}
+  </p>
 
-            <span className="
-              bg-red-100
-              text-red-600
-              px-2
-              py-1
-              rounded-full
-              text-sm
-              font-semibold
-            ">
-              25% OFF
-            </span>
+  <div className="
+    flex
+    items-center
+    gap-3
+    mt-1
+  ">
+
+    <p className="
+      text-gray-400
+      line-through
+      text-lg
+    ">
+      ₹{
+        product.mrp ||
+        Math.round(
+          product.price * 1.25
+        )
+      }
+    </p>
+
+    <span className="
+      bg-red-100
+      text-red-600
+      px-2
+      py-1
+      rounded-full
+      text-sm
+      font-semibold
+    ">
+      {
+        product.discountPercent || 25
+      }% OFF
+    </span>
+
+  </div>
+
+  <p className="
+    text-green-700
+    font-semibold
+    mt-1
+  ">
+    You Save ₹
+    {
+      (product.mrp || 0)
+      -
+      product.price
+    }
+  </p>
+
+  <p className="
+    text-xs
+    text-gray-500
+  ">
+    Inclusive of all taxes
+  </p>
+
+</div>
 
           </div>
 
@@ -439,6 +481,64 @@ md:text-4xl
           ">
             Category: {product.category}
           </p>
+
+          <div className="
+  bg-slate-50
+  rounded-2xl
+  p-4
+  mb-4
+">
+
+  <h3 className="
+    font-bold
+    mb-3
+  ">
+    Product Details
+  </h3>
+
+  <div className="
+    grid
+    grid-cols-2
+    gap-2
+    text-sm
+  ">
+
+    <p>
+      <b>Brand:</b>
+      {" "}
+      {product.brand || "-"}
+    </p>
+
+    <p>
+      <b>Gender:</b>
+      {" "}
+      {product.gender || "-"}
+    </p>
+
+    <p>
+      <b>Color:</b>
+      {" "}
+      {product.color || "-"}
+    </p>
+
+    <p>
+      <b>Material:</b>
+      {" "}
+      {product.material || "-"}
+    </p>
+
+    <p>
+      <b>Country:</b>
+      {" "}
+      {
+        product.countryOfOrigin
+        || "-"
+      }
+    </p>
+
+  </div>
+
+</div>
 
           <div className="mb-4">
 
@@ -462,6 +562,67 @@ md:text-4xl
                   ? "In Stock"
                   : "Out Of Stock"
               }
+
+              {
+  product.sizes &&
+  product.sizes.length > 0 && (
+
+    <div className="mb-4">
+
+      <p className="
+        font-semibold
+        mb-2
+      ">
+        Select Size
+      </p>
+
+      <div className="
+        flex
+        gap-2
+        flex-wrap
+      ">
+
+        {product.sizes.map(
+          (
+            size:string,
+            index:number
+          ) => (
+
+            <button
+              key={index}
+              onClick={() =>
+                setSelectedSize(
+                  size
+                )
+              }
+              className={`
+                px-4
+                py-2
+                border
+                rounded-xl
+
+                ${
+                  selectedSize ===
+                  size
+
+                  ? "bg-blue-600 text-white"
+
+                  : "bg-white"
+                }
+              `}
+            >
+              {size}
+            </button>
+
+          )
+        )}
+
+      </div>
+
+    </div>
+
+  )
+}
             </span>
 
           </div>

@@ -130,6 +130,26 @@ export default function SellerPage() {
 
   const [editingId, setEditingId] =
     useState("");
+    const [brand,setBrand] =
+  useState("");
+
+const [mrp,setMrp] =
+  useState("");
+
+const [gender,setGender] =
+  useState("Men");
+
+const [color,setColor] =
+  useState("");
+
+const [material,setMaterial] =
+  useState("");
+
+const [sizes,setSizes] =
+  useState("");
+
+const [countryOfOrigin,setCountryOfOrigin] =
+  useState("India");
 
   const [bestSeller,
     setBestSeller] =
@@ -419,11 +439,46 @@ await loadProducts(
             ),
 
             {
-              name,
-              price: Number(price),
-              stock: Number(stock),
-              category,
-              description,
+  name,
+
+  brand,
+
+  mrp: Number(mrp),
+
+  discountPercent:
+    mrp
+      ? Math.round(
+          (
+            (Number(mrp) -
+              Number(price)
+            ) /
+            Number(mrp)
+          ) * 100
+        )
+      : 0,
+
+  gender,
+
+  color,
+
+  material,
+
+  sizes:
+    sizes
+      .split(",")
+      .map((s)=>
+        s.trim()
+      ),
+
+  countryOfOrigin,
+
+  price: Number(price),
+
+  stock: Number(stock),
+
+  category,
+
+  description,
 
               image:
                 uploadedImages[0] || image,
@@ -482,24 +537,94 @@ console.log(
 
 console.log("BEFORE addDoc");
 
+console.log({
+  brand,
+  mrp,
+  gender,
+  color,
+  material,
+  sizes,
+  countryOfOrigin
+});
+console.log("PRODUCT OBJECT", {
+  name,
+
+  brand,
+
+  mrp: Number(mrp),
+
+  gender,
+
+  color,
+
+  material,
+
+  sizes,
+
+  countryOfOrigin,
+
+  price: Number(price)
+});
+
 await addDoc(
 
   collection(db,"products"),
 
   {
-    name,
-    price: Number(price),
-    stock: Number(stock),
-    category,
-    description,
-    image: uploadedImages[0],
-    images: uploadedImages,
-    vendorId: auth.currentUser!.uid,
-    vendorName,
-    views: 0,
-    sales: 0,
-    createdAt: new Date()
-  }
+  name,
+
+  brand,
+
+  mrp: Number(mrp),
+
+  discountPercent:
+    mrp
+      ? Math.round(
+          (
+            (Number(mrp) -
+              Number(price)
+            ) /
+            Number(mrp)
+          ) * 100
+        )
+      : 0,
+
+  gender,
+
+  color,
+
+  material,
+
+  sizes:
+    sizes
+      .split(",")
+      .map((s) => s.trim()),
+
+  countryOfOrigin,
+
+  price: Number(price),
+
+  stock: Number(stock),
+
+  category,
+
+  description,
+
+  image: uploadedImages[0],
+
+  images: uploadedImages,
+
+  vendorId:
+    auth.currentUser!.uid,
+
+  vendorName,
+
+  views: 0,
+
+  sales: 0,
+
+  createdAt: new Date()
+}
 
 );
 
@@ -563,6 +688,45 @@ console.log("AFTER addDoc");
       (product as any)
         .description || ""
     );
+    setBrand(
+  (product as any)
+    .brand || ""
+);
+
+setMrp(
+  String(
+    (product as any)
+      .mrp || ""
+  )
+);
+
+setGender(
+  (product as any)
+    .gender || "Men"
+);
+
+setColor(
+  (product as any)
+    .color || ""
+);
+
+setMaterial(
+  (product as any)
+    .material || ""
+);
+
+setSizes(
+  (
+    (product as any)
+      .sizes || []
+  ).join(",")
+);
+
+setCountryOfOrigin(
+  (product as any)
+    .countryOfOrigin ||
+    "India"
+);
 
     setEditingId(product.id);
 
@@ -1253,6 +1417,114 @@ console.log("AFTER addDoc");
                   rounded-xl
                 "
               />
+              <input
+  type="text"
+  placeholder="Brand Name"
+  value={brand}
+  onChange={(e)=>
+    setBrand(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<input
+  type="number"
+  placeholder="MRP"
+  value={mrp}
+  onChange={(e)=>
+    setMrp(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<select
+  value={gender}
+  onChange={(e)=>
+    setGender(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+>
+  <option>Men</option>
+  <option>Women</option>
+  <option>Kids</option>
+</select>
+
+<input
+  type="text"
+  placeholder="Color"
+  value={color}
+  onChange={(e)=>
+    setColor(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<input
+  type="text"
+  placeholder="Material"
+  value={material}
+  onChange={(e)=>
+    setMaterial(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<input
+  type="text"
+  placeholder="Sizes (S,M,L,XL)"
+  value={sizes}
+  onChange={(e)=>
+    setSizes(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<input
+  type="text"
+  placeholder="Country Of Origin"
+  value={countryOfOrigin}
+  onChange={(e)=>
+    setCountryOfOrigin(
+      e.target.value
+    )
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
               <textarea
                 placeholder="Product Description"
                 value={description}
@@ -1287,15 +1559,34 @@ console.log("AFTER addDoc");
                 </option>
 
                 <option>
-                  Fashion
+                 Men Fashion
+                </option>
+
+                 <option>
+                Women Fashion
+                </option>
+                 <option>
+                 Kids Fashion
+                </option>
+                 <option>
+                 Beauty
+                </option>
+                 <option>
+                 Electronics
                 </option>
 
                 <option>
-                  Beauty
+                 Furniture
                 </option>
 
                 <option>
-                  Electronics
+                  Mobiles
+                </option>
+                 <option>
+                 Appliances
+                </option>
+                 <option>
+                 Books
                 </option>
 
               </select>
