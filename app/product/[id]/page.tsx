@@ -28,6 +28,8 @@ export default function ProductPage() {
 
   const [loading,setLoading] =
     useState(true);
+    const [selectedImage,setSelectedImage] =
+  useState("");
 
   useEffect(()=>{
 
@@ -50,10 +52,18 @@ export default function ProductPage() {
 
   const productData = snap.data();
 
-  setProduct({
-    id: snap.id,
-    ...productData
-  });
+ const fullProduct: any = {
+  id: snap.id,
+  ...productData
+};
+
+setProduct(fullProduct);
+
+setSelectedImage(
+  fullProduct.images?.[0] ||
+  fullProduct.image ||
+  "/no-image.png"
+);
 
   const q = query(
     collection(db, "products"),
@@ -289,30 +299,71 @@ export default function ProductPage() {
 
         <div>
 
-          <div className="
-            bg-slate-50
-            rounded-3xl
-            p-4
-          ">
+ <div
+  className="
+    bg-slate-50
+    rounded-3xl
+    p-4
+    overflow-hidden
+  "
+>
 
-            <img
-              src={
-                product.image ||
-                "/no-image.png"
-              }
-              alt={product.name}
-              className="
-  w-full
-  h-[300px]
-  md:h-[500px]
-  object-contain
-  rounded-2xl
-"
-            />
+  <img
+  src={selectedImage}
+  alt={product.name}
+  className="
+    w-full
+    h-[300px]
+    md:h-[500px]
+    object-contain
+    rounded-2xl
+    transition-all
+    duration-300
+    hover:scale-150
+    cursor-zoom-in
+  "
+/>
 
-          </div>
+  </div>
 
-        </div>
+  <div className="
+    flex
+     justify-center
+    gap-3
+    mt-4
+    flex-wrap
+  ">
+
+    {(product.images || [product.image])
+      .map((img:string,index:number)=>(
+
+        <img
+          key={index}
+          src={img}
+          alt=""
+          onClick={() =>
+            setSelectedImage(img)
+          }
+         className={`
+  w-20
+  h-20
+  object-cover
+  rounded-xl
+  border-2
+  cursor-pointer
+  ${
+    selectedImage === img
+      ? "border-blue-600"
+      : "border-gray-300"
+  }
+`}
+        />
+
+      ))}
+
+  </div>
+
+</div>
 
         {/* DETAILS */}
 

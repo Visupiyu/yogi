@@ -1497,16 +1497,27 @@ console.log("AFTER addDoc");
 
                     <div className="flex gap-5">
 
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="
-                        w-24
-                        h-24
-                        object-cover
-                        rounded-xl
-                      "
-                      />
+                     <div className="flex gap-2">
+
+  {(product.images || [product.image])
+    .slice(0,5)
+    .map((img, index) => (
+
+      <img
+        key={index}
+        src={img}
+        alt=""
+        className="
+          w-16
+          h-16
+          object-cover
+          rounded-lg
+        "
+      />
+
+    ))}
+
+</div>
 
                       <div>
 
