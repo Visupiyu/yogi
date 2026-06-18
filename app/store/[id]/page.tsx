@@ -203,7 +203,7 @@ setTotalStock(
   from-green-600
   to-blue-600
   rounded-3xl
-  p-12 md:p-16
+  p-6 md:p-12
   text-white
   mb-10
 ">
@@ -214,33 +214,9 @@ setTotalStock(
     md:flex-row
     md:items-center
     md:justify-between
-    gap-6
+    gap-4
   ">
-
-    <div>
-
-     <div className="
-  flex
-  items-center
-  gap-5
-">
-  <div className="
-  flex
-  items-center
-  gap-5
-"></div>
-
-  <div className="
-    w-24
-    h-24
-    rounded-full
-    bg-white
-    overflow-hidden
-    border-4
-    border-white
-  ">
-
-    <img
+  <img
       src={
         vendorInfo?.logo ||
         "/user.png"
@@ -260,7 +236,7 @@ setTotalStock(
     <div className="
   flex
   items-center
-  gap-5
+  gap-4
 ">
 
   <div className="
@@ -297,11 +273,22 @@ setTotalStock(
       text-sm
       opacity-80
     ">
+      <img
+  src="/store-banner.jpg"
+  alt=""
+  className="
+    w-full
+    h-48
+    object-cover
+    rounded-3xl
+    mb-6
+  "
+/>
       Verified Seller
     </p>
 
     <h1 className="
-      text-4xl
+      text-2xl
       md:text-5xl
       font-bold
       mt-2
@@ -417,7 +404,21 @@ Trusted marketplace seller serving customers across India
   ">
     {totalStock} 📊 Total Stock
   </span>
-
+<div className="
+  bg-white/20
+  rounded-2xl
+  p-4
+  min-w-[120px]
+  text-center
+">
+  <p>Rating</p>
+  <h3 className="
+    text-3xl
+    font-bold
+  ">
+    4.8⭐
+  </h3>
+</div>
 </div>
 
         <p className="mt-2">
@@ -467,10 +468,6 @@ Trusted marketplace seller serving customers across India
 
     </div>
 
-  </div>
-
-</div>
-
 {/* STORE SEARCH */}
 
 <div className="mb-6">
@@ -493,6 +490,20 @@ Trusted marketplace seller serving customers across India
       focus:ring-green-500
     "
   />
+  <p className="
+  text-gray-600
+  mt-3
+">
+  Showing {
+    products.filter((product)=>
+      (product.name || "")
+      .toLowerCase()
+      .includes(
+        search.trim().toLowerCase()
+      )
+    ).length
+  } Products
+</p>
 
 </div>
         {/* PRODUCTS */}
@@ -503,7 +514,7 @@ Trusted marketplace seller serving customers across India
             bg-white
             rounded-3xl
             shadow-md
-            p-10
+            p-8
             text-center
           ">
 
@@ -521,9 +532,11 @@ Trusted marketplace seller serving customers across India
           <div className="
             grid
             grid-cols-2
-            md:grid-cols-3
-            lg:grid-cols-4
-            gap-6
+sm:grid-cols-2
+md:grid-cols-3
+lg:grid-cols-4
+xl:grid-cols-8
+gap-4
           ">
 
             {products
@@ -574,43 +587,66 @@ Trusted marketplace seller serving customers across India
       rounded-full
       z-10
     ">
-      25% OFF
+   {
+  product.discount
+    ? `${product.discount}% OFF`
+    : "HOT"
+}
     </div>
 
-    <img
-      src={
-        product.image ||
-        "/no-image.png"
-      }
-      alt={product.name}
-      className="
-        w-full
-        h-72
-        object-cover
-      "
-    />
+   <img
+  src={
+    product.image ||
+    "/no-image.png"
+  }
+  alt={product.name}
+  className="
+    w-full
+    h-44
+    md:h-56
+    object-cover
+  "
+/>
 
   </div>
 
-                  <div className="p-5">
-
+              <div className="p-3 md:p-4">
                     <h2 className="
-                      text-lg
+                    text-sm
+                     md:text-base
                       font-bold
                       line-clamp-2
-                      min-h-[56px]
+                      min-h-[40px]
                     ">
                       {product.name}
                     </h2>
-
                     <p className="
-                      text-green-600
-                      font-bold
-                      text-2xl
-                      mt-3
-                    ">
-                      ₹{product.price}
-                    </p>
+  text-sm
+  text-gray-500
+  mt-1
+">
+  {product.category}
+</p>
+
+                    <h2 className="
+  text-sm
+  md:text-base
+  font-semibold
+  line-clamp-2
+  leading-5
+">
+  {product.name}
+</h2>
+
+<p className="
+  text-green-600
+  font-bold
+  text-lg
+  md:text-xl
+  mt-1
+">
+  ₹{product.price}
+</p>
 
                     {product.stock > 0 ? (
 
@@ -645,8 +681,6 @@ Trusted marketplace seller serving customers across India
           </div>
 
         )}
-
-      </div>
 
     </section>
 

@@ -1,72 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import { useParams } from "next/navigation";
-
-import {
-  doc,
-  getDoc,
-  collection,
-  getDocs,
-  query,
-  where
-} from "firebase/firestore";
-
+import {doc,getDoc,collection,getDocs,query,where} from "firebase/firestore";
 import { db } from "@/lib/firebase";
-
 import Link from "next/link";
 
 export default function ProductPage() {
 
   const params = useParams();
-
-  const [product,setProduct] =
-    useState<any>(null);
-    const [relatedProducts,setRelatedProducts] =
-  useState<any[]>([]);
-
-  const [loading,setLoading] =
-    useState(true);
-    const [selectedImage,setSelectedImage] =
-  useState("");
-  const [selectedSize,setSelectedSize] =
-  useState("");
+  const [product,setProduct] = useState<any>(null);
+  const [relatedProducts,setRelatedProducts] = useState<any[]>([]);
+  const [loading,setLoading] = useState(true);
+  const [selectedImage,setSelectedImage] = useState("");
+  const [selectedSize,setSelectedSize] = useState("");
+  const [selectedColor, setSelectedColor] = useState("");
+  const [showSizeChart,setShowSizeChart] = useState(false);
 
   useEffect(()=>{
-
-    async function loadProduct(){
-
-      try{
-
+    async function loadProduct(){ try{ 
         const snap =
-          await getDoc(
-
+          await getDoc( 
             doc(
               db,
               "products",
               params.id as string
             )
-
           );
 
         if (snap.exists()) {
 
   const productData = snap.data();
-
- const fullProduct: any = {
-  id: snap.id,
-  ...productData
+ const fullProduct: any = { id: snap.id, ...productData
 };
-
 setProduct(fullProduct);
-
 setSelectedImage(
   fullProduct.images?.[0] ||
   fullProduct.image ||
   "/no-image.png"
 );
-
   const q = query(
     collection(db, "products"),
     where(
@@ -75,16 +47,12 @@ setSelectedImage(
       productData.category
     )
   );
-
   const relatedSnap =
     await getDocs(q);
-
   const related: any[] = [];
 
   relatedSnap.forEach((doc) => {
-
     if (doc.id !== snap.id) {
-
       related.push({
         id: doc.id,
         ...doc.data()
@@ -99,31 +67,18 @@ setSelectedImage(
   );
 
 }
-
       }catch(error){
-
         console.log(error);
-
       }finally{
-
         setLoading(false);
-
       }
-
     }
-
     if(params?.id){
-
       loadProduct();
-
     }
-
   },[params]);
-
   const addToCart = ()=>{
-
-    const cart = JSON.parse(
-
+  const cart = JSON.parse(
       localStorage.getItem(
         "cart"
       ) || "[]"
@@ -274,7 +229,16 @@ setSelectedImage(
 
   }
 
+  const colors =
+  product.color
+    ? product.color
+        .split(",")
+        .map((c: string) => c.trim())
+    : [];
+
  return (
+
+    <>
 
   <div className="
     min-h-screen
@@ -283,23 +247,25 @@ setSelectedImage(
   ">
 
     <div className="
-      max-w-7xl
-      mx-auto
-      bg-white
-      rounded-3xl
-      shadow
-      p-4
-    ">
+  max-w-7xl
+  mx-auto
+  bg-white
+  rounded-3xl
+  shadow
+  p-4
+  h-fit
+">
 
-      <div className="
-        grid
-        md:grid-cols-2
-        gap-10
-      ">
+  <div className="
+  grid
+  md:grid-cols-2
+  gap-10
+  items-start
+">
 
         {/* IMAGE */}
 
-        <div>
+       <div className="sticky top-24 self-start">
 
  <div
   className="
@@ -315,8 +281,8 @@ setSelectedImage(
   alt={product.name}
   className="
     w-full
-    h-[300px]
-    md:h-[500px]
+    h-[500px]
+    md:h-[700px]
     object-contain
     rounded-2xl
     transition-all
@@ -489,52 +455,56 @@ md:text-4xl
   mb-4
 ">
 
-  <h3 className="
-    font-bold
-    mb-3
-  ">
-    Product Details
-  </h3>
-
   <div className="
-    grid
-    grid-cols-2
-    gap-2
-    text-sm
-  ">
+  grid
+  grid-cols-2
+  gap-y-3
+  text-sm
+">
 
-    <p>
-      <b>Brand:</b>
-      {" "}
-      {product.brand || "-"}
-    </p>
+  <p className="font-semibold">
+    Brand
+  </p>
 
-    <p>
-      <b>Gender:</b>
-      {" "}
-      {product.gender || "-"}
-    </p>
+  <p>
+    {product.brand || "-"}
+  </p>
 
-    <p>
-      <b>Color:</b>
-      {" "}
-      {product.color || "-"}
-    </p>
+  <p className="font-semibold">
+    Gender
+  </p>
 
-    <p>
-      <b>Material:</b>
-      {" "}
-      {product.material || "-"}
-    </p>
+  <p>
+    {product.gender || "-"}
+  </p>
 
-    <p>
-      <b>Country:</b>
-      {" "}
-      {
-        product.countryOfOrigin
-        || "-"
-      }
-    </p>
+  <p className="font-semibold">
+    Color
+  </p>
+
+  <p>
+    {product.color || "-"}
+  </p>
+
+  <p className="font-semibold">
+    Material
+  </p>
+
+  <p>
+    {product.material || "-"}
+  </p>
+
+  <p className="font-semibold">
+    Country Of Origin
+  </p>
+
+  <p>
+    {
+      product.countryOfOrigin
+      || "-"
+    }
+  </p>
+
 
   </div>
 
@@ -542,26 +512,35 @@ md:text-4xl
 
           <div className="mb-4">
 
-            <span
-              className={`
-                px-3
-                py-1
-                rounded-full
-                text-sm
-                font-semibold
+           <div
+  className={`
+    p-3
+    rounded-xl
 
-                ${
-                  product.stock > 0
-                    ? "bg-green-100 text-green-700"
-                    : "bg-red-100 text-red-700"
-                }
-              `}
-            >
-              {
-                product.stock > 0
-                  ? "In Stock"
-                  : "Out Of Stock"
-              }
+    ${
+      product.stock > 0
+        ? "bg-green-50"
+        : "bg-red-50"
+    }
+  `}
+>
+              <div>
+
+  <p className="
+    text-green-600
+    font-semibold
+  ">
+    ✓ In Stock
+  </p>
+
+  <p className="
+    text-orange-500
+    text-sm
+  ">
+    Only {product.stock} Left
+  </p>
+
+</div>
 
               {
   product.sizes &&
@@ -569,12 +548,32 @@ md:text-4xl
 
     <div className="mb-4">
 
-      <p className="
-        font-semibold
-        mb-2
-      ">
-        Select Size
-      </p>
+      <div className="
+  flex
+  justify-between
+  items-center
+  mb-2
+">
+
+  <p className="font-semibold">
+    Select Size
+  </p>
+
+  <button
+    type="button"
+   onClick={() =>
+  setShowSizeChart(true)
+}
+    className="
+      text-blue-600
+      text-sm
+      font-semibold
+    "
+  >
+    Size Chart
+  </button>
+
+</div>
 
       <div className="
         flex
@@ -623,9 +622,60 @@ md:text-4xl
 
   )
 }
-            </span>
+          </div>
 
           </div>
+
+          {/* COLOR SELECTOR */}
+
+{colors.length > 0 && (
+
+  <div className="mb-4">
+
+    <p className="
+      font-semibold
+      text-green-700
+      mb-2
+    ">
+      Select Color
+    </p>
+
+    <div className="
+      flex
+      flex-wrap
+      gap-2
+    ">
+
+      {colors.map((color:any) => (
+
+        <button
+          key={color}
+          onClick={() =>
+            setSelectedColor(color)
+          }
+          className={`
+            px-4
+            py-2
+            rounded-xl
+            border
+            font-medium
+            ${
+              selectedColor === color
+                ? "border-blue-600 bg-blue-50 text-blue-600"
+                : "border-gray-300"
+            }
+          `}
+        >
+          {color}
+        </button>
+
+      ))}
+
+    </div>
+
+  </div>
+
+)}
 
           {/* VENDOR */}
 
@@ -662,6 +712,52 @@ md:text-4xl
             </Link>
 
           </div>
+
+          <div
+  className="
+    bg-slate-50
+    rounded-2xl
+    p-4
+    mb-4
+  "
+>
+
+  <h3 className="
+    font-bold
+    text-lg
+    mb-3
+  ">
+    Delivery & Services
+  </h3>
+
+  <div className="
+    space-y-2
+    text-sm
+  ">
+
+    <p>
+      🚚 Free Delivery
+    </p>
+
+    <p>
+      📦 Delivery in 3-5 Days
+    </p>
+
+    <p>
+      ↩️ 7 Days Easy Return
+    </p>
+
+    <p>
+      💳 Cash On Delivery Available
+    </p>
+
+    <p>
+      🔒 Secure Payment
+    </p>
+
+  </div>
+
+</div>
 
           {/* BUTTONS */}
 
@@ -719,7 +815,158 @@ md:text-4xl
             Buy Now
           </Link>
 
-          {/* DESCRIPTION */}
+          {/* HIGHLIGHTS */}
+
+<div className="mt-8">
+
+  <h2 className="
+    text-xl
+    font-bold
+    mb-4
+  ">
+    Highlights
+  </h2>
+
+  <div className="
+    grid
+    grid-cols-1
+    md:grid-cols-2
+    gap-3
+  ">
+
+    <div>✔ Premium Quality</div>
+
+    <div>
+      ✔ {product.material || "Quality Material"}
+    </div>
+
+    <div>
+      ✔ {product.color || "Stylish Color"}
+    </div>
+
+    <div>
+      ✔ Made In {
+        product.countryOfOrigin ||
+        "India"
+      }
+    </div>
+
+  </div>
+
+</div>
+
+  {/* SPECIFICATIONS */}
+
+<div className="mt-8">
+
+  <h2 className="
+    text-xl
+    font-bold
+    mb-4
+  ">
+    Specifications
+  </h2>
+
+  <div className="
+    border
+    rounded-2xl
+    overflow-hidden
+  ">
+
+    <div className="
+      grid
+      grid-cols-2
+      border-b
+    ">
+      <div className="
+        bg-gray-50
+        p-3
+        font-semibold
+      ">
+        Brand
+      </div>
+
+      <div className="p-3">
+        {product.brand || "-"}
+      </div>
+    </div>
+
+    <div className="
+      grid
+      grid-cols-2
+      border-b
+    ">
+      <div className="
+        bg-gray-50
+        p-3
+        font-semibold
+      ">
+        Color
+      </div>
+
+      <div className="p-3">
+        {product.color || "-"}
+      </div>
+    </div>
+
+    <div className="
+      grid
+      grid-cols-2
+      border-b
+    ">
+      <div className="
+        bg-gray-50
+        p-3
+        font-semibold
+      ">
+        Material
+      </div>
+
+      <div className="p-3">
+        {product.material || "-"}
+      </div>
+    </div>
+
+    <div className="
+      grid
+      grid-cols-2
+      border-b
+    ">
+      <div className="
+        bg-gray-50
+        p-3
+        font-semibold
+      ">
+        Country Of Origin
+      </div>
+
+      <div className="p-3">
+        {product.countryOfOrigin || "-"}
+      </div>
+    </div>
+
+    <div className="
+      grid
+      grid-cols-2
+    ">
+      <div className="
+        bg-gray-50
+        p-3
+        font-semibold
+      ">
+        Category
+      </div>
+
+      <div className="p-3">
+        {product.category || "-"}
+      </div>
+    </div>
+
+  </div>
+
+</div>    
+
+ {/* DESCRIPTION */}
 
           <div className="mt-8">
 
@@ -747,34 +994,26 @@ md:text-4xl
         </div>
 
       </div>
-
-      {/* REVIEWS */}
-
-      <div className="mt-8">
-
-        <h2 className="
-          text-2xl
-          font-bold
-          mb-2
-        ">
-          Reviews & Ratings
-        </h2>
-
-        <p className="text-gray-500">
-          Reviews feature coming soon.
-        </p>
+    
 
       </div>
+    </div>
+    {/* RELATED PRODUCTS */}
 
-      {/* RELATED PRODUCTS */}
-
-      <div className="mt-8">
+      <div
+  className="
+    max-w-7xl
+    mx-auto
+    mt-10
+    px-4
+  "
+>
 
         <h2 className="
-          text-2xl
-          font-bold
-          mb-4
-        ">
+  text-3xl
+  font-bold
+  mb-6
+">
           Related Products
         </h2>
 
@@ -835,11 +1074,160 @@ md:text-4xl
 
         </div>
 
+        
+      </div>
+
+       {/* REVIEWS */}
+
+      <div className="mt-8">
+
+        <h2 className="
+          text-2xl
+          font-bold
+          mb-2
+        ">
+          Reviews & Ratings
+        </h2>
+
+        <div className="
+  space-y-4
+">
+
+  <div className="
+    border
+    rounded-xl
+    p-4
+  ">
+
+    <div className="
+      flex
+      items-center
+      gap-2
+      mb-2
+    ">
+
+      <span>
+        ⭐⭐⭐⭐⭐
+      </span>
+
+      <span className="
+        font-semibold
+      ">
+        Ramesh
+      </span>
+
+    </div>
+
+    <p className="
+      text-gray-600
+    ">
+      Very good quality product.
+      Fast delivery.
+    </p>
+
+  </div>
+
+  <div className="
+    border
+    rounded-xl
+    p-4
+  ">
+
+    <div className="
+      flex
+      items-center
+      gap-2
+      mb-2
+    ">
+
+      <span>
+        ⭐⭐⭐⭐
+      </span>
+
+      <span className="
+        font-semibold
+      ">
+        Priya
+      </span>
+
+    </div>
+
+    <p className="
+      text-gray-600
+    ">
+      Good material and fitting.
+    </p>
+
+  </div>
+
+</div>
+
+</div>
+
+{
+  showSizeChart && (
+
+    <div className="
+      fixed
+      inset-0
+      bg-black/50
+      flex
+      items-center
+      justify-center
+      z-50
+    ">
+
+      <div className="
+        bg-white
+        p-6
+        rounded-2xl
+        w-80
+      ">
+
+        <h2 className="
+          text-xl
+          font-bold
+          mb-4
+        ">
+          Size Chart
+        </h2>
+
+        <div className="
+          space-y-2
+        ">
+
+          <p>S = 36</p>
+          <p>M = 38</p>
+          <p>L = 40</p>
+          <p>XL = 42</p>
+          <p>XXL = 44</p>
+
+        </div>
+
+        <button
+          onClick={() =>
+            setShowSizeChart(false)
+          }
+          className="
+            mt-4
+            w-full
+            bg-blue-600
+            text-white
+            py-2
+            rounded-xl
+          "
+        >
+          Close
+        </button>
+
       </div>
 
     </div>
 
-  </div>
+  )
+}
+
+       </>
 
 );
 }

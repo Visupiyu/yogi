@@ -47,6 +47,9 @@ const [filtered,setFiltered] =
   const [stockOnly,setStockOnly] =
     useState(false);
 
+    const [category,setCategory] =
+  useState("");
+
   useEffect(()=>{
 
     const fetchProducts =
@@ -108,6 +111,15 @@ if(
 
     let items = [...products];
 
+    if(category){
+
+  items = items.filter(
+    (item)=>
+      item.category === category
+  );
+
+}
+
     /* STOCK FILTER */
 
     if(stockOnly){
@@ -153,7 +165,8 @@ if(sort === "stock"){
   },[
     products,
     sort,
-    stockOnly,
+      stockOnly,
+  category,
   ]);
 
   return (
@@ -334,6 +347,43 @@ if(sort === "stock"){
   "
 >
 
+  <select
+  value={category}
+  onChange={(e)=>
+    setCategory(
+      e.target.value
+    )
+  }
+  className="
+    border
+    rounded-xl
+    px-4
+    py-2
+  "
+>
+
+  <option value="">
+    All Categories
+  </option>
+
+  <option value="Fashion">
+    Fashion
+  </option>
+
+  <option value="Electronics">
+    Electronics
+  </option>
+
+  <option value="Beauty">
+    Beauty
+  </option>
+
+  <option value="Grocery">
+    Grocery
+  </option>
+
+</select>
+
   Clear Filters
 
 </button>
@@ -460,7 +510,7 @@ if(sort === "stock"){
 
                   </div>
 
-                  <div className="p-4">
+                  <div className="p-2">
 
                     <h3 className="
                       font-semibold
@@ -471,18 +521,13 @@ if(sort === "stock"){
                     </h3>
 
                     <p className="
-                      text-green-600
-                      font-bold
-                      text-lg
-                      mt-2
-                    ">
-                      <p className="
-  text-gray-400
-  line-through
-">
-  ₹{Math.round(product.price * 1.25)}
-</p>
-                    </p>
+    text-gray-400
+    line-through
+    text-sm
+  ">
+    ₹{Math.round(product.price * 1.25)}
+  </p>
+  
 
                     {product?.stock > 0 ? (
 

@@ -121,9 +121,32 @@ stock:
 
     alert("Added to cart");
 
-  };
+const updatedWishlist =
+  wishlist.filter(
+    (wishlistItem) =>
+      wishlistItem.id !== item.id
+  );
 
-  return (
+setWishlist(
+  updatedWishlist
+);
+
+localStorage.setItem(
+  "wishlist",
+  JSON.stringify(
+    updatedWishlist
+  )
+);
+
+window.dispatchEvent(
+  new Event(
+    "wishlistUpdated"
+  )
+);
+
+};
+
+ return (
 
     <section className="
       py-10
@@ -250,6 +273,28 @@ stock:
                     ₹{item.price}
                   </p>
 
+                  {item.stock > 0 ? (
+
+  <p className="
+    text-green-600
+    font-semibold
+    mt-2
+  ">
+    ✓ In Stock
+  </p>
+
+) : (
+
+  <p className="
+    text-red-500
+    font-semibold
+    mt-2
+  ">
+    Out Of Stock
+  </p>
+
+)}
+
                   {/* BUTTONS */}
 
                   <div className="
@@ -260,22 +305,22 @@ stock:
                   ">
 
                     <button
-                    disabled={
-    item.stock <= 0
+                   className={`
+  py-3
+  rounded-xl
+  font-semibold
+  transition
+
+  ${
+    item.stock > 0
+      ? "bg-green-600 hover:bg-green-700 text-white"
+      : "bg-gray-300 text-gray-500 cursor-not-allowed"
   }
+`}
                       onClick={() =>
                         moveToCart(item)
                       }
-                      className="
-                        bg-green-600
-                        hover:bg-green-700
-                        text-white
-                        py-3
-                        rounded-xl
-                        font-semibold
-                        transition
-                      "
-                    >
+                     >
                       Move To Cart
                     </button>
 
@@ -293,8 +338,11 @@ stock:
     transition
   "
 >
+
                       Remove
                     </button>
+
+                  
 
                   </div>
 
@@ -314,4 +362,4 @@ stock:
 
   );
 
-}
+  }

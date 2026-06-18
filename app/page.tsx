@@ -42,6 +42,7 @@ from "@/components/CouponPopup";
 
 import RecommendedProducts
 from "@/components/RecommendedProducts";
+import CategoryRow from "@/components/CategoryRow";
 
 import { db } from "@/lib/firebase";
 
@@ -72,7 +73,7 @@ export default function Home() {
   const [sortBy,setSortBy] =
     useState("default");
 
-  async function loadProducts(){
+    async function loadProducts(){
 
   try{
 
@@ -148,7 +149,7 @@ if(error){
     min-h-screen
     bg-slate-100
     px-2
-    py-*
+    py-1
   ">
 
     <div className="
@@ -156,10 +157,10 @@ if(error){
       mx-auto
       grid
      grid-cols-2
-sm:grid-cols-3
-md:grid-cols-4
-lg:grid-cols-5
-xl:grid-cols-6
+sm:grid-cols-2
+md:grid-cols-3
+lg:grid-cols-4
+xl:grid-cols-5
       gap-3
     ">
 
@@ -254,7 +255,7 @@ xl:grid-cols-6
   max-w-7xl
   mx-auto
   px-2
-  py-*
+  py-1
   grid
   grid-cols-1
   lg:grid-cols-4
@@ -272,288 +273,91 @@ xl:grid-cols-6
   <OfferCards />
 
 </section>
-
-      <motion.section className="
-      initial={{ opacity:0, y:40 }}
-
-whileInView={{
-  opacity:1,
-  y:0
-}}
-
-transition={{
-  duration:0.5
-}}
-
-viewport={{
-  once:true
-}}
-        max-w-7xl
-        mx-auto
-        px-2
-        py-*
-      ">
-
-        <div className="
-          flex
-          flex-col
-          md:flex-row
-          md:items-center
-          md:justify-between
-          gap-3
-          mb-*
-        ">
-
-          <div>
-
-           <h2 className="
-  text-2xl
-  md:text-3xl
-  font-bold
-  text-gray-800
-">
-
-              Trending Products
-
-            </h2>
-
-            <p className="
-              text-gray-500
-              mt-*
-            ">
-
-              {filteredProducts.length}
-              {" "}
-              Products Found
-
-            </p>
-
-          </div>
-
-        </div>
-
-        <div className="
-  bg-white
-  rounded-3xl
-  p-6
-  shadow-md
-  border
-  border-gray-100
-">
-
-          <div className="
-            flex
-            flex-col
-            md:flex-row
-            gap-3
-          ">
-
-            <input
-
-              type="text"
-
-              placeholder="Search products..."
-
-              value={search}
-
-              onChange={(e)=>
-                setSearch(
-                  e.target.value
-                )
-              }
-
-              className="
-  flex-1
-  px-2
-  py-*
-  rounded-2xl
-  border
-  border-gray-200
-  outline-none
-  focus:ring-4
-  focus:ring-green-100
-  focus:border-green-500
-"
-            />
-
-            <select
-
-              value={category}
-
-              onChange={(e)=>
-                setCategory(
-                  e.target.value
-                )
-              }
-
-              className="
-  px-2
-  py-*
-  rounded-2xl
-  border
-  border-gray-200
-  bg-white
-  outline-none
-  focus:border-green-500
-"
-            >
-
-              <option>
-                All
-              </option>
-
-              <option>
-                Grocery
-              </option>
-
-              <option>
-                Fashion
-              </option>
-
-              <option>
-                Beauty
-              </option>
-
-              <option>
-                Electronics
-              </option>
-
-            </select>
-
-            <select
-
-              value={sortBy}
-
-              onChange={(e)=>
-                setSortBy(
-                  e.target.value
-                )
-              }
-
-              className="
-                p-2
-                rounded-xl
-                border
-                bg-white
-              "
-            >
-
-              <option value="default">
-                Sort By
-              </option>
-
-              <option value="low">
-                Price: Low to High
-              </option>
-
-              <option value="high">
-                Price: High to Low
-              </option>
-
-              <option value="stock">
-                Stock Available
-              </option>
-
-            </select>
-
-            <button
-
-              onClick={()=>{
-
-                setSearch("");
-
-                setCategory("All");
-
-                setSortBy("default");
-
-              }}
-
-              className="
-               bg-gradient-to-r
-from-green-600
-to-blue-600
-hover:from-green-500
-hover:to-blue-500
-                text-white
-                px-6
-                py-1
-                rounded-xl
-                font-semibold
-              "
-            >
-
-              Clear
-
-            </button>
-
-          </div>
-
-        </div>
-
-        {filteredProducts.length === 0 && (
-
-          <div className="
-            bg-white
-            rounded-2xl
-            shadow-sm
-            p-10
-            text-center
-            mb-*
-          ">
-
-            <h3 className="
-              text-2xl
-              font-bold
-              mb-3
-            ">
-
-              No Products Found
-
-            </h3>
-
-            <p className="
-              text-gray-500
-            ">
-
-              Try another search
-              or category
-
-            </p>
-
-          </div>
-
-        )}
-
-       <div className="
-  grid
- grid-cols-2
-sm:grid-cols-3
-md:grid-cols-4
-lg:grid-cols-5
-xl:grid-cols-6
-  gap-3
-">
-
-          {filteredProducts.map((product)=>(
-
-            <ProductCard
-              key={product.id}
-              id={product.id}
-              name={product.name}
-              price={product.price}
-              image={product.image}
-              stock={product.stock}
-            />
-
-          ))}
-
-        </div>
-
-      </motion.section>
+        
 
        <CouponPopup />
 
       <FlashSale />
+
+     <CategoryRow
+  title="📱 Mobiles"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Mobile"
+    )
+  }
+/>
+<CategoryRow
+  title=" 👔 Men Fashion"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Men Fashion"
+    )
+  }
+/>
+
+<CategoryRow
+  title="👗 Women Fashion"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Women Fashion"
+    )
+  }
+/>
+<CategoryRow
+  title=" 🧒 Kids Fashion"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Kids Fashion"
+    )
+  }
+/>
+
+<CategoryRow
+  title="👕 Fashion"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Fashion"
+    )
+  }
+/>
+
+<CategoryRow
+  title="💻 Electronics"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Electronics"
+    )
+  }
+/>
+
+<CategoryRow
+  title=" 💄 Beauty"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Beauty"
+    )
+  }
+/>
+
+<CategoryRow
+  title=" 🏠 Appliances"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Appliances"
+    )
+  }
+/>
+
+<CategoryRow
+  title="🛒 Grocery"
+  products={
+    filteredData.filter(
+      (p) => p.category === "Grocery"
+    )
+  }
+/>
+
 
       <TrendingProducts />
 

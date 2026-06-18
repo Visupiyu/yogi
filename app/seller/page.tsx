@@ -1470,6 +1470,7 @@ setCountryOfOrigin(
   value={color}
   onChange={(e)=>
     setColor(e.target.value)
+    
   }
   className="
     w-full

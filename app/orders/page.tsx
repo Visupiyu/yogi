@@ -1,80 +1,34 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
+import {useEffect,useState,
 } from "react";
-
-import {
-  collection,
-  getDocs,
-  orderBy,
-  query,
+import {collection,getDocs,orderBy,query,
 } from "firebase/firestore";
-
 import { db }
 from "@/lib/firebase";
-import {
-  useRouter
+import {useRouter
 } from "next/navigation";
 
 export default function OrdersPage(){
-
-  const router =
-  useRouter();
-
- const [orders,setOrders] =
-  useState<any[]>([]);
-
-  const [loading,setLoading] =
-    useState(true);
-
-  useEffect(()=>{
-
-    const user =
-  localStorage.getItem(
-    "user"
-  );
-
-if(!user){
-
-  alert(
-    "Please login first"
-  );
-
+  const router =useRouter();
+ const [orders,setOrders] =useState<any[]>([]);
+  const [loading,setLoading] =useState(true);
+  useEffect(()=>{const user =localStorage.getItem("user");
+if(!user){alert("Please login first");
   router.push("/login");
-
   return;
-
 }
-
-    const fetchOrders =
-async()=>{
-
-  try{
-
-    const userData =
-
+   const fetchOrders =async()=>{
+  try{const userData =
       JSON.parse(
-
         localStorage.getItem(
           "user"
         ) || "{}"
-
       );
-
     const q = query(
+      collection(db,"orders"),
 
-      collection(
-        db,
-        "orders"
-      ),
-
-      orderBy(
-        "createdAt",
-        "desc"
-      )
-
+      orderBy("createdAt","desc")
     );
 
     const snapshot =
@@ -91,11 +45,8 @@ async()=>{
 
         order.userEmail ===
         userData.email
-
       ){
-
         items.push({
-
           id:doc.id,
 
           ...order,
@@ -111,11 +62,9 @@ async()=>{
   }catch(error){
 
     console.log(error);
-
   }
 
   setLoading(false);
-
 };
     fetchOrders();
 
@@ -253,24 +202,45 @@ async()=>{
                     ">
                       {order.customerName}
                     </p>
-
-                  </div>
-
-                  <div className="
-                    text-right
-                  ">
-
                     <p className="
-                      text-xl
-                      font-bold
-                    ">
-                     ₹{
+  text-sm
+  text-gray-400
+">
+  {order.createdAt?.seconds
+    ? new Date(
+        order.createdAt.seconds * 1000
+      ).toLocaleDateString()
+    : "Date unavailable"}
+</p>
+
+  </div>
+
+ <div className="
+  flex
+  flex-col
+  items-end
+  gap-3
+">
+
+<p className="
+ text-xl
+ font-bold
+   ">
+ ₹{
   order.finalTotal ||
   order.total
 }
-                    </p>
+<p className="
+  text-sm
+  text-gray-500
+">
+  {
+    order.items?.length || 0
+  } Items
+</p>
+</p>
 
-                    <a
+ <a
   href={`/invoice/${order.id}`}
   target="_blank"
   rel="noopener noreferrer"
@@ -285,7 +255,7 @@ async()=>{
   Download Invoice
 </a>
 
-                    <span className={`
+  <span className={`
   px-4
   py-2
   rounded-full
@@ -313,8 +283,26 @@ async()=>{
 `}>
 
   {order.status}
+  
 
 </span>
+{order.status === "Pending" && (
+
+  <button
+    className="
+      mt-3
+      bg-red-500
+      text-white
+      px-4
+      py-2
+      rounded-lg
+      text-sm
+    "
+  >
+    Cancel Order
+  </button>
+
+)}
 
                   </div>
 

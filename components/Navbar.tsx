@@ -58,6 +58,8 @@ const [wishlistCount, setWishlistCount] =
 
   const [user,setUser] =
   useState<any>(null);
+  
+
   /* SEARCH */
 
   const handleSearch = () => {
@@ -75,6 +77,7 @@ const [wishlistCount, setWishlistCount] =
     /* CART COUNT */
 
   useEffect(() => {
+    console.log("Navbar User:", user);
 
   const updateCart = () => {
 
@@ -484,7 +487,7 @@ hover:to-blue-500
                 <div className="
   flex
   items-center
-  gap-6
+  gap-2
 ">
 
   <Search size={18} />
@@ -618,11 +621,13 @@ hover:to-blue-500
   md:block
 ">
 
-  {
-    user?.email
-      ? user.email.split("@")[0]
-      : "Login"
-  }
+ {
+  user?.email
+    ? user.email.length > 18
+  ? user.email.substring(0,18) + "..."
+  : user.email
+    : "Login"
+}
 
 </span>
 

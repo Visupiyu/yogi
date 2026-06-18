@@ -80,23 +80,31 @@ export default function CategoriesGrid(){
         </div>
 
         <div className="
-          grid
-          grid-cols-2
-          md:grid-cols-3
-          lg:grid-cols-6
-          gap-3
-        ">
-
+  flex
+  flex-nowrap
+  overflow-x-scroll
+  w-full
+  gap-4
+  pb-2
+  scrollbar-hide
+">
           {categories.map((category,index)=>(
+            
 
-            <Link
-              key={index}
-              href={`/category/${category.slug}`}
-            >
+          <Link
+  key={index}
+  href={`/category/${category.slug}`}
+  className="
+    flex-shrink-0
+    block
+  "
+>
 
-              <div
+             <div
   className={`
     group
+    min-w-[140px]
+    md:min-w-[180px]
     ${category.bg}
     rounded-2xl
     overflow-hidden
@@ -109,7 +117,8 @@ export default function CategoriesGrid(){
 >
 
                 <div className="
-                  h-20
+                  h-24
+                  md:h-28
                   overflow-hidden
                 ">
 
@@ -135,7 +144,8 @@ export default function CategoriesGrid(){
 
                   <h3 className="
                     font-semibold
-                    text-lg
+                  text-sm
+md:text-base
                   ">
                     {category.name}
                   </h3>
