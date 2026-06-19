@@ -17,43 +17,43 @@ import {
 const features = [
 
   {
-    title:"Free Delivery",
-    subtitle:"On orders above ₹499",
+    title:"🚚 FREE DELIVERY",
+    subtitle:"Above ₹499",
     icon:Truck,
-    bg:"bg-green-100",
-    iconColor:"text-green-600"
+    bg:"bg-gradient-to-r from-green-500 to-emerald-700",
+    iconColor:"text-white"
   },
 
   {
-    title:"Secure Payment",
-    subtitle:"100% protected payments",
+    title:"💳 SECURE PAYMENT",
+    subtitle:"100% Protected",
     icon:ShieldCheck,
-    bg:"bg-blue-100",
-    iconColor:"text-blue-600"
+    bg:"bg-gradient-to-r from-blue-500 to-indigo-700",
+    iconColor:"text-white"
   },
 
   {
-    title:"Easy Returns",
-    subtitle:"7 days return policy",
+    title:"↩ EASY RETURNS",
+    subtitle:"7 Day Returns",
     icon:RotateCcw,
-    bg:"bg-orange-100",
-    iconColor:"text-orange-600"
+    bg:"bg-gradient-to-r from-orange-500 to-red-600",
+    iconColor:"text-white"
   },
 
   {
-    title:"Best Quality",
-    subtitle:"Trusted branded products",
+    title:"⭐ PREMIUM QUALITY",
+    subtitle:"Top Brands",
     icon:BadgeCheck,
-    bg:"bg-purple-100",
-    iconColor:"text-purple-600"
+    bg:"bg-gradient-to-r from-purple-500 to-pink-600",
+    iconColor:"text-white"
   },
 
   {
-    title:"24/7 Support",
-    subtitle:"Dedicated customer support",
+    title:"🎧 24/7 SUPPORT",
+    subtitle:"Always Here",
     icon:Headphones,
-    bg:"bg-red-100",
-    iconColor:"text-red-600"
+    bg:"bg-gradient-to-r from-cyan-500 to-blue-700",
+    iconColor:"text-white"
   }
 
 ];
@@ -86,31 +86,37 @@ export default function FeatureStrip(){
 
           return(
 
-            <div
-
+ <div
   key={index}
-
   className={`
     flex
     items-center
     gap-4
     ${item.bg}
-    rounded-2xl
-    p-4
-    hover:shadow-md
-    transition
+    rounded-3xl
+    p-5
+    text-white
+    shadow-lg
+    hover:shadow-2xl
+    hover:scale-105
+    transition-all
+    duration-300
+    cursor-pointer
+    relative
+    overflow-hidden
   `}
 >
 
-              <div className={`
-  w-12
-  h-12
+  <div className="
+  w-14
+  h-14
   rounded-full
-  ${item.bg}
+  bg-white/20
+  backdrop-blur-sm
   flex
   items-center
   justify-center
-`}>
+">
 
                 <Icon
   size={24}
@@ -132,14 +138,13 @@ export default function FeatureStrip(){
                 </h3>
 
                 <p className="
-                  text-gray-500
-                  text-xs
-                  md:text-sm
-                ">
-
-                  {item.subtitle}
-
-                </p>
+  text-white/90
+  text-xs
+  md:text-sm
+">
+  {item.subtitle}
+</p>
+                
 
               </div>
 

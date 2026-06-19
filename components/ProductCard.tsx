@@ -2,47 +2,13 @@
 
 import Link from "next/link";
 
-import {
+import { Heart, Star } from "lucide-react";
 
-  Heart,
+import { motion } from "framer-motion";
 
-  ShoppingCart,
+type Props = { id:string; name:string; price:number; image:string; stock:number; };
 
-  Star
-
-} from "lucide-react";
-
-import { motion }
-from "framer-motion";
-
-type Props = {
-
-  id:string;
-
-  name:string;
-
-  price:number;
-
-  image:string;
-
-  stock:number;
-
-};
-
-export default function ProductCard({
-
-  
-
-  id,
-
-  name,
-
-  price,
-
-  image,
-
-  stock
-
+export default function ProductCard({ id, name, price, image, stock 
 }:Props){
   const addToWishlist = ()=>{
 
@@ -56,34 +22,15 @@ export default function ProductCard({
 
       );
 
-    const exists = wishlist.find(
+    const exists = wishlist.find( (item:any)=> item.id === id );
 
-      (item:any)=>
-
-        item.id === id
-
-    );
-
-    if(exists){
-
-      alert("Already In Wishlist");
+    if(exists){ alert("Already In Wishlist");
 
       return;
 
     }
 
-    wishlist.push({
-
-      id,
-
-      name,
-
-      price,
-
-      image, stock
-
-
-    });
+    wishlist.push({id, name, price, image, stock });
 
     localStorage.setItem(
 
@@ -156,21 +103,7 @@ export default function ProductCard({
     
     else{
 
-      existingCart.push({
-
-        id,
-
-        name,
-
-        price,
-
-        image,
-
-        stock,
-
-        qty:1
-
-      });
+      existingCart.push({ id, name, price, image, stock, qty:1 });
 
     }
 
@@ -227,7 +160,7 @@ export default function ProductCard({
   to-gray-50
   rounded-3xl
   overflow-hidden
-  shadow-1g
+ shadow-lg
     hover:shadow-2xl
     transition
     duration-300
@@ -252,7 +185,8 @@ export default function ProductCard({
   alt={name}
   className="
     w-full
-    h-32
+    h-56
+    md:h-64
     object-cover
     group-hover:scale-105
     transition
@@ -312,6 +246,7 @@ to-gray-50
             justify-center
             shadow-md
             hover:bg-pink-500
+            hover:scale-110
             hover:text-white
             transition
           "
@@ -326,8 +261,8 @@ to-gray-50
       {/* CONTENT */}
 
       <motion.div className="
-        p-1
-      ">
+  p-2
+">
 
         {/* RATING */}
 
@@ -336,7 +271,7 @@ to-gray-50
           items-center
           gap-1
           text-yellow-500
-          mb-1
+          mb-0
         ">
 
           <Star size={14} fill="currentColor" />
@@ -351,7 +286,7 @@ to-gray-50
             ml-1
           ">
 
-            (4.9)
+          (4.9)
 
           </span>
 
@@ -367,7 +302,7 @@ to-gray-50
             font-semibold
            text-sm
             line-clamp-2
-            min-h-[30px]
+            min-h-[24px]
             hover:text-green-600
             transition
           ">
@@ -384,7 +319,7 @@ to-gray-50
           flex
           items-center
           gap-2
-          mt-0
+      
         ">
 
           <p className="
@@ -406,53 +341,31 @@ to-gray-50
            ₹{Math.round(price * 1.25)}
 
           </p>
+          <p className="
+  text-xs
+  text-green-600
+  font-medium
+  mt-1
+">
+  🚚 Free Delivery
+</p>
 
        </motion.div>
 
+       <p className="
+  text-xs
+  font-medium
+  mt-2
+  mb-2
+">
+  {stock <= 10
+ ? "⚠️ Limited Stock"
+ : "🟢 In Stock"
+}
+</p>
+
         {/* BUTTON */}
 
-        <motion.button
-
-          disabled={
-            stock <= 0
-          }
-
-          onClick={addToCart}
-
-          className={`
-
-  mt-1
-  w-full
-  flex
-  items-center
-  justify-center
-  gap-2
-  py-1.5
-  rounded-xl
-  font-semibold
-  transition
-
-  ${stock <= 0
-
-    ? "bg-gray-300 text-gray-500"
-
-    : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white"
-
-  }
-
-`}        >
-
-          <ShoppingCart size={16} />
-
-          {stock <= 0
-
-            ? "Out Of Stock"
-
-            : "Add To Cart"
-
-          }
-
-        </motion.button>
 
      </motion.div>
 

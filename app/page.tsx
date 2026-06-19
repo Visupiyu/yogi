@@ -43,6 +43,7 @@ from "@/components/CouponPopup";
 import RecommendedProducts
 from "@/components/RecommendedProducts";
 import CategoryRow from "@/components/CategoryRow";
+import FeaturedCategories from "@/components/FeaturedCategories";
 
 import { db } from "@/lib/firebase";
 
@@ -274,7 +275,7 @@ xl:grid-cols-5
 
 </section>
         
-
+<FeaturedCategories />
        <CouponPopup />
 
       <FlashSale />

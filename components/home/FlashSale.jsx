@@ -10,41 +10,37 @@ from "framer-motion";
 
 export default function FlashSale(){
 
-  const calculateTimeLeft = ()=>{
+  const [targetTime] = useState(
+    new Date().getTime() +
+    1000 * 60 * 60 * 24
+  );
 
-    const target =
-      new Date().getTime() +
-      1000 * 60 * 60 * 24;
+ const calculateTimeLeft = ()=>{
 
-    const now =
-      new Date().getTime();
+  const now =
+    new Date().getTime();
 
-    const difference =
-      target - now;
+  const difference =
+    targetTime - now;
 
-    return {
+  return {
 
-      hours:
-        Math.floor(
-          (difference /
-          (1000 * 60 * 60)) % 24
-        ),
+    hours: Math.floor(
+      (difference / (1000 * 60 * 60)) % 24
+    ),
 
-      minutes:
-        Math.floor(
-          (difference / 1000 / 60) % 60
-        ),
+    minutes: Math.floor(
+      (difference / 1000 / 60) % 60
+    ),
 
-      seconds:
-        Math.floor(
-          (difference / 1000) % 60
-        ),
-
-    };
+    seconds: Math.floor(
+      (difference / 1000) % 60
+    ),
 
   };
 
-  const [timeLeft,setTimeLeft] =
+};
+const [timeLeft,setTimeLeft] =
     useState(calculateTimeLeft());
 
   useEffect(()=>{
@@ -99,8 +95,9 @@ export default function FlashSale(){
           rounded-2xl
           overflow-hidden
           bg-gradient-to-r
-          from-red-500
-          to-orange-500
+         from-red-600
+via-orange-500
+to-yellow-500
           text-white
           p-5 md:p-6
           shadow-xl
@@ -127,7 +124,7 @@ export default function FlashSale(){
                 text-sm
                 mb-*
               ">
-                Limited Time Offer
+               🔥 Limited Time Offer
               </p>
 
               <h2 className="
@@ -136,7 +133,7 @@ export default function FlashSale(){
                 font-extrabold
                 leading-tight
               ">
-                Flash Sale
+                ⚡ Flash Sale
                 <br />
                 Up To 70% OFF
               </h2>
@@ -156,10 +153,11 @@ export default function FlashSale(){
                 text-red-500
                 px-*
                 py-*
-                rounded-x1
+                rounded-xl
                 font-bold
                 hover:scale-105
                 transition
+                animate-pulse
               ">
                 Shop Now
               </button>
@@ -177,7 +175,12 @@ export default function FlashSale(){
                 bg-white/20
                 backdrop-blur-md
                 rounded-2xl
-                p-2                min-w-[90px]
+                p-2 
+                min-w-[100px]
+h-[100px]
+flex
+flex-col
+justify-center
                 text-center
               ">
 
@@ -195,11 +198,18 @@ export default function FlashSale(){
               </div>
 
               <div className="
-                bg-white/20
+                bg-white/25
+border
+border-white/20
+shadow-lg
                 backdrop-blur-md
                 rounded-2xl
                 p-2
-                min-w-[90px]
+              min-w-[100px]
+h-[100px]
+flex
+flex-col
+justify-center
                 text-center
               ">
 
@@ -221,7 +231,11 @@ export default function FlashSale(){
                 backdrop-blur-md
                 rounded-2xl
                 p-2
-                min-w-[75px]
+              min-w-[100px]
+h-[100px]
+flex
+flex-col
+justify-center
                 text-center
               ">
 

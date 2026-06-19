@@ -7,33 +7,40 @@ import { motion } from "framer-motion";
 
 export default function HeroSlider(){
 
- const slides = [
+ const slides = [ 
+
+   {
+  title:"Fresh Grocery Deals",
+  subtitle:"Daily Essentials Delivered Fast",
+  image:"https://images.unsplash.com/photo-1610348725531-843dff563e2c?q=80&w=1600&auto=format&fit=crop",
+  button:"Order Grocery",
+  link:"/category/Grocery"
+},
 
   {
-    title:"Fresh Grocery Delivered",
-    subtitle:"Daily essentials at best prices",
-    image:"https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1600&auto=format&fit=crop",
-    button:"Shop Grocery",
-    link:"/category/Grocery"
-  },
-
-  {
-    title:"Latest Fashion Collection",
-    subtitle:"Trending styles for everyone",
-    image:"https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1600&auto=format&fit=crop",
-    button:"Explore Fashion",
-    link:"/category/Fashion"
-  },
-
-  {
-    title:"Beauty & Electronics",
-    subtitle:"Everything you need in one marketplace",
-    image:"https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=1600&auto=format&fit=crop",
-    button:"Shop Now",
-    link:"/search"
-  }
+  title:"Men's Fashion Collection",
+  subtitle:"Upgrade Your Style • Up To 70% OFF",
+  image:"https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1600&auto=format&fit=crop",
+  button:"Shop Men's Fashion",
+  link:"/category/Men Fashion"
+},
+{
+  title:"Women's Fashion Sale",
+  subtitle:"Trending Styles For Every Occasion",
+  image:"https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1600&auto=format&fit=crop",
+  button:"Explore Women's Fashion",
+  link:"/category/Women Fashion"
+},
+{
+  title:"Latest Electronics",
+  subtitle:"Mobiles • Laptops • Smart Watches",
+  image:"https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=1600&auto=format&fit=crop",
+  button:"Shop Electronics",
+  link:"/category/Electronics"
+},
 
 ];
+console.log("Slides:", slides.length);
 
  const [current,setCurrent] =
     useState(0);
@@ -156,6 +163,10 @@ export default function HeroSlider(){
               >
                 {slide.subtitle}
               </p>
+
+              <p className="absolute top-2 right-2 z-50 bg-black text-white p-2">
+  Slide {current + 1}
+</p>
 
               <motion.div
 

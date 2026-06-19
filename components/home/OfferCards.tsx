@@ -5,31 +5,30 @@ export default function OfferCards(){
   const offers = [
 
     {
+  title:"Latest Smartphones",
 
-      title:"Fashion Sale",
+  subtitle:"Up To 40% OFF",
 
-      subtitle:"Up To 50% OFF",
+  image:
+    "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1200&auto=format&fit=crop",
 
-      image:
-        "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200&auto=format&fit=crop",
+  button:"Shop Mobiles",
 
-      color:"from-pink-500 to-red-500"
-
-    },
+  link:"/category/Mobile"
+},
 
     {
+  title:"Home Appliances",
 
-      title:"Fresh Grocery",
+  subtitle:"Smart Living Starts Here",
 
-      subtitle:"Free Delivery",
+  image:
+    "https://images.unsplash.com/photo-1586208958839-06c17cacdf08?q=80&w=1200&auto=format&fit=crop",
 
-      image:
-        "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1200&auto=format&fit=crop",
+  button:"Shop Appliances",
 
-      color:"from-green-500 to-emerald-600"
-
-    }
-
+  link:"/category/Appliances"
+},
   ];
 
   return(
@@ -71,13 +70,13 @@ export default function OfferCards(){
             "
           />
 
-          <div className={`
-            absolute
-            inset-0
-            bg-gradient-to-r
-            ${offer.color}
-            opacity-80
-          `}>
+         <div
+  className="
+    absolute
+    inset-0
+    bg-black/30
+  "
+>
 
           </div>
 
@@ -89,7 +88,7 @@ export default function OfferCards(){
             flex-col
             justify-center
             p-6
-            text-white
+           text-slate-900
           ">
 
             <p className="
@@ -124,8 +123,9 @@ export default function OfferCards(){
 
             <button className="
               mt-*
-              bg-white
-              text-black
+            bg-white
+text-slate-900
+hover:bg-gray-100
               px-*
               py-2
               rounded-xl

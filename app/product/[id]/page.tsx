@@ -241,10 +241,11 @@ setSelectedImage(
     <>
 
   <div className="
-    min-h-screen
-    bg-gray-100
-    p-3
-  ">
+  min-h-screen
+  bg-gray-100
+  p-3
+  pb-32
+">
 
     <div className="
   max-w-7xl
@@ -265,7 +266,11 @@ setSelectedImage(
 
         {/* IMAGE */}
 
-       <div className="sticky top-24 self-start">
+      <div className="
+  md:sticky
+  md:top-24
+  self-start
+">
 
  <div
   className="
@@ -281,13 +286,15 @@ setSelectedImage(
   alt={product.name}
   className="
     w-full
-    h-[500px]
-    md:h-[700px]
+    h-[280px]
+    sm:h-[350px]
+    md:h-[500px]
+    lg:h-[650px]
     object-contain
     rounded-2xl
     transition-all
     duration-300
-    hover:scale-150
+    hover:scale-110
     cursor-zoom-in
   "
 />
@@ -313,8 +320,10 @@ setSelectedImage(
             setSelectedImage(img)
           }
          className={`
-  w-20
-  h-20
+ w-14
+h-14
+md:w-20
+md:h-20
   object-cover
   rounded-xl
   border-2
