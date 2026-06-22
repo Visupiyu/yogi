@@ -1138,6 +1138,37 @@ window.location.href =
     Customers
   </h2>
 
+  <div
+  onClick={() =>
+    router.push(
+      "/admin/refunds"
+    )
+  }
+  className="
+    bg-white
+    p-6
+    rounded-2xl
+    shadow
+    cursor-pointer
+    hover:shadow-lg
+  "
+>
+
+  <h2 className="
+    text-2xl
+    font-bold
+  ">
+    Refunds
+  </h2>
+
+  <p className="
+    text-gray-500
+  ">
+    Manage refund requests
+  </p>
+
+</div>
+
   <input
   type="text"
   placeholder="Search Customer Email..."
