@@ -9,6 +9,16 @@ import {
 
 import { db } from "@/lib/firebase";
 
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
+
 export default function SellerAnalyticsPage() {
 
   const [totalOrders,setTotalOrders] =
@@ -25,6 +35,9 @@ export default function SellerAnalyticsPage() {
 
   const [loading,setLoading] =
     useState(true);
+
+  const [chartData,setChartData] =
+    useState<any[]>([]);
 
   useEffect(()=>{
 
@@ -57,19 +70,18 @@ export default function SellerAnalyticsPage() {
         let commission = 0;
         let earnings = 0;
 
+        const monthly:any = {};
+
         snapshot.forEach((doc)=>{
 
           const order:any =
             doc.data();
 
           const vendorItems =
-
             order.items?.filter(
               (item:any)=>
-
                 item.vendorId ===
                 vendor.id
-
             ) || [];
 
           if(vendorItems.length){
@@ -83,6 +95,50 @@ export default function SellerAnalyticsPage() {
               order.commission || 0;
 
             earnings +=
+              order.sellerEarning || 0;
+
+            let month = "Unknown";
+
+            if(
+              order.createdAt?.seconds
+            ){
+
+              month =
+                new Date(
+                  order.createdAt.seconds *
+                  1000
+                ).toLocaleString(
+                  "en-US",
+                  {
+                    month:"short"
+                  }
+                );
+
+            }
+
+            if(!monthly[month]){
+
+              monthly[month] = {
+
+                month,
+
+                sales:0,
+
+                commission:0,
+
+                earnings:0,
+
+              };
+
+            }
+
+            monthly[month].sales +=
+              order.finalTotal || 0;
+
+            monthly[month].commission +=
+              order.commission || 0;
+
+            monthly[month].earnings +=
               order.sellerEarning || 0;
 
           }
@@ -103,6 +159,12 @@ export default function SellerAnalyticsPage() {
 
         setNetEarnings(
           earnings
+        );
+
+        setChartData(
+          Object.values(
+            monthly
+          )
         );
 
       }catch(error){
@@ -174,6 +236,7 @@ export default function SellerAnalyticsPage() {
           md:grid-cols-2
           lg:grid-cols-4
           gap-6
+          mb-8
         ">
 
           <div className="
@@ -237,6 +300,69 @@ export default function SellerAnalyticsPage() {
             ">
               ₹{netEarnings}
             </p>
+          </div>
+
+        </div>
+
+        <div className="
+          bg-white
+          p-6
+          rounded-3xl
+          shadow
+        ">
+
+          <h2 className="
+            text-2xl
+            font-bold
+            mb-6
+          ">
+            Monthly Performance
+          </h2>
+
+          <div
+            style={{
+              width:"100%",
+              height:400
+            }}
+          >
+
+            <ResponsiveContainer>
+
+              <BarChart
+                data={chartData}
+              >
+
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                />
+
+                <XAxis
+                  dataKey="month"
+                />
+
+                <YAxis />
+
+                <Tooltip />
+
+                <Bar
+                  dataKey="sales"
+                  name="Sales"
+                />
+
+                <Bar
+                  dataKey="commission"
+                  name="Commission"
+                />
+
+                <Bar
+                  dataKey="earnings"
+                  name="Earnings"
+                />
+
+              </BarChart>
+
+            </ResponsiveContainer>
+
           </div>
 
         </div>

@@ -1158,17 +1158,18 @@ setNetEarnings(
               >
                 Logout
 
-                <button
-  onClick={() =>
-    router.push(
-      "/seller/analytics"
-    )
-  }
->
-  Analytics
-</button>
+                
               </button>
 
+              <button
+    onClick={() =>
+      router.push(
+        "/seller/analytics"
+      )
+    }
+  >
+    Analytics
+  </button>
             </div>
 
           </div>
