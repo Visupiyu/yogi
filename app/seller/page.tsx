@@ -85,7 +85,11 @@ export default function SellerPage() {
 
   const [earnings, setEarnings] =
     useState(0);
+const [commissionPaid, setCommissionPaid] =
+  useState(0);
 
+const [netEarnings, setNetEarnings] =
+  useState(0);
   const [totalViews, setTotalViews] =
     useState(0);
 
@@ -968,6 +972,8 @@ setCountryOfOrigin(
         let pendingCount = 0;
 
         let totalEarnings = 0;
+        let totalCommission = 0;
+        let totalNetEarnings = 0;
 
         ordersSnap.forEach((docSnap) => {
 
@@ -1000,17 +1006,22 @@ setCountryOfOrigin(
 
             }
 
-            sellerItems.forEach(
-              (item: any) => {
+          sellerItems.forEach(
+  (item: any) => {
 
-                totalEarnings +=
-                  item.price *
-                  item.qty;
+    totalEarnings +=
+      item.price * item.qty;
 
-              }
-            );
+  }
+);
 
-          }
+totalCommission +=
+  order.commission || 0;
+
+totalNetEarnings +=
+  order.sellerEarning || 0;
+
+             }
 
         });
 
@@ -1025,6 +1036,14 @@ setCountryOfOrigin(
         setEarnings(
           totalEarnings
         );
+
+        setCommissionPaid(
+  totalCommission
+);
+
+setNetEarnings(
+  totalNetEarnings
+);
 
       };
 
@@ -1138,6 +1157,16 @@ setCountryOfOrigin(
                 }}
               >
                 Logout
+
+                <button
+  onClick={() =>
+    router.push(
+      "/seller/analytics"
+    )
+  }
+>
+  Analytics
+</button>
               </button>
 
             </div>
@@ -1151,9 +1180,9 @@ setCountryOfOrigin(
         <div
           className="
             grid
-            grid-cols-1
-            md:grid-cols-2
-            lg:grid-cols-4
+           grid-cols-1
+md:grid-cols-2
+lg:grid-cols-6
             gap-6
             mb-8
           "
@@ -1205,6 +1234,30 @@ setCountryOfOrigin(
             <p className="text-5xl font-bold text-pink-600">
 
               ₹{earnings}
+
+              <div className="bg-white p-8 rounded-2xl shadow">
+
+  <h2 className="text-2xl font-bold mb-4">
+    Commission
+  </h2>
+
+  <p className="text-4xl font-bold text-orange-600">
+    ₹{commissionPaid}
+  </p>
+
+</div>
+
+<div className="bg-white p-8 rounded-2xl shadow">
+
+  <h2 className="text-2xl font-bold mb-4">
+    Net Earnings
+  </h2>
+
+  <p className="text-4xl font-bold text-green-700">
+    ₹{netEarnings}
+  </p>
+
+</div>
             </p>
 
           </div>

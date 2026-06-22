@@ -188,6 +188,14 @@ async ()=>{
   const grandTotal =
   finalAmount + shipping;
 
+  const commission =
+  Math.round(
+    grandTotal * 0.10
+  );
+
+const sellerEarning =
+  grandTotal - commission;
+
   const loadRazorpayScript =
 ()=>{
 
@@ -358,6 +366,12 @@ if(items.length === 0){
 
         deliveryDate:
           deliveryDate,
+
+          commission:
+  commission,
+
+sellerEarning:
+  sellerEarning,
 
           couponCode:
   couponApplied
@@ -636,6 +650,12 @@ if(items.length === 0){
 
                 deliveryDate:
                   deliveryDate,
+
+                  commission:
+  commission,
+
+sellerEarning:
+  sellerEarning,
 
                   couponCode:
   couponApplied
