@@ -314,6 +314,8 @@ if(!user){alert("Please login first");
 
 {order.status === "Delivered" && (
 
+  
+
   <div className="
     bg-green-100
     text-green-700
@@ -325,6 +327,24 @@ if(!user){alert("Please login first");
   ">
 
     🎉 Order Delivered Successfully
+
+    <a
+  href={`/returns?orderId=${order.id}`}
+  className="
+    mt-3
+    bg-orange-500
+    text-white
+    px-4
+    py-2
+    rounded-lg
+    text-sm
+    inline-block
+  "
+>
+  Request Return
+</a>
+
+
 
   </div>
 
