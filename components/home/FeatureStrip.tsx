@@ -34,7 +34,7 @@ const features = [
 
   {
     title:"↩ EASY RETURNS",
-    subtitle:"7 Day Returns",
+    subtitle:"14 Day Returns",
     icon:RotateCcw,
     bg:"bg-gradient-to-r from-orange-500 to-red-600",
     iconColor:"text-white"

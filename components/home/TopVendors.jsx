@@ -107,8 +107,9 @@ export default function TopVendors(){
   bg-gradient-to-br
   from-white
   to-green-50
-  rounded-2xl
-  shadow-md
+ rounded-3xl
+shadow-md
+hover:shadow-2xl
                 overflow-hidden
                 hover:shadow-xl
                 transition
@@ -116,11 +117,12 @@ export default function TopVendors(){
               ">
 
                 <div className="
-                  h-24
-                  bg-gradient-to-r
-                  from-green-400
-                  to-green-600
-                ">
+  h-28
+  bg-gradient-to-r
+  from-green-500
+  via-blue-500
+  to-purple-600
+">
 
                 </div>
 
@@ -129,17 +131,18 @@ export default function TopVendors(){
                   text-center
                 ">
 
-                  <div className="
-                    w-16
-                    h-16
-                    rounded-full
-                    bg-gray-200
-                    mx-auto
-                    -mt-*
-                    border-4
-                    border-white
-                    overflow-hidden
-                  ">
+                 <div className="
+  w-20
+  h-20
+  rounded-full
+  bg-gray-200
+  mx-auto
+  -mt-10
+  border-4
+  border-white
+  overflow-hidden
+  shadow-lg
+">
 
                     <img
                       src={
@@ -163,24 +166,47 @@ export default function TopVendors(){
                   ">
                     {vendor.shopName}
                   </h3>
-
                   <p className="
-                    text-gray-500
-                    text-sm
-                    mt-1
-                  ">
-                    Trusted Seller
-                  </p>
+  text-xs
+  text-gray-400
+  mt-1
+">
+  📍 {vendor.city || "India"}
+</p>
+
+                  <>
+  <p className="
+    text-gray-500
+    text-sm
+    mt-1
+  ">
+    Trusted Seller
+  </p>
+
+  <p className="
+    text-yellow-500
+    font-semibold
+    text-sm
+    mt-1
+  ">
+    ⭐ 4.8 Rating
+  </p>
+</>
 
                   <button className="
-                    mt-3
-                    bg-green-600
-                    text-white
-                    px-4
-                    py-4
-                   rounded-xl
-                    hover:bg-green-700
-                  ">
+  mt-4
+  w-full
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  text-white
+  py-3
+  rounded-xl
+  font-semibold
+  hover:from-green-500
+  hover:to-blue-500
+  transition
+">
                     Visit Store
                   </button>
 

@@ -445,6 +445,47 @@ md:text-4xl
   ">
     Inclusive of all taxes
   </p>
+  <div className="
+  flex
+  flex-wrap
+  gap-2
+  mt-3
+">
+
+  <span className="
+    bg-green-100
+    text-green-700
+    px-3
+    py-1
+    rounded-full
+    text-xs
+  ">
+    🚚 Fast Delivery
+  </span>
+
+  <span className="
+    bg-blue-100
+    text-blue-700
+    px-3
+    py-1
+    rounded-full
+    text-xs
+  ">
+    🔒 Secure Payment
+  </span>
+
+  <span className="
+    bg-orange-100
+    text-orange-700
+    px-3
+    py-1
+    rounded-full
+    text-xs
+  ">
+    ↩ Easy Returns
+  </span>
+
+</div>
 
 </div>
 
@@ -1235,6 +1276,49 @@ md:text-4xl
 
   )
 }
+
+<div className="
+  md:hidden
+  fixed
+  bottom-16
+  left-0
+  right-0
+  bg-white
+  border-t
+  p-3
+  flex
+  gap-2
+  z-40
+">
+  <button
+    onClick={addToCart}
+    className="
+      flex-1
+      bg-green-600
+      text-white
+      py-3
+      rounded-xl
+      font-bold
+    "
+  >
+    Cart
+  </button>
+
+  <Link
+    href="/checkout"
+    className="
+      flex-1
+      bg-blue-600
+      text-white
+      py-3
+      rounded-xl
+      text-center
+      font-bold
+    "
+  >
+    Buy Now
+  </Link>
+</div>
 
        </>
 

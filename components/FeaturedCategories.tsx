@@ -14,8 +14,8 @@ export default function FeaturedCategories() {
 
 {
   name: "Women-Fashion",
-  image: "/woman fashion.jpg",
-  link: "/category/Women Fashion",
+  image: "/woman-fashion.jpg",
+  link: "/category/Women-Fashion",
 },
 
 {
