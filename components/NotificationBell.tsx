@@ -21,26 +21,49 @@ export default function NotificationBell() {
     setOpen] =
     useState(false);
 
-  useEffect(() => {
+ useEffect(() => {
 
-    try {
+  const loadNotifications =
+    () => {
 
-  const stored =
-    JSON.parse(
-      localStorage.getItem(
-        "notifications"
-      ) || "[]"
+      try {
+
+        const stored =
+          JSON.parse(
+            localStorage.getItem(
+              "notifications"
+            ) || "[]"
+          );
+
+        setNotifications(
+          stored
+        );
+
+      } catch {
+
+        setNotifications([]);
+
+      }
+
+    };
+
+  loadNotifications();
+
+  window.addEventListener(
+    "notificationUpdated",
+    loadNotifications
+  );
+
+  return () => {
+
+    window.removeEventListener(
+      "notificationUpdated",
+      loadNotifications
     );
 
-  setNotifications(stored);
+  };
 
-} catch {
-
-  setNotifications([]);
-
-}
-
-   }, []);
+}, []);
 
   const unreadCount =
     notifications.filter(

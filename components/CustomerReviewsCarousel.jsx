@@ -54,10 +54,13 @@ export default function CustomerReviewsCarousel() {
 
   return (
 
-    <section className="
-      py-*
-      px-*
-    ">
+   <section className="
+  py-8
+  px-4
+  bg-gradient-to-b
+  from-white
+  to-gray-50
+">
 
       <div className="
         max-w-5xl
@@ -70,7 +73,7 @@ export default function CustomerReviewsCarousel() {
           text-center
           mb-*
         ">
-          ⭐ Customer Reviews
+        ❤️ What Our Customers Say
         </h2>
 
         <div
@@ -78,7 +81,7 @@ export default function CustomerReviewsCarousel() {
     ${reviews[current].bg}
     rounded-3xl
     shadow-xl
-    p-2 md:p-6
+    p-6 md:p-10
     text-center
     transition-all
     duration-500
@@ -95,6 +98,14 @@ export default function CustomerReviewsCarousel() {
             )}
           </div>
 
+          <div className="
+  text-5xl
+  text-white/70
+  mb-2
+">
+  ❝
+</div>
+
           <p className="
             text-lg
             text-gray-700
@@ -105,6 +116,22 @@ export default function CustomerReviewsCarousel() {
             {reviews[current].text}
             "
           </p>
+
+          <div className="
+  w-20
+  h-20
+  rounded-full
+  bg-white
+  shadow-lg
+  mx-auto
+  mb-4
+  flex
+  items-center
+  justify-center
+  text-3xl
+">
+  👤
+</div>
 
           <h3 className="
   font-bold
@@ -118,7 +145,7 @@ export default function CustomerReviewsCarousel() {
   text-sm
   mt-1
 ">
-  Verified Customer
+ ✅ Verified Purchase
 </p>
 
         </div>
@@ -139,8 +166,8 @@ export default function CustomerReviewsCarousel() {
                 setCurrent(index)
               }
               className={`
-                w-3
-                h-3
+                w-4
+                h-4
                 rounded-full
                 transition
 

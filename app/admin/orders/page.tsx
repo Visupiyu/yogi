@@ -218,28 +218,28 @@ const totalRevenue =
 ">
 
   <div className="bg-white p-6 rounded-2xl shadow">
-    <h3>Total Orders</h3>
+    <h3>📦 Total Orders</h3>
     <p className="text-3xl font-bold">
       {totalOrders}
     </p>
   </div>
 
   <div className="bg-white p-6 rounded-2xl shadow">
-    <h3>Pending</h3>
+    <h3>⏳ Pending Orders</h3>
     <p className="text-3xl font-bold text-yellow-600">
       {pendingOrders}
     </p>
   </div>
 
   <div className="bg-white p-6 rounded-2xl shadow">
-    <h3>Delivered</h3>
+    <h3>✅ Delivered Orders</h3>
     <p className="text-3xl font-bold text-green-600">
       {deliveredOrders}
     </p>
   </div>
 
   <div className="bg-white p-6 rounded-2xl shadow">
-    <h3>Revenue</h3>
+    <h3>💰 Revenue</h3>
     <p className="text-3xl font-bold text-blue-600">
       ₹{totalRevenue}
     </p>
@@ -437,6 +437,40 @@ const totalRevenue =
 
       {order.status}
 
+      <div className="
+  w-full
+  bg-gray-200
+  h-2
+  rounded-full
+  mt-2
+">
+
+  <div
+    className={`
+      h-2
+      rounded-full
+      bg-green-600
+
+      ${
+        order.status === "Pending"
+          ? "w-[15%]"
+        : order.status === "Confirmed"
+          ? "w-[30%]"
+        : order.status === "Packed"
+          ? "w-[50%]"
+        : order.status === "Shipped"
+          ? "w-[70%]"
+        : order.status === "Out For Delivery"
+          ? "w-[90%]"
+        : order.status === "Delivered"
+          ? "w-full"
+          : "w-0"
+      }
+    `}
+  />
+
+</div>
+
     </span>
 
   </div>
@@ -465,35 +499,13 @@ const totalRevenue =
       rounded-lg
     "
   >
-
-                        <option>
-                          Pending
-                        </option>
-
-                        <option>
-                          Confirmed
-                        </option>
-
-                        <option>
-                          Packed
-                        </option>
-
-                        <option>
-                          Shipped
-                        </option>
-
-                        <option>
-                     Out For Delivery
-                        </option>
-
-                        <option>
-                          Delivered
-                        </option>
-
-                        <option>
-                          Cancelled
-                        </option>
-
+<option>Pending</option>
+<option>Confirmed</option>
+<option>Packed</option>
+<option>Shipped</option>
+<option>Out For Delivery</option>
+<option>Delivered</option>
+<option>Cancelled</option>
                       </select>
 
                     </td>

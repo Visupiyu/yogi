@@ -9,10 +9,10 @@ export default function Footer(){
   return(
 
     <footer className="
-  bg-gradient-to-r
-  from-green-50
-  via-white
-  to-blue-50
+  bg-gradient-to-br
+from-slate-50
+via-white
+to-green-50
   border-t
   mt-*
 ">
@@ -51,7 +51,7 @@ object-contain
             leading-7
           ">
 
-           India's growing multi-vendor marketplace for groceries, fashion, electronics, beauty and more.
+          India's trusted multi-vendor marketplace connecting customers with quality sellers across Grocery, Fashion, Electronics, Beauty and Home Essentials.
             
           </p>
 
@@ -72,7 +72,9 @@ object-contain
 
           <ul className="
             space-y-3
-            text-gray-600
+           text-gray-600
+hover:text-green-600
+transition
           ">
 
             <li>
@@ -259,6 +261,49 @@ object-contain
 
       </div>
 
+      <div className="
+  border-t
+  border-b
+  py-4
+  px-4
+">
+
+  <div className="
+    max-w-7xl
+    mx-auto
+    grid
+    grid-cols-2
+    md:grid-cols-4
+    gap-4
+    text-center
+  ">
+
+    <div>🚚 Fast Delivery</div>
+
+    <div>🔒 Secure Payments</div>
+
+    <div>↩ Easy Returns</div>
+
+    <div>✅ Trusted Sellers</div>
+
+  </div>
+
+</div>
+
+<div className="
+  flex
+  justify-center
+  gap-4
+  py-4
+">
+
+  <span className="text-2xl cursor-pointer">📘</span>
+  <span className="text-2xl cursor-pointer">📷</span>
+  <span className="text-2xl cursor-pointer">▶️</span>
+  <span className="text-2xl cursor-pointer">🐦</span>
+
+</div>
+
       {/* BOTTOM */}
 
       <div className="
@@ -269,8 +314,7 @@ object-contain
         text-sm
       ">
 
-        © 2026 Yogi Mart.
-        All Rights Reserved.
+       © 2026 Yogi Mart • Made in India 🇮🇳 • All Rights Reserved
 
       </div>    
     </footer>

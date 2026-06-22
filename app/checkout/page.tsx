@@ -395,6 +395,44 @@ discount:
       "checkoutItems"
     );
 
+    const notifications =
+  JSON.parse(
+    localStorage.getItem(
+      "notifications"
+    ) || "[]"
+  );
+
+notifications.unshift({
+
+  id: Date.now(),
+
+  title: "🛒 New Order",
+
+  message:
+    `Order placed successfully by ${name}`,
+
+  read: false,
+
+});
+
+localStorage.setItem(
+
+  "notifications",
+
+  JSON.stringify(
+    notifications
+  )
+
+);
+
+window.dispatchEvent(
+
+  new Event(
+    "notificationUpdated"
+  )
+
+);
+
     localStorage.removeItem(
       "cart"
     );

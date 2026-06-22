@@ -283,12 +283,20 @@ if(!user){alert("Please login first");
 `}>
 
   {order.status}
+
+  <p className="
+  text-xs
+  text-gray-500
+  mt-1
+">
+  Tracking Updated
+</p>
   
 
 </span>
 {order.status === "Pending" && (
 
-  <button
+   <button
     className="
       mt-3
       bg-red-500
@@ -301,6 +309,24 @@ if(!user){alert("Please login first");
   >
     Cancel Order
   </button>
+
+)}
+
+{order.status === "Delivered" && (
+
+  <div className="
+    bg-green-100
+    text-green-700
+    px-4
+    py-2
+    rounded-xl
+    text-sm
+    font-semibold
+  ">
+
+    🎉 Order Delivered Successfully
+
+  </div>
 
 )}
 
@@ -318,13 +344,13 @@ if(!user){alert("Please login first");
     gap-2
   ">
 
-    {[
-      "Pending",
-  "Confirmed",
-  "Packed",
-  "Shipped",
-  "Out For Delivery",
-  "Delivered"
+    {[  
+  "📝 Placed",
+  "✅ Confirmed",
+  "📦 Packed",
+  "🚚 Shipped",
+  "🏍️ Out For Delivery",
+  "🎉 Delivered"
     ].map(
 
       (
