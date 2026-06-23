@@ -318,19 +318,23 @@ if(items.length === 0){
 
 }
 
+localStorage.removeItem(
+  "checkoutItems"
+);
+
   setLoading(true);
 
   try{
 
-    await addDoc(
+   const orderRef =
+  await addDoc(
 
-      collection(
-        db,
-        "orders"
-      ),
+    collection(
+      db,
+      "orders"
+    ),
 
-      {
-
+    {
         customerName:name,
 
         phone:phone,
@@ -405,9 +409,72 @@ discount:
 
 }
 
+await fetch(
+  "/api/send-order-email",
+  {
+    method:"POST",
+
+    headers:{
+      "Content-Type":
+      "application/json",
+    },
+
+    body:JSON.stringify({
+
+      customerName:name,
+
+      customerEmail:
+        JSON.parse(
+          localStorage.getItem(
+            "user"
+          ) || "{}"
+        ).email,
+
+      orderId:
+        orderRef.id,
+
+      total:
+        grandTotal,
+
+    }),
+  }
+);
+
+
     localStorage.removeItem(
       "checkoutItems"
     );
+
+    await fetch(
+  "/api/send-order-email",
+  {
+    method:"POST",
+
+    headers:{
+      "Content-Type":
+      "application/json",
+    },
+
+    body:JSON.stringify({
+
+      customerName:name,
+
+      customerEmail:
+        JSON.parse(
+          localStorage.getItem(
+            "user"
+          ) || "{}"
+        ).email,
+
+      orderId:
+        orderRef.id,
+
+      total:
+        grandTotal,
+
+    }),
+  }
+);
 
     const notifications =
   JSON.parse(

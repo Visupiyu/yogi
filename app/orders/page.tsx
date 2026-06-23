@@ -221,24 +221,28 @@ if(!user){alert("Please login first");
   items-end
   gap-3
 ">
+<div>
 
-<p className="
- text-xl
- font-bold
-   ">
- ₹{
-  order.finalTotal ||
-  order.total
-}
-<p className="
-  text-sm
-  text-gray-500
-">
-  {
-    order.items?.length || 0
-  } Items
-</p>
-</p>
+  <p className="
+    text-xl
+    font-bold
+  ">
+    ₹{
+      order.finalTotal ||
+      order.total
+    }
+  </p>
+
+  <p className="
+    text-sm
+    text-gray-500
+  ">
+    {
+      order.items?.length || 0
+    } Items
+  </p>
+
+</div>
 
  <a
   href={`/invoice/${order.id}`}
