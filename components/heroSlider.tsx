@@ -163,12 +163,7 @@ console.log("Slides:", slides.length);
               >
                 {slide.subtitle}
               </p>
-
-              <p className="absolute top-2 right-2 z-50 bg-black text-white p-2">
-  Slide {current + 1}
-</p>
-
-              <motion.div
+             <motion.div
 
   animate={{
     y:[0,-6,0]
@@ -216,18 +211,17 @@ console.log("Slides:", slides.length);
 
       ))}
 
-      <div
-        className="
-          absolute
-          bottom-5
-          left-1/2
-          -translate-x-1/2
-          flex
-          gap-4
-        "
-      >
-
-        {slides.map((_,index)=>(
+       <div
+  className="
+    absolute
+    bottom-5
+    left-1/2
+    -translate-x-1/2
+    flex
+    gap-4
+  "
+>
+      {slides.map((_,index)=>(
 
           <button
 

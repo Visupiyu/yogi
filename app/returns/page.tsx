@@ -86,6 +86,33 @@ useEffect(()=>{
 
         );
 
+        await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    title:
+      "Refund Request",
+
+    message:
+      `${user.name || "Customer"} requested a refund`,
+
+    type:
+      "refund",
+
+    read:false,
+
+    createdAt:
+      serverTimestamp(),
+
+  }
+
+);      
+
         alert(
           "Return request submitted successfully"
         );
@@ -107,6 +134,8 @@ useEffect(()=>{
       }
 
     };
+
+    
 
   return(
 

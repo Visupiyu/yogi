@@ -34,6 +34,11 @@ import {
   useRouter
 } from "next/navigation";
 
+import {
+  query,
+  where,
+} from "firebase/firestore";
+
 
 
 type Vendor = {
@@ -172,6 +177,9 @@ setNotifications] =
   useState("");
   const [customerSearch,setCustomerSearch] =
   useState("");
+
+  const [unreadCount,setUnreadCount] =
+  useState(0);
 
     const [vendorPayouts,
 setVendorPayouts] =
@@ -606,6 +614,8 @@ if(
 
     await loadProducts();
 
+    await loadUnreadNotifications();
+
     setLoading(false);
 
   }
@@ -823,6 +833,41 @@ async (
 
 };
 
+const loadUnreadNotifications =
+async()=>{
+
+  try{
+
+    const q = query(
+
+      collection(
+        db,
+        "notifications"
+      ),
+
+      where(
+        "read",
+        "==",
+        false
+      )
+
+    );
+
+    const snapshot =
+      await getDocs(q);
+
+    setUnreadCount(
+      snapshot.size
+    );
+
+  }catch(error){
+
+    console.log(error);
+
+  }
+
+};
+
   if(loading){
 
     return(
@@ -891,26 +936,64 @@ to-blue-600
       👑 Admin Dashboard
     </p>
 
+    <div className="
+  mt-4
+">
+
+  <button
+
+    onClick={()=>
+
+      router.push(
+        "/admin/notifications"
+      )
+
+    }
+
+    className="
+      relative
+      bg-white
+      text-black
+      px-5
+      py-3
+      rounded-full
+      font-bold
+      shadow
+    "
+  >
+
+    🔔 Notifications
+
+    {unreadCount > 0 && (
+
+      <span
+        className="
+          absolute
+          -top-2
+          -right-2
+          bg-red-600
+          text-white
+          text-xs
+          px-2
+          py-1
+          rounded-full
+        "
+      >
+
+        {unreadCount}
+
+      </span>
+
+    )}
+
+  </button>
+
+</div>
+
   </div>
 
 </div>
 
-          <div className="
-  mt-4
-  inline-block
-  bg-yellow-400
-  text-black
-  px-4
-  py-2
-  rounded-full
-  font-bold
-">
-
-  🔔
-  {notifications.length}
-  Notifications
-
-</div>
 <button
 
   onClick={async()=>{

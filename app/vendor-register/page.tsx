@@ -91,13 +91,17 @@ export default function VendorRegisterPage(){
 
       accountHolder:"",
 
-      bankName:"",
+bankName:"",
 
-      accountNumber:"",
+accountNumber:"",
 
-      ifsc:"",
+ifsc:"",
 
-      agreed:false
+panNumber:"",
+
+aadhaarNumber:"",
+
+agreed:false
 
     });
 
@@ -275,6 +279,15 @@ businessType:
           ifsc:
             formData.ifsc,
 
+            panNumber:
+  formData.panNumber,
+
+aadhaarNumber:
+  formData.aadhaarNumber,
+
+kycStatus:
+  "Pending",
+
           agreed:
             formData.agreed,
 
@@ -301,6 +314,33 @@ businessType:
         }
 
       );
+
+      await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    title:
+      "New Vendor Registration",
+
+    message:
+      `${formData.businessName} registered as a vendor`,
+
+    type:
+      "vendor",
+
+    read:false,
+
+    createdAt:
+      serverTimestamp(),
+
+  }
+
+);
 
       alert(
         "Vendor Registration Submitted"
@@ -329,11 +369,14 @@ businessType:
   state:"",
 
   accountHolder:"",
-  bankName:"",
-  accountNumber:"",
-  ifsc:"",
+bankName:"",
+accountNumber:"",
+ifsc:"",
 
-  agreed:false
+panNumber:"",
+aadhaarNumber:"",
+
+agreed:false
 
 });
 
@@ -578,7 +621,32 @@ to-blue-50 py-12 px-6">
     rounded-2xl
   "
 />
-
+<input
+  type="text"
+  placeholder="PAN Number"
+  name="panNumber"
+  value={formData.panNumber}
+  onChange={handleChange}
+  className="
+    w-full
+    border
+    p-4
+    rounded-xl
+  "
+/>
+<input
+  type="text"
+  placeholder="Aadhaar Number"
+  name="aadhaarNumber"
+  value={formData.aadhaarNumber}
+  onChange={handleChange}
+  className="
+    w-full
+    border
+    p-4
+    rounded-xl
+  "
+/>
             <select
               name="businessType"
               value={formData.businessType}

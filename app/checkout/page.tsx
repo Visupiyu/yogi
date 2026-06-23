@@ -392,6 +392,28 @@ discount:
 
     );
 
+    await addDoc(
+  collection(
+    db,
+    "notifications"
+  ),
+  {
+    title:
+      "New Order Received",
+
+    message:
+      `${name} placed an order`,
+
+    type:
+      "order",
+
+    read:false,
+
+    createdAt:
+      new Date(),
+  }
+);
+
     for (const item of items) {
 
   await updateDoc(
@@ -748,6 +770,33 @@ discount:
               }
 
             );
+
+            await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    title:
+      "New Order Received",
+
+    message:
+      `${name} placed an order worth ₹${grandTotal}`,
+
+    type:
+      "order",
+
+    read:false,
+
+    createdAt:
+      Timestamp.now(),
+
+  }
+
+);
 
             for (const item of items) {
 

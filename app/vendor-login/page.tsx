@@ -115,6 +115,38 @@ export default function VendorLoginPage(){
       const vendorData =
         snapshot.docs[0].data();
 
+        if(
+
+  !vendorData.kycStatus ||
+
+  vendorData.kycStatus ===
+  "Pending"
+
+){
+
+  alert(
+    "Your KYC is under review."
+  );
+
+  return;
+
+}
+
+if(
+
+  vendorData.kycStatus ===
+  "Rejected"
+
+){
+
+  alert(
+    "Your KYC was rejected. Please contact support."
+  );
+
+  return;
+
+}
+
       if(
   vendorData.status ===
   "Pending"

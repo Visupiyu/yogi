@@ -12,6 +12,7 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  serverTimestamp,
 } from "firebase/firestore";
 
 import {
@@ -495,6 +496,37 @@ await loadProducts(
 
           );
 
+          if(Number(stock) <= 5){
+
+  await addDoc(
+
+    collection(
+      db,
+      "notifications"
+    ),
+
+    {
+
+      title:
+        "Low Stock Alert",
+
+      message:
+        `${name} stock is only ${stock}`,
+
+      type:
+        "stock",
+
+      read:false,
+
+      createdAt:
+        serverTimestamp(),
+
+    }
+
+  );
+
+}        
+
           alert("Product Updated");
 
         } else {
@@ -631,6 +663,37 @@ await addDoc(
 }
 
 );
+
+if(Number(stock) <= 5){
+
+  await addDoc(
+
+    collection(
+      db,
+      "notifications"
+    ),
+
+    {
+
+      title:
+        "Low Stock Alert",
+
+      message:
+        `${name} stock is only ${stock}`,
+
+      type:
+        "stock",
+
+      read:false,
+
+      createdAt:
+        serverTimestamp(),
+
+    }
+
+  );
+
+}
 
 console.log("AFTER addDoc");
 
