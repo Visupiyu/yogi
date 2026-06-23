@@ -291,6 +291,19 @@ if(!user){alert("Please login first");
 ">
   Tracking Updated
 </p>
+
+{order.expectedDelivery && (
+
+  <p className="
+    text-sm
+    text-green-600
+  ">
+    📅 Expected Delivery:
+    {" "}
+    {order.expectedDelivery}
+  </p>
+
+)}
   
 
 </span>

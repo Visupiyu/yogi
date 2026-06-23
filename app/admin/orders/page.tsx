@@ -87,7 +87,16 @@ export default function AdminOrdersPage(){
               data.createdAt
               ?.toDate?.()
               ?.toLocaleDateString()
-              || "-"
+              || "-",
+
+              courierName:
+  data.courierName || "",
+
+trackingNumber:
+  data.trackingNumber || "",
+
+expectedDelivery:
+  data.expectedDelivery || "",
 
           });
 
@@ -169,6 +178,37 @@ const totalRevenue =
 
           }
         )
+
+      );
+
+    }catch(error){
+
+      console.log(error);
+
+    }
+
+  };
+
+  const updateShipping =
+  async (
+    orderId:string,
+    field:string,
+    value:string
+  ) => {
+
+    try{
+
+      await updateDoc(
+
+        doc(
+          db,
+          "orders",
+          orderId
+        ),
+
+        {
+          [field]: value
+        }
 
       );
 
@@ -317,21 +357,22 @@ const totalRevenue =
                     Date
                   </th>
 
-                  <th className="text-left py-4">
-  Invoice
+                 <th className="text-left py-4">
+  Courier
 </th>
 
+<th className="text-left py-4">
+  Tracking
+</th>
 
-                </tr>
-
-              </thead>
-
-              <tbody>
-
-                {orders.length === 0 && (
-
+<th className="text-left py-4">
+  Invoice
+</th>
+</tr>
+</thead>
+<tbody>
+{orders.length === 0 && (
   <tr>
-
     <div className="
   bg-white
   rounded-3xl
@@ -410,17 +451,10 @@ const totalRevenue =
 
                     <td>
 
-  <div className="mb-2">
+  <div className="mb-2"> </div>
 
     <span
-      className={`
-        px-3
-        py-1
-        rounded-full
-        text-sm
-        font-semibold
-
-        ${
+      className={` px-3 py-1 rounded-full text-sm font-semibold ${
           order.status === "Delivered"
           ? "bg-green-100 text-green-700"
 
@@ -437,21 +471,11 @@ const totalRevenue =
 
       {order.status}
 
-      <div className="
-  w-full
-  bg-gray-200
-  h-2
-  rounded-full
-  mt-2
-">
+       </span>
 
-  <div
-    className={`
-      h-2
-      rounded-full
-      bg-green-600
-
-      ${
+      <div className=" w-full bg-gray-200 h-2 rounded-full mt-2 ">
+<div
+    className={`h-2 rounded-full bg-green-600 ${
         order.status === "Pending"
           ? "w-[15%]"
         : order.status === "Confirmed"
@@ -468,37 +492,15 @@ const totalRevenue =
       }
     `}
   />
-
-</div>
-
-    </span>
-
-  </div>
+ </div>
 
   <select
 
-    value={
-      order.status
-    }
+    value={order.status}
 
-    onChange={(e)=>
+    onChange={(e)=> updateStatus( order.id, e.target.value ) }
 
-      updateStatus(
-
-        order.id,
-
-        e.target.value
-
-      )
-
-    }
-
-    className="
-      border
-      p-2
-      rounded-lg
-    "
-  >
+    className=" border p-2 rounded-lg " >
 <option>Pending</option>
 <option>Confirmed</option>
 <option>Packed</option>
@@ -513,9 +515,107 @@ const totalRevenue =
                     <td>
                       {order.createdAt}
                     </td>
+                   <td>
 
-                    <td>
+  <input
+    type="text"
+    defaultValue={
+      (order as any).courierName || ""
+    }
 
+    onBlur={(e)=>
+
+      updateShipping(
+
+        order.id,
+
+        "courierName",
+
+        e.target.value
+
+      )
+
+    }
+
+    className="
+      border
+      p-2
+      rounded-lg
+      w-32
+    "
+  />
+
+</td>
+
+<td>
+
+  <input
+    type="text"
+    defaultValue={
+      (order as any).trackingNumber || ""
+    }
+
+    onBlur={(e)=>
+
+      updateShipping(
+
+        order.id,
+
+        "trackingNumber",
+
+        e.target.value
+
+      )
+
+    }
+
+    className="
+      border
+      p-2
+      rounded-lg
+      w-40
+    "
+  />
+
+</td>
+
+<th className="text-left py-4">
+  Expected Delivery
+</th>
+
+<td>
+
+  <input
+    type="date"
+
+    defaultValue={
+      (order as any)
+        .expectedDelivery || ""
+    }
+
+    onBlur={(e)=>
+
+      updateShipping(
+
+        order.id,
+
+        "expectedDelivery",
+
+        e.target.value
+
+      )
+
+    }
+
+    className="
+      border
+      p-2
+      rounded-lg
+    "
+  />
+
+</td>
+<td>
   <a
     href={`/invoice/${order.id}`}
     target="_blank"
@@ -530,34 +630,16 @@ to-blue-600
       rounded-lg
     "
   >
-
     Invoice
-
   </a>
-
 </td>
-
-                  </tr>
-
-                ))}
-
-               
-
-  
-                
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
-      </div>
-
-    </div>
-    
-
-  );
-
+</tr>
+))}
+</tbody>
+</table>
+</div>
+)}
+</div>
+</div> 
+);
 }
