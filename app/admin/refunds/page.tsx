@@ -6,6 +6,7 @@ import {
   collection,
   getDocs,
   updateDoc,
+  addDoc,
   doc,
 } from "firebase/firestore";
 
@@ -87,6 +88,34 @@ export default function AdminRefundsPage() {
           }
 
         );
+
+        await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    title:
+      "Refund Status Updated",
+
+    message:
+
+      `Refund ${id} marked as ${status}`,
+
+    type:
+      "refund",
+
+    read:false,
+
+    createdAt:
+      new Date(),
+
+  }
+
+);
 
         setRefunds(
 
@@ -205,11 +234,21 @@ export default function AdminRefundsPage() {
                     Status
                   </th>
 
-                </tr>
+             <th className="
+  text-left
+">
+  Date
+</th>
+
+
+           </tr>
 
               </thead>
+              
 
               <tbody>
+
+                
 
                 {refunds.map((item)=>(
 
@@ -238,29 +277,52 @@ export default function AdminRefundsPage() {
 
                       <select
 
-                        value={
-                          item.status
-                        }
+  value={
+    item.status
+  }
 
-                        onChange={(e)=>
+  onChange={(e)=>
 
-                          updateRefundStatus(
+    updateRefundStatus(
 
-                            item.id,
+      item.id,
 
-                            e.target.value
+      e.target.value
 
-                          )
+    )
 
-                        }
+  }
 
-                        className="
-                          border
-                          p-2
-                          rounded-lg
-                        "
-                      >
+  className={`
 
+    p-2
+    rounded-lg
+    text-white
+
+    ${
+
+      item.status ===
+      "Pending"
+
+      ? "bg-yellow-500"
+
+      : item.status ===
+        "Approved"
+
+      ? "bg-blue-600"
+
+      : item.status ===
+        "Rejected"
+
+      ? "bg-red-600"
+
+      : "bg-green-600"
+
+    }
+
+  `}
+>
+                    
                         <option>
                           Pending
                         </option>
@@ -280,6 +342,20 @@ export default function AdminRefundsPage() {
                       </select>
 
                     </td>
+                    <td>
+
+  {item.createdAt?.seconds
+
+    ? new Date(
+
+        item.createdAt.seconds *
+        1000
+
+      ).toLocaleDateString()
+
+    : "-"}
+
+</td>
 
                   </tr>
 

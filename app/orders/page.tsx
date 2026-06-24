@@ -56,6 +56,7 @@ if(!user){alert("Please login first");
       }
 
     });
+    
 
     setOrders(items);
 
@@ -305,6 +306,32 @@ if(!user){alert("Please login first");
     📅 Expected Delivery:
     {" "}
     {order.expectedDelivery}
+  </p>
+
+)}
+
+{order.courierName && (
+
+  <p className="
+    text-sm
+    text-blue-600
+  ">
+    🚚 Delivery Partner:
+    {" "}
+    {order.courierName}
+  </p>
+
+)}
+
+{order.trackingNumber && (
+
+  <p className="
+    text-sm
+    text-purple-600
+  ">
+    📦 Tracking:
+    {" "}
+    {order.trackingNumber}
   </p>
 
 )}

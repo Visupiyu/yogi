@@ -1,26 +1,11 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+import {useEffect, useState, } from "react";
 
-import {
-  collection,
-  addDoc,
-  Timestamp,
-  doc,
-  updateDoc,
-  increment,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
+import { collection, addDoc, Timestamp, doc, updateDoc, increment, getDocs, query, where,} from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-import {
-  useRouter
-} from "next/navigation";
+import {useRouter } from "next/navigation";
 
 export default function CheckoutPage() {
 
@@ -62,6 +47,18 @@ const [couponApplied,
 setCouponApplied] =
   useState(false);
 
+  const [rewardDiscount,
+setRewardDiscount] =
+useState(0);
+
+const [redeemPoints,
+setRedeemPoints] =
+useState(false);
+
+const [availablePoints, 
+setAvailablePoints] =
+useState(0);
+
   useEffect(() => {
 
     const storedItems =
@@ -74,73 +71,54 @@ setCouponApplied] =
     setItems(storedItems);
 
   }, []);
-
   const applyCoupon =
 async ()=>{
-
-  if(couponApplied){
-
-    alert(
-      "Coupon already applied"
-    );
-
+  if(couponApplied){alert( "Coupon already applied" );
     return;
-
   }
 
-  try{
+  try{ const q = query( collection( db, "coupons" ),
 
-   const q = query(
-      
-
-      collection(
-        db,
-        "coupons"
-      ),
-
-      where(
-        "code",
-        "==",
-        coupon
-.trim()
-.toUpperCase()
-      )
-
-    );
-
+      where("code", "==", coupon .trim()
+.toUpperCase() ) );
     const snapshot =
       await getDocs(q);
-
       if(snapshot.empty){
-
       alert(
         "Invalid coupon"
       );
 
+      const userData =
+  JSON.parse(
+
+    localStorage.getItem(
+      "user"
+    ) || "{}"
+
+  );
+
+setAvailablePoints(
+
+  Number(
+    userData.rewardPoints || 0
+  )
+
+);
       return;
-
     }
-
     const couponData =
       snapshot.docs[0].data();
-
-      
+  
       if(
       !couponData.active
     ){
-
       alert(
         "Coupon inactive"
       );
-
       return;
-
     }
-
     const discountAmount =
-
       total *
-
       (
         couponData.discount
         / 100
@@ -169,26 +147,38 @@ async ()=>{
   }
 
 };
-
   const total =
-    items.reduce(
+  items.reduce(
 
-      (sum, item) =>
+    (sum,item)=>
+      sum +
+      item.price *
+      item.qty,
+    0
+  );
 
-        sum +
-        item.price * item.qty,
+const rewardValue =
+  redeemPoints
+    ? Math.min(
+        availablePoints,
+        Math.floor(
+          total
+        )
+      )
 
-      0
+    : 0;
 
-    );
-
-    const finalAmount =
+const finalAmount =
   total - discount;
+const grandTotal =
+  Math.max(
+    0,
+    finalAmount +
+    shipping -
+    rewardValue
+  );
 
-  const grandTotal =
-  finalAmount + shipping;
-
-  const commission =
+const commission =
   Math.round(
     grandTotal * 0.10
   );
@@ -236,6 +226,21 @@ const sellerEarning =
     const user =
   localStorage.getItem(
     "user"
+  );
+
+  const userData =
+  JSON.parse(
+
+    localStorage.getItem(
+      "user"
+    ) || "{}"
+
+  );
+
+const availablePoints =
+
+  Number(
+    userData.rewardPoints || 0
   );
 
 if(!user){
@@ -324,32 +329,13 @@ localStorage.removeItem(
 
   setLoading(true);
 
-  try{
+  const rewardPoints =Math.floor(grandTotal / 100 );
 
-   const orderRef =
-  await addDoc(
+  try{const orderRef = await addDoc(collection( db, "orders" ),
 
-    collection(
-      db,
-      "orders"
-    ),
+    { customerName:name, phone:phone, address:address, userEmail:
 
-    {
-        customerName:name,
-
-        phone:phone,
-
-        address:address,
-
-        userEmail:
-
-  JSON.parse(
-
-    localStorage.getItem(
-      "user"
-    ) || "{}"
-
-  ).email,
+  JSON.parse(localStorage.getItem( "user" ) || "{}" ).email,
 
         items:items,
 
@@ -359,38 +345,24 @@ localStorage.removeItem(
 
         paymentMethod:"COD",
 
-        paymentStatus:
-  "Pending",
+        paymentStatus: "Pending",
 
-        shippingCharge:
-          shipping,
+        shippingCharge: shipping,
 
-        finalTotal:
-          grandTotal,
+        finalTotal: grandTotal,
 
-        deliveryDate:
-          deliveryDate,
+        deliveryDate: deliveryDate,
 
-          commission:
-  commission,
+          commission: commission,
 
-sellerEarning:
-  sellerEarning,
+          sellerEarning: sellerEarning,
 
-          couponCode:
-  couponApplied
-    ? coupon
-    : "",
+          couponCode: couponApplied ? coupon : "",
+          discount: discount,
 
-discount:
-  discount,
+             rewardPoints: rewardPoints,
   
-        createdAt:
-          Timestamp.now(),
-
-      }
-
-    );
+        createdAt: Timestamp.now(), } );
 
     await addDoc(
   collection(
@@ -461,6 +433,42 @@ await fetch(
     }),
   }
 );
+const user = JSON.parse(
+
+  localStorage.getItem(
+    "user"
+  ) || "{}"
+
+);
+
+const currentPoints =
+
+  Number(
+    user.rewardPoints || 0
+  );
+
+const updatedPoints =
+
+  currentPoints +
+
+  rewardPoints -
+
+  rewardValue;
+
+user.rewardPoints =
+
+  Math.max(
+    0,
+    updatedPoints
+  );
+
+localStorage.setItem(
+
+  "user",
+
+  JSON.stringify(user)
+
+);
 
 
     localStorage.removeItem(
@@ -497,7 +505,73 @@ await fetch(
     }),
   }
 );
+await addDoc(
 
+  collection(
+    db,
+    "rewardTransactions"
+  ),
+
+  {
+
+    userEmail:
+
+      JSON.parse(
+
+        localStorage.getItem(
+          "user"
+        ) || "{}"
+
+      ).email,
+
+    type:"Earned",
+
+    points:
+      rewardPoints,
+
+    orderTotal:
+      grandTotal,
+
+    createdAt:
+      Timestamp.now(),
+
+  }
+
+);
+if(rewardValue > 0){
+
+  await addDoc(
+
+    collection(
+      db,
+      "rewardTransactions"
+    ),
+
+    {
+
+      userEmail:
+
+        JSON.parse(
+
+          localStorage.getItem(
+            "user"
+          ) || "{}"
+
+        ).email,
+
+      type:"Redeemed",
+
+      points:
+        rewardValue,
+
+      createdAt:
+        Timestamp.now(),
+
+    }
+
+  );
+
+}
     const notifications =
   JSON.parse(
     localStorage.getItem(
@@ -1142,6 +1216,69 @@ return (
   </span>
 
 </div>
+
+<div className="
+  mt-4
+">
+
+  <label className="
+    flex
+    items-center
+    gap-2
+  ">
+
+    <input
+      type="checkbox"
+
+      checked={
+        redeemPoints
+      }
+
+      onChange={()=>
+
+        setRedeemPoints(
+          !redeemPoints
+        )
+
+      }
+    />
+
+    <span>
+
+      Redeem Reward Points
+
+      (
+      {availablePoints}
+      Available
+      )
+
+    </span>
+
+  </label>
+
+</div>
+
+{redeemPoints && (
+
+  <div className="
+    flex
+    justify-between
+    mt-4
+    text-purple-600
+    font-semibold
+  ">
+
+    <span>
+      Reward Discount
+    </span>
+
+    <span>
+      - ₹{rewardValue}
+    </span>
+
+  </div>
+
+)}
 
   {/* FINAL TOTAL */}
 

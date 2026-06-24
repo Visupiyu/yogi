@@ -6,7 +6,7 @@ import {
   collection,
   getDocs,
   updateDoc,
-  doc,
+  doc,addDoc,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -129,6 +129,18 @@ const deliveredOrders =
   orders.filter(
     o => o.status === "Delivered"
   ).length;
+  const shippedOrders =
+  orders.filter(
+    o =>
+
+      o.status ===
+      "Shipped"
+
+      ||
+
+      o.status ===
+      "Out For Delivery"
+  ).length;
 
 const totalRevenue =
   orders.reduce(
@@ -156,6 +168,32 @@ const totalRevenue =
         { status }
 
       );
+      await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    title:
+      "Order Status Updated",
+
+    message:
+      `Order ${orderId.slice(0,8)} status changed to ${status}`,
+
+    type:
+      "order",
+
+    read:false,
+
+    createdAt:
+      new Date(),
+
+  }
+
+);
 
       setOrders(
 
@@ -284,6 +322,12 @@ const totalRevenue =
       ₹{totalRevenue}
     </p>
   </div>
+  <div className="bg-white p-6 rounded-2xl shadow">
+    <h3>🚚 In Transit</h3>
+    <p className="text-3xl font-bold text-blue-600">
+      {shippedOrders}
+    </p>
+  </div>
 
 </div>
 
@@ -366,6 +410,10 @@ const totalRevenue =
 </th>
 
 <th className="text-left py-4">
+  Expected Delivery
+</th>
+
+<th className="text-left py-4">
   Invoice
 </th>
 </tr>
@@ -373,23 +421,6 @@ const totalRevenue =
 <tbody>
 {orders.length === 0 && (
   <tr>
-    <div className="
-  bg-white
-  rounded-3xl
-  shadow
-  p-10
-  text-center
-">
-
-  <p className="
-    text-gray-500
-    text-lg
-  ">
-    No Orders Found
-  </p>
-
-</div>
-
     <td
       colSpan={6}
       className="
@@ -398,13 +429,9 @@ const totalRevenue =
         text-gray-500
       "
     >
-
       No Orders Found
-
     </td>
-
   </tr>
-
 )}
 
                {orders
@@ -578,10 +605,6 @@ const totalRevenue =
   />
 
 </td>
-
-<th className="text-left py-4">
-  Expected Delivery
-</th>
 
 <td>
 

@@ -23,14 +23,65 @@ const geist = Geist({
 
 export const metadata: Metadata = {
 
+  title: {
+
+    default:
+      "Yogi Mart",
+
+    template:
+      "%s | Yogi Mart",
+
+  },
+
+  description:
+    "Buy groceries, electronics, fashion, furniture and more from local vendors on Yogi Mart.",
+
+  keywords: [
+
+    "Yogi Mart",
+
+    "Online Shopping",
+
+    "Multi Vendor Marketplace",
+
+    "Grocery Delivery",
+
+    "Electronics",
+
+    "Fashion",
+
+    "Furniture",
+
+  ],
+
+  manifest:
+    "/manifest.json",
+
+    openGraph: {
+
   title:
     "Yogi Mart",
 
   description:
     "Multi Vendor Marketplace",
 
-  manifest:
-    "/manifest.json",
+  type:
+    "website",
+
+},
+
+twitter: {
+
+  card:
+    "summary_large_image",
+
+  title:
+    "Yogi Mart",
+
+  description:
+    "Multi Vendor Marketplace",
+
+},
 
 };
 

@@ -278,7 +278,61 @@ loadOrders();
 
           </Link>
 
-          <Link href="/orders">
+          
+
+          <div className="
+  bg-gradient-to-r
+  from-yellow-500
+  to-orange-500
+  text-white
+  rounded-3xl
+  p-6
+  mb-6
+">
+
+  <p className="
+    text-sm
+    opacity-90
+  ">
+    Reward Wallet
+  </p>
+
+  <h2 className="
+    text-4xl
+    font-bold
+    mt-2
+  ">
+    🏆
+    {" "}
+    {user?.rewardPoints || 0}
+    {" "}
+    Points
+  </h2>
+
+  <p className="
+  mt-3
+  font-semibold
+">
+
+  {Number(
+    user?.rewardPoints || 0
+  ) >= 500
+
+    ? "🥇 Gold Member"
+
+    : Number(
+        user?.rewardPoints || 0
+      ) >= 200
+
+    ? "🥈 Silver Member"
+
+    : "🥉 Bronze Member"}
+
+</p>
+
+</div>
+
+<Link href="/orders">
 
   <div className="
     bg-white
@@ -386,6 +440,67 @@ loadOrders();
           </Link>
 
         </div>
+        <Link href="/profile/rewards">
+
+  <div className="
+    bg-white
+    rounded-3xl
+    shadow-md
+    p-8
+    hover:shadow-xl
+    transition
+    cursor-pointer
+  ">
+
+    <h2 className="
+      text-2xl
+      font-bold
+      mb-3
+    ">
+      Rewards
+    </h2>
+
+    <p className="
+      text-gray-500
+    ">
+      View reward points
+      and transaction history
+    </p>
+
+  </div>
+
+</Link>
+
+<Link href="/profile/refunds">
+
+  <div className="
+    bg-white
+    rounded-3xl
+    shadow-md
+    p-8
+    hover:shadow-xl
+    transition
+    cursor-pointer
+  ">
+
+    <h2 className="
+      text-2xl
+      font-bold
+      mb-3
+    ">
+      My Refunds
+    </h2>
+
+    <p className="
+      text-gray-500
+    ">
+      Track return requests
+      and refund status
+    </p>
+
+  </div>
+
+</Link>
 
         {/* ACCOUNT INFO */}
 
