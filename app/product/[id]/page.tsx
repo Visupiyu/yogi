@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import {doc,getDoc,collection,getDocs,query,where} from "firebase/firestore";
+import {doc,getDoc,collection,getDocs,query,where, addDoc,  serverTimestamp} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 
@@ -16,6 +16,12 @@ export default function ProductPage() {
   const [selectedSize,setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [showSizeChart,setShowSizeChart] = useState(false);
+  const [question,setQuestion] =useState("");
+  const [questions,setQuestions] =useState<any[]>([]);
+  const [reviews,setReviews] =useState<any[]>([]);
+  const [rating,setRating] =useState(5);
+  const [reviewText,setReviewText] =useState("");
+ 
 
   useEffect(()=>{
     async function loadProduct(){ try{ 
@@ -65,6 +71,83 @@ setSelectedImage(
   setRelatedProducts(
     related.slice(0, 4)
   );
+  const questionQuery = query(
+
+  collection(
+    db,
+    "productQuestions"
+  ),
+
+  where(
+    "productId",
+    "==",
+    snap.id
+  )
+
+);
+
+const questionSnap =
+  await getDocs(
+    questionQuery
+  );
+
+const questionData:any[] =
+  [];
+
+questionSnap.forEach((doc)=>{
+
+  questionData.push({
+
+    id:doc.id,
+
+    ...doc.data()
+
+  });
+
+});
+
+setQuestions(
+  questionData
+);
+
+const reviewQuery = query(
+
+  collection(
+    db,
+    "productReviews"
+  ),
+
+  where(
+    "productId",
+    "==",
+    snap.id
+  )
+
+);
+
+const reviewSnap =
+  await getDocs(
+    reviewQuery
+  );
+
+const reviewData:any[] =
+  [];
+
+reviewSnap.forEach((doc)=>{
+
+  reviewData.push({
+
+    id:doc.id,
+
+    ...doc.data()
+
+  });
+
+});
+
+setReviews(
+  reviewData
+);
 
 }
       }catch(error){
@@ -190,7 +273,147 @@ setSelectedImage(
     );
 
   };
+ const askQuestion = async()=>{
 
+  const user =
+    JSON.parse(
+      localStorage.getItem(
+        "user"
+      ) || "{}"
+    );
+
+  if(!question.trim()){
+
+    alert(
+      "Enter a question"
+    );
+
+    return;
+
+  }
+
+  try{
+
+    await addDoc(
+
+      collection(
+        db,
+        "productQuestions"
+      ),
+
+      {
+
+        productId:
+          product.id,
+
+        productName:
+          product.name,
+
+        customerName:
+          user.name ||
+          "Customer",
+
+        question,
+
+        answer: "",
+
+        status:
+          "Pending",
+
+        createdAt:
+          new Date(),
+
+      }
+
+    );
+
+    alert(
+      "Question submitted"
+    );
+
+    setQuestion("");
+
+    window.location.reload();
+
+  }catch(error){
+
+    console.log(error);
+
+  }
+
+};
+
+const submitReview =
+async()=>{
+
+  const user =
+    JSON.parse(
+
+      localStorage.getItem(
+        "user"
+      ) || "{}"
+
+    );
+
+  if(!reviewText){
+
+    alert(
+      "Enter review"
+    );
+
+    return;
+
+  }
+
+  try{
+
+    await addDoc(
+
+      collection(
+        db,
+        "productReviews"
+      ),
+
+      {
+
+        productId:
+          product.id,
+
+        productName:
+          product.name,
+
+        customerName:
+          user.name ||
+          "Customer",
+
+        userEmail:
+          user.email || "",
+
+        rating,
+
+        review:
+          reviewText,
+
+        createdAt:
+          serverTimestamp()
+
+      }
+
+    );
+
+    alert(
+      "Review Submitted"
+    );
+
+    window.location.reload();
+
+  }catch(error){
+
+    console.log(error);
+
+  }
+
+};
   if(loading){
 
     return(
@@ -1126,91 +1349,296 @@ md:text-4xl
 
         
       </div>
-
-       {/* REVIEWS */}
-
-      <div className="mt-8">
-
-        <h2 className="
-          text-2xl
-          font-bold
-          mb-2
-        ">
-          Reviews & Ratings
-        </h2>
-
-        <div className="
-  space-y-4
+    <div className="
+  max-w-7xl
+  mx-auto
+  mt-10
+  px-4
 ">
 
   <div className="
-    border
-    rounded-xl
-    p-4
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
   ">
+
+    <h2 className="
+      text-2xl
+      font-bold
+      mb-5
+    ">
+      Product Questions
+    </h2>
 
     <div className="
       flex
-      items-center
-      gap-2
-      mb-2
+      gap-3
+      mb-6
     ">
 
-      <span>
-        ⭐⭐⭐⭐⭐
-      </span>
+      <input
 
-      <span className="
-        font-semibold
-      ">
-        Ramesh
-      </span>
+        type="text"
+
+        value={question}
+
+        onChange={(e)=>
+
+          setQuestion(
+            e.target.value
+          )
+
+        }
+
+        placeholder="
+        Ask a question..."
+
+        className="
+          flex-1
+          border
+          p-3
+          rounded-xl
+        "
+      />
+
+      <button
+
+        onClick={
+          askQuestion
+        }
+
+        className="
+          bg-blue-600
+          text-white
+          px-6
+          rounded-xl
+        "
+      >
+
+        Ask
+
+      </button>
 
     </div>
-
-    <p className="
-      text-gray-600
-    ">
-      Very good quality product.
-      Fast delivery.
-    </p>
-
-  </div>
-
-  <div className="
-    border
-    rounded-xl
-    p-4
-  ">
 
     <div className="
-      flex
-      items-center
-      gap-2
-      mb-2
+      space-y-4
     ">
 
-      <span>
-        ⭐⭐⭐⭐
-      </span>
+      {questions.map((q:any)=>(
 
-      <span className="
-        font-semibold
-      ">
-        Priya
-      </span>
+        <div
+          key={q.id}
+          className="
+            border-b
+            pb-4
+          "
+        >
+
+          <p className="
+            font-semibold
+          ">
+            ❓ {q.question}
+          </p>
+
+          <p className="
+            text-sm
+            text-gray-500
+          ">
+            {q.customerName}
+          </p>
+
+          {q.answer && (
+
+            <div className="
+              bg-green-50
+              p-3
+              rounded-xl
+              mt-3
+            ">
+
+              <p className="
+                font-semibold
+              ">
+                ✅ Seller Answer
+              </p>
+
+              <p>
+                {q.answer}
+              </p>
+
+            </div>
+
+          )}
+
+        </div>
+
+      ))}
 
     </div>
-
-    <p className="
-      text-gray-600
-    ">
-      Good material and fitting.
-    </p>
 
   </div>
 
 </div>
+
+       {/* REVIEWS */}
+
+      <div className="
+  max-w-7xl
+  mx-auto
+  mt-10
+  px-4
+">
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+  ">
+
+    <h2 className="
+      text-2xl
+      font-bold
+      mb-5
+    ">
+      Reviews & Ratings
+    </h2>
+
+    <div className="
+      flex
+      gap-3
+      mb-4
+    ">
+
+      <select
+
+        value={rating}
+
+        onChange={(e)=>
+
+          setRating(
+            Number(
+              e.target.value
+            )
+          )
+
+        }
+
+        className="
+          border
+          p-3
+          rounded-xl
+        "
+      >
+
+        <option value={5}>
+          ⭐⭐⭐⭐⭐
+        </option>
+
+        <option value={4}>
+          ⭐⭐⭐⭐
+        </option>
+
+        <option value={3}>
+          ⭐⭐⭐
+        </option>
+
+        <option value={2}>
+          ⭐⭐
+        </option>
+
+        <option value={1}>
+          ⭐
+        </option>
+
+      </select>
+
+      <input
+
+        value={reviewText}
+
+        onChange={(e)=>
+
+          setReviewText(
+            e.target.value
+          )
+
+        }
+
+        placeholder="
+        Write review..."
+
+        className="
+          flex-1
+          border
+          p-3
+          rounded-xl
+        "
+      />
+
+      <button
+
+        onClick={
+          submitReview
+        }
+
+        className="
+          bg-green-600
+          text-white
+          px-5
+          rounded-xl
+        "
+      >
+
+        Submit
+
+      </button>
+
+    </div>
+
+    <div className="
+      space-y-4
+    ">
+
+      {reviews.map((review:any)=>(
+
+        <div
+          key={review.id}
+          className="
+            border-b
+            pb-4
+          "
+        >
+
+          <p className="
+            font-semibold
+          ">
+            {"⭐".repeat(
+              review.rating
+            )}
+          </p>
+
+          <p className="
+            font-semibold
+          ">
+            {review.customerName}
+          </p>
+
+          <p className="
+            text-gray-600
+          ">
+            {review.review}
+          </p>
+
+        </div>
+
+      ))}
+
+    </div>
+
+  </div>
 
 </div>
 

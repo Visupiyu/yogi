@@ -96,6 +96,20 @@ to-blue-700
   View Stores
 </Link>
 
+<Link
+  href="/seller/questions"
+  className="
+    block
+    px-4
+    py-3
+    rounded-xl
+    hover:bg-white/20
+    transition
+  "
+>
+  Questions
+</Link>
+
 <button
   onClick={()=>{
     localStorage.removeItem(
