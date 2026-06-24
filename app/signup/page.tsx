@@ -12,7 +12,13 @@ import {
 
 import {
   doc,
-  setDoc
+  setDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  updateDoc,
+  addDoc
 } from "firebase/firestore";
 
 import {
@@ -32,6 +38,10 @@ export default function SignupPage() {
 
   const [password,setPassword] =
     useState("");
+    const [
+  referralCode,
+  setReferralCode
+] = useState("");
 
   const [loading,setLoading] =
     useState(false);
@@ -59,6 +69,15 @@ export default function SignupPage() {
 
   );
 
+  const myReferralCode =
+
+  "YOGI" +
+
+  Math.floor(
+    100000 +
+    Math.random() * 900000
+  );
+
 await setDoc(
 
   doc(
@@ -68,21 +87,135 @@ await setDoc(
   ),
 
   {
+  uid: result.user.uid,
 
-    uid: result.user.uid,
+  name,
 
-    name,
+  email,
 
-    email,
+  role:"customer",
 
-    role:"customer",
+  rewardPoints: 0,
 
-    createdAt:
-      new Date()
+  referralCode:
+    myReferralCode,
+
+  referredBy:
+    referralCode || "",
+
+  totalReferrals: 0,
+
+  createdAt:
+    new Date()
+}
+
+);
+
+if(referralCode){
+
+  try{
+
+    const q = query(
+
+      collection(
+        db,
+        "users"
+      ),
+
+      where(
+        "referralCode",
+        "==",
+        referralCode
+      )
+
+    );
+
+    const snapshot =
+      await getDocs(q);
+
+    if(!snapshot.empty){
+
+      const referrer =
+        snapshot.docs[0];
+
+      const referrerData =
+        referrer.data();
+
+      await updateDoc(
+
+        doc(
+          db,
+          "users",
+          referrer.id
+        ),
+
+        {
+
+          rewardPoints:
+
+            Number(
+              referrerData.rewardPoints || 0
+            ) + 100,
+
+          totalReferrals:
+
+            Number(
+              referrerData.totalReferrals || 0
+            ) + 1
+
+        }
+
+      );
+
+      await updateDoc(
+
+        doc(
+          db,
+          "users",
+          result.user.uid
+        ),
+
+        {
+
+          rewardPoints: 50
+
+        }
+
+      );
+
+      await addDoc(
+
+        collection(
+          db,
+          "rewardTransactions"
+        ),
+
+        {
+
+          userId:
+            referrer.id,
+
+          points:100,
+
+          type:
+            "Referral Bonus",
+
+          createdAt:
+            new Date()
+
+        }
+
+      );
+
+    }
+
+  }catch(error){
+
+    console.log(error);
 
   }
 
-);
+}
 
 localStorage.setItem(
 
@@ -219,6 +352,30 @@ localStorage.setItem(
               outline-none
             "
           />
+          <input
+
+  type="text"
+
+  placeholder="
+  Referral Code (Optional)
+  "
+
+  value={referralCode}
+
+  onChange={(e)=>
+    setReferralCode(
+      e.target.value
+    )
+  }
+
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+    outline-none
+  "
+/>
 
         </div>
 
