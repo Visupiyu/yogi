@@ -1,84 +1,78 @@
-"use client";
-
-import TopStrip from "@/components/TopStrip";
-import React from "react";
+import type {
+  Metadata
+} from "next";
 
 import "./globals.css";
 
-import Navbar
-from "@/components/Navbar";
+import { Geist }
+from "next/font/google";
 
-import {
-  usePathname
-} from "next/navigation";
-import MobileBottomNav
-from "@/components/MobileBottomNav";
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
+import { cn }
+from "@/lib/utils";
 
-import QueryProvider from "@/components/providers/QueryProvider";
+import ClientLayout
+from "@/components/ClientLayout";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const geist = Geist({
 
+  subsets:["latin"],
+
+  variable:"--font-sans"
+
+});
+
+export const metadata: Metadata = {
+
+  title:
+    "Yogi Mart",
+
+  description:
+    "Multi Vendor Marketplace",
+
+  manifest:
+    "/manifest.json",
+
+};
 
 export default function RootLayout({
 
-  children
+  children,
 
 }:{
 
-  children: React.ReactNode
+  children: React.ReactNode;
 
 }) {
 
-
-  const pathname =
-    usePathname();
-
-  const isSellerPage =
-
-    pathname.startsWith(
-      "/seller"
-    );
-
   return (
 
-    <html lang="en" className={cn("font-sans", geist.variable)}>
+    <html
+      lang="en"
+      className={cn(
+        "font-sans",
+        geist.variable
+      )}
+    >
 
+      <body
+        className="
+          bg-gradient-to-br
+          from-green-50
+          via-white
+          to-blue-50
+          min-h-screen
+        "
+      >
 
-<body
-  className="
-    bg-gradient-to-br
-    from-green-50
-    via-white
-    to-blue-50
-    min-h-screen
-  "
->
+        <ClientLayout>
 
-  <QueryProvider>
+          {children}
 
-    {!isSellerPage && (
+        </ClientLayout>
 
-      <>
+      </body>
 
-        <TopStrip />
-
-        <Navbar />
-
-      </>
-
-    )}
-
-    {children}
-
-    <MobileBottomNav />
-
-  </QueryProvider>
-
-</body>
-
-</html>
+    </html>
 
   );
 

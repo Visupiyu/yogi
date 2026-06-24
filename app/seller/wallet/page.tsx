@@ -17,6 +17,11 @@ import { db } from "@/lib/firebase";
 export default function SellerWalletPage() {
     const [walletBalance,setWalletBalance] =
   useState(0);
+  const [pendingAmount,setPendingAmount] =
+  useState(0);
+
+const [totalWithdrawn,setTotalWithdrawn] =
+  useState(0);
 
 const [amount,setAmount] =
   useState("");
@@ -89,6 +94,62 @@ async()=>{
     );
 
     setWithdrawals(items);
+    const pending =
+
+  items
+
+    .filter(
+      (item)=>
+
+        item.status ===
+        "Pending"
+    )
+
+    .reduce(
+
+      (sum,item)=>
+
+        sum +
+        Number(
+          item.amount || 0
+        ),
+
+      0
+
+    );
+
+const withdrawn =
+
+  items
+
+    .filter(
+      (item)=>
+
+        item.status ===
+        "Paid"
+    )
+
+    .reduce(
+
+      (sum,item)=>
+
+        sum +
+        Number(
+          item.amount || 0
+        ),
+
+      0
+
+    );
+
+setPendingAmount(
+  pending
+);
+
+setTotalWithdrawn(
+  withdrawn
+);
+
 
   }catch(error){
 
@@ -173,6 +234,34 @@ async()=>{
 
     );
 
+    await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    title:
+      "Withdrawal Request",
+
+    message:
+      `${vendor.businessName}
+       requested ₹${amount}`,
+
+    type:
+      "withdrawal",
+
+    read:false,
+
+    createdAt:
+      serverTimestamp(),
+
+  }
+
+);
+
     alert(
       "Withdrawal Request Submitted"
     );
@@ -241,6 +330,64 @@ async()=>{
     </h2>
 
   </div>
+  <div className="
+  grid
+  md:grid-cols-2
+  gap-6
+  mt-6
+">
+
+  <div className="
+    bg-white
+    p-6
+    rounded-3xl
+    shadow
+  ">
+
+    <p className="
+      text-gray-500
+    ">
+      Pending Withdrawals
+    </p>
+
+    <h2 className="
+      text-3xl
+      font-bold
+      text-orange-600
+      mt-2
+    ">
+      ₹
+      {pendingAmount.toLocaleString()}
+    </h2>
+
+  </div>
+
+  <div className="
+    bg-white
+    p-6
+    rounded-3xl
+    shadow
+  ">
+
+    <p className="
+      text-gray-500
+    ">
+      Total Withdrawn
+    </p>
+
+    <h2 className="
+      text-3xl
+      font-bold
+      text-blue-600
+      mt-2
+    ">
+      ₹
+      {totalWithdrawn.toLocaleString()}
+    </h2>
+
+  </div>
+
+</div>
 
   <div className="
     bg-white
@@ -314,6 +461,96 @@ async()=>{
         </div>
 
       </div>
+      <div className="
+  bg-white
+  rounded-3xl
+  shadow
+  p-6
+  mt-8
+">
+
+  <h2 className="
+    text-2xl
+    font-bold
+    mb-6
+  ">
+    Withdrawal History
+  </h2>
+
+  {withdrawals.length === 0 ? (
+
+    <p className="
+      text-gray-500
+    ">
+      No withdrawals yet
+    </p>
+
+  ) : (
+
+    <div className="
+      overflow-x-auto
+    ">
+
+      <table className="
+        w-full
+      ">
+
+        <thead>
+
+          <tr className="
+            border-b
+          ">
+
+            <th className="
+              text-left
+              py-3
+            ">
+              Amount
+            </th>
+
+            <th>
+              Status
+            </th>
+
+          </tr>
+
+        </thead>
+
+        <tbody>
+
+          {withdrawals.map(
+            (item)=>(
+
+            <tr
+              key={item.id}
+              className="
+                border-b
+              "
+            >
+
+              <td className="
+                py-3
+              ">
+                ₹{item.amount}
+              </td>
+
+              <td>
+                {item.status}
+              </td>
+
+            </tr>
+
+          ))}
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  )}
+
+</div>
 
     </div>
 
