@@ -306,8 +306,8 @@ to-blue-100
     src="/logo.png"
     alt="Yogi-Mart"
     className="
-      h-20
-      md:h-24
+      h-30
+      md:h-40
       w-auto
       object-contain
     "

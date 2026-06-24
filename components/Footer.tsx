@@ -39,8 +39,8 @@ to-green-50
             src="/logo.png"
             alt="Yogi Mart"
             className="
-            h-20
-md:h-24
+            h-36
+md:h-42
 w-auto
 object-contain
             "
