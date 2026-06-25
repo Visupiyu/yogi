@@ -1,42 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState
+} from "react";
 
 import {
   collection,
-  getDocs,
+  getDocs
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 
 import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
   ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
   CartesianGrid,
+  LineChart,
+  Line,
+  Legend
 } from "recharts";
 
-export default function SellerAnalyticsPage() {
-
-  const [totalOrders,setTotalOrders] =
-    useState(0);
-
-  const [totalSales,setTotalSales] =
-    useState(0);
-
-  const [totalCommission,setTotalCommission] =
-    useState(0);
-
-  const [netEarnings,setNetEarnings] =
-    useState(0);
+export default function SellerAnalyticsPage(){
 
   const [loading,setLoading] =
     useState(true);
 
-  const [chartData,setChartData] =
+  const [orders,setOrders] =
+    useState<any[]>([]);
+
+  const [products,setProducts] =
+    useState<any[]>([]);
+
+  const [reviews,setReviews] =
     useState<any[]>([]);
 
   useEffect(()=>{
@@ -46,138 +49,439 @@ export default function SellerAnalyticsPage() {
   },[]);
 
   const loadAnalytics =
-    async()=>{
+  async()=>{
 
-      try{
+    try{
 
-        const vendor =
-          JSON.parse(
-            localStorage.getItem(
-              "vendor"
-            ) || "{}"
-          );
+      const vendor = JSON.parse(
 
-        const snapshot =
-          await getDocs(
-            collection(
-              db,
-              "orders"
-            )
-          );
+        localStorage.getItem(
+          "vendor"
+        ) || "{}"
 
-        let orders = 0;
-        let sales = 0;
-        let commission = 0;
-        let earnings = 0;
+      );
 
-        const monthly:any = {};
-
-        snapshot.forEach((doc)=>{
-
-          const order:any =
-            doc.data();
-
-          const vendorItems =
-            order.items?.filter(
-              (item:any)=>
-                item.vendorId ===
-                vendor.id
-            ) || [];
-
-          if(vendorItems.length){
-
-            orders++;
-
-            sales +=
-              order.finalTotal || 0;
-
-            commission +=
-              order.commission || 0;
-
-            earnings +=
-              order.sellerEarning || 0;
-
-            let month = "Unknown";
-
-            if(
-              order.createdAt?.seconds
-            ){
-
-              month =
-                new Date(
-                  order.createdAt.seconds *
-                  1000
-                ).toLocaleString(
-                  "en-US",
-                  {
-                    month:"short"
-                  }
-                );
-
-            }
-
-            if(!monthly[month]){
-
-              monthly[month] = {
-
-                month,
-
-                sales:0,
-
-                commission:0,
-
-                earnings:0,
-
-              };
-
-            }
-
-            monthly[month].sales +=
-              order.finalTotal || 0;
-
-            monthly[month].commission +=
-              order.commission || 0;
-
-            monthly[month].earnings +=
-              order.sellerEarning || 0;
-
-          }
-
-        });
-
-        setTotalOrders(
-          orders
-        );
-
-        setTotalSales(
-          sales
-        );
-
-        setTotalCommission(
-          commission
-        );
-
-        setNetEarnings(
-          earnings
-        );
-
-        setChartData(
-          Object.values(
-            monthly
+      const productSnap =
+        await getDocs(
+          collection(
+            db,
+            "products"
           )
         );
 
-      }catch(error){
+      const productList:any[]=[];
 
-        console.log(error);
+      productSnap.forEach(doc=>{
 
-      }finally{
+        const data:any={
+          id:doc.id,
+          ...doc.data()
+        };
 
-        setLoading(false);
+        if(
+          data.vendorId ===
+          vendor.uid
+        ){
 
-      }
+          productList.push(data);
 
-    };
+        }
+
+      });
+
+      setProducts(productList);
+
+      const orderSnap =
+        await getDocs(
+          collection(
+            db,
+            "orders"
+          )
+        );
+
+      const orderList:any[]=[];
+
+      orderSnap.forEach(doc=>{
+
+        const data:any=
+          doc.data();
+
+        const myItems =
+
+          data.items?.filter(
+
+            (item:any)=>
+
+              item.vendorId ===
+              vendor.uid
+
+          ) || [];
+
+        if(myItems.length){
+
+          orderList.push({
+
+            ...data,
+
+            myItems
+
+          });
+
+        }
+
+      });
+
+      setOrders(orderList);
+
+      const reviewSnap =
+        await getDocs(
+          collection(
+            db,
+            "productReviews"
+          )
+        );
+
+      const reviewList:any[]=[];
+
+      reviewSnap.forEach(doc=>{
+
+        reviewList.push(doc.data());
+
+      });
+
+      setReviews(reviewList);
+
+    }catch(error){
+
+      console.log(error);
+
+    }finally{
+
+      setLoading(false);
+
+    }
+
+  };
+
+  const revenue =
+
+    orders.reduce(
+
+      (sum,order)=>
+
+        sum +
+
+        order.myItems.reduce(
+
+          (s:any,item:any)=>
+
+            s +
+
+            item.price *
+
+            item.qty,
+
+          0
+
+        ),
+
+      0
+
+    );
+
+  const totalProducts =
+    products.length;
+
+  const totalOrders =
+    orders.length;
+
+  const averageRating =
+
+    reviews.length
+
+      ? (
+
+          reviews.reduce(
+
+            (sum:any,r:any)=>
+
+              sum+r.rating,
+
+            0
+
+          ) /
+
+          reviews.length
+
+        ).toFixed(1)
+
+      : "0";
+
+  const chartData=[
+
+    {
+      name:"Products",
+      value:totalProducts
+    },
+
+    {
+      name:"Orders",
+      value:totalOrders
+    },
+
+    {
+      name:"Reviews",
+      value:reviews.length
+    }
+
+  ];
+
+  const revenueChart=[
+
+    {
+      name:"Revenue",
+      amount:revenue
+    }
+
+  ];
+  const productSales:any = {};
+
+orders.forEach((order)=>{
+
+  order.myItems.forEach((item:any)=>{
+
+    if(!productSales[item.name]){
+
+      productSales[item.name]=0;
+
+    }
+
+    productSales[item.name]+=item.qty;
+
+  });
+
+});
+
+const bestSellingProducts =
+
+  Object.entries(productSales)
+
+  .map(
+
+    ([name,qty])=>({
+
+       name: name as string,
+
+      qty: Number(qty)
+
+    })
+
+  )
+
+ .sort(
+
+    (a, b) =>
+
+      b.qty - a.qty
+
+  )
+
+  .slice(0, 5);
+
+  const pendingOrders =
+
+  orders.filter(
+
+    (order:any)=>
+
+      order.status ===
+      "Pending"
+
+  ).length;
+
+const lowStockProducts =
+
+  products.filter(
+
+    (product:any)=>
+
+      Number(
+        product.stock || 0
+      ) <= 5
+
+  ).length;
+
+const totalCommission =
+
+  Math.round(
+
+    revenue * 0.10
+
+  );
+
+const netEarnings =
+
+  revenue -
+
+  totalCommission;
+
+const deliveredOrders =
+
+  orders.filter(
+
+    (order:any)=>
+
+      order.status ===
+      "Delivered"
+
+  ).length;
+
+const returnedOrders =
+
+  orders.filter(
+
+    (order:any)=>
+
+      order.status ===
+      "Refunded"
+
+  ).length;
+
+const returnRate =
+
+  deliveredOrders
+
+    ? (
+
+        returnedOrders *
+
+        100 /
+
+        deliveredOrders
+
+      ).toFixed(1)
+
+    : "0";
+
+    const orderStatusData = [
+
+  {
+    name:"Pending",
+    value: orders.filter(
+      (o:any)=>
+        o.status==="Pending"
+    ).length
+  },
+
+  {
+    name:"Packed",
+    value: orders.filter(
+      (o:any)=>
+        o.status==="Packed"
+    ).length
+  },
+
+  {
+    name:"Shipped",
+    value: orders.filter(
+      (o:any)=>
+        o.status==="Shipped"
+    ).length
+  },
+
+  {
+    name:"Delivered",
+    value: orders.filter(
+      (o:any)=>
+        o.status==="Delivered"
+    ).length
+  },
+
+  {
+    name:"Refunded",
+    value: orders.filter(
+      (o:any)=>
+        o.status==="Refunded"
+    ).length
+  }
+
+];
+const inventoryData = [
+
+  {
+    name:"Healthy",
+    value: products.filter(
+      (p:any)=>
+        Number(
+          p.stock || 0
+        ) > 5
+    ).length
+  },
+
+  {
+    name:"Low Stock",
+    value: products.filter(
+      (p:any)=>
+        Number(
+          p.stock || 0
+        ) <=5 &&
+        Number(
+          p.stock || 0
+        ) >0
+    ).length
+  },
+
+  {
+    name:"Out of Stock",
+    value: products.filter(
+      (p:any)=>
+        Number(
+          p.stock || 0
+        )===0
+    ).length
+  }
+
+];
+
+const monthlyRevenue = [
+
+  {
+    month:"Jan",
+    revenue:0
+  },
+
+  {
+    month:"Feb",
+    revenue:0
+  },
+
+  {
+    month:"Mar",
+    revenue:0
+  },
+
+  {
+    month:"Apr",
+    revenue:0
+  },
+
+  {
+    month:"May",
+    revenue:0
+  },
+
+  {
+    month:"Jun",
+    revenue:revenue
+  }
+
+];
+
+  const COLORS=[
+    "#16a34a",
+    "#2563eb",
+    "#f59e0b"
+  ];
 
   if(loading){
 
@@ -187,7 +491,9 @@ export default function SellerAnalyticsPage() {
         p-10
         text-center
       ">
+
         Loading Analytics...
+
       </div>
 
     );
@@ -212,8 +518,8 @@ export default function SellerAnalyticsPage() {
           from-green-600
           to-blue-600
           text-white
-          p-8
           rounded-3xl
+          p-8
           mb-8
         ">
 
@@ -224,139 +530,665 @@ export default function SellerAnalyticsPage() {
             Seller Analytics
           </h1>
 
-          <p>
-            Revenue & Earnings Overview
+          <p className="mt-2">
+            Business Performance Dashboard
           </p>
 
         </div>
+        <div className="
+  grid
+  md:grid-cols-3
+  gap-6
+  mb-8
+">
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+  ">
+
+    <p>Best Seller</p>
+
+    <h2 className="
+      text-2xl
+      font-bold
+      mt-3
+    ">
+      {bestSellingProducts[0]?.name || "N/A"}
+    </h2>
+
+  </div>
+  <div className="
+  grid
+  md:grid-cols-4
+  gap-6
+  mb-8
+">
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+  ">
+
+    <p>Pending Orders</p>
+
+    <h2 className="
+      text-3xl
+      font-bold
+      mt-3
+      text-orange-600
+    ">
+
+      {pendingOrders}
+
+    </h2>
+
+  </div>
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+  ">
+
+    <p>Low Stock</p>
+
+    <h2 className="
+      text-3xl
+      font-bold
+      mt-3
+      text-red-600
+    ">
+
+      {lowStockProducts}
+
+    </h2>
+
+  </div>
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+  ">
+
+    <p>Commission</p>
+
+    <h2 className="
+      text-3xl
+      font-bold
+      mt-3
+    ">
+
+      ₹{totalCommission}
+
+    </h2>
+
+  </div>
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+  ">
+
+    <p>Net Earnings</p>
+
+    <h2 className="
+      text-3xl
+      font-bold
+      mt-3
+      text-green-600
+    ">
+
+      ₹{netEarnings}
+
+    </h2>
+
+  </div>
+
+</div>
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+  ">
+
+    <p>Units Sold</p>
+
+    <h2 className="
+      text-3xl
+      font-bold
+      mt-3
+    ">
+      {bestSellingProducts[0]?.qty || 0}
+    </h2>
+
+  </div>
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+  ">
+
+    <p>Total Reviews</p>
+
+    <h2 className="
+      text-3xl
+      font-bold
+      mt-3
+    ">
+      {reviews.length}
+    </h2>
+
+  </div>
+
+</div>
 
         <div className="
           grid
-          grid-cols-1
-          md:grid-cols-2
-          lg:grid-cols-4
+          md:grid-cols-4
           gap-6
           mb-8
         ">
 
           <div className="
             bg-white
+            rounded-3xl
             p-6
-            rounded-2xl
             shadow
           ">
-            <h3>📦 Orders</h3>
-            <p className="
+
+            <p>Total Revenue</p>
+
+            <h2 className="
               text-3xl
               font-bold
+              mt-3
+            ">
+              ₹{revenue}
+            </h2>
+
+          </div>
+
+          <div className="
+            bg-white
+            rounded-3xl
+            p-6
+            shadow
+          ">
+
+            <p>Orders</p>
+
+            <h2 className="
+              text-3xl
+              font-bold
+              mt-3
             ">
               {totalOrders}
-            </p>
+            </h2>
+
           </div>
 
           <div className="
             bg-white
+            rounded-3xl
             p-6
-            rounded-2xl
             shadow
           ">
-            <h3>💰 Sales</h3>
-            <p className="
+
+            <p>Products</p>
+
+            <h2 className="
               text-3xl
               font-bold
-              text-green-600
+              mt-3
             ">
-              ₹{totalSales}
-            </p>
+              {totalProducts}
+            </h2>
+
           </div>
 
           <div className="
             bg-white
+            rounded-3xl
             p-6
-            rounded-2xl
             shadow
           ">
-            <h3>🏦 Commission</h3>
-            <p className="
-              text-3xl
-              font-bold
-              text-orange-600
-            ">
-              ₹{totalCommission}
-            </p>
-          </div>
 
-          <div className="
-            bg-white
-            p-6
-            rounded-2xl
-            shadow
-          ">
-            <h3>💵 Net Earnings</h3>
-            <p className="
+            <p>Average Rating</p>
+
+            <h2 className="
               text-3xl
               font-bold
-              text-blue-600
+              mt-3
             ">
-              ₹{netEarnings}
-            </p>
+              ⭐ {averageRating}
+            </h2>
+
           </div>
 
         </div>
 
         <div className="
-          bg-white
-          p-6
-          rounded-3xl
-          shadow
+          grid
+          lg:grid-cols-2
+          gap-8
         ">
 
-          <h2 className="
-            text-2xl
-            font-bold
-            mb-6
+          <div className="
+            bg-white
+            rounded-3xl
+            p-6
+            shadow
+            h-[400px]
           ">
-            Monthly Performance
-          </h2>
 
-          <div
-            style={{
-              width:"100%",
-              height:400
-            }}
-          >
+            <h2 className="
+              text-xl
+              font-bold
+              mb-4
+            ">
+              Business Overview
+            </h2>
+
+            <ResponsiveContainer>
+
+              <PieChart>
+
+                <Pie
+
+                  data={chartData}
+
+                  dataKey="value"
+
+                  outerRadius={120}
+
+                  label
+
+                >
+
+                  {chartData.map(
+
+                    (entry,index)=>(
+
+                      <Cell
+
+                        key={index}
+
+                        fill={
+                          COLORS[index]
+                        }
+
+                      />
+
+                    )
+
+                  )}
+
+                </Pie>
+
+                <Tooltip/>
+
+              </PieChart>
+
+            </ResponsiveContainer>
+
+          </div>
+          <div className="
+  bg-white
+  rounded-3xl
+  p-6
+  shadow
+  mt-8
+">
+
+  <h2 className="
+    text-2xl
+    font-bold
+    mb-6
+  ">
+    🔥 Best Selling Products
+  </h2>
+
+  <ResponsiveContainer
+    width="100%"
+    height={350}
+  >
+
+    <BarChart
+      data={bestSellingProducts}
+    >
+
+      <CartesianGrid
+        strokeDasharray="3 3"
+      />
+
+      <XAxis
+        dataKey="name"
+      />
+
+      <YAxis/>
+
+      <Tooltip/>
+
+      <Bar
+        dataKey="qty"
+      />
+
+    </BarChart>
+
+  </ResponsiveContainer>
+
+</div>
+<div className="
+  bg-white
+  rounded-3xl
+  shadow
+  p-8
+  mt-8
+">
+
+  <h2 className="
+    text-2xl
+    font-bold
+    mb-6
+  ">
+    📈 Business Insights
+  </h2>
+
+  <div className="
+    space-y-4
+    text-lg
+  ">
+
+    <p>
+
+      💰 Revenue Generated:
+      <strong>
+        {" "}
+        ₹{revenue}
+      </strong>
+
+    </p>
+
+    <p>
+
+      🏆 Best Seller:
+      <strong>
+        {" "}
+        {
+          bestSellingProducts[0]?.name ||
+          "N/A"
+        }
+      </strong>
+
+    </p>
+
+    <p>
+
+      ⭐ Average Rating:
+      <strong>
+        {" "}
+        {averageRating}
+      </strong>
+
+    </p>
+
+    <p>
+
+      📉 Return Rate:
+      <strong>
+        {" "}
+        {returnRate}%
+      </strong>
+
+    </p>
+
+    <p>
+
+      📦 Low Stock Products:
+      <strong>
+        {" "}
+        {lowStockProducts}
+      </strong>
+
+    </p>
+
+    <p>
+
+      🚚 Pending Orders:
+      <strong>
+        {" "}
+        {pendingOrders}
+      </strong>
+
+    </p>
+
+  </div>
+
+</div>
+<div className="
+  grid
+  lg:grid-cols-3
+  gap-8
+  mt-8
+">
+
+  {/* Monthly Revenue */}
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+    h-[380px]
+  ">
+
+    <h2 className="
+      text-xl
+      font-bold
+      mb-4
+    ">
+      📈 Monthly Revenue
+    </h2>
+
+    <ResponsiveContainer>
+
+      <LineChart
+        data={monthlyRevenue}
+      >
+
+        <CartesianGrid strokeDasharray="3 3"/>
+
+        <XAxis dataKey="month"/>
+
+        <YAxis/>
+
+        <Tooltip/>
+
+        <Legend/>
+
+        <Line
+          type="monotone"
+          dataKey="revenue"
+        />
+
+      </LineChart>
+
+    </ResponsiveContainer>
+
+  </div>
+
+  {/* Order Status */}
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+    h-[380px]
+  ">
+
+    <h2 className="
+      text-xl
+      font-bold
+      mb-4
+    ">
+      📦 Order Status
+    </h2>
+
+    <ResponsiveContainer>
+
+      <PieChart>
+
+        <Pie
+
+          data={orderStatusData}
+
+          dataKey="value"
+
+          outerRadius={100}
+
+          label
+
+        >
+
+          {orderStatusData.map(
+
+            (_,index)=>(
+
+              <Cell
+                key={index}
+                fill={
+                  COLORS[
+                    index %
+                    COLORS.length
+                  ]
+                }
+              />
+
+            )
+
+          )}
+
+        </Pie>
+
+        <Tooltip/>
+
+      </PieChart>
+
+    </ResponsiveContainer>
+
+  </div>
+
+  {/* Inventory */}
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-6
+    shadow
+    h-[380px]
+  ">
+
+    <h2 className="
+      text-xl
+      font-bold
+      mb-4
+    ">
+      📦 Inventory Health
+    </h2>
+
+    <ResponsiveContainer>
+
+      <PieChart>
+
+        <Pie
+
+          data={inventoryData}
+
+          dataKey="value"
+
+          outerRadius={100}
+
+          label
+
+        >
+
+          {inventoryData.map(
+
+            (_,index)=>(
+
+              <Cell
+                key={index}
+                fill={
+                  COLORS[
+                    index %
+                    COLORS.length
+                  ]
+                }
+              />
+
+            )
+
+          )}
+
+        </Pie>
+
+        <Tooltip/>
+
+      </PieChart>
+
+    </ResponsiveContainer>
+
+  </div>
+
+</div>
+
+          <div className="
+            bg-white
+            rounded-3xl
+            p-6
+            shadow
+            h-[400px]
+          ">
+
+            <h2 className="
+              text-xl
+              font-bold
+              mb-4
+            ">
+              Revenue
+            </h2>
 
             <ResponsiveContainer>
 
               <BarChart
-                data={chartData}
+                data={revenueChart}
               >
 
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                />
+                <CartesianGrid strokeDasharray="3 3"/>
 
-                <XAxis
-                  dataKey="month"
-                />
+                <XAxis dataKey="name"/>
 
-                <YAxis />
+                <YAxis/>
 
-                <Tooltip />
+                <Tooltip/>
 
                 <Bar
-                  dataKey="sales"
-                  name="Sales"
-                />
-
-                <Bar
-                  dataKey="commission"
-                  name="Commission"
-                />
-
-                <Bar
-                  dataKey="earnings"
-                  name="Earnings"
+                  dataKey="amount"
                 />
 
               </BarChart>

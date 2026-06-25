@@ -142,6 +142,53 @@ export default function AdminRefundsPage() {
 
     };
 
+    const updateRefundField = async(
+  id:string,
+  field:string,
+  value:any
+)=>{
+
+  try{
+
+    await updateDoc(
+
+      doc(
+        db,
+        "returns",
+        id
+      ),
+
+      {
+        [field]:value
+      }
+
+    );
+
+    setRefunds(
+
+      refunds.map(item=>
+
+        item.id===id
+
+          ? {
+              ...item,
+              [field]:value
+            }
+
+          : item
+
+      )
+
+    );
+
+  }catch(error){
+
+    console.log(error);
+
+  }
+
+};
+
   return(
 
     <div className="
@@ -233,146 +280,162 @@ export default function AdminRefundsPage() {
                   ">
                     Status
                   </th>
+                  <th className="text-left">
+  Pickup Partner
+</th>
+
+<th className="text-left">
+  Pickup Date
+</th>
+
+<th className="text-left">
+  Refund Amount
+</th>
 
              <th className="
   text-left
 ">
   Date
 </th>
+</tr>
+</thead>
+<tbody>
+{refunds.map((item)=>(
+<tr key={item.id} className=" border-b " >
+<td className=" py-4 ">
+{item.orderId}
+</td>
+<td>
+{item.customerName}
+</td>
+<td>
+{item.reason}
+</td>
+<td>
+<select
+value={ item.status }
+onChange={(e)=> updateRefundStatus( item.id, e.target.value ) }
+className={`p-2 rounded-lg text-white ${ item.status === "Pending" ? "bg-yellow-500"
+      : item.status === "Approved" ? "bg-blue-600"
+      : item.status === "Rejected" ? "bg-red-600" : "bg-green-600" } `} >
+                    
+      <option> Pending </option>
+      <option> Approved </option>
+      <option> Rejected </option>
+      <option> Refunded </option>
+ </select>
+ </td>
+  <td>
+    <td>
 
+  <input
 
-           </tr>
+    value={
+      item.pickupPartner || ""
+    }
 
-              </thead>
-              
+    onChange={(e)=>
 
-              <tbody>
+      updateRefundField(
 
-                
+        item.id,
 
-                {refunds.map((item)=>(
+        "pickupPartner",
 
-                  <tr
-                    key={item.id}
-                    className="
-                      border-b
-                    "
-                  >
+        e.target.value
 
-                    <td className="
-                      py-4
-                    ">
-                      {item.orderId}
-                    </td>
-
-                    <td>
-                      {item.customerName}
-                    </td>
-
-                    <td>
-                      {item.reason}
-                    </td>
-
-                    <td>
-
-                      <select
-
-  value={
-    item.status
-  }
-
-  onChange={(e)=>
-
-    updateRefundStatus(
-
-      item.id,
-
-      e.target.value
-
-    )
-
-  }
-
-  className={`
-
-    p-2
-    rounded-lg
-    text-white
-
-    ${
-
-      item.status ===
-      "Pending"
-
-      ? "bg-yellow-500"
-
-      : item.status ===
-        "Approved"
-
-      ? "bg-blue-600"
-
-      : item.status ===
-        "Rejected"
-
-      ? "bg-red-600"
-
-      : "bg-green-600"
+      )
 
     }
 
-  `}
->
-                    
-                        <option>
-                          Pending
-                        </option>
+    placeholder="Partner"
 
-                        <option>
-                          Approved
-                        </option>
+    className="
+      border
+      p-2
+      rounded-lg
+      w-36
+    "
+  />
 
-                        <option>
-                          Rejected
-                        </option>
+</td>
+<td>
 
-                        <option>
-                          Refunded
-                        </option>
+  <input
 
-                      </select>
+    type="date"
 
-                    </td>
-                    <td>
+    value={
+      item.pickupDate || ""
+    }
 
-  {item.createdAt?.seconds
+    onChange={(e)=>
 
-    ? new Date(
+      updateRefundField(
 
-        item.createdAt.seconds *
-        1000
+        item.id,
 
-      ).toLocaleDateString()
+        "pickupDate",
 
-    : "-"}
+        e.target.value
+
+      )
+
+    }
+
+    className="
+      border
+      p-2
+      rounded-lg
+    "
+  />
+
+</td>
+<td>
+
+  <input
+
+    type="number"
+
+    value={
+      item.refundAmount || 0
+    }
+
+    onChange={(e)=>
+
+      updateRefundField(
+
+        item.id,
+
+        "refundAmount",
+
+        Number(
+          e.target.value
+        )
+
+      )
+
+    }
+
+    className="
+      border
+      p-2
+      rounded-lg
+      w-28
+    "
+  />
 
 </td>
 
-                  </tr>
-
-                ))}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
-      </div>
-
-    </div>
-
+  {item.createdAt?.seconds ? new Date( item.createdAt.seconds * 1000 ).toLocaleDateString() : "-"}
+</td>
+</tr>
+ ))}
+</tbody>
+</table>
+</div>
+)}
+</div>
+</div>
   );
-
 }

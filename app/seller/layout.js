@@ -109,6 +109,45 @@ to-blue-700
 >
   Questions
 </Link>
+<Link
+  href="/seller/analytics"
+  className="
+    block
+    px-4
+    py-3
+    rounded-xl
+    hover:bg-white/20
+    transition
+  "
+>
+  Analytics
+</Link>
+<Link
+  href="/seller/reports"
+  className="
+    block
+    px-4
+    py-3
+    rounded-xl
+    hover:bg-white/20
+    transition
+  "
+>
+  Reports
+</Link>
+<Link
+  href="/seller/assistant"
+  className="
+    block
+    px-4
+    py-3
+    rounded-xl
+    hover:bg-white/20
+    transition
+  "
+>
+  AI Assistant
+</Link>
 
 <button
   onClick={()=>{

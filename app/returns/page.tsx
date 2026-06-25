@@ -31,6 +31,12 @@ useEffect(()=>{
   const [reason,setReason] =
     useState("");
 
+    const [refundMethod,setRefundMethod] =
+  useState("Original Payment");
+
+const [comments,setComments] =
+  useState("");
+
   const [loading,setLoading] =
     useState(false);
 
@@ -67,23 +73,36 @@ useEffect(()=>{
 
           {
 
-            orderId,
+  orderId,
 
-            customerName:
-              user.name || "Customer",
+  customerName:
+    user.name || "Customer",
 
-            userEmail:
-              user.email || "",
+  userEmail:
+    user.email || "",
 
-            reason,
+  reason,
 
-            status:"Pending",
+  comments,
 
-            createdAt:
-              serverTimestamp(),
+  refundMethod,
 
-          }
+  status:"Pending",
 
+  pickupDate:"",
+
+  pickupPartner:"",
+
+  pickupPhone:"",
+
+  refundAmount:0,
+
+  refundTransactionId:"",
+
+  createdAt:
+    serverTimestamp(),
+
+}
         );
 
         await addDoc(
@@ -209,7 +228,6 @@ useEffect(()=>{
                 e.target.value
               )
             }
-
             className="
               w-full
               border
@@ -217,6 +235,87 @@ useEffect(()=>{
               rounded-xl
             "
           >
+            <div className="
+  mb-6
+">
+
+  <label className="
+    block
+    mb-2
+    font-semibold
+  ">
+    Refund Method
+  </label>
+
+  <select
+
+    value={refundMethod}
+
+    onChange={(e)=>
+      setRefundMethod(
+        e.target.value
+      )
+    }
+
+    className="
+      w-full
+      border
+      p-3
+      rounded-xl
+    "
+  >
+    <div className="
+  mb-6
+">
+
+  <label className="
+    block
+    mb-2
+    font-semibold
+  ">
+    Additional Comments
+  </label>
+
+  <textarea
+
+    value={comments}
+
+    onChange={(e)=>
+      setComments(
+        e.target.value
+      )
+    }
+
+    rows={4}
+
+    placeholder="
+    Describe the issue..."
+
+    className="
+      w-full
+      border
+      p-3
+      rounded-xl
+    "
+  />
+
+</div>
+
+    <option>
+      Original Payment
+    </option>
+
+    <option>
+      Wallet
+    </option>
+
+    <option>
+      Bank Transfer
+    </option>
+
+  </select>
+
+</div>
 
             <option value="">
               Choose Reason
