@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {doc,getDoc,collection,getDocs,query,where, addDoc,  serverTimestamp} from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
+
 import Link from "next/link";
 
 export default function ProductPage() {
 
-  const params = useParams();
+  const params = useParams();  const router = useRouter();
   const [product,setProduct] = useState<any>(null);
   const [relatedProducts,setRelatedProducts] = useState<any[]>([]);
   const [loading,setLoading] = useState(true);
@@ -412,6 +414,117 @@ async()=>{
     console.log(error);
 
   }
+
+};
+const startChat = async()=>{
+
+  const user = JSON.parse(
+
+    localStorage.getItem(
+      "user"
+    ) || "{}"
+
+  );
+
+  if(!user.email){
+
+    alert("Please Login First");
+
+    router.push("/login");
+
+    return;
+
+  }
+
+  const q = query(
+
+    collection(
+      db,
+      "chats"
+    ),
+
+    where(
+      "customerEmail",
+      "==",
+      user.email
+    ),
+
+    where(
+      "sellerId",
+      "==",
+      product.vendorId
+    )
+
+  );
+
+  const snapshot =
+    await getDocs(q);
+
+  if(!snapshot.empty){
+
+    router.push(
+
+      `/chat/${snapshot.docs[0].id}`
+
+    );
+
+    return;
+
+  }
+
+  const docRef =
+    await addDoc(
+
+      collection(
+        db,
+        "chats"
+      ),
+
+      {
+
+        customerEmail:
+          user.email,
+
+        customerName:
+          user.name,
+
+        sellerId:
+          product.vendorId,
+
+        sellerName:
+          product.vendorName,
+
+        sellerImage:"",
+
+        customerImage:"",
+
+        productId:
+          product.id,
+
+        productName:
+          product.name,
+
+        lastMessage:"",
+
+       customerUnread:0,
+
+      sellerUnread:0,
+
+        createdAt:
+          serverTimestamp(),
+
+        lastMessageAt:
+          serverTimestamp(),
+
+      }
+
+    );
+
+  router.push(
+
+    `/chat/${docRef.id}`
+
+  );
 
 };
   if(loading){
@@ -1087,6 +1200,25 @@ md:text-4xl
           >
             Buy Now
           </Link>
+          <button
+
+  onClick={startChat}
+
+  className="
+    w-full
+    mt-4
+    bg-indigo-600
+    text-white
+    py-4
+    rounded-2xl
+    font-bold
+  "
+
+>
+
+  💬 Chat With Seller
+
+</button>
 
           {/* HIGHLIGHTS */}
 

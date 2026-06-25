@@ -8,6 +8,7 @@ import {
   updateDoc,
   addDoc,
   doc,
+  Timestamp,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -117,6 +118,41 @@ export default function AdminRefundsPage() {
 
 );
 
+const refund:any = refunds.find(
+  (r:any)=>r.id===id
+);
+
+if(
+  status==="Refunded" &&
+  refund
+){
+
+  await addDoc(
+
+    collection(
+      db,
+      "rewardTransactions"
+    ),
+
+    {
+
+      userEmail:
+        refund.userEmail,
+
+      type:
+        "Refund",
+
+      points:
+        refund.refundAmount || 0,
+
+      createdAt:
+        Timestamp.now(),
+
+    }
+
+  );
+
+}
         setRefunds(
 
           refunds.map((item)=>

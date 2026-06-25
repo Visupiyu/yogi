@@ -570,9 +570,9 @@ if(rewardValue > 0){
     }
 
   );
-
+  
 }
-    const notifications =
+  const notifications =
   JSON.parse(
     localStorage.getItem(
       "notifications"

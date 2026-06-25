@@ -148,6 +148,23 @@ to-blue-700
 >
   AI Assistant
 </Link>
+<Link
+
+  href="/seller/chat"
+
+  className="
+    block
+    px-4
+    py-3
+    rounded-xl
+    hover:bg-white/20
+  "
+
+>
+
+  💬 Customer Chats
+
+</Link>
 
 <button
   onClick={()=>{
