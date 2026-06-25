@@ -1220,6 +1220,50 @@ md:text-4xl
 
 </button>
 
+<button
+
+  onClick={async()=>{
+
+    const url = window.location.href;
+
+    if(navigator.share){
+
+      await navigator.share({
+
+        title: product.name,
+
+        text: product.name,
+
+        url
+
+      });
+
+    }else{
+
+      navigator.clipboard.writeText(url);
+
+      alert("Product link copied.");
+
+    }
+
+  }}
+
+  className="
+    w-full
+    mt-4
+    bg-gray-700
+    text-white
+    py-4
+    rounded-2xl
+    font-bold
+  "
+
+>
+
+  🔗 Share Product
+
+</button>
+
           {/* HIGHLIGHTS */}
 
 <div className="mt-8">
