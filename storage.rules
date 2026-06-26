@@ -4,9 +4,16 @@ service firebase.storage {
 
   match /b/{bucket}/o {
 
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Public read for all uploaded files
     match /{allPaths=**} {
 
-      allow read, write: if true;
+      allow read: if true;
+
+      allow write: if signedIn();
 
     }
 
