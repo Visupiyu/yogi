@@ -162,15 +162,23 @@ setReviews(
       loadProduct();
     }
   },[params]);
-  const addToCart = ()=>{
+  const addToCart = () => {
+
+  console.log("Product:", product);
+
+  console.log("vendorId:", product.vendorId);
+
+  console.log("vendorName:", product.vendorName);
+
   const cart = JSON.parse(
-      localStorage.getItem(
-        "cart"
-      ) || "[]"
+    localStorage.getItem("cart") || "[]"
+  );
 
-    );
+  console.log("Cart Before:", cart);
 
-    const index = cart.findIndex(
+
+  // existing code...
+   const index = cart.findIndex(
 
       (item:any)=>
 
@@ -196,7 +204,11 @@ setReviews(
 
         stock:product.stock,
 
-        qty:1
+        qty:1,
+
+         vendorId: product.vendorId,
+
+         vendorName: product.vendorName,
 
       });
 
@@ -1200,6 +1212,60 @@ md:text-4xl
           >
             Buy Now
           </Link>
+
+          <div
+  className="
+    grid
+    grid-cols-2
+    gap-3
+    mt-4
+  "
+>
+
+  <Link href="/">
+
+    <button
+      className="
+        w-full
+        border-2
+        border-green-600
+        text-green-600
+        hover:bg-green-600
+        hover:text-white
+        py-4
+        rounded-2xl
+        font-bold
+        transition
+      "
+    >
+
+      ← Continue Shopping
+
+    </button>
+
+  </Link>
+
+  <Link href="/cart">
+
+    <button
+      className="
+        w-full
+        bg-green-600
+        hover:bg-green-700
+        text-white
+        py-4
+        rounded-2xl
+        font-bold
+      "
+    >
+
+      🛒 View Cart
+
+    </button>
+
+  </Link>
+
+</div>
           <button
 
   onClick={startChat}

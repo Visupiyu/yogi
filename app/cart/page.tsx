@@ -127,7 +127,7 @@ const [discount,setDiscount] =
   const applyCoupon = ()=>{
 
   if(
-    coupon === "YOGI100"
+    coupon === "TEST50"
   ){
 
     setDiscount(100);
@@ -439,47 +439,62 @@ const [discount,setDiscount] =
   )}
 
 </p>
-                <div className="
-  flex
-  gap-3
-  mt-5
-">
+ <div
+  className="
+    flex
+    flex-col
+    sm:flex-row
+    gap-3
+    mt-5
+  "
+>
 
-  <input
+ <input
 
-    type="text"
+  type="text"
 
-    placeholder="Coupon Code"
+  placeholder="Coupon Code"
 
-    value={coupon}
+  value={coupon}
 
-    onChange={(e)=>
-      setCoupon(
-        e.target.value
-      )
-    }
+  onChange={(e)=>
+    setCoupon(
+      e.target.value
+    )
+  }
 
-    className="
-      flex-1
-      border
-      p-3
-      rounded-xl
-    "
-  />
+  className="
+    flex-1
+    w-full
+    border
+    p-3
+    rounded-xl
+  "
+
+/>
 
   <button
 
-    onClick={applyCoupon}
+  onClick={applyCoupon}
 
-    className="
-      bg-black
-      text-white
-      px-5
-      rounded-xl
-    "
-  >
-    Apply
-  </button>
+  className="
+    w-full
+    sm:w-auto
+    bg-green-600
+    hover:bg-green-700
+    text-white
+    px-6
+    py-3
+    rounded-xl
+    font-semibold
+    whitespace-nowrap
+  "
+
+>
+
+  Apply
+
+</button>
 
 </div>
 
@@ -546,6 +561,30 @@ const [discount,setDiscount] =
     </span>
   </div>
 </div>
+
+<Link href="/">
+
+  <button
+    className="
+      w-full
+      mb-4
+      border-2
+      border-green-600
+      text-green-600
+      hover:bg-green-600
+      hover:text-white
+      py-3
+      rounded-xl
+      font-semibold
+      transition
+    "
+  >
+
+    ← Continue Shopping
+
+  </button>
+
+</Link>
 
               <button
                 onClick={proceedCheckout}
