@@ -45,148 +45,87 @@ to-blue-700
 
 </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
 
-          <Link
-            href="/seller"
-            className="block"
-          >
-            Dashboard
-          </Link>
+  <Link
+    href="/seller"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    Dashboard
+  </Link>
 
-          <Link
-            href="/seller/orders"
-            className="block"
-          >
-            Orders
-          </Link>
+  <Link
+    href="/seller/orders"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    Orders
+  </Link>
 
-          <Link
-            href="/seller/add-product"
-           className="
-  block
-  px-4
-  py-3
-  rounded-xl
-  hover:bg-white/20
-  transition
-"
-          >
-            Add Product
-          </Link>
+  <Link
+    href="/seller#add-product"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    Add Product
+  </Link>
 
-          <Link
-            href="/seller/products"
-            className="block"
-          >
-            Products
-          </Link>
+  <Link
+   href="/seller#products"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    Products
+  </Link>
 
-          <Link
-  href="/store"
-  className="
-    block
-    px-4
-    py-3
-    rounded-xl
-    hover:bg-white/20
-    transition
-  "
->
-  View Stores
-</Link>
+  <Link
+    href="/store"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    View Stores
+  </Link>
 
-<Link
-  href="/seller/questions"
-  className="
-    block
-    px-4
-    py-3
-    rounded-xl
-    hover:bg-white/20
-    transition
-  "
->
-  Questions
-</Link>
-<Link
-  href="/seller/analytics"
-  className="
-    block
-    px-4
-    py-3
-    rounded-xl
-    hover:bg-white/20
-    transition
-  "
->
-  Analytics
-</Link>
-<Link
-  href="/seller/reports"
-  className="
-    block
-    px-4
-    py-3
-    rounded-xl
-    hover:bg-white/20
-    transition
-  "
->
-  Reports
-</Link>
-<Link
-  href="/seller/assistant"
-  className="
-    block
-    px-4
-    py-3
-    rounded-xl
-    hover:bg-white/20
-    transition
-  "
->
-  AI Assistant
-</Link>
-<Link
+  <Link
+    href="/seller/questions"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    Questions
+  </Link>
 
-  href="/seller/chat"
+  <Link
+    href="/seller/analytics"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    Analytics
+  </Link>
 
-  className="
-    block
-    px-4
-    py-3
-    rounded-xl
-    hover:bg-white/20
-  "
+  <Link
+    href="/seller/reports"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    Reports
+  </Link>
 
->
+  <Link
+    href="/seller/assistant"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    AI Assistant
+  </Link>
 
-  💬 Customer Chats
+  <Link
+    href="/seller/chat"
+    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
+  >
+    💬 Customer Chats
+  </Link>
 
-</Link>
-
-<button
-  onClick={()=>{
-    localStorage.removeItem(
-      "vendor"
-    );
-
-    window.location.href =
-      "/vendor-login";
-  }}
-  className="
-    w-full
-    text-left
-    px-4
-    py-3
-    rounded-xl
-    hover:bg-red-500
-    transition
-  "
->
-  Logout
-</button>
+  <button
+    onClick={() => {
+      localStorage.removeItem("vendor");
+      window.location.href = "/vendor-login";
+    }}
+    className="w-full text-left whitespace-nowrap px-4 py-3 rounded-xl hover:bg-red-500 transition"
+  >
+    Logout
+  </button>
 
         </div>
 

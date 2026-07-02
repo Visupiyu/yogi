@@ -402,233 +402,503 @@ console.log("Vendor Orders Array:", vendorOrders);
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* HEADER */}
-      <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-6">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div>
-            <p className="text-sm uppercase tracking-wider opacity-80">
-              Yogi Mart Seller Dashboard
-            </p>
-            <h1 className="text-4xl font-bold">{vendorName}</h1>
-            <p className="opacity-90">Manage Products, Orders and Revenue</p>
-          </div>
 
-          <div className="flex gap-6">
-            <button
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() =>
-                document
-                  .getElementById("orders")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              Orders
-            </button>
-            <button
-              onClick={() =>
-                document
-                  .getElementById("products")
-                  ?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              Products
-            </button>
-            <button onClick={() => router.push("/seller/analytics")}>
-              Analytics
-            </button>
-            <button
-              onClick={async () => {
-                await signOut(auth);
-                localStorage.removeItem("vendor");
-                router.push("/vendor-login");
-              }}
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
+        {/* HEADER */}
 
-      <div className="max-w-7xl mx-auto p-8">
-        {/* STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-2xl font-bold mb-4">Total Products</h2>
-            <p className="text-5xl font-bold text-blue-600">{totalProducts}</p>
-          </div>
+       <div
+className="
+bg-gradient-to-r
+from-green-700
+via-teal-600
+to-blue-700
+text-white
+">
+<div className="
+flex
+items-center
+gap-3
+whitespace-nowrap
+">
+  <div className="
+w-64
+h-28
+flex
+items-center
+justify-center
+border-r
+border-white/20
+">
 
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-2xl font-bold mb-4">Total Orders</h2>
-            <p className="text-5xl font-bold text-green-600">{totalOrders}</p>
-          </div>
+<img
+src="/logo.png"
+className="h-42"
+/>
 
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-2xl font-bold mb-4">Pending Orders</h2>
-            <p className="text-5xl font-bold text-yellow-500">{pendingOrders}</p>
-          </div>
+</div>
 
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-2xl font-bold mb-4">Earnings</h2>
-            <p className="text-5xl font-bold text-pink-600">
-              ₹{earnings.toLocaleString("en-IN")}
-            </p>
-          </div>
+            <div>
 
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-2xl font-bold mb-4">Commission</h2>
-            <p className="text-4xl font-bold text-orange-600">
-              ₹{commissionPaid.toLocaleString("en-IN")}
-            </p>
-          </div>
+              <p className="
+        text-sm
+        uppercase
+        tracking-wider
+        opacity-80
+      ">
+                Yogi Mart Seller Dashboard
+              </p>
 
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-2xl font-bold mb-4">Net Earnings</h2>
-            <p className="text-4xl font-bold text-green-700">
-              ₹{netEarnings.toLocaleString("en-IN")}
-            </p>
-          </div>
-        </div>
+              <h1 className="
+        text-4xl
+        font-bold
+      ">
+                {vendorName}
+              </h1>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-xl font-bold mb-2">Total Views</h2>
-            <p className="text-4xl font-bold text-indigo-600">{totalViews}</p>
-          </div>
+              <p className="opacity-90">
+                Manage Products, Orders and Revenue
+              </p>
 
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-xl font-bold mb-2">Units Sold</h2>
-            <p className="text-4xl font-bold text-green-600">{totalSales}</p>
-          </div>
-
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-xl font-bold mb-2">Best Seller</h2>
-            <p className="text-xl font-bold text-orange-600">{bestSeller}</p>
-          </div>
-        </div>
-
-        {/* NOTIFICATIONS */}
-        <div className="bg-white rounded-2xl shadow p-8 mb-8">
-          <h2 className="text-2xl font-bold mb-5">Notifications</h2>
-          {notifications.length === 0 ? (
-            <p className="text-gray-500">No notifications</p>
-          ) : (
-            <div className="space-y-4">
-              {notifications.map((note) => (
-                <div key={note.id} className="border p-4 rounded-xl">
-                  <h3 className="font-bold">{note.title}</h3>
-                  <p>{note.message}</p>
-                </div>
-              ))}
             </div>
-          )}
+
+           </div>
+
         </div>
+       
+
+        {/* STATS */}
+
+       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
+
+  {/* Total Products */}
+  <div className="bg-white rounded-3xl shadow-md p-6 h-44">
+    <p className="text-gray-500">Total Products</p>
+    <h2 className="text-4xl font-bold text-blue-600 mt-4">
+      {totalProducts}
+    </h2>
+  </div>
+
+  {/* Total Orders */}
+  <div className="bg-white rounded-3xl shadow-md p-6 h-44">
+    <p className="text-gray-500">Total Orders</p>
+    <h2 className="text-4xl font-bold text-green-600 mt-4">
+      {totalOrders}
+    </h2>
+  </div>
+
+  {/* Pending Orders */}
+  <div className="bg-white rounded-3xl shadow-md p-6 h-44">
+    <p className="text-gray-500">Pending Orders</p>
+    <h2 className="text-4xl font-bold text-yellow-500 mt-4">
+      {pendingOrders}
+    </h2>
+  </div>
+
+  {/* Earnings */}
+  <div className="bg-white rounded-3xl shadow-md p-6 h-44">
+    <p className="text-gray-500">Earnings</p>
+    <h2 className="text-3xl font-bold text-pink-600 mt-4 break-all">
+      ₹{earnings.toLocaleString("en-IN")}
+    </h2>
+  </div>
+
+  {/* Commission */}
+  <div className="bg-white rounded-3xl shadow-md p-6 h-44">
+    <p className="text-gray-500">Commission</p>
+    <h2 className="text-3xl font-bold text-orange-600 mt-4 break-all">
+      ₹{commissionPaid.toLocaleString("en-IN")}
+    </h2>
+  </div>
+
+  {/* Net Earnings */}
+  <div className="bg-white rounded-3xl shadow-md p-6 h-44">
+    <p className="text-gray-500">Net Earnings</p>
+    <h2 className="text-3xl font-bold text-green-700 mt-4 break-all">
+      ₹{netEarnings.toLocaleString("en-IN")}
+    </h2>
+  </div>
+
+</div>
+
+        <div
+          className="
+    grid
+    grid-cols-1
+    md:grid-cols-3
+    gap-6
+    mb-10
+  "
+        >
+
+          <div className="
+    bg-white
+    p-8
+    rounded-2xl
+    shadow
+  ">
+            <h2 className="text-xl font-bold mb-2">
+              Total Views
+            </h2>
+
+            <p className="
+      text-4xl
+      font-bold
+      text-indigo-600
+    ">
+              {totalViews}
+            </p>
+          </div>
+
+          <div className="
+    bg-white
+    p-8
+    rounded-2xl
+    shadow
+  ">
+            <h2 className="text-xl font-bold mb-2">
+              Units Sold
+            </h2>
+
+            <p className="
+      text-4xl
+      font-bold
+      text-green-600
+    ">
+              {totalSales}
+            </p>
+          </div>
+
+          <div className="
+    bg-white
+    p-8
+    rounded-2xl
+    shadow
+  ">
+            <h2 className="text-xl font-bold mb-2">
+              Best Seller
+            </h2>
+
+            <p className="
+      text-xl
+      font-bold
+      text-orange-600
+    ">
+              {bestSeller}
+            </p>
+          </div>
+
+        </div>
+
+        <div
+          className="
+    bg-white
+    rounded-2xl
+    shadow
+    p-8
+    mb-8
+  "
+        >
+
+          <h2
+            className="
+      text-2xl
+      font-bold
+      mb-5
+    "
+          >
+            Notifications
+          </h2>
+
+          {notifications.length === 0 ? (
+
+            <p className="text-gray-500">
+              No notifications
+            </p>
+
+          ) : (
+
+            <div className="space-y-4">
+
+              {notifications.map(
+                (note) => (
+
+                  <div
+                    key={note.id}
+                    className="
+            border
+            p-4
+            rounded-xl
+          "
+                  >
+
+                    <h3 className="font-bold">
+                      {note.title}
+                    </h3>
+
+                    <p>
+                      {note.message}
+                    </p>
+
+                  </div>
+
+                ))}
+
+            </div>
+
+          )}
+
+        </div>
+
 
         {/* MAIN */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <div
+          className="
+            grid
+            grid-cols-1
+            lg:grid-cols-3
+            gap-8
+          "
+        >
+
           {/* FORM */}
-          <div className="bg-white p-8 rounded-2xl shadow">
+
+          <div
+  id="add-product"
+  className="
+    bg-white
+    p-8
+    rounded-2xl
+    shadow
+  "
+>
+
             <h2 className="text-3xl font-bold mb-8">
-              {editingId ? "Edit Product" : "Add Product"}
+
+              {editingId
+                ? "Edit Product"
+                : "Add Product"}
+
             </h2>
 
             <div className="space-y-5">
+
               <input
                 type="text"
                 placeholder="Product Name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full p-4 border rounded-xl"
+                onChange={(e) =>
+                  setName(e.target.value)
+                }
+                className="
+                  w-full
+                  p-4
+                  border
+                  rounded-xl
+                "
               />
+
               <input
                 type="number"
                 placeholder="Price"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="w-full p-4 border rounded-xl"
+                onChange={(e) =>
+                  setPrice(e.target.value)
+                }
+                className="
+                  w-full
+                  p-4
+                  border
+                  rounded-xl
+                "
               />
+
               <input
                 type="number"
                 placeholder="Stock"
                 value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                className="w-full p-4 border rounded-xl"
+                onChange={(e) =>
+                  setStock(e.target.value)
+                }
+                className="
+                  w-full
+                  p-4
+                  border
+                  rounded-xl
+                "
               />
               <input
-                type="text"
-                placeholder="Brand Name"
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="number"
-                placeholder="MRP"
-                value={mrp}
-                onChange={(e) => setMrp(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              >
-                <option>Men</option>
-                <option>Women</option>
-                <option>Kids</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="text"
-                placeholder="Material"
-                value={material}
-                onChange={(e) => setMaterial(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="text"
-                placeholder="Sizes (S,M,L,XL)"
-                value={sizes}
-                onChange={(e) => setSizes(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="text"
-                placeholder="Country Of Origin"
-                value={countryOfOrigin}
-                onChange={(e) => setCountryOfOrigin(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
+  type="text"
+  placeholder="Brand Name"
+  value={brand}
+  onChange={(e)=>
+    setBrand(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<input
+  type="number"
+  placeholder="MRP"
+  value={mrp}
+  onChange={(e)=>
+    setMrp(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<select
+  value={gender}
+  onChange={(e)=>
+    setGender(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+>
+  <option>Men</option>
+  <option>Women</option>
+  <option>Kids</option>
+</select>
+
+<input
+  type="text"
+  placeholder="Color"
+  value={color}
+  onChange={(e)=>
+    setColor(e.target.value)
+    
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<input
+  type="text"
+  placeholder="Material"
+  value={material}
+  onChange={(e)=>
+    setMaterial(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<input
+  type="text"
+  placeholder="Sizes (S,M,L,XL)"
+  value={sizes}
+  onChange={(e)=>
+    setSizes(e.target.value)
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
+
+<input
+  type="text"
+  placeholder="Country Of Origin"
+  value={countryOfOrigin}
+  onChange={(e)=>
+    setCountryOfOrigin(
+      e.target.value
+    )
+  }
+  className="
+    w-full
+    p-4
+    border
+    rounded-xl
+  "
+/>
               <textarea
                 placeholder="Product Description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full p-4 border rounded-2xl h-32"
+                onChange={(e) =>
+                  setDescription(
+                    e.target.value
+                  )
+                }
+                className="
+    w-full
+    p-4
+    border
+    rounded-2xl
+    h-32
+  "
               />
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-4 border rounded-xl"
+                onChange={(e) =>
+                  setCategory(e.target.value)
+                }
+                className="
+                  w-full
+                  p-4
+                  border
+                  rounded-xl
+                "
               >
-                <option>Grocery</option>
-                <option>Men Fashion</option>
-                <option>Women Fashion</option>
-                <option>Kids Fashion</option>
-                <option>Beauty</option>
-                <option>Electronics</option>
-                <option>Furniture</option>
-                <option>Mobiles</option>
-                <option>Appliances</option>
-                <option>Books</option>
+
+                <option>
+                  Grocery
+                </option>
+
+                <option>
+                 Men Fashion
+                </option>
+
+                 <option>
+                Women Fashion
+                </option>
+                 <option>
+                 Kids Fashion
+                </option>
+                 <option>
+                 Beauty
+                </option>
+                 <option>
+                 Electronics
+                </option>
+
+                <option>
+                 Furniture
+                </option>
+
+                <option>
+                  Mobiles
+                </option>
+                 <option>
+                 Appliances
+                </option>
+                 <option>
+                 Books
+                </option>
+
               </select>
 
               <input
@@ -636,218 +906,457 @@ console.log("Vendor Orders Array:", vendorOrders);
                 multiple
                 accept="image/*"
                 onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
+
+                  const files =
+                    Array.from(
+                      e.target.files || []
+                    );
+
                   if (files.length > 5) {
-                    alert("Maximum 5 images allowed");
+
+                    alert(
+                      "Maximum 5 images allowed"
+                    );
+
                     return;
+
                   }
+
                   setImageFiles(files);
-                  const previews = files.map((file) =>
-                    URL.createObjectURL(file)
-                  );
+
+                  const previews =
+                    files.map((file) =>
+
+                      URL.createObjectURL(file)
+
+                    );
+
                   setImages(previews);
+
                   setImage(previews[0] || "");
+
                 }}
-                className="w-full border p-4 rounded-xl"
+
+                className="
+    w-full
+    border
+    p-4
+    rounded-xl
+  "
               />
 
               <div className="grid grid-cols-5 gap-2">
+
                 {images.map((img, index) => (
+
                   <img
                     key={index}
                     src={img}
                     alt=""
-                    className="w-20 h-20 object-cover rounded-xl"
+                    className="
+        w-20
+        h-20
+        object-cover
+        rounded-xl
+      "
                   />
-                ))}
-              </div>
 
+                ))}
+
+              </div>
+               </div>
+              
               <button
-                onClick={addOrUpdateProduct}
+
+                onClick={
+                  addOrUpdateProduct
+                }
+
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:opacity-60 text-white py-4 rounded-xl text-lg font-semibold"
+
+                className="
+  w-full
+  bg-gradient-to-r
+  from-green-600
+  to-blue-600
+  hover:from-green-500
+  hover:to-blue-500
+  text-white
+  py-4
+  rounded-xl
+  text-lg
+  font-semibold
+"
               >
+
                 {loading
                   ? "Saving..."
                   : editingId
-                  ? "Update Product"
-                  : "Add Product"}
+                    ? "Update Product"
+                    : "Add Product"}
+
               </button>
+
             </div>
+          
+
           </div>
+          
+           
 
           {/* PRODUCTS */}
+
           <div
             id="products"
-            className="lg:col-span-2 bg-white p-8 rounded-2xl shadow"
+            className="
+              lg:col-span-2
+              bg-white
+              p-8
+              rounded-2xl
+              shadow
+            "
           >
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
+
+
+            <div className="
+  flex
+  flex-col
+  md:flex-row
+  md:justify-between
+  md:items-center
+  gap-4
+  mb-8
+">
+
               <h2 className="text-3xl font-bold">
                 Products ({products.length})
               </h2>
+
               <input
                 type="text"
                 placeholder="Search Products..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="border p-3 rounded-xl w-full md:w-72"
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                className="
+      border
+      p-3
+      rounded-xl
+      w-full
+      md:w-72
+    "
               />
+
             </div>
 
             <div className="space-y-6">
+
               {products.length === 0 && (
-                <div className="text-center py-10">
-                  <p className="text-gray-500 text-lg">No products added yet.</p>
+
+                <div className="
+    text-center
+    py-10
+  ">
+
+                  <p className="
+      text-gray-500
+      text-lg
+    ">
+                    No products added yet.
+                  </p>
+
                 </div>
+
               )}
 
               {products
-                .filter((product) => {
-                  if (!search.trim()) return true;
-                  return (product.name || "")
-                    .toLowerCase()
-                    .includes(search.toLowerCase());
-                })
-                .map((product) => (
+  .filter((product) => {
+
+    if (!search.trim()) {
+      return true;
+    }
+
+    console.log("orders state:", orders);
+
+    return (
+      product.name || ""
+    )
+      .toLowerCase()
+      .includes(
+        search.toLowerCase()
+      );
+
+  })
+  .map((product) => (
+
                   <div
+
                     key={product.id}
-                    className="flex items-center justify-between border-b pb-6"
+
+                    className="
+                    flex
+                    items-center
+                    justify-between
+                    border-b
+                    pb-6
+                  "
                   >
+
                     <div className="flex gap-5">
-                      <div className="flex gap-2">
-                        {(product.images || [product.image])
-                          .slice(0, 5)
-                          .map((img, index) => (
-                            <img
-                              key={index}
-                              src={img}
-                              alt=""
-                              className="w-16 h-16 object-cover rounded-lg"
-                            />
-                          ))}
-                      </div>
+
+                     <div className="flex gap-2">
+
+  {(product.images || [product.image])
+    .slice(0,5)
+    .map((img, index) => (
+
+      <img
+        key={index}
+        src={img}
+        alt=""
+        className="
+          w-16
+          h-16
+          object-cover
+          rounded-lg
+        "
+      />
+
+    ))}
+
+</div>
 
                       <div>
-                        <h3 className="text-2xl font-bold">{product.name}</h3>
+
+                        <h3 className="text-2xl font-bold">
+  {product.name}
+</h3>
+
                         <p className="text-lg">
-                          ₹{product.price?.toLocaleString("en-IN")}
+                          ₹{product.price}
                         </p>
+
                         <p className="text-sm text-gray-500">
                           {product.category}
                         </p>
-                        <p className="text-sm">Stock: {product.stock}</p>
 
-                        {product.stock > 0 && product.stock <= 5 && (
-                          <p className="text-red-500 font-semibold text-sm mt-1">
-                            Low Stock
-                          </p>
-                        )}
+                        <p className="text-sm">
+
+                          Stock:
+                          {" "}
+                          {product.stock}
+
+                        </p>
+
+                        {product.stock > 0 &&
+                          product.stock <= 5 && (
+
+                            <p
+                              className=" text-red-500
+                    font-semibold
+                   text-sm
+                    mt-1
+                     "
+                            >
+
+                              Low Stock
+
+                            </p>
+
+                          )}
                       </div>
+
                     </div>
 
                     <div className="flex gap-3">
+
                       <button
-                        onClick={() => editProduct(product)}
-                        className="bg-blue-600 text-white px-5 py-3 rounded-xl"
+
+                        onClick={() =>
+                          editProduct(product)
+                        }
+
+                        className="
+                        bg-blue-600
+                        text-white
+                        px-5
+                        py-3
+                        rounded-xl
+                      "
                       >
                         Edit
                       </button>
+
                       <button
-                        onClick={() => deleteProduct(product.id)}
-                        className="bg-red-500 text-white px-5 py-3 rounded-xl"
+
+                        onClick={() =>
+                          deleteProduct(product.id)
+                        }
+
+                        className="
+                        bg-red-500
+                        text-white
+                        px-5
+                        py-3
+                        rounded-xl
+                      "
                       >
                         Delete
                       </button>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
 
-        {/* ORDERS */}
-        <div id="orders" className="bg-white p-8 rounded-2xl shadow mt-10">
-          <h2 className="text-3xl font-bold mb-8">Recent Orders</h2>
+                    </div>
+
+                  </div>
+
+                ))}
+
+          
+
+          </div>   {/* End Products */}
+          </div>   {/* End MAIN Grid */}
+
+         {/* ORDERS */}
+
+        <div
+          id="orders"
+          className="
+            bg-white
+            p-8
+            rounded-2xl
+            shadow
+            mt-10
+          "
+        >
+
+          <h2 className="text-3xl font-bold mb-8">
+            Recent Orders
+          </h2>
 
           <div className="overflow-x-auto">
+
             <table className="w-full">
+
               <thead>
+
                 <tr className="border-b">
-                  <th className="text-left py-4">Order ID</th>
-                  <th className="text-left py-4">Customer</th>
-                  <th className="text-left py-4">Amount</th>
-                  <th className="text-left py-4">Status</th>
-                  <th className="text-left py-4">Date</th>
+
+                  <th className="text-left py-4">
+                    Order ID
+                  </th>
+
+                  <th className="text-left py-4">
+                    Customer
+                  </th>
+
+                  <th className="text-left py-4">
+                    Amount
+                  </th>
+
+                  <th className="text-left py-4">
+                    Status
+                  </th>
+
+                  <th className="text-left py-4">
+                    Date
+                  </th>
+
                 </tr>
+
               </thead>
-             <tbody>
 
-  {orders.length === 0 ? (
+              <tbody>
 
-    <tr>
-  <td
-    colSpan={5}
-    className="py-10 text-center text-gray-500"
-  >
-    No orders found.
-  </td>
-</tr>
+                {orders.map((order) => (
 
-  ) : ( orders.map((order) => (
-      <tr
-        key={order.id}
-        className="border-b"
-      >
-        <td className="py-5">
-          {order.id}
-        </td>
-        <td>
-          {order.customer}
-        </td>
-        <td>
-          ₹{order.amount?.toLocaleString("en-IN")}
-        </td>
-        <td>
-          <select
-            value={order.status}
-            onChange={(e) =>
-              updateOrderStatus(
-                order.id,
-                e.target.value
-              )
-            }
-            className="
-              border
-              p-2
-              rounded-lg
-            "
-          >
-            <option>Pending</option>
-            <option>Confirmed</option>
-            <option>Packed</option>
-            <option>Shipped</option>
-            <option>Delivered</option>
-            <option>Cancelled</option>
+                  <tr
+                    key={order.id}
+                    className="border-b"
+                  >
 
-          </select>
+                    <td className="py-5">
+                      {order.id}
+                    </td>
 
-        </td>
+                    <td>
+                      {order.customer}
+                    </td>
 
-        <td>
-          {order.date}
-        </td>
+                    <td>
+                      ₹{order.amount}
+                    </td>
 
-      </tr>
+                    <td>
 
-    ))
+                      <select
 
-  )}
+                        value={order.status}
 
-</tbody>
+                        onChange={(e) =>
+
+                          updateOrderStatus(
+
+                            order.id,
+                            e.target.value
+
+                          )
+
+                        }
+
+                        className="
+                          border
+                          p-2
+                          rounded-lg
+                        "
+                      >
+
+                        <option>
+                          Pending
+                        </option>
+
+                        <option>
+                          Confirmed
+                        </option>
+
+                        <option>
+                          Packed
+                        </option>
+
+                        <option>
+                          Shipped
+                        </option>
+
+                        <option>
+                          Delivered
+                        </option>
+
+                        <option>
+                          Cancelled
+                        </option>
+
+                      </select>
+
+                    </td>
+
+                    <td>
+                      {order.date}
+                    </td>
+
+                  </tr>
+
+                ))}
+
+              </tbody>
+
             </table>
+
           </div>
+
         </div>
+
       </div>
-    </div>
-  );
-}
+
+
+    );
+
+  }

@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import { getDoc } from "firebase/firestore";
 
 export default function AdminKYCPage() {
 
@@ -76,39 +77,39 @@ export default function AdminKYCPage() {
 
     try{
 
-      await updateDoc(
+    await updateDoc(
 
-        doc(
-          db,
-          "vendors",
-          id
-        ),
+  doc(
+    db,
+    "vendors",
+    id
+  ),
 
-        {
-          kycStatus:
-            status
+  {
+    kycStatus: status,
+    status: status,
+  }
+
+);
+
+     setVendors(
+
+  vendors.map(
+    (vendor)=>
+
+      vendor.id === id
+
+      ? {
+          ...vendor,
+          kycStatus: status,
+          status: status,
         }
 
-      );
+      : vendor
 
-      setVendors(
+  )
 
-        vendors.map(
-          (vendor)=>
-
-            vendor.id === id
-
-            ? {
-                ...vendor,
-                kycStatus:
-                  status
-              }
-
-            : vendor
-
-        )
-
-      );
+);
 
     }catch(error){
 

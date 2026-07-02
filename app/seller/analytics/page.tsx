@@ -507,6 +507,7 @@ const monthlyRevenue = [
       bg-gray-100
       p-6
     ">
+    
 
       <div className="
         max-w-7xl
@@ -535,257 +536,612 @@ const monthlyRevenue = [
           </p>
 
         </div>
-        <div className="
+         </div>
+         
+       <div className="
   grid
-  md:grid-cols-3
+  grid-cols-1
+  md:grid-cols-2
+  lg:grid-cols-3
   gap-6
   mb-8
 ">
 
-  <div className="
+
+  {/* Best Seller */}
+ <div
+  className="
     bg-white
-    rounded-3xl
-    p-6
-    shadow
-  ">
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
 
-    <p>Best Seller</p>
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+    🏆 
+  </div>
+<div>
 
-    <h2 className="
-      text-2xl
-      font-bold
-      mt-3
-    ">
-      {bestSellingProducts[0]?.name || "N/A"}
+    <p className="text-gray-500 text-lg">
+      Best Seller
+    </p>
+
+    <h2 className="text-4xl font-bold mt-2">
+      {bestSellingProducts[0]?.name}
     </h2>
 
+    <p className="text-gray-400 mt-1">
+      Awaiting dispatch
+    </p>
+
   </div>
-  <div className="
-  grid
-  md:grid-cols-4
-  gap-6
-  mb-8
-">
+   </div>
 
-  <div className="
+
+  {/* Pending Orders */}
+  <div
+  className="
     bg-white
-    rounded-3xl
-    p-6
-    shadow
-  ">
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
 
-    <p>Pending Orders</p>
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+    📦
+  </div>
 
-    <h2 className="
-      text-3xl
-      font-bold
-      mt-3
-      text-orange-600
-    ">
+  <div>
 
+    <p className="text-gray-500 text-lg">
+      Pending Orders
+    </p>
+
+    <h2 className="text-4xl font-bold mt-2">
       {pendingOrders}
-
     </h2>
 
+    <p className="text-gray-400 mt-1">
+     
+    </p>
+
+  </div>
+   </div>
+
+
+  {/* Low Stock */}
+ <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
+
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+    📉 
   </div>
 
-  <div className="
-    bg-white
-    rounded-3xl
-    p-6
-    shadow
-  ">
+  <div>
 
-    <p>Low Stock</p>
+    <p className="text-gray-500 text-lg">
+      Low Stock
+    </p>
 
-    <h2 className="
-      text-3xl
-      font-bold
-      mt-3
-      text-red-600
-    ">
-
-      {lowStockProducts}
-
+    <h2 className="text-4xl font-bold mt-2">
+    {lowStockProducts}
     </h2>
 
+    <p className="text-gray-400 mt-1">
+     
+    </p>
+
+  </div>
+   </div>
+
+
+  {/* Commission */}
+ <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
+
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+💸 
   </div>
 
-  <div className="
-    bg-white
-    rounded-3xl
-    p-6
-    shadow
-  ">
+  <div>
 
-    <p>Commission</p>
+    <p className="text-gray-500 text-lg">
+    Commission
+    </p>
 
-    <h2 className="
-      text-3xl
-      font-bold
-      mt-3
-    ">
-
-      ₹{totalCommission}
-
+    <h2 className="text-4xl font-bold mt-2">
+     ₹{totalCommission}
     </h2>
 
+    <p className="text-gray-400 mt-1">
+     
+    </p>
+
+  </div>
+   </div>
+
+
+
+  {/* Net Earnings */}
+ <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
+
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+   💵 
   </div>
 
-  <div className="
-    bg-white
-    rounded-3xl
-    p-6
-    shadow
-  ">
+  <div>
 
-    <p>Net Earnings</p>
+    <p className="text-gray-500 text-lg">
+     Net Earnings
+    </p>
 
-    <h2 className="
-      text-3xl
-      font-bold
-      mt-3
-      text-green-600
-    ">
-
+    <h2 className="text-4xl font-bold mt-2">
       ₹{netEarnings}
-
     </h2>
 
+    <p className="text-gray-400 mt-1">
+      
+    </p>
+
+  </div>
+   </div>
+
+    {/* Units Sold */}
+  <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
+
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+    🛒 
   </div>
 
-</div>
+  <div>
 
-  <div className="
-    bg-white
-    rounded-3xl
-    p-6
-    shadow
-  ">
+    <p className="text-gray-500 text-lg">
+      🛒 Units Sold
+    </p>
 
-    <p>Units Sold</p>
-
-    <h2 className="
-      text-3xl
-      font-bold
-      mt-3
-    ">
-      {bestSellingProducts[0]?.qty || 0}
+    <h2 className="text-4xl font-bold mt-2">
+      {bestSellingProducts[0]?.qty}
     </h2>
 
+    <p className="text-gray-400 mt-1">
+    
+    </p>
+
+  </div>
+   </div>
+
+
+  {/* Total Reviews */}
+  <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
+
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+   ⭐
   </div>
 
-  <div className="
-    bg-white
-    rounded-3xl
-    p-6
-    shadow
-  ">
+  <div>
 
-    <p>Total Reviews</p>
+    <p className="text-gray-500 text-lg">
+    Total Reviews
+    </p>
 
-    <h2 className="
-      text-3xl
-      font-bold
-      mt-3
-    ">
+    <h2 className="text-4xl font-bold mt-2">
       {reviews.length}
     </h2>
 
+    <p className="text-gray-400 mt-1">
+      
+    </p>
+
+  </div>
+   </div>
+  
+  <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
+
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+💰 
   </div>
 
-</div>
+  <div>
 
-        <div className="
-          grid
-          md:grid-cols-4
-          gap-6
-          mb-8
-        ">
+    <p className="text-gray-500 text-lg">
+  Total Revenue
+    </p>
 
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
+    <h2 className="text-4xl font-bold mt-2">
+     ₹{revenue}
+    </h2>
 
-            <p>Total Revenue</p>
+    <p className="text-gray-400 mt-1">
+      
+    </p>
 
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-3
-            ">
-              ₹{revenue}
-            </h2>
+  </div>
+   </div>
 
-          </div>
 
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
 
-            <p>Orders</p>
+          <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
 
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-3
-            ">
-              {totalOrders}
-            </h2>
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+  📋
+  </div>
 
-          </div>
+  <div>
 
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
+    <p className="text-gray-500 text-lg">
+     📋 Orders
+    </p>
 
-            <p>Products</p>
+    <h2 className="text-4xl font-bold mt-2">
+     {totalOrders}
+    </h2>
 
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-3
-            ">
-              {totalProducts}
-            </h2>
+    <p className="text-gray-400 mt-1">
+      Awaiting dispatch
+    </p>
 
-          </div>
+  </div>
+   </div>
 
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
+   <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
 
-            <p>Average Rating</p>
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+    📦 
+  </div>
 
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-3
-            ">
-              ⭐ {averageRating}
-            </h2>
+  <div>
 
-          </div>
+    <p className="text-gray-500 text-lg">
+      Products
 
-        </div>
+    </p>
 
-        <div className="
-          grid
-          lg:grid-cols-2
-          gap-8
-        ">
+    <h2 className="text-4xl font-bold mt-2">
+      {totalProducts}
+    </h2>
+
+    <p className="text-gray-400 mt-1">
+     </p>
+
+  </div>
+   </div>
+
+
+          <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
+
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+    ⭐ 
+  </div>
+
+  <div>
+
+    <p className="text-gray-500 text-lg">
+      Average Rating
+    </p>
+
+    <h2 className="text-4xl font-bold mt-2">
+      {averageRating}
+    </h2>
+
+    <p className="text-gray-400 mt-1">
+      </p>
+
+  </div>
+   </div>
+    <div
+  className="
+    bg-white
+    rounded-[28px]
+    shadow-lg
+    border
+    border-gray-100
+    p-8
+    min-h-[170px]
+    flex
+    items-center
+    gap-6
+  "
+>
+
+  <div
+    className="
+      w-20
+      h-20
+      rounded-3xl
+      bg-blue-100
+      flex
+      items-center
+      justify-center
+      text-4xl
+      flex-shrink-0
+    "
+  >
+    ⭐ 
+  </div>
+
+  <div>
+
+    <p className="text-gray-500 text-lg">
+      Average Rating
+    </p>
+
+    <h2 className="text-4xl font-bold mt-2">
+      {averageRating}
+    </h2>
+
+    <p className="text-gray-400 mt-1"> </p>
+
+  </div>
+   </div>
+   
+<div className="
+  bg-white
+  rounded-3xl
+  p-6
+  shadow
+  mt-8
+">
 
           <div className="
             bg-white
@@ -846,12 +1202,12 @@ const monthlyRevenue = [
             </ResponsiveContainer>
 
           </div>
+
           <div className="
-  bg-white
-  rounded-3xl
-  p-6
-  shadow
-  mt-8
+grid
+xl:grid-cols-2
+gap-8
+mb-8
 ">
 
   <h2 className="
@@ -979,11 +1335,12 @@ const monthlyRevenue = [
   </div>
 
 </div>
+</div>
+
 <div className="
-  grid
-  lg:grid-cols-3
-  gap-8
-  mt-8
+grid
+xl:grid-cols-3
+gap-8
 ">
 
   {/* Monthly Revenue */}
@@ -993,7 +1350,7 @@ const monthlyRevenue = [
     rounded-3xl
     p-6
     shadow
-    h-[380px]
+  min-h-[420px]
   ">
 
     <h2 className="
@@ -1038,7 +1395,7 @@ const monthlyRevenue = [
     rounded-3xl
     p-6
     shadow
-    h-[380px]
+    min-h-[420px]
   ">
 
     <h2 className="
@@ -1100,7 +1457,7 @@ const monthlyRevenue = [
     rounded-3xl
     p-6
     shadow
-    h-[380px]
+    min-h-[420px]
   ">
 
     <h2 className="
@@ -1162,7 +1519,7 @@ const monthlyRevenue = [
             rounded-3xl
             p-6
             shadow
-            h-[400px]
+            min-h-[420px]
           ">
 
             <h2 className="
@@ -1199,10 +1556,11 @@ const monthlyRevenue = [
 
         </div>
 
-      </div>
+ </div>
+    
+    
 
-    </div>
-
+    
   );
 
 }

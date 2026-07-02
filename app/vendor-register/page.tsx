@@ -876,6 +876,7 @@ to-blue-50 py-12 px-6">
 
             <input
               type="text"
+               name="ifsc"
               onChange={(e)=>{setFormData({...formData, ifsc: e.target.value.toUpperCase()
 
   });

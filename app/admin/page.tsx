@@ -38,6 +38,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
+import { getDoc } from "firebase/firestore";
 
 
 
@@ -58,6 +59,8 @@ type Vendor = {
   state:string;
 
   status:string;
+
+  kycStatus?: string;
 
 };
 
@@ -551,31 +554,49 @@ setNotifications(alerts);
 }
 
   /* REJECT */
-const approveVendor =
-async (
-  id:string
-)=>{
+const approveVendor = async (id: string) => {
 
   await updateDoc(
-
-    doc(
-      db,
-      "vendors",
-      id
-    ),
-
+    doc(db, "vendors", id),
     {
-
-      status:"Approved"
-
+      status: "Approved",
+      kycStatus: "Approved",
     }
-
   );
 
   loadVendors();
-
 };
 
+const updateKYC = async (
+  id: string,
+  status: string
+) => {
+
+  try {
+
+    console.log("KYC Button Clicked", id, status);
+
+    await updateDoc(
+      doc(db, "vendors", id),
+      {
+        kycStatus: status,
+      }
+    );
+
+    alert("KYC Updated");
+
+    await loadVendors();
+
+  } catch (error) {
+
+    console.log(error);
+
+    alert("KYC Update Failed");
+
+  }
+
+};
+ 
 useEffect(()=>{
 
 
@@ -639,7 +660,8 @@ async (
 
     {
 
-      status:"Rejected"
+      status:"Rejected",
+       kycStatus: "Rejected",
 
     }
 
@@ -915,18 +937,18 @@ to-blue-600
     src="/logo.png"
     alt="Yogi Mart"
     className="
-      w-16
-      h-16
+      w-24
+      h-30
       rounded-full
       bg-white
-      p-2
+      p-3
     "
   />
 
   <div>
 
     <h1 className="
-      text-4xl
+      text-6xl
       font-bold
     ">
       Yogi Mart
@@ -1065,7 +1087,7 @@ window.location.href =
             </h2>
 
             <p className="
-              text-5xl
+              text-3xl
               font-bold
               text-blue-600
             ">
@@ -1090,7 +1112,7 @@ window.location.href =
             </h2>
 
             <p className="
-              text-5xl
+              text-3xl
               font-bold
               text-green-600
             ">
@@ -1123,7 +1145,7 @@ window.location.href =
             </h2>
 
             <p className="
-              text-5xl
+              text-3xl
               font-bold
               text-pink-600
             ">
@@ -1148,7 +1170,7 @@ window.location.href =
   </h2>
 
   <p className="
-    text-5xl
+    text-3xl
     font-bold
     text-orange-600
   ">
@@ -1173,7 +1195,7 @@ window.location.href =
   </h2>
 
   <p className="
-    text-5xl
+    text-3xl
     font-bold
     text-yellow-600
   ">
@@ -1198,7 +1220,7 @@ window.location.href =
             </h2>
 
             <p className="
-              text-5xl
+              text-3xl
               font-bold
               text-green-600
             ">
@@ -1271,7 +1293,7 @@ window.location.href =
 />
 
   <p className="
-    text-5xl
+    text-3xl
     font-bold
     text-purple-600
   ">
@@ -1720,102 +1742,166 @@ window.location.href =
 
                 </div>
 
-                <div className="
-  flex
-  gap-4
-">
+  <div
+  className="
+    flex
+    gap-3
+    flex-wrap
+    items-center
+  "
+>
 
-  {vendor.status === "Pending" && (
+  {/* Vendor Status */}
+
+  {vendor.status === "Pending" ? (
 
     <>
-
       <button
-
-        onClick={()=>
-          approveVendor(
-            vendor.id
-          )
+        onClick={() =>
+          approveVendor(vendor.id)
         }
-
         className="
           bg-green-600
           text-white
-          px-6
-          py-3
-          rounded-xl
+          px-5
+          py-2
+          rounded-lg
         "
       >
-
-        Approve
-
+        Vendor Approve
       </button>
 
       <button
-
-        onClick={()=>
-          rejectVendor(
-            vendor.id
-          )
+        onClick={() =>
+          rejectVendor(vendor.id)
         }
-
         className="
-          bg-red-500
+          bg-red-600
           text-white
-          px-6
-          py-3
-          rounded-xl
+          px-5
+          py-2
+          rounded-lg
         "
       >
+        Vendor Reject
+      </button>
+    </>
 
-        Reject
+  ) : vendor.status === "Approved" ? (
 
+    <span
+      className="
+        bg-green-100
+        text-green-700
+        px-4
+        py-2
+        rounded-lg
+        font-semibold
+      "
+    >
+      ✅ Vendor Approved
+    </span>
+
+  ) : (
+
+    <span
+      className="
+        bg-red-100
+        text-red-700
+        px-4
+        py-2
+        rounded-lg
+        font-semibold
+      "
+    >
+      ❌ Vendor Rejected
+    </span>
+
+  )}
+
+  {/* KYC Status */}
+
+  {vendor.kycStatus === "Approved" ? (
+
+    <span
+      className="
+        bg-blue-100
+        text-blue-700
+        px-4
+        py-2
+        rounded-lg
+        font-semibold
+      "
+    >
+      ✅ KYC Approved
+    </span>
+
+  ) : vendor.kycStatus === "Rejected" ? (
+
+    <span
+      className="
+        bg-red-100
+        text-red-700
+        px-4
+        py-2
+        rounded-lg
+        font-semibold
+      "
+    >
+      ❌ KYC Rejected
+    </span>
+
+  ) : (
+
+    <>
+      <button
+        onClick={() =>
+          updateKYC(
+            vendor.id,
+            "Approved"
+          )
+        }
+        className="
+          bg-blue-600
+          text-white
+          px-4
+          py-2
+          rounded-lg
+        "
+      >
+        KYC Approve
       </button>
 
+      <button
+        onClick={() =>
+          updateKYC(
+            vendor.id,
+            "Rejected"
+          )
+        }
+        className="
+          bg-orange-600
+          text-white
+          px-4
+          py-2
+          rounded-lg
+        "
+      >
+        KYC Reject
+      </button>
     </>
 
   )}
 
-  {vendor.status ===
-    "Approved" && (
+               </div>
 
-    <span
-      className="
-        text-green-600
-        font-bold
-      "
-    >
+      </div>
 
-      Approved
-
-    </span>
-
-  )}
-
-  {vendor.status ===
-    "Rejected" && (
-
-    <span
-      className="
-        text-red-600
-        font-bold
-      "
-    >
-
-      Rejected
-
-    </span>
-
-  )}
-
-</div>
-
-              </div>
-
-            ))}
-
-          </div>
+  ))}
 
         </div>
+
+      </div>
 
         {/* PRODUCTS */}
 
