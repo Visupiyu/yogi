@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState }
-from "react";
-
+import { useEffect, useState } from "react";
 import {
   collection,
   getDocs,
@@ -10,2471 +8,824 @@ import {
   updateDoc,
   deleteDoc,
   doc,
-  setDoc
+  setDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import {
-
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer
-
+  ResponsiveContainer,
 } from "recharts";
-
-import { db }
-from "@/lib/firebase";
-
-import {
-  auth
-} from "@/lib/firebase";
-
-import {
-  useRouter
-} from "next/navigation";
-
-import {
-  query,
-  where,
-} from "firebase/firestore";
-import { getDoc } from "firebase/firestore";
-
-
+import { db, auth } from "@/lib/firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 type Vendor = {
-
-  id:string;
-
-  fullName:string;
-
-  businessName:string;
-
-  businessPhone:string;
-
-  businessType:string;
-
-  city:string;
-
-  state:string;
-
-  status:string;
-
+  id: string;
+  fullName: string;
+  businessName: string;
+  businessPhone: string;
+  businessType: string;
+  city: string;
+  state: string;
+  status: string;
   kycStatus?: string;
-
 };
 
 type Product = {
-
-  id:string;
-
-  name:string;
-
-  image:string;
-
-  price:number;
-
-  stock:number;
-
+  id: string;
+  name: string;
+  image: string;
+  price: number;
+  stock: number;
 };
 
 type Order = {
-
-  id:string;
-
-  customerName:string;
-
-  total:number;
-
-  status:string;
-
-  paymentMethod?:string;
-
+  id: string;
+  customerName: string;
+  total: number;
+  status: string;
+  paymentMethod?: string;
 };
 
 type Customer = {
-
-  id:string;
-
-  name?:string;
-
-  email?:string;
-
-  totalOrders?:number;
-
-  totalSpent?:number;
-
+  id: string;
+  name?: string;
+  email?: string;
+  totalOrders?: number;
+  totalSpent?: number;
 };
 
 type Coupon = {
-
-  id:string;
-
-  code:string;
-
-  type:string;
-
-  value:number;
-
-  expiry:string;
-
+  id: string;
+  code: string;
+  type: string;
+  value: number;
+  expiry: string;
 };
 
-export default function
-AdminPage(){
+const adminEmails = ["adminyogimart@gmail.com"];
 
-  const router =
-  useRouter();
-  const [vendors,setVendors] =
-    useState<Vendor[]>([]);
+export default function AdminPage() {
+  const router = useRouter();
 
-  const [products,setProducts] =
-    useState<Product[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [totalRevenue, setTotalRevenue] = useState(0);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
 
-  const [orders,setOrders] =
-    useState<Order[]>([]);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponType, setCouponType] = useState("percent");
+  const [couponValue, setCouponValue] = useState("");
+  const [couponExpiry, setCouponExpiry] = useState("");
 
-    const [customers,
-setCustomers] =
-  useState<Customer[]>([]);
+  const [notifications, setNotifications] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [vendorPayouts, setVendorPayouts] = useState<any[]>([]);
 
-  const [totalOrders,
-  setTotalOrders] =
-    useState(0);
+  const pendingOrders = orders.filter((o) => o.status === "Pending").length;
 
-  const [totalRevenue,
-  setTotalRevenue] =
-    useState(0);
+  const chartData = [
+    { name: "Products", value: products.length },
+    { name: "Orders", value: totalOrders },
+    { name: "Customers", value: customers.length },
+    { name: "Revenue", value: Math.floor(totalRevenue / 100) },
+  ];
 
-    const [coupons,
-setCoupons] =
-  useState<Coupon[]>([]);
-
-const [couponCode,
-setCouponCode] =
-  useState("");
-
-const [couponType,
-setCouponType] =
-  useState("percent");
-
-const [couponValue,
-setCouponValue] =
-  useState("");
-
-const [couponExpiry,
-setCouponExpiry] =
-  useState("");
-
-  const [notifications,
-setNotifications] =
-  useState<string[]>([]);
-
-  const [loading,setLoading] =
-    useState(true);
-
-    const [vendorSearch,setVendorSearch] =
-  useState("");
-
-  const [productSearch,setProductSearch] =
-  useState("");
-  const [customerSearch,setCustomerSearch] =
-  useState("");
-
-  const [unreadCount,setUnreadCount] =
-  useState(0);
-
-    const [vendorPayouts,
-setVendorPayouts] =
-  useState<any[]>([]);
-
-    const pendingOrders =
-  orders.filter(
-    order =>
-      order.status ===
-      "Pending"
-  ).length;
-
-    const adminEmails = [
-
-  "adminyogimart@gmail.com"
-
-];
-
-    const chartData = [
-
-  {
-    name:"Products",
-    value:products.length
-  },
-
-  {
-    name:"Orders",
-    value:totalOrders
-  },
-
-  {
-    name:"Customers",
-    value:customers.length
-  },
-
-  {
-    name:"Revenue",
-    value:Math.floor(
-      totalRevenue / 100
-    )
-  }
-
-];
-
-  async function loadVendors(){
-
-    const snapshot =
-      await getDocs(
-
-        collection(
-          db,
-          "vendors"
-        )
-
-      );
-
-    const items:Vendor[] = [];
-
-    snapshot.forEach((docItem)=>{
-
-      items.push({
-
-        id:docItem.id,
-
-        ...docItem.data()
-
-      } as Vendor);
-
+  async function loadVendors() {
+    const snapshot = await getDocs(collection(db, "vendors"));
+    const items: Vendor[] = [];
+    snapshot.forEach((docItem) => {
+      items.push({ id: docItem.id, ...docItem.data() } as Vendor);
     });
-
     setVendors(items);
-
+    return items;
   }
 
-  async function loadProducts(){
-
-    /* PRODUCTS */
-
-    const snapshot =
-      await getDocs(
-
-        collection(
-          db,
-          "products"
-        )
-
-      );
-
-    const items:Product[] = [];
-
-    snapshot.forEach((docItem)=>{
-
-      items.push({
-
-        id:docItem.id,
-
-        ...docItem.data()
-
-      } as Product);
-
+  async function loadProducts(vendorList: Vendor[] = []) {
+    const snapshot = await getDocs(collection(db, "products"));
+    const items: Product[] = [];
+    snapshot.forEach((docItem) => {
+      items.push({ id: docItem.id, ...docItem.data() } as Product);
     });
-
     setProducts(items);
 
-    /* ORDERS */
-
-    const ordersSnapshot =
-      await getDocs(
-
-        collection(
-          db,
-          "orders"
-        )
-
-      );
-
-    setTotalOrders(
-      ordersSnapshot.size
-    );
+    const ordersSnapshot = await getDocs(collection(db, "orders"));
+    setTotalOrders(ordersSnapshot.size);
 
     let revenue = 0;
+    const orderItems: Order[] = [];
+    const payouts: any = {};
+    const customerMap: any = {};
 
-    const orderItems:Order[] = [];
+    ordersSnapshot.forEach((docItem) => {
+      const order = docItem.data();
 
-    ordersSnapshot.forEach(
-      (docItem)=>{
+      if (order.items) {
+        order.items.forEach((item: any) => {
+          revenue += item.price * item.qty;
 
-        const order =
-          docItem.data();
-
-        if(order.items){
-
-          order.items.forEach(
-            (item:any)=>{
-
-              revenue +=
-
-                item.price *
-                item.qty;
-
-            }
-          );
-
-        }
-
-        orderItems.push({
-
-          id:docItem.id,
-
-          ...order
-
-        } as Order);
-
-      }
-    );
-
-    setTotalRevenue(
-      revenue
-    );
-
-    setOrders(orderItems);
-
-    const payouts:any = {};
-
-ordersSnapshot.forEach(
-  (docItem)=>{
-
-    const order =
-      docItem.data();
-
-    if(order.items){
-
-      order.items.forEach(
-        (item:any)=>{
-
-          const vendor =
-
-            item.vendorEmail ||
-            "Unknown";
-
-          if(
-            !payouts[vendor]
-          ){
-
-            payouts[vendor] = {
-
-              vendor,
-
-              orders:0,
-
-              sales:0,
-
-              commission:0,
-
-              payout:0
-
+          const vid = item.vendorId || "unknown";
+          if (!payouts[vid]) {
+            payouts[vid] = {
+              vendorId: vid,
+              vendorName: item.vendorName || "Unknown",
+              orders: 0,
+              sales: 0,
+              commission: 0,
+              payout: 0,
             };
-
           }
+          const amount = item.price * item.qty;
+          const commission = amount * 0.1;
+          payouts[vid].orders += 1;
+          payouts[vid].sales += amount;
+          payouts[vid].commission += commission;
+          payouts[vid].payout += amount - commission;
+        });
+      }
 
-          const amount =
+      const email = order.userEmail || "unknown";
+      if (!customerMap[email]) {
+        customerMap[email] = {
+          id: docItem.id,
+          email,
+          totalOrders: 0,
+          totalSpent: 0,
+        };
+      }
+      customerMap[email].totalOrders += 1;
+      customerMap[email].totalSpent += order.total || 0;
 
-            item.price *
-            item.qty;
+      orderItems.push({ id: docItem.id, ...order } as Order);
+    });
 
-          const commission =
+    setTotalRevenue(revenue);
+    setOrders(orderItems);
+    setVendorPayouts(Object.values(payouts));
+    setCustomers(Object.values(customerMap));
 
-            amount * 0.10;
+    const couponSnapshot = await getDocs(collection(db, "coupons"));
+    const couponItems: Coupon[] = [];
+    couponSnapshot.forEach((docItem) => {
+      couponItems.push({ id: docItem.id, ...docItem.data() } as Coupon);
+    });
+    setCoupons(couponItems);
 
-          payouts[vendor]
-            .orders += 1;
-
-          payouts[vendor]
-            .sales += amount;
-
-          payouts[vendor]
-            .commission +=
-              commission;
-
-          payouts[vendor]
-            .payout +=
-              amount -
-              commission;
-
-        }
-      );
-
-    }
-
-  }
-);
-
-setVendorPayouts(
-  Object.values(
-    payouts
-  )
-);
-
-    const customerMap:any = {};
-
-ordersSnapshot.forEach(
-  (docItem)=>{
-
-    const order =
-      docItem.data();
-
-    const email =
-      order.userEmail ||
-      "unknown";
-
-    if(!customerMap[email]){
-
-      customerMap[email] = {
-
-        id: docItem.id,
-
-        email,
-
-        totalOrders: 0,
-
-        totalSpent: 0,
-
-      };
-
-    }
-
-   customerMap[email]
-  .totalOrders += 1;
-
-customerMap[email]
-  .totalSpent +=
-
-  order.total || 0;
-
-});
-
-setCustomers(
-
-  Object.values(
-    customerMap
-  )
-
-);
-
-const couponSnapshot =
-  await getDocs(
-
-    collection(
-      db,
-      "coupons"
-    )
-
-  );
-
-const couponItems:Coupon[] =
-  [];
-
-couponSnapshot.forEach(
-  (docItem)=>{
-
-    couponItems.push({
-
-      id:docItem.id,
-
-      ...docItem.data()
-
-    } as Coupon);
-
-  }
-);
-
-setCoupons(couponItems);
-
-const alerts:string[] = [];
-
-/* LOW STOCK */
-
-items.forEach((product)=>{
-
-  if(product.stock < 5){
-
-    alerts.push(
-
-      `⚠️ Low stock:
-       ${product.name}`
-
-    );
-
+    // Notifications
+    const alerts: string[] = [];
+    items.forEach((product) => {
+      if (product.stock < 5) alerts.push(`⚠️ Low stock: ${product.name}`);
+    });
+    vendorList.forEach((vendor) => {
+      if (vendor.status === "Pending")
+        alerts.push(`🛒 Pending vendor: ${vendor.businessName}`);
+    });
+    if (ordersSnapshot.size > 0)
+      alerts.push(`📦 Total Orders: ${ordersSnapshot.size}`);
+    setNotifications(alerts);
   }
 
-});
-
-/* PENDING VENDORS */
-
-vendors.forEach((vendor)=>{
-
-  if(
-    vendor.status ===
-    "Pending"
-  ){
-
-    alerts.push(
-
-      `🛒 Pending vendor:
-       ${vendor.businessName}`
-
-    );
-
-  }
-
-});
-
-/* NEW ORDERS */
-
-if(
-  ordersSnapshot.size > 0
-){
-
-  alerts.push(
-
-    `📦 Total Orders:
-     ${ordersSnapshot.size}`
-
-  );
-
-}
-
-setNotifications(alerts);
-}
-
-  /* REJECT */
-const approveVendor = async (id: string) => {
-
-  await updateDoc(
-    doc(db, "vendors", id),
-    {
+  const approveVendor = async (id: string) => {
+    await updateDoc(doc(db, "vendors", id), {
       status: "Approved",
       kycStatus: "Approved",
+    });
+    loadVendors();
+  };
+
+  const rejectVendor = async (id: string) => {
+    await updateDoc(doc(db, "vendors", id), {
+      status: "Rejected",
+      kycStatus: "Rejected",
+    });
+    loadVendors();
+  };
+
+  const updateKYC = async (id: string, status: string) => {
+    try {
+      await updateDoc(doc(db, "vendors", id), { kycStatus: status });
+      alert("KYC Updated");
+      await loadVendors();
+    } catch (error) {
+      console.error(error);
+      alert("KYC Update Failed");
     }
-  );
+  };
 
-  loadVendors();
-};
-
-const updateKYC = async (
-  id: string,
-  status: string
-) => {
-
-  try {
-
-    console.log("KYC Button Clicked", id, status);
-
-    await updateDoc(
-      doc(db, "vendors", id),
-      {
-        kycStatus: status,
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push("/login");
+        return;
       }
-    );
+      if (!adminEmails.includes(user.email || "")) {
+        alert("Not Admin Account");
+        await signOut(auth);
+        router.push("/login");
+        return;
+      }
 
-    alert("KYC Updated");
+      const vendorList = await loadVendors();
+      await loadProducts(vendorList);
+      await loadUnreadNotifications();
+      setLoading(false);
+    });
 
-    await loadVendors();
+    return () => unsub();
+  }, []);
 
-  } catch (error) {
-
-    console.log(error);
-
-    alert("KYC Update Failed");
-
-  }
-
-};
- 
-useEffect(()=>{
-
-
-  async function init(){
-
-   const currentUser =
-  auth.currentUser;
-if(!currentUser){
-
-  router.push("/login");
-
-  return;
-
-}
-
-const user =
-  auth.currentUser;
-
-if(
-
-  !adminEmails.includes(
-    currentUser?.email || ""
-  )
-
-){
-
-  alert(
-    "Not Admin Account"
-  );
-
-  return;
-
-}
-
-    await loadVendors();
-
-    await loadProducts();
-
-    await loadUnreadNotifications();
-
-    setLoading(false);
-
-  }
-
-  init();
-
-},[]); 
-
-const rejectVendor =
-async (
-  id:string
-)=>{
-
-  await updateDoc(
-
-    doc(
-      db,
-      "vendors",
-      id
-    ),
-
-    {
-
-      status:"Rejected",
-       kycStatus: "Rejected",
-
-    }
-
-  );
-
-  loadVendors();
-
-};
-    /* DELETE PRODUCT */
-
-  const deleteProduct =
-  async (
-    id:string
-  )=>{
-
-    await deleteDoc(
-
-      doc(
-        db,
-        "products",
-        id
-      )
-
-    );
-
-    loadProducts();
-
+  const deleteProduct = async (id: string) => {
+    await deleteDoc(doc(db, "products", id));
+    loadProducts(vendors);
   };
 
-  const deleteCoupon =
-async (
-  id:string
-)=>{
+  const deleteCoupon = async (id: string) => {
+    await deleteDoc(doc(db, "coupons", id));
+    loadProducts(vendors);
+  };
 
-  await deleteDoc(
+  const createCoupon = async () => {
+    if (!couponCode || !couponValue || !couponExpiry) {
+      alert("Fill all coupon fields");
+      return;
+    }
 
-    doc(
-      db,
-      "coupons",
-      id
-    )
+    const today = new Date().toISOString().split("T")[0];
+    if (couponExpiry < today) {
+      alert("Coupon expiry invalid");
+      return;
+    }
 
-  );
-
-  loadProducts();
-
-};
-
-  const createCoupon =
-async()=>{
-
- if(
-
-  !couponCode ||
-  !couponValue ||
-  !couponExpiry
-
-){
-
-  alert(
-    "Fill all coupon fields"
-  );
-
-  return;
-
-}
-
-const today =
-
-  new Date()
-  .toISOString()
-  .split("T")[0];
-
-if(
-  couponExpiry < today
-){
-
-  alert(
-    "Coupon expiry invalid"
-  );
-
-  return;
-
-}
-
- 
-  await addDoc(
-
-    collection(
-      db,
-      "coupons"
-    ),
-
-    {
-
+    await addDoc(collection(db, "coupons"), {
       code: couponCode,
-
       type: couponType,
-
-      value:Number(
-        couponValue
-      ),
-
+      value: Number(couponValue),
       expiry: couponExpiry,
+    });
 
-    }
-
-  );
-
-  setCouponCode("");
-
-  setCouponValue("");
-
-  setCouponExpiry("");
-
-  loadProducts();
-
-};
-
-  /* UPDATE ORDER */
-
-  const updateOrderStatus =
-  async (
-    id:string,
-    status:string
-  )=>{
-
-    try{
-
-      await updateDoc(
-
-        doc(
-          db,
-          "orders",
-          id
-        ),
-
-        {
-
-          status
-
-        }
-
-      );
-
-      await loadProducts();
-
-    }catch(error){
-
-      console.log(error);
-
-    }
-
+    setCouponCode("");
+    setCouponValue("");
+    setCouponExpiry("");
+    loadProducts(vendors);
   };
 
-  const markVendorPaid =
-async (
-  vendorEmail:string,
-  amount:number
-)=>{
-
-  await setDoc(
-
-    doc(
-      db,
-      "vendor_payouts",
-      vendorEmail
-    ),
-
-    {
-
-      vendorEmail,
-
-      amount,
-
-      status:"Paid",
-
-      createdAt:
-        new Date(),
-
-      paidAt:
-        new Date()
-
+  const updateOrderStatus = async (id: string, status: string) => {
+    try {
+      await updateDoc(doc(db, "orders", id), { status });
+      await loadProducts(vendors);
+    } catch (error) {
+      console.error(error);
     }
+  };
 
-  );
+  const markVendorPaid = async (
+    vendorId: string,
+    vendorName: string,
+    amount: number
+  ) => {
+    await setDoc(doc(db, "vendor_payouts", vendorId), {
+      vendorId,
+      vendorName,
+      amount,
+      status: "Paid",
+      createdAt: new Date(),
+      paidAt: new Date(),
+    });
+    alert("Vendor marked paid");
+  };
 
-  alert(
-    "Vendor marked paid"
-  );
+  const loadUnreadNotifications = async () => {
+    try {
+      const snapshot = await getDocs(
+        query(collection(db, "notifications"), where("read", "==", false))
+      );
+      setUnreadCount(snapshot.size);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-};
+  const logout = async () => {
+    await signOut(auth);
+    localStorage.removeItem("user");
+    router.push("/login");
+  };
 
-const loadUnreadNotifications =
-async()=>{
-
-  try{
-
-    const q = query(
-
-      collection(
-        db,
-        "notifications"
-      ),
-
-      where(
-        "read",
-        "==",
-        false
-      )
-
-    );
-
-    const snapshot =
-      await getDocs(q);
-
-    setUnreadCount(
-      snapshot.size
-    );
-
-  }catch(error){
-
-    console.log(error);
-
-  }
-
-};
-
-  if(loading){
-
-    return(
-<div className="
-        p-10
-      ">
-        Loading Admin Dashboard...
-      </div>
-
-
-    );
-
+  if (loading) {
+    return <div className="p-10">Loading Admin Dashboard...</div>;
   }
 
   return (
-
-    <div className="
-      min-h-screen
-      bg-gray-100
-    ">
-
+    <div className="min-h-screen bg-gray-100">
       {/* HEADER */}
+      <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-5 flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <img
+            src="/logo.png"
+            alt="Yogi Mart"
+            className="w-24 h-24 rounded-full bg-white p-3"
+          />
+          <div>
+            <h1 className="text-5xl font-bold">Yogi Mart</h1>
+            <p>👑 Admin Dashboard</p>
 
-      <div className="
-      bg-gradient-to-r
-from-green-600
-to-blue-600
-        text-white
-        px-8
-        py-5
-        flex
-        justify-between
-        items-center
-      ">
-
-        <div>
-
-          <div className="
-  flex
-  items-center
-  gap-4
-">
-
-  <img
-    src="/logo.png"
-    alt="Yogi Mart"
-    className="
-      w-24
-      h-30
-      rounded-full
-      bg-white
-      p-3
-    "
-  />
-
-  <div>
-
-    <h1 className="
-      text-6xl
-      font-bold
-    ">
-      Yogi Mart
-    </h1>
-
-    <p>
-      👑 Admin Dashboard
-    </p>
-
-    <div className="
-  mt-4
-">
-
-  <button
-
-    onClick={()=>
-
-      router.push(
-        "/admin/notifications"
-      )
-
-    }
-
-    className="
-      relative
-      bg-white
-      text-black
-      px-5
-      py-3
-      rounded-full
-      font-bold
-      shadow
-    "
-  >
-
-    🔔 Notifications
-
-    {unreadCount > 0 && (
-
-      <span
-        className="
-          absolute
-          -top-2
-          -right-2
-          bg-red-600
-          text-white
-          text-xs
-          px-2
-          py-1
-          rounded-full
-        "
-      >
-
-        {unreadCount}
-
-      </span>
-
-    )}
-
-  </button>
-
-</div>
-
-  </div>
-
-</div>
-
-<button
-
-  onClick={async()=>{
-
-    const {
-      signOut
-    } = await import(
-      "firebase/auth"
-    );
-
-    await signOut(auth);
-
-localStorage.removeItem(
-  "user"
-);
-
-window.location.href =
-  "/login";
-
-  }}
-
-  className="
-    mt-4
-    bg-red-500
-    px-6
-    py-3
-    rounded-xl
-    font-semibold
-  "
->
-
-  Logout
-
-</button>
-
+            <div className="mt-4">
+              <button
+                onClick={() => router.push("/admin/notifications")}
+                className="relative bg-white text-black px-5 py-3 rounded-full font-bold shadow"
+              >
+                🔔 Notifications
+                {unreadCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
+        <button
+          onClick={logout}
+          className="bg-red-500 px-6 py-3 rounded-xl font-semibold"
+        >
+          Logout
+        </button>
       </div>
 
-      <div className="
-        max-w-7xl
-        mx-auto
-        p-8
-      ">
-
+      <div className="max-w-7xl mx-auto p-8">
         {/* STATS */}
-
-        <div className="
-          grid
-          grid-cols-1
-          md:grid-cols-6
-          gap-5
-          mb-10
-        ">
-
-          <div className="
-            bg-white
-            p-8
-            rounded-2xl
-            shadow
-          ">
-
-            <h2 className="
-              text-2xl
-              font-bold
-              mb-4
-            ">
-              Total Vendors
-            </h2>
-
-            <p className="
-              text-3xl
-              font-bold
-              text-blue-600
-            ">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-5 mb-10">
+          <div className="bg-white p-8 rounded-2xl shadow">
+            <h2 className="text-2xl font-bold mb-4">Total Vendors</h2>
+            <p className="text-3xl font-bold text-blue-600">
               {vendors.length}
             </p>
-
           </div>
 
-          <div className="
-            bg-white
-            p-8
-            rounded-2xl
-            shadow
-          ">
-
-            <h2 className="
-              text-2xl
-              font-bold
-              mb-4
-            ">
-              Approved Vendors
-            </h2>
-
-            <p className="
-              text-3xl
-              font-bold
-              text-green-600
-            ">
-
-              {
-                vendors.filter(
-                  (v)=>
-                    v.status ===
-                    "Approved"
-                ).length
-              }
-
+          <div className="bg-white p-8 rounded-2xl shadow">
+            <h2 className="text-2xl font-bold mb-4">Approved Vendors</h2>
+            <p className="text-3xl font-bold text-green-600">
+              {vendors.filter((v) => v.status === "Approved").length}
             </p>
-
           </div>
 
-          <div className="
-            bg-white
-            p-8
-            rounded-2xl
-            shadow
-          ">
-
-            <h2 className="
-              text-2xl
-              font-bold
-              mb-4
-            ">
-              Total Products
-            </h2>
-
-            <p className="
-              text-3xl
-              font-bold
-              text-pink-600
-            ">
+          <div className="bg-white p-8 rounded-2xl shadow">
+            <h2 className="text-2xl font-bold mb-4">Total Products</h2>
+            <p className="text-3xl font-bold text-pink-600">
               {products.length}
             </p>
-
           </div>
 
-          <div className="
-  bg-white
-  p-8
-  rounded-2xl
-  shadow
-">
+          <div className="bg-white p-8 rounded-2xl shadow">
+            <h2 className="text-2xl font-bold mb-4">Total Orders</h2>
+            <p className="text-3xl font-bold text-orange-600">{totalOrders}</p>
+          </div>
 
-  <h2 className="
-    text-2xl
-    font-bold
-    mb-4
-  ">
-    Total Orders
-  </h2>
-
-  <p className="
-    text-3xl
-    font-bold
-    text-orange-600
-  ">
-    {totalOrders}
-  </p>
-
-</div>
-
-<div className="
-  bg-white
-  p-8
-  rounded-2xl
-  shadow
-">
-
-  <h2 className="
-    text-2xl
-    font-bold
-    mb-4
-  ">
-    Pending Orders
-  </h2>
-
-  <p className="
-    text-3xl
-    font-bold
-    text-yellow-600
-  ">
-    {pendingOrders}
-  </p>
-
-</div>
-            
-          <div className="
-            bg-white
-            p-8
-            rounded-2xl
-            shadow
-          ">
-
-            <h2 className="
-              text-2xl
-              font-bold
-              mb-4
-            ">
-              Revenue
-            </h2>
-
-            <p className="
-              text-3xl
-              font-bold
-              text-green-600
-            ">
-              ₹{totalRevenue}
+          <div className="bg-white p-8 rounded-2xl shadow">
+            <h2 className="text-2xl font-bold mb-4">Pending Orders</h2>
+            <p className="text-3xl font-bold text-yellow-600">
+              {pendingOrders}
             </p>
-
           </div>
-          <div className="
-  bg-white
-  p-8
-  rounded-2xl
-  shadow
-">
 
-  <h2 className="
-    text-2xl
-    font-bold
-    mb-4
-  ">
-    Customers
-  </h2>
-
-  <div
-  onClick={() =>
-    router.push(
-      "/admin/refunds"
-    )
-  }
-  className="
-    bg-white
-    p-6
-    rounded-2xl
-    shadow
-    cursor-pointer
-    hover:shadow-lg
-  "
->
-
-  <h2 className="
-    text-2xl
-    font-bold
-  ">
-    Refunds
-  </h2>
-
-  <p className="
-    text-gray-500
-  ">
-    Manage refund requests
-  </p>
-
-</div>
-
-  <input
-  type="text"
-  placeholder="Search Customer Email..."
-  value={customerSearch}
-  onChange={(e)=>
-    setCustomerSearch(
-      e.target.value
-    )
-  }
-  className="
-    border
-    p-4
-    rounded-xl
-    w-full
-    mb-6
-  "
-/>
-
-  <p className="
-    text-3xl
-    font-bold
-    text-purple-600
-  ">
-    {customers.length}
-  </p>
-
-</div>
-
-</div>
-
-    
-{/* NOTIFICATIONS */}
-
-<div className="
-  bg-white
-  rounded-2xl
-  shadow
-  p-8
-  mb-10
-">
-
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-8
-  ">
-    Notifications
-  </h2>
-
-  <div className="
-    space-y-4
-  ">
-
-    {notifications.length === 0 && (
-
-      <p>
-        No Notifications
-      </p>
-
-    )}
-
-    {notifications.map(
-      (
-        item,
-        index
-      )=>(
-
-      <div
-
-        key={index}
-
-        className="
-          bg-gray-100
-          p-4
-          rounded-xl
-        "
-      >
-
-        {item}
-
-      </div>
-
-    ))}
-
-  </div>
-
-</div>
-{/* ANALYTICS CHART */}
-
-<div className="
-  bg-white
-  rounded-2xl
-  shadow
-  p-8
-  mb-10
-">
-
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-8
-  ">
-    Marketplace Analytics
-  </h2>
-
-  <p className="
-  text-gray-500
-  mb-6
-">
-  Real-time marketplace performance overview
-</p>
-
-  <div className="
-    w-full
-    h-[400px]
-     min-w-0
-  ">
-
-    <ResponsiveContainer
-      width="99%"
-  height={400}
-    >
-
-      <BarChart
-        data={chartData}
-      >
-
-        <XAxis
-          dataKey="name"
-        />
-
-        <YAxis />
-
-        <Tooltip />
-
-        <Bar
-          dataKey="value"
-        />
-
-      </BarChart>
-
-    </ResponsiveContainer>
-
-  </div>
-
-</div>
-
-{/* COUPONS */}
-
-<div className="
-  bg-white
-  rounded-2xl
-  shadow
-  p-8
-  mb-10
-">
-
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-8
-  ">
-    Coupon Management
-  </h2>
-
-  <div className="
-    grid
-    grid-cols-1
-    md:grid-cols-4
-    gap-4
-    mb-8
-  ">
-
-    <input
-      type="text"
-      placeholder="Coupon Code"
-      value={couponCode}
-      onChange={(e)=>
-        setCouponCode(
-          e.target.value
-        )
-      }
-      className="
-        border
-        p-4
-        rounded-xl
-      "
-    />
-
-    <select
-      value={couponType}
-      onChange={(e)=>
-        setCouponType(
-          e.target.value
-        )
-      }
-      className="
-        border
-        p-4
-        rounded-xl
-      "
-    >
-
-      <option value="percent">
-        Percentage
-      </option>
-
-      <option value="flat">
-        Flat
-      </option>
-
-    </select>
-
-    <input
-      type="number"
-      placeholder="Value"
-      value={couponValue}
-      onChange={(e)=>
-        setCouponValue(
-          e.target.value
-        )
-      }
-      className="
-        border
-        p-4
-        rounded-xl
-      "
-    />
-
-    <input
-      type="date"
-      value={couponExpiry}
-      onChange={(e)=>
-        setCouponExpiry(
-          e.target.value
-        )
-      }
-      className="
-        border
-        p-4
-        rounded-xl
-      "
-    />
-
-  </div>
-
-  <button
-
-    onClick={createCoupon}
-
-    className="
-  bg-gradient-to-r
-  from-green-600
-  to-blue-600
-  text-white
-  px-8
-  py-4
-  rounded-xl
-  mb-10
-"
-  >
-    Create Coupon
-  </button>
-
-  <div className="
-    overflow-x-auto
-  ">
-
-    <table className="
-      w-full
-    ">
-
-      <thead>
-
-        <tr className="
-          border-b
-        ">
-
-          <th className="
-            text-left
-            py-4
-          ">
-            Code
-          </th>
-
-          <th className="
-            text-left
-            py-4
-          ">
-            Type
-          </th>
-
-          <th className="
-            text-left
-            py-4
-          ">
-            Value
-          </th>
-
-          <th className="
-            text-left
-            py-4
-          ">
-            Expiry
-          </th>
-
-          <th className="
-            text-left
-            py-4
-          ">
-            Action
-          </th>
-
-        </tr>
-
-      </thead>
-
-      <tbody>
-
-        {coupons.map((coupon)=>(
-
-          <tr
-            key={coupon.id}
-            className="
-              border-b
-            "
+          <div className="bg-white p-8 rounded-2xl shadow">
+            <h2 className="text-2xl font-bold mb-4">Revenue</h2>
+            <p className="text-3xl font-bold text-green-600">
+              ₹{totalRevenue.toLocaleString("en-IN")}
+            </p>
+          </div>
+
+          <div className="bg-white p-8 rounded-2xl shadow">
+            <h2 className="text-2xl font-bold mb-4">Customers</h2>
+            <p className="text-3xl font-bold text-purple-600">
+              {customers.length}
+            </p>
+          </div>
+
+          <div
+            onClick={() => router.push("/admin/refunds")}
+            className="bg-white p-8 rounded-2xl shadow cursor-pointer hover:shadow-lg"
           >
+            <h2 className="text-2xl font-bold mb-4">Refunds</h2>
+            <p className="text-gray-500">Manage refund requests</p>
+          </div>
+        </div>
 
-            <td className="
-              py-5
-            ">
-              {coupon.code}
-            </td>
+        {/* NOTIFICATIONS */}
+        <div className="bg-white rounded-2xl shadow p-8 mb-10">
+          <h2 className="text-3xl font-bold mb-8">Notifications</h2>
+          <div className="space-y-4">
+            {notifications.length === 0 && <p>No Notifications</p>}
+            {notifications.map((item, index) => (
+              <div key={index} className="bg-gray-100 p-4 rounded-xl">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
 
-            <td>
-              {coupon.type}
-            </td>
+        {/* ANALYTICS CHART */}
+        <div className="bg-white rounded-2xl shadow p-8 mb-10">
+          <h2 className="text-3xl font-bold mb-8">Marketplace Analytics</h2>
+          <p className="text-gray-500 mb-6">
+            Real-time marketplace performance overview
+          </p>
+          <div className="w-full h-[400px] min-w-0">
+            <ResponsiveContainer width="99%" height={400}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
-            <td>
-              {coupon.value}
-            </td>
+        {/* COUPONS */}
+        <div className="bg-white rounded-2xl shadow p-8 mb-10">
+          <h2 className="text-3xl font-bold mb-8">Coupon Management</h2>
 
-            <td>
-              {coupon.expiry}
-            </td>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <input
+              type="text"
+              placeholder="Coupon Code"
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+              className="border p-4 rounded-xl"
+            />
+            <select
+              value={couponType}
+              onChange={(e) => setCouponType(e.target.value)}
+              className="border p-4 rounded-xl"
+            >
+              <option value="percent">Percentage</option>
+              <option value="flat">Flat</option>
+            </select>
+            <input
+              type="number"
+              placeholder="Value"
+              value={couponValue}
+              onChange={(e) => setCouponValue(e.target.value)}
+              className="border p-4 rounded-xl"
+            />
+            <input
+              type="date"
+              value={couponExpiry}
+              onChange={(e) => setCouponExpiry(e.target.value)}
+              className="border p-4 rounded-xl"
+            />
+          </div>
 
-            <td>
+          <button
+            onClick={createCoupon}
+            className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-4 rounded-xl mb-10"
+          >
+            Create Coupon
+          </button>
 
-              <button
-
-                onClick={()=>
-                  deleteCoupon(
-                    coupon.id
-                  )
-                }
-
-                className="
-                  bg-red-500
-                  text-white
-                  px-5
-                  py-2
-                  rounded-lg
-                "
-              >
-                Delete
-              </button>
-
-            </td>
-
-          </tr>
-
-        ))}
-
-      </tbody>
-
-    </table>
-
-  </div>
-
-</div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-4">Code</th>
+                  <th className="text-left py-4">Type</th>
+                  <th className="text-left py-4">Value</th>
+                  <th className="text-left py-4">Expiry</th>
+                  <th className="text-left py-4">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coupons.map((coupon) => (
+                  <tr key={coupon.id} className="border-b">
+                    <td className="py-5">{coupon.code}</td>
+                    <td>{coupon.type}</td>
+                    <td>{coupon.value}</td>
+                    <td>{coupon.expiry}</td>
+                    <td>
+                      <button
+                        onClick={() => deleteCoupon(coupon.id)}
+                        className="bg-red-500 text-white px-5 py-2 rounded-lg"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         {/* VENDORS */}
-
-        <div className="
-          bg-white
-          rounded-2xl
-          shadow
-          p-8
-          mb-10
-        ">
-
-          <h2 className="
-            text-3xl
-            font-bold
-            mb-8
-          ">
-            Vendor Approvals
-          </h2>
+        <div className="bg-white rounded-2xl shadow p-8 mb-10">
+          <h2 className="text-3xl font-bold mb-8">Vendor Approvals</h2>
 
           <input
-  type="text"
-  placeholder="Search Vendor..."
-  value={vendorSearch}
-  onChange={(e)=>
-    setVendorSearch(
-      e.target.value
-    )
-  }
-  className="
-    border
-    p-4
-    rounded-xl
-    w-full
-    mb-6
-  "
-/>
+            type="text"
+            placeholder="Search Vendor..."
+            value={vendorSearch}
+            onChange={(e) => setVendorSearch(e.target.value)}
+            className="border p-4 rounded-xl w-full mb-6"
+          />
 
-          <div className="
-            space-y-6
-          ">
-
-           {vendors
-  .filter((vendor)=>
-
-    vendor.businessName
-      .toLowerCase()
-      .includes(
-        vendorSearch
-          .toLowerCase()
-      )
-
-  )
-  .map((vendor)=>(
-
-              <div
-                key={vendor.id}
-                className="
-                  border-b
-                  pb-6
-                  flex
-                  flex-col
-                  lg:flex-row
-                  lg:justify-between
-                  gap-6
-                "
-              >
-
-                <div>
-
-                  <h3 className="
-                    text-2xl
-                    font-bold
-                  ">
-                    {vendor.businessName}
-                  </h3>
-
-                  <p>
-                    {vendor.fullName}
-                  </p>
-
-                  <p>
-                    {vendor.city},
-                    {" "}
-                    {vendor.state}
-                  </p>
-
-                </div>
-
-  <div
-  className="
-    flex
-    gap-3
-    flex-wrap
-    items-center
-  "
->
-
-  {/* Vendor Status */}
-
-  {vendor.status === "Pending" ? (
-
-    <>
-      <button
-        onClick={() =>
-          approveVendor(vendor.id)
-        }
-        className="
-          bg-green-600
-          text-white
-          px-5
-          py-2
-          rounded-lg
-        "
-      >
-        Vendor Approve
-      </button>
-
-      <button
-        onClick={() =>
-          rejectVendor(vendor.id)
-        }
-        className="
-          bg-red-600
-          text-white
-          px-5
-          py-2
-          rounded-lg
-        "
-      >
-        Vendor Reject
-      </button>
-    </>
-
-  ) : vendor.status === "Approved" ? (
-
-    <span
-      className="
-        bg-green-100
-        text-green-700
-        px-4
-        py-2
-        rounded-lg
-        font-semibold
-      "
-    >
-      ✅ Vendor Approved
-    </span>
-
-  ) : (
-
-    <span
-      className="
-        bg-red-100
-        text-red-700
-        px-4
-        py-2
-        rounded-lg
-        font-semibold
-      "
-    >
-      ❌ Vendor Rejected
-    </span>
-
-  )}
-
-  {/* KYC Status */}
-
-  {vendor.kycStatus === "Approved" ? (
-
-    <span
-      className="
-        bg-blue-100
-        text-blue-700
-        px-4
-        py-2
-        rounded-lg
-        font-semibold
-      "
-    >
-      ✅ KYC Approved
-    </span>
-
-  ) : vendor.kycStatus === "Rejected" ? (
-
-    <span
-      className="
-        bg-red-100
-        text-red-700
-        px-4
-        py-2
-        rounded-lg
-        font-semibold
-      "
-    >
-      ❌ KYC Rejected
-    </span>
-
-  ) : (
-
-    <>
-      <button
-        onClick={() =>
-          updateKYC(
-            vendor.id,
-            "Approved"
-          )
-        }
-        className="
-          bg-blue-600
-          text-white
-          px-4
-          py-2
-          rounded-lg
-        "
-      >
-        KYC Approve
-      </button>
-
-      <button
-        onClick={() =>
-          updateKYC(
-            vendor.id,
-            "Rejected"
-          )
-        }
-        className="
-          bg-orange-600
-          text-white
-          px-4
-          py-2
-          rounded-lg
-        "
-      >
-        KYC Reject
-      </button>
-    </>
-
-  )}
-
-               </div>
-
-      </div>
-
-  ))}
-
-        </div>
-
-      </div>
-
-        {/* PRODUCTS */}
-
-        <div className="
-          bg-white
-          rounded-2xl
-          shadow
-          p-8
-          mb-10
-        ">
-
-          <h2 className="
-            text-3xl
-            font-bold
-            mb-8
-          ">
-            Marketplace Products
-          </h2>
-
-          <input
-  type="text"
-  placeholder="Search Product..."
-  value={productSearch}
-  onChange={(e)=>
-    setProductSearch(
-      e.target.value
-    )
-  }
-  className="
-    border
-    p-4
-    rounded-xl
-    w-full
-    mb-6
-  "
-/>
-
-          <div className="
-            space-y-6
-          ">
-
-           {products
-  .filter((product)=>
-
-    product.name
-      .toLowerCase()
-      .includes(
-        productSearch
-          .toLowerCase()
-      )
-
-  )
-  .map((product)=>(
-
-              <div
-                key={product.id}
-                className="
-                  flex
-                  justify-between
-                  items-center
-                  border-b
-                  pb-6
-                "
-              >
-
-                <div className="
-                  flex
-                  gap-5
-                ">
-
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="
-                      w-24
-                      h-24
-                      object-cover
-                      rounded-xl
-                    "
-                  />
-
+          <div className="space-y-6">
+            {vendors
+              .filter((vendor) =>
+                vendor.businessName
+                  .toLowerCase()
+                  .includes(vendorSearch.toLowerCase())
+              )
+              .map((vendor) => (
+                <div
+                  key={vendor.id}
+                  className="border-b pb-6 flex flex-col lg:flex-row lg:justify-between gap-6"
+                >
                   <div>
-
-                    <h3 className="
-                      text-2xl
-                      font-bold
-                    ">
-                      {product.name}
+                    <h3 className="text-2xl font-bold">
+                      {vendor.businessName}
                     </h3>
-
+                    <p>{vendor.fullName}</p>
                     <p>
-                      ₹{product.price}
+                      {vendor.city}, {vendor.state}
                     </p>
-
-                    <p>
-  Views:
-  {(product as any).views || 0}
-</p>
-
-<p>
-  Sales:
-  {(product as any).sales || 0}
-</p>
-
-                    <div
-  className={`font-semibold ${
-    product.stock <= 5
-      ? "text-red-500"
-      : "text-green-600"
-  }`}
->
-  Stock: {product.stock}
-</div>
-
                   </div>
 
+                  <div className="flex gap-3 flex-wrap items-center">
+                    {/* Vendor Status */}
+                    {vendor.status === "Pending" ? (
+                      <>
+                        <button
+                          onClick={() => approveVendor(vendor.id)}
+                          className="bg-green-600 text-white px-5 py-2 rounded-lg"
+                        >
+                          Vendor Approve
+                        </button>
+                        <button
+                          onClick={() => rejectVendor(vendor.id)}
+                          className="bg-red-600 text-white px-5 py-2 rounded-lg"
+                        >
+                          Vendor Reject
+                        </button>
+                      </>
+                    ) : vendor.status === "Approved" ? (
+                      <span className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold">
+                        ✅ Vendor Approved
+                      </span>
+                    ) : (
+                      <span className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold">
+                        ❌ Vendor Rejected
+                      </span>
+                    )}
+
+                    {/* KYC Status */}
+                    {vendor.kycStatus === "Approved" ? (
+                      <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-semibold">
+                        ✅ KYC Approved
+                      </span>
+                    ) : vendor.kycStatus === "Rejected" ? (
+                      <span className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold">
+                        ❌ KYC Rejected
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => updateKYC(vendor.id, "Approved")}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                        >
+                          KYC Approve
+                        </button>
+                        <button
+                          onClick={() => updateKYC(vendor.id, "Rejected")}
+                          className="bg-orange-600 text-white px-4 py-2 rounded-lg"
+                        >
+                          KYC Reject
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-
-                <button
-                  onClick={()=>{
-
-  const confirmDelete =
-
-    confirm(
-      "Delete product?"
-    );
-
-  if(confirmDelete){
-
-    deleteProduct(
-      product.id
-    );
-
-  }
-
-}}
-  
-                  className="
-                    bg-red-500
-                    text-white
-                    px-6
-                    py-3
-                    rounded-xl
-                  "
-                >
-                  Remove
-                </button>
-
-              </div>
-
-            ))}
-
+              ))}
           </div>
-
         </div>
 
-        <div className="
-  bg-white
-  rounded-2xl
-  shadow
-  p-8
-  mb-10
-">
+        {/* PRODUCTS */}
+        <div className="bg-white rounded-2xl shadow p-8 mb-10">
+          <h2 className="text-3xl font-bold mb-8">Marketplace Products</h2>
 
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-8
-  ">
-    Vendor Payout Report
-  </h2>
+          <input
+            type="text"
+            placeholder="Search Product..."
+            value={productSearch}
+            onChange={(e) => setProductSearch(e.target.value)}
+            className="border p-4 rounded-xl w-full mb-6"
+          />
 
-  <table className="
-    w-full
-  ">
-
-    <thead>
-
-      <tr>
-
-        <th>Vendor</th>
-
-        <th>Orders</th>
-
-        <th>Sales</th>
-
-        <th>Commission</th>
-
-      <th>Payout</th>
-      <th>Status</th>
-      <th>Action</th>
-
-      </tr>
-
-    </thead>
-
-    <tbody>
-
-      {vendorPayouts.map(
-        (vendor:any)=>(
-
-        <tr
-          key={vendor.vendor}
-          className="
-            border-b
-          "
-        >
-
-          <td>
-            {vendor.vendor}
-          </td>
-
-          <td>
-            {vendor.orders}
-          </td>
-
-          <td>
-            ₹{vendor.sales}
-          </td>
-
-          <td>
-            ₹{
-              Math.round(
-                vendor.commission
+          <div className="space-y-6">
+            {products
+              .filter((product) =>
+                product.name
+                  .toLowerCase()
+                  .includes(productSearch.toLowerCase())
               )
-            }
-          </td>
+              .map((product) => (
+                <div
+                  key={product.id}
+                  className="flex justify-between items-center border-b pb-6"
+                >
+                  <div className="flex gap-5">
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-24 h-24 object-cover rounded-xl"
+                    />
+                    <div>
+                      <h3 className="text-2xl font-bold">{product.name}</h3>
+                      <p>₹{product.price?.toLocaleString("en-IN")}</p>
+                      <p>Views: {(product as any).views || 0}</p>
+                      <p>Sales: {(product as any).sales || 0}</p>
+                      <div
+                        className={`font-semibold ${
+                          product.stock <= 5
+                            ? "text-red-500"
+                            : "text-green-600"
+                        }`}
+                      >
+                        Stock: {product.stock}
+                      </div>
+                    </div>
+                  </div>
 
-          <td className="
-  text-green-600
-  font-bold
-">
-  ₹{
-    Math.round(
-      vendor.payout
-    )
-  }
-</td>
+                  <button
+                    onClick={() => {
+                      if (confirm("Delete product?")) deleteProduct(product.id);
+                    }}
+                    className="bg-red-500 text-white px-6 py-3 rounded-xl"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+          </div>
+        </div>
 
-<td>
-  Pending
-</td>
+        {/* VENDOR PAYOUT REPORT */}
+        <div className="bg-white rounded-2xl shadow p-8 mb-10">
+          <h2 className="text-3xl font-bold mb-8">Vendor Payout Report</h2>
 
-<td>
-
-  <button
-
-    onClick={()=>
-
-      markVendorPaid(
-
-        vendor.vendor,
-
-        Math.round(
-          vendor.payout
-        )
-
-      )
-
-    }
-
-    className="
-      bg-green-600
-      text-white
-      px-4
-      py-2
-      rounded-lg
-    "
-  >
-
-    Mark Paid
-
-  </button>
-
-</td>
-
-</tr>
-
-      ))}
-
-    </tbody>
-
-  </table>
-
-</div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-4">Vendor</th>
+                  <th className="py-4">Orders</th>
+                  <th className="py-4">Sales</th>
+                  <th className="py-4">Commission</th>
+                  <th className="py-4">Payout</th>
+                  <th className="py-4">Status</th>
+                  <th className="py-4">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorPayouts.map((vendor: any) => (
+                  <tr key={vendor.vendorId} className="border-b">
+                    <td className="py-4">{vendor.vendorName}</td>
+                    <td>{vendor.orders}</td>
+                    <td>₹{Math.round(vendor.sales).toLocaleString("en-IN")}</td>
+                    <td>
+                      ₹{Math.round(vendor.commission).toLocaleString("en-IN")}
+                    </td>
+                    <td className="text-green-600 font-bold">
+                      ₹{Math.round(vendor.payout).toLocaleString("en-IN")}
+                    </td>
+                    <td>Pending</td>
+                    <td>
+                      <button
+                        onClick={() =>
+                          markVendorPaid(
+                            vendor.vendorId,
+                            vendor.vendorName,
+                            Math.round(vendor.payout)
+                          )
+                        }
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg"
+                      >
+                        Mark Paid
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         {/* ORDERS */}
+        <div className="bg-white rounded-2xl shadow p-8 mb-10">
+          <h2 className="text-3xl font-bold mb-8">Marketplace Orders</h2>
 
-        <div className="
-          bg-white
-          rounded-2xl
-          shadow
-          p-8
-        ">
-
-          <h2 className="
-            text-3xl
-            font-bold
-            mb-8
-          ">
-            Marketplace Orders
-          </h2>
-
-          <div className="
-            overflow-x-auto
-          ">
-
-            <table className="
-              w-full
-            ">
-
+          <div className="overflow-x-auto">
+            <table className="w-full">
               <thead>
-
-                <tr className="
-                  border-b
-                ">
-
-                  <th className="
-                    text-left
-                    py-4
-                  ">
-                    Order
-                  </th>
-
-                  <th className="
-                    text-left
-                    py-4
-                  ">
-                    Customer
-                  </th>
-
-                  <th className="
-                    text-left
-                    py-4
-                  ">
-                    Amount
-                  </th>
-
-                  <th className="
-                    text-left
-                    py-4
-                  ">
-                    Payment
-                  </th>
-
-                  <th className="
-                    text-left
-                    py-4
-                  ">
-                    Status
-                  </th>
-
+                <tr className="border-b">
+                  <th className="text-left py-4">Order</th>
+                  <th className="text-left py-4">Customer</th>
+                  <th className="text-left py-4">Amount</th>
+                  <th className="text-left py-4">Payment</th>
+                  <th className="text-left py-4">Status</th>
                 </tr>
-
               </thead>
-
               <tbody>
-
-                {orders.map((order)=>(
-
-                  <tr
-                    key={order.id}
-                    className="
-                      border-b
-                    "
-                  >
-
-                    <td className="
-                      py-5
-                    ">
-                      #
-                      {order.id.slice(0,6)}
-                    </td>
-
+                {orders.map((order) => (
+                  <tr key={order.id} className="border-b">
+                    <td className="py-5">#{order.id.slice(0, 6)}</td>
+                    <td>{order.customerName}</td>
+                    <td>₹{order.total?.toLocaleString("en-IN")}</td>
+                    <td>{order.paymentMethod || "COD"}</td>
                     <td>
-                      {order.customerName}
-                    </td>
-
-                    <td>
-                      ₹{order.total}
-                    </td>
-
-                    <td>
-                      {order.paymentMethod ||
-                       "COD"}
-                    </td>
-
-                    <td>
-
                       <select
-
-  value={order.status}
-
-  onChange={(e:any)=>{
-
-    updateOrderStatus(
-
-       order.id,
-
-      e.target.value
-
-    );
-
-  }}
-
-  className={`
-    border
-    p-2
-    rounded-lg
-
-    ${
-      order.status ===
-      "Delivered"
-
-      ? "bg-green-100"
-
-      : order.status ===
-        "Pending"
-
-      ? "bg-yellow-100"
-
-      : "bg-blue-100"
-    }
-  `}
->
-
-                        <option>
-                          Pending
-                        </option>
-
-                        <option>
-                        Confirmed
-                        </option>
-
-                          <option>
-                           Packed
-                          </option>
-
-                        <option>
-                          Shipped
-                        </option>
-
-                        <option>
-                          Out For Delivery
-                        </option>
-
-                        <option>
-                          Delivered
-                        </option>
-
+                        value={order.status}
+                        onChange={(e) =>
+                          updateOrderStatus(order.id, e.target.value)
+                        }
+                        className={`border p-2 rounded-lg ${
+                          order.status === "Delivered"
+                            ? "bg-green-100"
+                            : order.status === "Pending"
+                            ? "bg-yellow-100"
+                            : "bg-blue-100"
+                        }`}
+                      >
+                        <option>Pending</option>
+                        <option>Confirmed</option>
+                        <option>Packed</option>
+                        <option>Shipped</option>
+                        <option>Out For Delivery</option>
+                        <option>Delivered</option>
                       </select>
-
                     </td>
-
                   </tr>
-
                 ))}
-
               </tbody>
-
             </table>
-
-            {/* CUSTOMERS */}
-
-<div className="
-  bg-white
-  rounded-2xl
-  shadow
-  p-8
-  mt-10
-">
-
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-8
-  ">
-    Customers
-  </h2>
-
-  <div className="
-    overflow-x-auto
-  ">
-
-    <table className="
-      w-full
-    ">
-
-      <thead>
-
-        <tr className="
-          border-b
-        ">
-
-          <th className="
-            text-left
-            py-4
-          ">
-            Email
-          </th>
-
-          <th className="
-            text-left
-            py-4
-          ">
-            Orders
-          </th>
-
-          <th className="
-            text-left
-            py-4
-          ">
-            Total Spending
-          </th>
-
-        </tr>
-
-      </thead>
-
-      <tbody>
-
-       {customers
-  .filter((customer)=>
-
-    (customer.email || "")
-      .toLowerCase()
-      .includes(
-        customerSearch
-          .toLowerCase()
-      )
-
-  )
-  .map((customer)=>(
-          <tr
-            key={customer.id}
-            className="
-              border-b
-            "
-          >
-
-            <td className="
-              py-5
-            ">
-              {customer.email}
-            </td>
-
-            <td>
-              {customer.totalOrders}
-            </td>
-
-            <td>
-              ₹{customer.totalSpent}
-            </td>
-
-          </tr>
-
-        ))}
-
-      </tbody>
-
-    </table>
-
-  </div>
-
-</div>
-
           </div>
-
         </div>
 
+        {/* CUSTOMERS */}
+        <div className="bg-white rounded-2xl shadow p-8">
+          <h2 className="text-3xl font-bold mb-8">Customers</h2>
+
+          <input
+            type="text"
+            placeholder="Search Customer Email..."
+            value={customerSearch}
+            onChange={(e) => setCustomerSearch(e.target.value)}
+            className="border p-4 rounded-xl w-full mb-6"
+          />
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-4">Email</th>
+                  <th className="text-left py-4">Orders</th>
+                  <th className="text-left py-4">Total Spending</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers
+                  .filter((customer) =>
+                    (customer.email || "")
+                      .toLowerCase()
+                      .includes(customerSearch.toLowerCase())
+                  )
+                  .map((customer) => (
+                    <tr key={customer.id} className="border-b">
+                      <td className="py-5">{customer.email}</td>
+                      <td>{customer.totalOrders}</td>
+                      <td>
+                        ₹{(customer.totalSpent || 0).toLocaleString("en-IN")}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
-
     </div>
-
   );
 }
