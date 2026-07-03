@@ -28,7 +28,7 @@ to-blue-700
     src="/logo.png"
     alt="Yogi Mart"
     className="
-      w-16
+      w-72
       mx-auto
       mb-3
     "
