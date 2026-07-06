@@ -1,220 +1,88 @@
 "use client";
 
-import { useState }
-from "react";
+import { useState } from "react";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase";
 
-import {
-  signInWithEmailAndPassword
-} from "firebase/auth";
+const adminEmails = ["adminyogimart@gmail.com"];
 
-import {
-  useRouter
-} from "next/navigation";
+export default function AdminLoginPage() {
+  const router = useRouter();
 
-import {
-  auth
-} from "@/lib/firebase";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-export default function
-AdminLoginPage(){
-
-  const router =
-    useRouter();
-
-  const [email,setEmail] =
-    useState("");
-
-  const [password,
-  setPassword] =
-    useState("");
-
-  const [loading,
-  setLoading] =
-    useState(false);
-
-  const handleLogin =
-async()=>{
-
-  if(
-    !email ||
-    !password
-  ){
-
-    alert(
-      "Fill all fields"
-    );
-
-    return;
-
-  }
-
-  try{
-
-    setLoading(true);
-
-    const result =
-      await signInWithEmailAndPassword(
-
-        auth,
-
-        email,
-
-        password
-
-      );
-
-    const adminEmails = [
-
-      "adminyogimart@gmail.com"
-
-    ];
-
-    if(
-
-      !adminEmails.includes(
-        result.user.email || ""
-      )
-
-    ){
-
-      alert(
-        "Not Admin Account"
-      );
-
+  const handleLogin = async () => {
+    if (!email || !password) {
+      alert("Fill all fields");
       return;
-
     }
 
-    router.push("/admin");
+    try {
+      setLoading(true);
 
-  }catch(error:any){
+      const result = await signInWithEmailAndPassword(
+        auth,
+        email.trim().toLowerCase(),
+        password
+      );
 
-    alert(
-      error.message
-    );
+      const userEmail = (result.user.email || "").toLowerCase();
 
-  }finally{
+      if (!adminEmails.includes(userEmail)) {
+        await signOut(auth);
+        alert("Not Admin Account");
+        return;
+      }
 
-    setLoading(false);
-
-  }
-
-};
+      router.push("/admin");
+    } catch (error: any) {
+      if (error.code === "auth/invalid-credential") {
+        alert("Invalid email or password");
+      } else {
+        alert(error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-
-    <div className="
-      min-h-screen
-      flex
-      items-center
-      justify-center
-      bg-gray-100
-      p-6
-    ">
-
-      <div className="
-        bg-white
-        w-full
-        max-w-md
-        rounded-3xl
-        shadow-xl
-        p-10
-      ">
-
-        <h1 className="
-          text-4xl
-          font-bold
-          mb-3
-          text-center
-        ">
-          👑 Admin Login
-        </h1>
-
-        <p className="
-          text-gray-500
-          text-center
-          mb-10
-        ">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+      <div className="bg-white w-full max-w-md rounded-3xl shadow-xl p-10">
+        <h1 className="text-4xl font-bold mb-3 text-center">👑 Admin Login</h1>
+        <p className="text-gray-500 text-center mb-10">
           Yogi Mart Admin Panel
         </p>
 
-        <div className="
-          space-y-5
-        ">
-
+        <div className="space-y-5">
           <input
             type="email"
             placeholder="Admin Email"
             value={email}
-            onChange={(e)=>
-              setEmail(
-                e.target.value
-              )
-            }
-            className="
-              w-full
-              border
-              p-4
-              rounded-xl
-            "
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border p-4 rounded-xl"
           />
 
           <input
             type="password"
             placeholder="Password"
             value={password}
-            onChange={(e)=>
-              setPassword(
-                e.target.value
-              )
-            }
-            className="
-              w-full
-              border
-              p-4
-              rounded-xl
-            "
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border p-4 rounded-xl"
           />
 
           <button
-
             onClick={handleLogin}
-
             disabled={loading}
-
-            className="
-              w-full
-              bg-black
-              text-white
-              p-4
-              rounded-xl
-              text-lg
-              font-bold
-            "
+            className="w-full bg-black disabled:opacity-60 text-white p-4 rounded-xl text-lg font-bold"
           >
-
-            {
-
-              loading
-
-              ?
-
-              "Logging in..."
-
-              :
-
-              "Login"
-
-            }
-
+            {loading ? "Logging in..." : "Login"}
           </button>
-
         </div>
-
       </div>
-
     </div>
-
   );
-
 }
