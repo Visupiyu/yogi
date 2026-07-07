@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   addDoc,
   collection,
@@ -27,8 +28,11 @@ export default function ChatRoomPage() {
   const [message, setMessage] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview,setPreview] = useState("");
+  useEffect(() => { return () => { if (preview) { URL.revokeObjectURL(preview); } };
+}, [preview]);
   const clearImage = () => {setImageFile(null); setPreview(""); };
   const [messages, setMessages] = useState<any[]>([]);
+  const [sending, setSending] = useState(false);
 
   const uploadImage = async () => {
     if (!imageFile) return "";
@@ -72,6 +76,8 @@ export default function ChatRoomPage() {
   }, [id, router]);
 
   const sendMessage = async () => {
+    if (sending) return;
+    setSending(true);
     if (!message.trim() && !imageFile) return;
 
     const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -93,8 +99,10 @@ export default function ChatRoomPage() {
       sellerUnread: increment(1),
     });
 
-    setMessage("");
-    setImageFile(null);
+   setMessage("");
+setImageFile(null);
+setPreview("");
+setSending(false);
   };
 
  return (
@@ -104,8 +112,9 @@ export default function ChatRoomPage() {
         <div className="flex items-center gap-4">
           <img
             src="/avatar.png"
-            alt=""
-            className="w-14 h-14 rounded-full border-2 border-white"
+            alt="Seller"
+             width={56} height={56}
+            className="rounded-full border-2 border-white"
           />
           <div>
             <h1 className="text-2xl font-bold">Seller Chat</h1>
@@ -137,7 +146,8 @@ export default function ChatRoomPage() {
                 <img
                   src={msg.image}
                   alt="Chat Image"
-                  className="w-56 rounded-xl mb-3 object-cover"
+                  width={224} height={224}
+                  className="rounded-xl mb-3 object-cover"
                 />
               )}
 
@@ -163,8 +173,8 @@ export default function ChatRoomPage() {
           <div className="mb-3 relative w-20">
             <img
               src={preview}
-              alt=""
-              className="w-20 h-20 rounded-xl object-cover"
+              alt="Preview" width={80} height={80}
+              className="rounded-xl object-cover"
             />
             <button
               onClick={clearImage}
@@ -223,10 +233,10 @@ export default function ChatRoomPage() {
 </label>
 
           <button
-            onClick={sendMessage}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-8 rounded-xl font-semibold transition"
+            onClick={sendMessage}  disabled={sending}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 rounded-xl font-semibold transition"
           >
-           📤 Send
+     {sending ? "Sending..." : "📤 Send"}
           </button>
         </div>
       </div>

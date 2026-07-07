@@ -216,34 +216,45 @@ export default function ProductPage() {
       return;
     }
 
-    const snapshot = await getDocs(
-      query(
-        collection(db, "chats"),
-        where("customerEmail", "==", user.email),
-        where("sellerId", "==", product.vendorId)
-      )
-    );
+   const snapshot = await getDocs(
+  query(
+    collection(db, "chats"),
+    where("customerEmail", "==", user.email),
+    where("sellerId", "==", product.vendorId),
+    where("productId", "==", product.id)
+  )
+);
 
     if (!snapshot.empty) {
       router.push(`/chat/${snapshot.docs[0].id}`);
       return;
     }
 
-    const docRef = await addDoc(collection(db, "chats"), {
-      customerEmail: user.email,
-      customerName: user.name,
-      sellerId: product.vendorId,
-      sellerName: product.vendorName,
-      sellerImage: "",
-      customerImage: "",
-      productId: product.id,
-      productName: product.name,
-      lastMessage: "",
-      customerUnread: 0,
-      sellerUnread: 0,
-      createdAt: serverTimestamp(),
-      lastMessageAt: serverTimestamp(),
-    });
+   const docRef = await addDoc(collection(db, "chats"), {
+  customerId: user.uid || "",
+  customerEmail: user.email,
+  customerName: user.name,
+
+  sellerId: product.vendorId,
+  sellerEmail: product.vendorEmail || "",
+  sellerName: product.vendorName,
+
+  sellerImage: "",
+  customerImage: "",
+
+  productId: product.id,
+  productName: product.name,
+
+  lastMessage: "",
+
+  customerUnread: 0,
+  sellerUnread: 0,
+
+  status: "active",
+
+  createdAt: serverTimestamp(),
+  lastMessageAt: serverTimestamp(),
+});
 
     router.push(`/chat/${docRef.id}`);
   };
