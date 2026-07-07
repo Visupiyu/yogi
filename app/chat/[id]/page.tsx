@@ -44,73 +44,108 @@ export default function ChatRoomPage() {
     return await getDownloadURL(storageRef);
   };
 
-  useEffect(() => {
+ useEffect(() => {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  if (!user.email) {
+    router.push("/login");
+    return;
+  }
+
+  updateDoc(doc(db, "chats", id), {
+    customerUnread: 0,
+  }).catch(() => {});
+
+  const q = query(
+    collection(db, "messages"),
+    where("chatId", "==", id),
+    orderBy("createdAt")
+  );
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const list: any[] = [];
+
+    snapshot.forEach((docSnap) => {
+      list.push({
+        id: docSnap.id,
+        ...docSnap.data(),
+      });
+    });
+
+    setMessages(list);
+
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({
+        behavior: "smooth",
+      });
+    });
+  });
+
+  return () => unsubscribe();
+
+}, [id, router]);
+
+const sendMessage = async () => {
+
+  if (sending) return;
+
+  if (!message.trim() && !imageFile) {
+    return;
+  }
+
+  setSending(true);
+
+  try {
+
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.email) {
-      router.push("/login");
-      return;
-    }
 
-    // Clear this customer's unread count on open
-    updateDoc(doc(db, "chats", id), { customerUnread: 0 }).catch(() => {});
+    const imageUrl = imageFile
+      ? await uploadImage()
+      : "";
 
-    // Scoped to this chat on the server (needs a composite index on
-    // chatId + createdAt) instead of reading every message.
-    const q = query(
+    await addDoc(
       collection(db, "messages"),
-      where("chatId", "==", id),
-      orderBy("createdAt")
+      {
+        chatId: id,
+        sender: "customer",
+        senderName: user.name || "Customer",
+        text: message,
+        image: imageUrl,
+        createdAt: serverTimestamp(),
+      }
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-      setMessages(list);
+    await updateDoc(
+      doc(db, "chats", id),
+      {
+        lastMessage: message || "📷 Image",
+        lastMessageAt: serverTimestamp(),
+        lastSender: "customer",
+        sellerUnread: increment(1),
+      }
+    );
 
-      setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    });
+    setMessage("");
+    setImageFile(null);
+    setPreview("");
 
-    return () => unsubscribe();
-  }, [id, router]);
+  } catch (error) {
 
-  const sendMessage = async () => {
-    if (sending) return;
-    setSending(true);
-    if (!message.trim() && !imageFile) return;
+    console.error("Failed to send message:", error);
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const imageUrl = imageFile ? await uploadImage() : "";
+  } finally {
 
-    await addDoc(collection(db, "messages"), {
-      chatId: id,
-      sender: "customer",
-      senderName: user.name || "Customer",
-      text: message,
-      image: imageUrl,
-      createdAt: serverTimestamp(),
-    });
+    setSending(false);
 
-    await updateDoc(doc(db, "chats", id), {
-      lastMessage: message || "📷 Image",
-      lastMessageAt: serverTimestamp(),
-      lastSender: "customer",
-      sellerUnread: increment(1),
-    });
+  }
 
-   setMessage("");
-setImageFile(null);
-setPreview("");
-setSending(false);
-  };
-
+};
  return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* HEADER */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-5 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <img
+         <Image
             src="/avatar.png"
             alt="Seller"
              width={56} height={56}
@@ -143,12 +178,13 @@ setSending(false);
               }`}
             >
               {msg.image && (
-                <img
-                  src={msg.image}
-                  alt="Chat Image"
-                  width={224} height={224}
-                  className="rounded-xl mb-3 object-cover"
-                />
+                <Image
+  src={msg.image}
+  alt="Chat Image"
+  width={220}
+  height={220}
+  className="rounded-xl mb-3 object-cover"
+/>
               )}
 
               {msg.text && <p>{msg.text}</p>}
@@ -171,9 +207,11 @@ setSending(false);
       <div className="bg-white border-t p-4">
         {preview && (
           <div className="mb-3 relative w-20">
-            <img
+            <Image
               src={preview}
-              alt="Preview" width={80} height={80}
+              alt="Preview"
+              width={80}
+              height={80}
               className="rounded-xl object-cover"
             />
             <button

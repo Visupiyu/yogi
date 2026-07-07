@@ -64,115 +64,56 @@ export default function SellerChatPage() {
   };
 
   useEffect(() => {
+  let unsubscribeSnapshot: (() => void) | undefined;
 
-    const unsubscribe =
-      onAuthStateChanged(
+  const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
 
-        auth,
+    if (!user) {
+      router.push("/vendor-login");
+      return;
+    }
 
-        async (user) => {
+    setSellerName(user.displayName || "Seller");
 
-          if (!user) {
+    await updateDoc(doc(db, "chats", chatId), {
+      sellerUnread: 0,
+    }).catch(() => {});
 
-            router.push("/vendor-login");
+    const q = query(
+      collection(db, "messages"),
+      where("chatId", "==", chatId),
+      orderBy("createdAt")
+    );
 
-            return;
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
 
-          }
+      const list = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-          setSellerName(
-            user.displayName ||
-            "Seller"
-          );
+      setMessages(list);
+      setLoading(false);
 
-          await updateDoc(
+      requestAnimationFrame(() => {
+        bottomRef.current?.scrollIntoView({
+          behavior: "smooth",
+        });
+      });
 
-            doc(
-              db,
-              "chats",
-              chatId
-            ),
+    });
 
-            {
+  });
 
-              sellerUnread: 0,
+  return () => {
+    unsubscribeAuth();
 
-            }
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+    }
+  };
 
-          ).catch(() => {});
-
-          const q = query(
-
-            collection(
-              db,
-              "messages"
-            ),
-
-            where(
-              "chatId",
-              "==",
-              chatId
-            ),
-
-            orderBy(
-              "createdAt"
-            )
-
-          );
-
-          const unsub =
-            onSnapshot(
-
-              q,
-
-              (snapshot) => {
-
-                const list:any[]=[];
-
-                snapshot.forEach((d)=>{
-
-                  list.push({
-
-                    id:d.id,
-
-                    ...d.data()
-
-                  });
-
-                });
-
-                setMessages(list);
-
-                setTimeout(()=>{
-
-                  bottomRef.current
-                    ?.scrollIntoView({
-
-                      behavior:
-                        "smooth"
-
-                    });
-
-                },100);
-
-                setLoading(false);
-
-              }
-
-            );
-
-          return unsub;
-
-        }
-
-      );
-
-    return ()=>unsubscribe();
-
-  },[
-    chatId,
-    router
-  ]);
+}, [chatId, router]);
 
   const uploadImage =
     async()=>{

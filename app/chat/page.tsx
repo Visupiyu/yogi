@@ -5,12 +5,25 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import Image from "next/image";
 
 export default function ChatPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [chats, setChats] = useState<any[]>([]);
+ type Chat = {
+  id: string;
+  sellerName: string;
+  sellerImage?: string;
+  productName: string;
+  lastSender: string;
+  lastMessage: string;
+  lastMessageAt?: any;
+  customerUnread: number;
+  online?: boolean;
+};
+
+const [chats, setChats] = useState<Chat[]>([]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -33,13 +46,13 @@ export default function ChatPage() {
         );
 
         const list: any[] = [];
-        snapshot.forEach((doc) => {
-          list.push({ id: doc.id, ...doc.data() });
+        snapshot.forEach((docSnap) => {
+          list.push({ id: docSnap.id, ...docSnap.data() });
         });
 
         setChats(list);
       } catch (error) {
-        console.error(error);
+      console.error("Chat loading failed:", error);
       } finally {
         setLoading(false);
       }
@@ -59,7 +72,12 @@ export default function ChatPage() {
   );
 
   if (loading) {
-    return <div className="p-10 text-center">Loading Chats...</div>;
+    return 
+    <div className="min-h-screen flex items-center justify-center">
+    <h2 className="text-2xl font-bold">
+        Loading Chats...
+    </h2>
+</div>;
   }
 
   return (
@@ -91,11 +109,13 @@ export default function ChatPage() {
               >
                 <div className="flex items-center gap-4">
                   <div className="relative">
-                    <img
-                      src={chat.sellerImage || "/avatar.png"}
-                      alt=""
-                      className="w-16 h-16 rounded-full object-cover"
-                    />
+                    <Image
+  src={chat.sellerImage || "/avatar.png"}
+  alt={chat.sellerName || "Seller"}
+  width={64}
+  height={64}
+  className="rounded-full object-cover"
+/>
                     <span
                       className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white ${
                         chat.online ? "bg-green-500" : "bg-gray-400"

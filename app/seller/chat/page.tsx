@@ -6,12 +6,14 @@ import {
 } from "react";
 
 import Link from "next/link";
+import Image from "next/image";
 
 import {
   collection,
   getDocs,
   orderBy,
-  query
+  query,
+   where
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -46,56 +48,35 @@ export default function SellerChatPage(){
 
       );
 
-      const snapshot =
-        await getDocs(
-
-          query(
-
-            collection(
-              db,
-              "chats"
-            ),
-
-            orderBy(
-              "lastMessageAt",
-              "desc"
-            )
-
-          )
-
-        );
+     const snapshot = await getDocs(
+  query(
+    collection(db, "chats"),
+    where("sellerId", "==", vendor.uid),
+    orderBy("lastMessageAt", "desc")
+  )
+);
 
       const list:any[]=[];
 
-      snapshot.forEach(doc=>{
+   snapshot.forEach((docSnap) => {
 
-        const data:any={
+  list.push({
 
-          id:doc.id,
+    id: docSnap.id,
 
-          ...doc.data()
+    ...docSnap.data(),
 
-        };
+  });
 
-        if(
-
-          data.sellerId===
-
-          vendor.uid
-
-        ){
-
-          list.push(data);
-
-        }
-
-      });
-
+});
       setChats(list);
 
     }catch(error){
 
-      console.log(error);
+     console.error(
+  "Failed to load seller chats:",
+  error
+);
 
     }finally{
 
@@ -127,14 +108,11 @@ export default function SellerChatPage(){
 
     return(
 
-      <div className="
-        p-10
-        text-center
-      ">
-
-        Loading Chats...
-
-      </div>
+      <div className="min-h-screen flex items-center justify-center">
+  <h2 className="text-2xl font-bold">
+    Loading Customer Chats...
+  </h2>
+</div>
 
     );
 
@@ -256,27 +234,13 @@ export default function SellerChatPage(){
                     gap-4
                   ">
 
-                    <img
-
-                      src={
-
-                        chat.customerImage ||
-
-                        "/avatar.png"
-
-                      }
-
-                      alt=""
-
-                      className="
-                        w-16
-                        h-16
-                        rounded-full
-                        object-cover
-                      "
-
-                    />
-
+                  <Image
+  src={chat.customerImage || "/avatar.png"}
+  alt={chat.customerName || "Customer"}
+  width={64}
+  height={64}
+  className="rounded-full object-cover"
+/>
                     <div className="
                       flex-1
                     ">
@@ -296,20 +260,13 @@ export default function SellerChatPage(){
 
                       </h2>
 
-                      <p className="
-                        text-gray-500
-                        truncate
-                      ">
+                    <p className="text-sm text-green-600 font-medium">
+  📦 {chat.productName || "General Inquiry"}
+</p>
 
-                        {
-
-                          chat.lastMessage ||
-
-                          "Start Conversation"
-
-                        }
-
-                      </p>
+<p className="text-gray-500 truncate">
+  {chat.lastMessage || "Start Conversation"}
+</p>
 
                     </div>
 

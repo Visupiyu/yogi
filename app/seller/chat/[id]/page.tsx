@@ -19,8 +19,9 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  updateDoc
+  updateDoc,where
 } from "firebase/firestore";
+import Image from "next/image";
 
 import { db } from "@/lib/firebase";
 
@@ -40,6 +41,8 @@ const id = params.id as string;
 
   const [messages,setMessages]=
     useState<any[]>([]);
+    const [sending,setSending]=
+useState(false);
 
   useEffect(()=>{
 
@@ -59,18 +62,11 @@ const id = params.id as string;
 
     ).catch(()=>{});
 
-    const q=query(
-
-      collection(
-        db,
-        "messages"
-      ),
-
-      orderBy(
-        "createdAt"
-      )
-
-    );
+    const q = query(
+  collection(db, "messages"),
+  where("chatId", "==", id),
+  orderBy("createdAt")
+);
 
     const unsubscribe=
 
@@ -82,40 +78,29 @@ const id = params.id as string;
 
           const list:any[]=[];
 
-          snapshot.forEach(doc=>{
+         snapshot.forEach((docSnap) => {
 
-            const data:any={
+  list.push({
 
-              id:doc.id,
+    id: docSnap.id,
 
-              ...doc.data()
+    ...docSnap.data(),
 
-            };
+  });
 
-            if(
-
-              data.chatId===id
-
-            ){
-
-              list.push(data);
-
-            }
-
-          });
+});
 
           setMessages(list);
 
-          setTimeout(()=>{
+         requestAnimationFrame(() => {
 
-            bottomRef.current
-            ?.scrollIntoView({
+  bottomRef.current?.scrollIntoView({
 
-              behavior:"smooth"
+    behavior: "smooth",
 
-            });
+  });
 
-          },100);
+});
 
         }
 
@@ -125,20 +110,17 @@ const id = params.id as string;
 
   },[id]);
 
-  const sendMessage=
-  async()=>{
+  const sendMessage = async () => {
 
-   if(
+  if (sending) return;
 
-  !message.trim() &&
+  if (!message.trim() && !imageFile) {
+    return;
+  }
 
-  !imageFile
+  setSending(true);
 
-){
-
-  return;
-
-}
+  try {
 
     const vendor=JSON.parse(
 
@@ -177,35 +159,30 @@ const id = params.id as string;
 
     );
 
-    await updateDoc(
+   await updateDoc(
+  doc(db, "chats", id),
+  {
+    lastMessage: message || "📷 Image",
+    lastMessageAt: serverTimestamp(),
+    lastSender: "seller",
+    customerUnread: increment(1),
+  }
+);
 
-      doc(
-        db,
-        "chats",
-        id as string
-      ),
+    
 
-      {
+   setMessage("");
+setImageFile(null);
 
-       lastMessage:
+} finally {
 
-  message ||
+  setSending(false);
 
-  "📷 Image",
-
-        lastMessageAt:
-          serverTimestamp(),
-
-        customerUnread:
-          increment(1)
-
-      }
-
-    );
-
-    setMessage("");
+}
 
   };
+
+  
 
   return(
 
@@ -306,19 +283,12 @@ const id = params.id as string;
 
                   {msg.image && (
 
-<img
-
+<Image
   src={msg.image}
-
   alt="Chat Image"
-
-  className="
-    w-56
-    rounded-xl
-    mb-3
-    object-cover
-  "
-
+  width={220}
+  height={220}
+  className="rounded-xl mb-3 object-cover"
 />
 
 )}
@@ -385,18 +355,15 @@ const id = params.id as string;
       ">
 
         <input
-
-          value={message}
-
-          onChange={(e)=>
-
-            setMessage(
-
-              e.target.value
-
-            )
-
-          }
+  value={message}
+  onChange={(e) =>
+    setMessage(e.target.value)
+  }
+  onKeyDown={(e) => {
+    if (e.key === "Enter") {
+      sendMessage();
+    }
+  }}
 
           placeholder="Reply to customer..."
 
@@ -410,23 +377,19 @@ const id = params.id as string;
         />
 
         <button
-
-          onClick={
-            sendMessage
-          }
-
-          className="
-            bg-green-600
-            text-white
-            px-8
-            rounded-xl
-          "
-
-        >
-
-          Send
-
-        </button>
+  onClick={sendMessage}
+  disabled={sending}
+  className="
+    bg-green-600
+    text-white
+    px-8
+    rounded-xl
+    disabled:opacity-50
+    disabled:cursor-not-allowed
+  "
+>
+  {sending ? "Sending..." : "Send"}
+</button>
 
       </div>
 
