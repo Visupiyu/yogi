@@ -3,6 +3,27 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
+import {
+
+  collection,
+
+  onSnapshot,
+
+  query,
+
+  where,
+
+  orderBy,
+
+  updateDoc,
+
+  doc,
+
+  getDocs,
+
+} from "firebase/firestore";
+
+import { db } from "@/lib/firebase";
 
 interface Notification {
   id: string;
@@ -24,47 +45,67 @@ export default function NotificationBell() {
     setOpen] =
     useState(false);
 
- useEffect(() => {
+useEffect(() => {
 
-  const loadNotifications =
-    () => {
+  const user = JSON.parse(
 
-      try {
+    localStorage.getItem("user") ||
 
-        const stored =
-          JSON.parse(
-            localStorage.getItem(
-              "notifications"
-            ) || "[]"
-          );
+    localStorage.getItem("vendor") ||
 
-        setNotifications(
-          stored
-        );
+    "{}"
 
-      } catch {
-
-        setNotifications([]);
-
-      }
-
-    };
-
-  loadNotifications();
-
-  window.addEventListener(
-    "notificationUpdated",
-    loadNotifications
   );
 
-  return () => {
+  if (!user.uid) return;
 
-    window.removeEventListener(
-      "notificationUpdated",
-      loadNotifications
-    );
+  const role =
 
-  };
+    localStorage.getItem("vendor")
+
+      ? "seller"
+
+      : "customer";
+
+  const q = query(
+
+    collection(db, "notifications"),
+
+    where("userId", "==", user.uid),
+
+    where("role", "==", role),
+
+    orderBy("createdAt", "desc")
+
+  );
+
+  const unsubscribe = onSnapshot(
+
+    q,
+
+    (snapshot) => {
+
+      const list: Notification[] = [];
+
+      snapshot.forEach((docSnap) => {
+
+        list.push({
+
+          id: docSnap.id,
+
+          ...(docSnap.data() as Omit<Notification,"id">),
+
+        });
+
+      });
+
+      setNotifications(list);
+
+    }
+
+  );
+
+  return () => unsubscribe();
 
 }, []);
 
@@ -73,24 +114,37 @@ export default function NotificationBell() {
       (n) => !n.read
     ).length;
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
 
-    const updated =
-      notifications.map(
-        (n) => ({
-          ...n,
+  for (const item of notifications) {
+
+    if (!item.read) {
+
+      await updateDoc(
+
+        doc(
+
+          db,
+
+          "notifications",
+
+          item.id
+
+        ),
+
+        {
+
           read: true,
-        })
+
+        }
+
       );
 
-    setNotifications(updated);
+    }
 
-    localStorage.setItem(
-      "notifications",
-      JSON.stringify(updated)
-    );
+  }
 
-  };
+};
 
   return (
 

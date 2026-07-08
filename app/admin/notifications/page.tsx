@@ -1,18 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { db } from "@/lib/firebase";
 
 import {
   collection,
-  getDocs,
+  onSnapshot,
   updateDoc,
   deleteDoc,
   doc,
-   query,
+  query,
   orderBy,
 } from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
 
 export default function AdminNotificationsPage() {
 
@@ -32,56 +31,47 @@ const [notifications, setNotifications] =
 
 const [loading,setLoading] =
   useState(true);
-useEffect(()=>{
+useEffect(() => {
 
-  loadNotifications();
+  const q = query(
 
-},[]);
-
-const loadNotifications =
-async()=>{
-
-  try{
-
-    const snapshot =
-      await getDocs(
-  query(
     collection(db, "notifications"),
+
     orderBy("createdAt", "desc")
-  )
-);
 
-  const items: Notification[] = [];
+  );
 
-snapshot.forEach((docSnap) => {
+  const unsubscribe = onSnapshot(
 
-  items.push({
+    q,
 
-  id: docSnap.id,
+    (snapshot) => {
 
-  ...(docSnap.data() as Omit<Notification, "id">),
+      const items: Notification[] = [];
 
-});
+      snapshot.forEach((docSnap) => {
 
-});
+        items.push({
 
-    setNotifications(items);
+          id: docSnap.id,
 
-  }catch(error){
+          ...(docSnap.data() as Omit<Notification, "id">),
 
-  console.error(
-  "Failed to load notifications:",
-  error
-);
+        });
 
-  }finally{
+      });
 
-    setLoading(false);
+      setNotifications(items);
 
-  }
+      setLoading(false);
 
-};
+    }
 
+  );
+
+  return () => unsubscribe();
+
+}, []);
 const markAsRead =
 async(id:string)=>{
 
@@ -156,7 +146,10 @@ async(id:string)=>{
 
   }catch(error){
 
-    console.log(error);
+  console.error(
+  "Failed to delete notification:",
+  error
+);
 
   }
 

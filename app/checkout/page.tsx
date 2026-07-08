@@ -364,29 +364,24 @@ localStorage.removeItem(
   
         createdAt: Timestamp.now(), } );
 
-    await addDoc(
-  collection(
-    db,
-    "notifications"
-  ),
+   await addDoc(
+  collection(db, "notifications"),
   {
-    title:
-      "New Order Received",
+    title: "🛒 New Order",
 
-    message:
-      `${name} placed an order`,
+    message: `${name} placed an order worth ₹${grandTotal}`,
 
-    type:
-      "order",
+    type: "order",
 
-    read:false,
+    role: "admin",
 
-    createdAt:
-      new Date(),
+    read: false,
+
+    createdAt: Timestamp.now(),
   }
 );
 
-    for (const item of items) {
+ for (const item of items) {
 
   await updateDoc(
     doc(
@@ -395,13 +390,60 @@ localStorage.removeItem(
       item.id
     ),
     {
-      sales: increment(
-        item.qty
-      ),
+      sales: increment(item.qty),
     }
   );
 
+  if (item.vendorId) {
+
+    await addDoc(
+
+      collection(db, "notifications"),
+
+      {
+
+        userId: item.vendorId,
+
+        role: "seller",
+
+        title: "🛒 New Order",
+
+        message: `${name} ordered ${item.name}`,
+
+        type: "order",
+
+        read: false,
+
+        createdAt: Timestamp.now(),
+
+      }
+
+    );
+
+  }
+
 }
+
+await addDoc(
+  collection(db, "notifications"),
+  {
+    userId: JSON.parse(
+      localStorage.getItem("user") || "{}"
+    ).uid,
+
+    role: "customer",
+
+    title: "✅ Order Placed",
+
+    message: `Your order worth ₹${grandTotal} has been placed successfully.`,
+
+    type: "order",
+
+    read: false,
+
+    createdAt: Timestamp.now(),
+  }
+);
 
 await fetch(
   "/api/send-order-email",
@@ -470,41 +512,6 @@ localStorage.setItem(
 
 );
 
-
-    localStorage.removeItem(
-      "checkoutItems"
-    );
-
-    await fetch(
-  "/api/send-order-email",
-  {
-    method:"POST",
-
-    headers:{
-      "Content-Type":
-      "application/json",
-    },
-
-    body:JSON.stringify({
-
-      customerName:name,
-
-      customerEmail:
-        JSON.parse(
-          localStorage.getItem(
-            "user"
-          ) || "{}"
-        ).email,
-
-      orderId:
-        orderRef.id,
-
-      total:
-        grandTotal,
-
-    }),
-  }
-);
 await addDoc(
 
   collection(
@@ -623,7 +630,7 @@ window.dispatchEvent(
 
   }catch(error){
 
-    console.log(error);
+   console.error("Checkout Error:", error);
 
     alert(
       "Order Failed"
@@ -637,11 +644,12 @@ window.dispatchEvent(
 
 const payNow =
 async()=>{
-  if(
-  !name ||
-  !phone ||
-  !address
-){
+  if (
+  !name.trim() ||
+  !phone.trim() ||
+  !address.trim()
+)
+{
 
   alert(
     "Fill all checkout fields"
@@ -703,6 +711,10 @@ if(items.length === 0){
 
   const data =
     await response.json();
+    if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY) {
+  alert("Razorpay Key Missing");
+  return;
+}
 
   const options = {
 
@@ -845,33 +857,42 @@ discount:
 
             );
 
-            await addDoc(
-
-  collection(
-    db,
-    "notifications"
-  ),
-
+       await addDoc(
+  collection(db, "notifications"),
   {
+    title: "🛒 New Order",
 
-    title:
-      "New Order Received",
+    message: `${name} placed an order worth ₹${grandTotal}`,
 
-    message:
-      `${name} placed an order worth ₹${grandTotal}`,
+    type: "order",
 
-    type:
-      "order",
+    role: "admin",
 
-    read:false,
+    read: false,
 
-    createdAt:
-      Timestamp.now(),
-
+    createdAt: Timestamp.now(),
   }
-
 );
+await addDoc(
+  collection(db, "notifications"),
+  {
+    userId: JSON.parse(
+      localStorage.getItem("user") || "{}"
+    ).uid,
 
+    role: "customer",
+
+    title: "✅ Order Placed",
+
+    message: `Your order worth ₹${grandTotal} has been placed successfully.`,
+
+    type: "order",
+
+    read: false,
+
+    createdAt: Timestamp.now(),
+  }
+);
             for (const item of items) {
 
   await updateDoc(
@@ -1447,19 +1468,22 @@ return (
       "
     />
 
-    <button
-      onClick={applyCoupon}
-      className="
-        bg-green-600
-        hover:bg-green-700
-        text-white
-        px-6
-        rounded-2xl
-        font-semibold
-      "
-    >
-      Apply
-    </button>
+   <button
+  onClick={applyCoupon}
+  disabled={couponApplied}
+  className="
+    bg-green-600
+    hover:bg-green-700
+    disabled:bg-gray-400
+    disabled:cursor-not-allowed
+    text-white
+    px-6
+    rounded-2xl
+    font-semibold
+  "
+>
+  {couponApplied ? "Applied" : "Apply"}
+</button>
 
   </div>
 

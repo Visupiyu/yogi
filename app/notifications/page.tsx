@@ -2,6 +2,16 @@
 
 import { useEffect, useState } from "react";
 
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
+} from "firebase/firestore";
+
+import { db } from "@/lib/firebase";
+
 interface Notification {
   id: string;
   title: string;
@@ -17,27 +27,57 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] =
     useState<Notification[]>([]);
 
-  useEffect(() => {
+useEffect(() => {
 
-    try {
+  const user = JSON.parse(
 
-      const stored = JSON.parse(
+    localStorage.getItem("user") || "{}"
 
-        localStorage.getItem(
-          "notifications"
-        ) || "[]"
+  );
 
-      );
+  if (!user.uid) return;
 
-      setNotifications(stored);
+  const q = query(
 
-    } catch {
+    collection(db, "notifications"),
 
-      setNotifications([]);
+    where("userId", "==", user.uid),
+
+    where("role", "==", "customer"),
+
+    orderBy("createdAt", "desc")
+
+  );
+
+  const unsubscribe = onSnapshot(
+
+    q,
+
+    (snapshot) => {
+
+      const list: Notification[] = [];
+
+      snapshot.forEach((docSnap) => {
+
+        list.push({
+
+          id: docSnap.id,
+
+          ...(docSnap.data() as Omit<Notification, "id">),
+
+        });
+
+      });
+
+      setNotifications(list);
 
     }
 
-  }, []);
+  );
+
+  return () => unsubscribe();
+
+}, []);
 
   const markAllRead = () => {
 

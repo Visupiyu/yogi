@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import {
   collection,
-  getDocs,
+ onSnapshot,
   query,
   where,
   orderBy,
@@ -34,37 +34,31 @@ export default function SellerNotificationsPage() {
   const [loading, setLoading] =
     useState(true);
 
-  useEffect(() => {
+ useEffect(() => {
 
-    loadNotifications();
+  const vendor = JSON.parse(
+    localStorage.getItem("vendor") || "{}"
+  );
 
-  }, []);
+  if (!vendor.uid) return;
 
-  const loadNotifications = async () => {
+  const q = query(
 
-    try {
+    collection(db, "notifications"),
 
-      const vendor = JSON.parse(
+    where("userId", "==", vendor.uid),
 
-        localStorage.getItem("vendor") || "{}"
+    where("role", "==", "seller"),
 
-      );
+    orderBy("createdAt", "desc")
 
-      const snapshot = await getDocs(
+  );
 
-        query(
+  const unsubscribe = onSnapshot(
 
-          collection(db, "notifications"),
+    q,
 
-          where("userId", "==", vendor.uid),
-
-          where("role", "==", "seller"),
-
-          orderBy("createdAt", "desc")
-
-        )
-
-      );
+    (snapshot) => {
 
       const items: Notification[] = [];
 
@@ -82,24 +76,17 @@ export default function SellerNotificationsPage() {
 
       setNotifications(items);
 
-    } catch (error) {
-
-      console.error(
-
-        "Failed to load seller notifications:",
-
-        error
-
-      );
-
-    } finally {
-
       setLoading(false);
 
     }
 
-  };
+  );
 
+  return () => unsubscribe();
+
+}, []);
+
+   
   const markAsRead = async (id: string) => {
 
     await updateDoc(
