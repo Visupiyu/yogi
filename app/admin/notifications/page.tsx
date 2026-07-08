@@ -8,14 +8,27 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+   query,
+  orderBy,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 
 export default function AdminNotificationsPage() {
 
-    const [notifications,setNotifications] =
-  useState<any[]>([]);
+    type Notification = {
+  id: string;
+  title: string;
+  message: string;
+  read: boolean;
+  role?: string;
+  type?: string;
+  userId?: string;
+  createdAt?: any;
+};
+
+const [notifications, setNotifications] =
+  useState<Notification[]>([]);
 
 const [loading,setLoading] =
   useState(true);
@@ -32,33 +45,34 @@ async()=>{
 
     const snapshot =
       await getDocs(
-        collection(
-          db,
-          "notifications"
-        )
-      );
+  query(
+    collection(db, "notifications"),
+    orderBy("createdAt", "desc")
+  )
+);
 
-    const items:any[] = [];
+  const items: Notification[] = [];
 
-    snapshot.forEach(
-      (docSnap)=>{
+snapshot.forEach((docSnap) => {
 
-        items.push({
+  items.push({
 
-          id:docSnap.id,
+  id: docSnap.id,
 
-          ...docSnap.data(),
+  ...(docSnap.data() as Omit<Notification, "id">),
 
-        });
+});
 
-      }
-    );
+});
 
     setNotifications(items);
 
   }catch(error){
 
-    console.log(error);
+  console.error(
+  "Failed to load notifications:",
+  error
+);
 
   }finally{
 
@@ -107,7 +121,10 @@ async(id:string)=>{
 
   }catch(error){
 
-    console.log(error);
+    console.error(
+      "Failed to mark notification as read:",
+      error
+    );
 
   }
 
@@ -180,7 +197,7 @@ async(id:string)=>{
           </p>
 
         </div>
-        {loading ? (
+      {loading ? (
 
   <div className="
     bg-white
@@ -188,6 +205,32 @@ async(id:string)=>{
     rounded-3xl
   ">
     Loading...
+  </div>
+
+) : notifications.length === 0 ? (
+
+  <div className="
+    bg-white
+    rounded-3xl
+    p-10
+    text-center
+    shadow
+  ">
+
+    <h2 className="
+      text-2xl
+      font-bold
+    ">
+      🎉 No Notifications
+    </h2>
+
+    <p className="
+      text-gray-500
+      mt-2
+    ">
+      Everything is up to date.
+    </p>
+
   </div>
 
 ) : (
@@ -217,19 +260,44 @@ async(id:string)=>{
           `}
         >
 
-          <h2 className="
-            text-xl
-            font-bold
-          ">
-            {item.title}
-          </h2>
+         <span className="
+  inline-block
+  bg-blue-100
+  text-blue-700
+  text-xs
+  px-3
+  py-1
+  rounded-full
+  mb-2
+">
+  {item.type || "Info"}
+</span>
 
-          <p className="
-            mt-2
-            text-gray-600
-          ">
-            {item.message}
-          </p>
+<h2 className="
+  text-xl
+  font-bold
+">
+  {item.title}
+</h2>
+
+<p className="
+  mt-2
+  text-gray-600
+">
+  {item.message}
+</p>
+
+<p className="
+  text-sm
+  text-gray-400
+  mt-2
+">
+  {item.createdAt?.seconds
+    ? new Date(
+        item.createdAt.seconds * 1000
+      ).toLocaleString()
+    : ""}
+</p>
 
           <div className="
             flex

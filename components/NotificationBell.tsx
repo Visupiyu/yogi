@@ -5,10 +5,13 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 
 interface Notification {
-  id: number;
+  id: string;
   title: string;
   message: string;
   read: boolean;
+  createdAt?: any;
+  type?: string;
+  link?: string;
 }
 
 export default function NotificationBell() {
