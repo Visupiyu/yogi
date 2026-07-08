@@ -337,6 +337,10 @@ localStorage.removeItem(
 
   JSON.parse(localStorage.getItem( "user" ) || "{}" ).email,
 
+  userId:
+
+JSON.parse(localStorage.getItem("user") || "{}" ).uid,
+
         items:items,
 
         total:total,

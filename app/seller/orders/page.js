@@ -141,6 +141,61 @@ export default function SellerOrdersPage(){
 }
       );
 
+      const currentOrder = orders.find(
+  (order) => order.id === orderId
+);
+
+if (currentOrder?.userId) {
+
+  await addDoc(
+
+    collection(db, "notifications"),
+
+    {
+
+      userId: currentOrder.userId,
+
+      role: "customer",
+
+      title: "📦 Order Updated",
+
+      message: `Your order is now ${newStatus}.`,
+
+      type: "order",
+
+      read: false,
+
+      createdAt: serverTimestamp(),
+
+    }
+
+  );
+
+}
+await addDoc(
+
+  collection(db, "notifications"),
+
+  {
+
+    role: "seller",
+
+    userId: auth.currentUser?.uid,
+
+    title: "✅ Order Status Changed",
+
+    message: `Order ${orderId.slice(0,8)} updated to ${newStatus}.`,
+
+    type: "order",
+
+    read: false,
+
+    createdAt: serverTimestamp(),
+
+  }
+
+);
+
       setOrders((prev)=>
 
         prev.map((order)=>
@@ -165,13 +220,18 @@ export default function SellerOrdersPage(){
         "Status Updated"
       );
 
-    }catch(err){
+   }catch(err){
 
-      alert(
-        "Error Updating Status"
-      );
+  console.error(
+    "Failed to update order:",
+    err
+  );
 
-    }
+  alert(
+    "Error Updating Status"
+  );
+
+}
 
   };
 
@@ -351,6 +411,31 @@ export default function SellerOrdersPage(){
                 {order.address}
               </p>
 
+              <p>
+  Payment:
+  {" "}
+  <span
+    className={
+      order.paymentStatus === "Paid"
+        ? "text-green-600"
+        : "text-red-600"
+    }
+  >
+    {order.paymentStatus || "Pending"}
+  </span>
+</p>
+
+<p>
+  Method:
+  {" "}
+  {order.paymentMethod || "COD"}
+</p>
+<p>
+  Seller Earnings:
+  {" "}
+  ₹{order.sellerEarning || 0}
+</p>
+
               <div className="mt-4">
 
                 <p
@@ -396,17 +481,23 @@ export default function SellerOrdersPage(){
                     order.status
                   }
 
-                  onChange={(e)=>
+                 onChange={(e) => {
 
-                    updateStatus(
+  const value = e.target.value;
 
-                      order.id,
+  if (
+    value === "Delivered" &&
+    !confirm("Mark this order as Delivered?")
+  ) {
+    return;
+  }
 
-                      e.target.value
+  updateStatus(
+    order.id,
+    value
+  );
 
-                    )
-
-                  }
+}}
 
                   className="
                     border

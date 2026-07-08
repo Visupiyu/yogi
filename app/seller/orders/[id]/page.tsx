@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import Link from "next/link";
+import { toast } from "sonner";
 
 import { useParams } from "next/navigation";
 
@@ -41,6 +42,8 @@ export default function SellerOrderDetailsPage(){
 
   const [trackingNumber,setTrackingNumber] =
     useState("");
+    const [saving, setSaving] =
+  useState(false);
 
   const [courierPartner,setCourierPartner] =
     useState("");
@@ -53,7 +56,7 @@ export default function SellerOrderDetailsPage(){
 
   const [sellerNotes,setSellerNotes] =
     useState("");
-
+   
   useEffect(()=>{
 
     loadOrder();
@@ -123,10 +126,32 @@ export default function SellerOrderDetailsPage(){
     }
 
   };
+  
 
   const saveOrder = async()=>{
+    if (
 
-    try{
+  status === order.status &&
+
+  trackingNumber === order.trackingNumber &&
+
+  courierPartner === order.courierPartner &&
+
+  dispatchDate === order.dispatchDate &&
+
+  expectedDelivery === order.expectedDelivery &&
+
+  sellerNotes === order.sellerNotes
+
+){
+
+  toast.info("No changes found.");
+
+  return;
+
+}
+
+    try{ setSaving(true);
 
       await updateDoc(
 
@@ -164,75 +189,47 @@ export default function SellerOrderDetailsPage(){
           "notifications"
         ),
 
-        {
+       {
 
-          title:
-            "Order Status Updated",
+  title:
+    "Order Status Updated",
 
-          message:
+  message:
+    `Your order ${id.slice(0,8)} is now ${status}`,
 
-            `Your order ${id.slice(0,8)} is now ${status}`,
+  userEmail:
+    order.userEmail,
 
-          userEmail:
-            order.userEmail,
+  role:
+    "customer",
 
-          read:false,
+  type:
+    "shipping",
 
-          createdAt:
-            serverTimestamp()
+  read:false,
 
-        }
+  createdAt:
+    serverTimestamp(),
 
+}
       );
 
-      alert("Order Updated");
-
-    }catch(error){
-
-      console.log(error);
-
-      alert("Update Failed");
-
-    }
-
-    await addDoc(
-
-  collection(
-    db,
-    "notifications"
-  ),
-
-  {
-
-    title:
-
-      "Shipping Update",
-
-    message:
-
-      `Your order has been updated to ${status}`,
-
-    userEmail:
-
-      order.userEmail,
-
-    type:
-
-      "shipping",
-
-    read:false,
-
-    createdAt:
-
-      serverTimestamp()
-
-  }
-
+    toast.success(
+  "Order updated successfully."
 );
 
-  };
-  
+ catch(error){
 
+  console.error(error);
+
+  toast.error(
+    "Failed to update order."
+  );
+
+}
+
+    }
+finally{ setSaving(false);} };
   if(loading){
 
     return(
@@ -385,6 +382,27 @@ export default function SellerOrderDetailsPage(){
                   {order.paymentMethod}
 
                 </p>
+                <p>
+
+  <strong>Payment Status :</strong>
+
+  {" "}
+
+  <span
+    className={
+      order.paymentStatus === "Paid"
+
+      ? "text-green-600"
+
+      : "text-red-600"
+    }
+  >
+
+    {order.paymentStatus}
+
+  </span>
+
+</p>
 
               </div>
 
@@ -839,6 +857,20 @@ export default function SellerOrderDetailsPage(){
                      order.total ||
 
                      0}
+                     <p>
+
+<strong>Seller Earnings :</strong>
+
+₹{order.sellerEarning || 0}
+
+</p>
+<p>
+
+<strong>Commission :</strong>
+
+₹{order.commission || 0}
+
+</p>
 
                   </span>
 
@@ -1008,6 +1040,36 @@ export default function SellerOrderDetailsPage(){
                   "
 
                 />
+                {trackingNumber && (
+
+  <button
+
+    type="button"
+
+    onClick={() => {
+
+      navigator.clipboard.writeText(
+        trackingNumber
+      );
+
+      toast.success("Tracking number copied.");
+
+    }}
+
+    className="
+      mt-2
+      text-blue-600
+      text-sm
+      hover:underline
+    "
+
+  >
+
+    📋 Copy Tracking Number
+
+  </button>
+
+)}
 
                 <div>
 
@@ -1196,23 +1258,26 @@ export default function SellerOrderDetailsPage(){
 
               <button
 
-                onClick={saveOrder}
+  onClick={saveOrder}
 
-                className="
-                  w-full
-                  mt-6
-                  bg-green-600
-                  text-white
-                  py-3
-                  rounded-xl
-                  font-semibold
-                "
+  disabled={saving}
 
-              >
+  className="
+    bg-green-600
+    text-white
+    px-6
+    py-3
+    rounded-xl
 
-                Save Changes
+    disabled:opacity-50
+    disabled:cursor-not-allowed
+  "
 
-              </button>
+>
+
+  {saving ? "Saving..." : "Save Changes"}
+
+</button>
 
             </div>
 
@@ -1292,7 +1357,7 @@ export default function SellerOrderDetailsPage(){
                 font-semibold
               "
               onClick={()=>
-                alert(
+               toast.success(
                   "Invoice download coming soon."
                 )
               }

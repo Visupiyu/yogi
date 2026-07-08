@@ -10,6 +10,8 @@ from "next/font/google";
 import { cn }
 from "@/lib/utils";
 
+import { Toaster } from "sonner";
+
 import ClientLayout
 from "@/components/ClientLayout";
 
@@ -118,6 +120,12 @@ export default function RootLayout({
         <ClientLayout>
 
           {children}
+
+           <Toaster
+    position="top-right"
+    richColors
+    closeButton
+  />
 
         </ClientLayout>
 

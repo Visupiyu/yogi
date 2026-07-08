@@ -62,7 +62,10 @@ if(!user){alert("Please login first");
 
   }catch(error){
 
-    console.log(error);
+   console.error(
+  "Failed to load orders:",
+  error
+);
   }
 
   setLoading(false);
@@ -242,6 +245,31 @@ if(!user){alert("Please login first");
       order.items?.length || 0
     } Items
   </p>
+  <p className="
+  text-sm
+  font-semibold
+  mt-2
+">
+  Payment:
+  <span
+    className={
+      order.paymentStatus === "Paid"
+        ? "text-green-600"
+        : "text-red-600"
+    }
+  >
+    {" "}
+    {order.paymentStatus || "Pending"}
+  </span>
+</p>
+<p className="
+  text-sm
+  text-gray-500
+">
+  Method:
+  {" "}
+  {order.paymentMethod || "COD"}
+</p>
 
 </div>
 
@@ -258,6 +286,54 @@ if(!user){alert("Please login first");
   "
 >
   Download Invoice
+</a>
+{order.chatId ? (
+
+  <a
+    href={`/chat/${order.chatId}`}
+    className="
+      bg-green-600
+      text-white
+      px-4
+      py-2
+      rounded-lg
+      mt-2
+      inline-block
+    "
+  >
+    💬 Contact Seller
+  </a>
+
+) : (
+
+  <button
+    disabled
+    className="
+      bg-gray-300
+      text-gray-500
+      px-4
+      py-2
+      rounded-lg
+      mt-2
+    "
+  >
+    💬 Chat Unavailable
+  </button>
+
+)}
+<a
+  href={`/orders/${order.id}`}
+  className="
+    bg-indigo-600
+    text-white
+    px-4
+    py-2
+    rounded-lg
+    mt-2
+    inline-block
+  "
+>
+  📍 Track Order
 </a>
 
   <span className={`
@@ -326,18 +402,39 @@ if(!user){alert("Please login first");
 {order.trackingNumber && (
 
   <p className="
-    text-sm
-    text-purple-600
-  ">
-    📦 Tracking:
-    {" "}
-    {order.trackingNumber}
-  </p>
+  text-sm
+  text-purple-600
+">
+  📦 Tracking:
+  {" "}
+  {order.trackingNumber}
+
+  <button
+    onClick={() => {
+
+  if (order.trackingNumber) {
+
+    navigator.clipboard.writeText(
+      order.trackingNumber
+    );
+
+    alert("Tracking number copied!");
+
+  }
+
+}}
+    className="
+      ml-2
+      text-blue-600
+    "
+  >
+    Copy
+  </button>
+</p>
 
 )}
-  
-
 </span>
+
 {order.status === "Pending" && (
 
    <button
@@ -423,7 +520,7 @@ if(!user){alert("Please login first");
       )=>(
 
       <div
-        key={index}
+     key={order.id}
         className="
           flex-1
           text-center

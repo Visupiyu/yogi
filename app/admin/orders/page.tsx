@@ -7,21 +7,34 @@ import {
   getDocs,
   updateDoc,
   doc,addDoc,
+   serverTimestamp,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 
 type Order = {
 
-  id:string;
+  id: string;
 
-  customerName:string;
+  customerName: string;
 
-  total:number;
+  userEmail?: string;
 
-  status:string;
+  userId?: string;
 
-  createdAt:string;
+  total: number;
+
+  finalTotal?: number;
+
+  status: string;
+
+  paymentMethod?: string;
+
+  paymentStatus?: string;
+
+  vendorId?: string;
+
+  createdAt: any;
 
 };
 
@@ -57,65 +70,57 @@ export default function AdminOrdersPage(){
       const items:any[] =
         [];
 
-      snapshot.forEach(
-        (docSnap)=>{
+snapshot.forEach((docSnap) => {
 
-          const data =
-            docSnap.data();
+  const data = docSnap.data();
 
-          items.push({
+  items.push({
 
-            id:docSnap.id,
+    id: docSnap.id,
 
-            customerName:
-              data.customerName ||
-              "Customer",
+    customerName: data.customerName || "Customer",
 
-            total:
-              data.total ||
-              0,
+    userId: data.userId || "",
 
-            status:
-              data.status ||
-              "Pending",
+    userEmail: data.userEmail || "",
 
-              finalTotal:
-  data.finalTotal ||
-  data.total,
+    vendorId: data.vendorId || "",
 
-            createdAt:
-              data.createdAt
-              ?.toDate?.()
-              ?.toLocaleDateString()
-              || "-",
+    total: data.total || 0,
 
-              courierName:
-  data.courierName || "",
+    finalTotal: data.finalTotal || data.total,
 
-trackingNumber:
-  data.trackingNumber || "",
+    paymentMethod: data.paymentMethod || "",
 
-expectedDelivery:
-  data.expectedDelivery || "",
+    paymentStatus: data.paymentStatus || "",
 
-          });
+    status: data.status || "Pending",
 
-        }
-      );
+    createdAt:
+      data.createdAt?.toDate?.()?.toLocaleDateString() || "-",
 
-      setOrders(items);
+    courierName: data.courierName || "",
 
-    }catch(error){
+    trackingNumber: data.trackingNumber || "",
 
-      console.log(error);
+    expectedDelivery: data.expectedDelivery || "",
 
-    }finally{
+  });
 
-      setLoading(false);
+});
 
-    }
+setOrders(items);
 
-  };
+} catch (error) {
+
+  console.error("Failed to load orders:", error);
+
+} finally {
+
+  setLoading(false);
+
+}
+}
 
   const totalOrders =
   orders.length;
@@ -189,11 +194,31 @@ const totalRevenue =
     read:false,
 
     createdAt:
-      new Date(),
+    serverTimestamp(),
 
   }
 
 );
+const currentOrder = orders.find(
+  (order) => order.id === orderId
+);
+
+if (currentOrder?.userId) {
+
+  await addDoc(
+    collection(db, "notifications"),
+    {
+      userId: currentOrder.userId,
+      role: "customer",
+      title: "📦 Order Updated",
+      message: `Your order is now ${status}.`,
+      type: "order",
+      read: false,
+      createdAt: serverTimestamp(),
+    }
+  );
+
+}
 
       setOrders(
 
