@@ -216,7 +216,8 @@ export default function SellerOrderDetailsPage(){
 
     toast.success(
   "Order updated successfully."
-);
+); 
+}
 
  catch(error){
 
@@ -227,8 +228,6 @@ export default function SellerOrderDetailsPage(){
   );
 
 }
-
-    }
 finally{ setSaving(false);} };
   if(loading){
 
