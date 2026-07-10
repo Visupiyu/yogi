@@ -444,8 +444,27 @@ export default function AdminPage() {
 
     <Link href="/admin/users" className="bg-green-50 p-6 rounded-xl text-center hover:shadow-lg">
       👥
-      <p className="font-bold mt-2">Users</p>
+      <p className="font-bold mt-2">Admin Users</p>
     </Link>
+    <Link
+  href="/admin/customers"
+  className="bg-blue-50 p-6 rounded-xl text-center hover:shadow-lg"
+>
+  👥
+  <p className="font-bold mt-2">
+    Customers
+  </p>
+</Link>
+
+<Link
+  href="/admin/vendors"
+  className="bg-yellow-50 p-6 rounded-xl text-center hover:shadow-lg"
+>
+  🏪
+  <p className="font-bold mt-2">
+    Vendors
+  </p>
+</Link>
    <Link
   href="/admin/products"
   className="bg-green-50 p-6 rounded-xl text-center hover:shadow-lg"
@@ -631,302 +650,8 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* VENDORS */}
-        <div className="bg-white rounded-2xl shadow p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-8">Vendor Approvals</h2>
-
-          <input
-            type="text"
-            placeholder="Search Vendor..."
-            value={vendorSearch}
-            onChange={(e) => setVendorSearch(e.target.value)}
-            className="border p-4 rounded-xl w-full mb-6"
-          />
-
-          <div className="space-y-6">
-            {vendors
-              .filter((vendor) =>
-                vendor.businessName
-                  .toLowerCase()
-                  .includes(vendorSearch.toLowerCase())
-              )
-              .map((vendor) => (
-                <div
-                  key={vendor.id}
-                  className="border-b pb-6 flex flex-col lg:flex-row lg:justify-between gap-6"
-                >
-                  <div>
-                    <h3 className="text-2xl font-bold">
-                      {vendor.businessName}
-                    </h3>
-                    <p>{vendor.fullName}</p>
-                    <p>
-                      {vendor.city}, {vendor.state}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-3 flex-wrap items-center">
-                    {/* Vendor Status */}
-                    {vendor.status === "Pending" ? (
-                      <>
-                        <button
-                          onClick={() => approveVendor(vendor.id)}
-                          className="bg-green-600 text-white px-5 py-2 rounded-lg"
-                        >
-                          Vendor Approve
-                        </button>
-                        <button
-                          onClick={() => rejectVendor(vendor.id)}
-                          className="bg-red-600 text-white px-5 py-2 rounded-lg"
-                        >
-                          Vendor Reject
-                        </button>
-                      </>
-                    ) : vendor.status === "Approved" ? (
-                      <span className="bg-green-100 text-green-700 px-4 py-2 rounded-lg font-semibold">
-                        ✅ Vendor Approved
-                      </span>
-                    ) : (
-                      <span className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold">
-                        ❌ Vendor Rejected
-                      </span>
-                    )}
-
-                    {/* KYC Status */}
-                    {vendor.kycStatus === "Approved" ? (
-                      <span className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-semibold">
-                        ✅ KYC Approved
-                      </span>
-                    ) : vendor.kycStatus === "Rejected" ? (
-                      <span className="bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold">
-                        ❌ KYC Rejected
-                      </span>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => updateKYC(vendor.id, "Approved")}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-lg"
-                        >
-                          KYC Approve
-                        </button>
-                        <button
-                          onClick={() => updateKYC(vendor.id, "Rejected")}
-                          className="bg-orange-600 text-white px-4 py-2 rounded-lg"
-                        >
-                          KYC Reject
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {/* PRODUCTS */}
-        <div className="bg-white rounded-2xl shadow p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-8">Marketplace Products</h2>
-
-          <input
-            type="text"
-            placeholder="Search Product..."
-            value={productSearch}
-            onChange={(e) => setProductSearch(e.target.value)}
-            className="border p-4 rounded-xl w-full mb-6"
-          />
-
-          <div className="space-y-6">
-            {products
-              .filter((product) =>
-                product.name
-                  .toLowerCase()
-                  .includes(productSearch.toLowerCase())
-              )
-              .map((product) => (
-                <div
-                  key={product.id}
-                  className="flex justify-between items-center border-b pb-6"
-                >
-                  <div className="flex gap-5">
-                    <img
-                      src={product.image}
-                      alt={product.name}
-                      className="w-24 h-24 object-cover rounded-xl"
-                    />
-                    <div>
-                      <h3 className="text-2xl font-bold">{product.name}</h3>
-                      <p>₹{product.price?.toLocaleString("en-IN")}</p>
-                      <p>Views: {(product as any).views || 0}</p>
-                      <p>Sales: {(product as any).sales || 0}</p>
-                      <div
-                        className={`font-semibold ${
-                          product.stock <= 5
-                            ? "text-red-500"
-                            : "text-green-600"
-                        }`}
-                      >
-                        Stock: {product.stock}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      if (confirm("Delete product?")) deleteProduct(product.id);
-                    }}
-                    className="bg-red-500 text-white px-6 py-3 rounded-xl"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-          </div>
-        </div>
-
-        {/* VENDOR PAYOUT REPORT */}
-        <div className="bg-white rounded-2xl shadow p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-8">Vendor Payout Report</h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="py-4">Vendor</th>
-                  <th className="py-4">Orders</th>
-                  <th className="py-4">Sales</th>
-                  <th className="py-4">Commission</th>
-                  <th className="py-4">Payout</th>
-                  <th className="py-4">Status</th>
-                  <th className="py-4">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendorPayouts.map((vendor: any) => (
-                  <tr key={vendor.vendorId} className="border-b">
-                    <td className="py-4">{vendor.vendorName}</td>
-                    <td>{vendor.orders}</td>
-                    <td>₹{Math.round(vendor.sales).toLocaleString("en-IN")}</td>
-                    <td>
-                      ₹{Math.round(vendor.commission).toLocaleString("en-IN")}
-                    </td>
-                    <td className="text-green-600 font-bold">
-                      ₹{Math.round(vendor.payout).toLocaleString("en-IN")}
-                    </td>
-                    <td>Pending</td>
-                    <td>
-                      <button
-                        onClick={() =>
-                          markVendorPaid(
-                            vendor.vendorId,
-                            vendor.vendorName,
-                            Math.round(vendor.payout)
-                          )
-                        }
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg"
-                      >
-                        Mark Paid
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ORDERS */}
-        <div className="bg-white rounded-2xl shadow p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-8">Marketplace Orders</h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-4">Order</th>
-                  <th className="text-left py-4">Customer</th>
-                  <th className="text-left py-4">Amount</th>
-                  <th className="text-left py-4">Payment</th>
-                  <th className="text-left py-4">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-b">
-                    <td className="py-5">#{order.id.slice(0, 6)}</td>
-                    <td>{order.customerName}</td>
-                    <td>₹{order.total?.toLocaleString("en-IN")}</td>
-                    <td>{order.paymentMethod || "COD"}</td>
-                    <td>
-                      <select
-                        value={order.status}
-                        onChange={(e) =>
-                          updateOrderStatus(order.id, e.target.value)
-                        }
-                        className={`border p-2 rounded-lg ${
-                          order.status === "Delivered"
-                            ? "bg-green-100"
-                            : order.status === "Pending"
-                            ? "bg-yellow-100"
-                            : "bg-blue-100"
-                        }`}
-                      >
-                        <option>Pending</option>
-                        <option>Confirmed</option>
-                        <option>Packed</option>
-                        <option>Shipped</option>
-                        <option>Out For Delivery</option>
-                        <option>Delivered</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* CUSTOMERS */}
-        <div className="bg-white rounded-2xl shadow p-8">
-          <h2 className="text-3xl font-bold mb-8">Customers</h2>
-
-          <input
-            type="text"
-            placeholder="Search Customer Email..."
-            value={customerSearch}
-            onChange={(e) => setCustomerSearch(e.target.value)}
-            className="border p-4 rounded-xl w-full mb-6"
-          />
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-4">Email</th>
-                  <th className="text-left py-4">Orders</th>
-                  <th className="text-left py-4">Total Spending</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers
-                  .filter((customer) =>
-                    (customer.email || "")
-                      .toLowerCase()
-                      .includes(customerSearch.toLowerCase())
-                  )
-                  .map((customer) => (
-                    <tr key={customer.id} className="border-b">
-                      <td className="py-5">{customer.email}</td>
-                      <td>{customer.totalOrders}</td>
-                      <td>
-                        ₹{(customer.totalSpent || 0).toLocaleString("en-IN")}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
+   </div>                    
+</div>
+        
   );
 }

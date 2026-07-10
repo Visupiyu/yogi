@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 
 import {
-  collection,
+   collection,
   getDocs,
+  updateDoc,
+  deleteDoc,
+  doc,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 type User = {
 
@@ -19,7 +23,7 @@ type User = {
 
   role:string;
 
-   status?:string;
+  status:string;
 
 };
 
@@ -39,64 +43,233 @@ export default function AdminUsersPage(){
 
   },[]);
 
-  const loadUsers =
-    async ()=>{
+  const loadUsers = async () => {
 
-    try{
+  try {
 
-      const items:any[] = [];
+    const snapshot = await getDocs(
 
-      const vendorsSnap =
-        await getDocs(
-          collection(
-            db,
-            "vendors"
-          )
-        );
+      collection(
+        db,
+        "adminUsers"
+      )
 
-      vendorsSnap.forEach(
-        (docSnap)=>{
+    );
 
-          const data =
-            docSnap.data();
+    const items: User[] = [];
 
-          items.push({
+    snapshot.forEach((docSnap) => {
 
-            id:docSnap.id,
+      const data: any = docSnap.data();
 
-            status:
-  data.status ||
-  "Pending",
+      items.push({
 
-            name:
-              data.fullName ||
-              "Vendor",
+        id: docSnap.id,
 
-            email:
-              data.email ||
-              "-",
+        name:
+          data.name || "Admin",
 
-            role:"Vendor",
+        email:
+          data.email || "-",
 
-          });
+        role:
+          data.role || "Admin",
 
-        }
-      );
+        status:
+          data.status || "Active",
 
-      setUsers(items);
+      });
 
-    }catch(error){
+    });
 
-      console.log(error);
+    setUsers(items);
 
-    }finally{
+  } catch (error) {
 
-      setLoading(false);
+    console.error(error);
 
-    }
+  } finally {
 
-  };
+    setLoading(false);
 
+  }
+
+};
+
+const toggleStatus = async (
+
+  user: User
+
+) => {
+
+  try {
+
+    await updateDoc(
+
+      doc(
+        db,
+        "adminUsers",
+        user.id
+      ),
+
+      {
+
+        status:
+
+          user.status === "Active"
+
+            ? "Inactive"
+
+            : "Active",
+
+      }
+
+    );
+
+    toast.success(
+
+      "Staff updated."
+
+    );
+
+    loadUsers();
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast.error(
+
+      "Update failed."
+
+    );
+
+  }
+
+};
+
+const deleteStaff = async (
+
+  id: string
+
+) => {
+
+  if (
+
+    !confirm(
+
+      "Delete this staff member?"
+
+    )
+
+  ) {
+
+    return;
+
+  }
+
+  try {
+
+    await deleteDoc(
+
+      doc(
+        db,
+        "adminUsers",
+        id
+      )
+
+    );
+
+    toast.success(
+
+      "Staff deleted."
+
+    );
+
+    loadUsers();
+
+  } catch (error) {
+
+    console.error(error);
+
+    toast.error(
+
+      "Delete failed."
+
+    );
+
+  }
+
+};
+
+const exportCSV = ()=>{
+
+const rows=[
+
+[
+"Name",
+"Email",
+"Role",
+"Status"
+],
+
+...users.map(u=>([
+
+u.name,
+
+u.email,
+
+u.role,
+
+u.status
+
+]))
+
+];
+
+const csv=
+
+rows
+
+.map(
+
+r=>r.join(",")
+
+)
+
+.join("\n");
+
+const blob=
+
+new Blob(
+
+[csv],
+
+{
+
+type:"text/csv"
+
+}
+
+);
+
+const url=
+
+URL.createObjectURL(blob);
+
+const a=
+
+document.createElement("a");
+
+a.href=url;
+
+a.download="admin-users.csv";
+
+a.click();
+
+URL.revokeObjectURL(url);
+
+};
   return (
 
     <div className="min-h-screen bg-gray-100">
@@ -117,12 +290,27 @@ export default function AdminUsersPage(){
     text-4xl
     font-bold
   ">
-    User Management
+   Admin Staff Management
   </h1>
 
   <p className="opacity-90">
-    Manage vendors and marketplace users
+   Manage Yogi Mart administrators and staff
   </p>
+
+</div>
+<div className="flex justify-end mb-6">
+
+<button
+
+onClick={exportCSV}
+
+className="bg-green-600 text-white px-6 py-3 rounded-xl"
+
+>
+
+📥 Export CSV
+
+</button>
 
 </div>
 
@@ -142,7 +330,7 @@ export default function AdminUsersPage(){
           ">
 
             <h2 className="text-xl font-bold">
-              Total Users
+             Total Staff
             </h2>
 
             <p className="
@@ -164,25 +352,24 @@ export default function AdminUsersPage(){
           ">
 
             <h2 className="text-xl font-bold">
-              Vendors
+             Active Staff
             </h2>
 
-            <p className="
-              text-4xl
-              font-bold
-              text-green-600
-              mt-2
-            ">
-              {
-                users.filter(
-                  (u)=>
-                    u.role ===
-                    "Vendor"
-                ).length
-              }
-            </p>
-
-          </div>
+           <p
+  className="
+    text-4xl
+    font-bold
+    text-green-600
+    mt-2
+  "
+>
+  {
+    users.filter(
+      (u) => u.status === "Active"
+    ).length
+  }
+</p>
+    </div>
 
           <div className="
             bg-white
@@ -192,17 +379,23 @@ export default function AdminUsersPage(){
           ">
 
             <h2 className="text-xl font-bold">
-              Customers
+              Inactive Staff
             </h2>
 
-            <p className="
-              text-4xl
-              font-bold
-              text-purple-600
-              mt-2
-            ">
-              0
-            </p>
+            <p
+  className="
+    text-4xl
+    font-bold
+    text-red-600
+    mt-2
+  "
+>
+  {
+    users.filter(
+      (u) => u.status === "Inactive"
+    ).length
+  }
+</p>
 
           </div>
 
@@ -268,6 +461,11 @@ export default function AdminUsersPage(){
                   <th className="text-left py-4">
                     Status
                   </th>
+                  <th className="text-left py-4">
+
+Actions
+
+</th>
 
                 </tr>
 
@@ -330,34 +528,121 @@ export default function AdminUsersPage(){
                     </td>
 
                     <td>
-                      {user.role}
-                    </td>
 
-                   <td>
+<span
 
-  <span
-    className={`
-      px-3
-      py-1
-      rounded-full
-      text-sm
-      font-semibold
+className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold"
 
-      ${
-        user.status === "Approved"
-        ? "bg-green-100 text-green-700"
+>
 
-        : user.status === "Rejected"
-        ? "bg-red-100 text-red-700"
+{user.role}
 
-        : "bg-yellow-100 text-yellow-700"
-      }
-    `}
-  >
+</span>
 
-    {user.status}
+</td>
 
-  </span>
+ <td>
+
+<span
+
+className={`
+px-3
+py-1
+rounded-full
+text-sm
+font-semibold
+
+${
+user.status==="Active"
+
+? "bg-green-100 text-green-700"
+
+: "bg-red-100 text-red-700"
+
+}
+
+`}
+
+>
+
+{user.status}
+
+</span>
+
+</td>
+
+<td>
+
+<div className="flex flex-wrap gap-2">
+
+<button
+
+onClick={()=>
+
+toggleStatus(
+
+user
+
+)
+
+}
+
+className={`
+px-3
+py-1
+rounded-lg
+text-white
+
+${
+user.status==="Active"
+
+? "bg-yellow-600"
+
+: "bg-green-600"
+
+}
+
+`}
+
+>
+
+{
+
+user.status==="Active"
+
+?
+
+"Deactivate"
+
+:
+
+"Activate"
+
+}
+
+</button>
+
+<button
+
+onClick={()=>
+
+deleteStaff(
+
+user.id
+
+)
+
+}
+
+className="bg-red-600 text-white px-3 py-1 rounded-lg"
+
+>
+
+Delete
+
+</button>
+
+</div>
 
 </td>
 
