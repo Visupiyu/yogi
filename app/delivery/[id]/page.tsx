@@ -15,7 +15,16 @@ import {
 
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import {
+
+  ref,
+
+  uploadBytes,
+
+  getDownloadURL,
+
+} from "firebase/storage";
 
 import { toast } from "sonner";
 
@@ -39,6 +48,17 @@ export default function DeliveryDetailsPage() {
 
   const [deliveryNotes, setDeliveryNotes] =
     useState("");
+    const [otp, setOtp] =
+  useState("");
+
+const [enteredOtp, setEnteredOtp] =
+  useState("");
+  const [proofImage, setProofImage] =
+  useState<File | null>(null);
+
+const [proofPreview, setProofPreview] =
+  useState("");
+    
 
   useEffect(() => {
 
@@ -79,6 +99,9 @@ export default function DeliveryDetailsPage() {
           data.deliveryNotes || ""
 
         );
+        setOtp(
+  data.deliveryOtp || ""
+);
 
       }
 
@@ -100,6 +123,61 @@ export default function DeliveryDetailsPage() {
 
       setSaving(true);
 
+      if (
+
+  status === "Delivered"
+
+  &&
+
+  otp
+
+  &&
+
+  enteredOtp !== otp
+
+){
+
+  toast.error(
+
+    "Invalid delivery OTP."
+
+  );
+
+  setSaving(false);
+
+  return;
+
+}
+let proofImageUrl = order.proofImage || "";
+
+if (proofImage) {
+
+  const storageRef = ref(
+
+    storage,
+
+    `delivery-proof/${id}-${Date.now()}`
+
+  );
+
+  await uploadBytes(
+
+    storageRef,
+
+    proofImage
+
+  );
+
+  proofImageUrl =
+
+    await getDownloadURL(
+
+      storageRef
+
+    );
+
+}
+
       await updateDoc(
 
         doc(db, "orders", id),
@@ -109,6 +187,8 @@ export default function DeliveryDetailsPage() {
           status,
 
           deliveryNotes,
+          proofImage:
+            proofImageUrl,
 
           deliveredAt:
 
@@ -363,8 +443,49 @@ export default function DeliveryDetailsPage() {
               Delivery Status
 
             </label>
+            {status === "Delivered" && (
+
+<div className="mt-6">
+
+  <label className="font-semibold">
+
+    Customer OTP
+
+  </label>
+
+  <input
+
+    type="text"
+
+    value={enteredOtp}
+
+    onChange={(e)=>
+
+      setEnteredOtp(
+        e.target.value
+      )
+
+    }
+
+    placeholder="Enter customer OTP"
+
+    className="
+      w-full
+      mt-2
+      border
+      rounded-xl
+      p-3
+    "
+
+  />
+
+</div>
+
+)}
 
             <select
+
+            
 
               value={status}
 
@@ -471,6 +592,62 @@ export default function DeliveryDetailsPage() {
             </a>
 
           </div>
+          <div className="mt-6">
+
+  <label className="font-semibold">
+
+    Proof of Delivery
+
+  </label>
+
+  <input
+
+    type="file"
+
+    accept="image/*"
+
+    onChange={(e)=>{
+
+      const file = e.target.files?.[0];
+
+      if(file){
+
+        setProofImage(file);
+
+        setProofPreview(
+
+          URL.createObjectURL(file)
+
+        );
+
+      }
+
+    }}
+
+    className="mt-2"
+
+  />
+
+  {proofPreview && (
+
+    <img
+
+      src={proofPreview}
+
+      alt="Proof"
+
+      className="
+        mt-4
+        h-48
+        rounded-xl
+        object-cover
+      "
+
+    />
+
+  )}
+
+</div>
 
           <button
 

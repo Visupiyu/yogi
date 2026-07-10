@@ -12,6 +12,7 @@ import {
   orderBy,
   updateDoc,
   doc,
+  addDoc,
   serverTimestamp,
 
 } from "firebase/firestore";
@@ -78,57 +79,7 @@ export default function AdminDeliveryPage() {
 
       );
 
-      const assignPartner =
-async(
-
-orderId:string,
-
-partner:any
-
-)=>{
-
-try{
-
-await updateDoc(
-
-doc(
-
-db,
-
-"orders",
-
-orderId
-
-),
-
-{
-
-deliveryPartnerId:
-partner.id,
-
-deliveryPartnerName:
-partner.name,
-
-assignedAt:
-serverTimestamp(),
-
-status:"Assigned",
-
-}
-
-);
-
-loadDeliveries();
-
-}catch(error){
-
-console.error(error);
-
-}
-
-};
-
-      const items: Delivery[] = [];
+     const items: Delivery[] = [];
 
       snapshot.forEach((docSnap) => {
 
@@ -303,6 +254,33 @@ status:"Assigned",
 
 loadDeliveries();
 
+await addDoc(
+
+  collection(
+    db,
+    "notifications"
+  ),
+
+  {
+
+    title:
+      "Delivery Assigned",
+
+    message:
+      `${partner.name} has been assigned to Order ${orderId.slice(0,8)}.`,
+
+    type:
+      "delivery",
+
+    read: false,
+
+    createdAt:
+      serverTimestamp(),
+
+  }
+
+);
+
 }catch(error){
 
 console.error(error);
@@ -310,6 +288,86 @@ console.error(error);
 }
 
 };  
+
+const exportCSV = () => {
+
+  const rows = [
+
+    [
+
+      "Order ID",
+
+      "Customer",
+
+      "Partner",
+
+      "Status",
+
+      "Tracking",
+
+      "Expected Delivery"
+
+    ],
+
+    ...filtered.map((item)=>([
+
+      item.id,
+
+      item.customerName,
+
+      item.deliveryPartnerName ||
+
+      item.courierPartner ||
+
+      "",
+
+      item.status,
+
+      item.trackingNumber ||
+
+      "",
+
+      item.expectedDelivery ||
+
+      ""
+
+    ]))
+
+  ];
+
+  const csv = rows
+
+    .map((row)=>row.join(","))
+
+    .join("\n");
+
+  const blob = new Blob(
+
+    [csv],
+
+    {
+
+      type:"text/csv"
+
+    }
+
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+
+  a.href = url;
+
+  a.download =
+
+    "delivery-report.csv";
+
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
 
   return (
 
@@ -330,6 +388,50 @@ console.error(error);
             Manage all marketplace deliveries
 
           </p>
+
+         <div className="mt-5 flex gap-3">
+
+  <button
+
+    onClick={loadDeliveries}
+
+    className="
+      bg-white
+      text-indigo-700
+      px-5
+      py-2
+      rounded-xl
+      font-semibold
+      hover:bg-gray-100
+    "
+
+  >
+
+    🔄 Refresh Deliveries
+
+  </button>
+
+  <button
+
+  onClick={exportCSV}
+
+  className="
+    bg-green-600
+    text-white
+    px-5
+    py-2
+    rounded-xl
+    font-semibold
+    hover:bg-green-700
+  "
+
+>
+
+  📥 Export CSV
+
+</button>
+
+</div>
 
         </div>
 

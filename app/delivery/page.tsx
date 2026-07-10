@@ -1,53 +1,50 @@
 "use client";
-
 import { useEffect, useState } from "react";
-
 import Link from "next/link";
-
 import {
-
   collection,
   getDocs,
   query,
   where,
   orderBy,
-
 } from "firebase/firestore";
-
 import { auth, db } from "@/lib/firebase";
-
 type Delivery = {
-
   id: string;
-
   customerName: string;
-
   phone?: string;
-
   address?: string;
-
   courierPartner?: string;
-
   trackingNumber?: string;
-
   expectedDelivery?: string;
-
   status: string;
-
   createdAt?: any;
-
 };
-
 export default function DeliveryDashboardPage() {
 
-  const [deliveries, setDeliveries] =
-    useState<Delivery[]>([]);
+  const [deliveries, setDeliveries] =useState<Delivery[]>([]);
+  const [loading, setLoading] =    useState(true);
+  const [search, setSearch] =    useState("");
+    const [statusFilter, setStatusFilter] =  useState("All");
+    const totalDeliveries =  deliveries.length;
+const pendingDeliveries =  deliveries.filter(
+    (d:any)=>
+      d.status === "Pending"
+  ).length;
 
-  const [loading, setLoading] =
-    useState(true);
+const outForDelivery =
+  deliveries.filter(
+    (d:any)=>
+      d.status ===
+      "Out For Delivery"
+  ).length;
 
-  const [search, setSearch] =
-    useState("");
+const deliveredDeliveries =
+  deliveries.filter(
+    (d:any)=>
+      d.status ===
+      "Delivered"
+  ).length;
 
   useEffect(() => {
 
@@ -57,30 +54,21 @@ export default function DeliveryDashboardPage() {
 
   const loadDeliveries = async () => {
 
-    try {
-
+    try { 
       const user = auth.currentUser;
 
-      if (!user) {
-
+      if (!user) { 
         setLoading(false);
-
         return;
-
       }
 
       const snapshot = await getDocs(
 
         query(
-
           collection(db, "orders"),
-
           where("deliveryPartnerId", "==", user.uid),
-
           orderBy("createdAt", "desc")
-
         )
-
       );
 
       const items: Delivery[] = [];
@@ -135,21 +123,31 @@ export default function DeliveryDashboardPage() {
 
   };
 
-  const filtered = deliveries.filter(
+ const filtered = deliveries.filter((item) => {
 
-    (item) =>
+  const matchesSearch =
 
-      item.customerName
-        .toLowerCase()
-        .includes(search.toLowerCase())
+    item.customerName
+      .toLowerCase()
+      .includes(search.toLowerCase())
 
-      ||
+    ||
 
-      item.id
-        .toLowerCase()
-        .includes(search.toLowerCase())
+    item.id
+      .toLowerCase()
+      .includes(search.toLowerCase());
 
-  );
+  const matchesStatus =
+
+    statusFilter === "All"
+
+    ||
+
+    item.status === statusFilter;
+
+  return matchesSearch && matchesStatus;
+
+});
 
   return (
 
@@ -170,6 +168,29 @@ export default function DeliveryDashboardPage() {
             Assigned deliveries
 
           </p>
+          <div className="mt-5">
+
+  <button
+
+    onClick={loadDeliveries}
+
+    className="
+      bg-white
+      text-blue-700
+      px-5
+      py-2
+      rounded-xl
+      font-semibold
+      hover:bg-gray-100
+    "
+
+  >
+
+    🔄 Refresh Deliveries
+
+  </button>
+
+</div>
 
         </div>
 
@@ -185,7 +206,7 @@ export default function DeliveryDashboardPage() {
 
             <h2 className="text-3xl font-bold">
 
-              {deliveries.length}
+              {totalDeliveries}
 
             </h2>
 
@@ -201,17 +222,9 @@ export default function DeliveryDashboardPage() {
 
             <h2 className="text-3xl font-bold text-yellow-600">
 
-              {
+              {pendingDeliveries}
 
-                deliveries.filter(
-
-                  d => d.status === "Pending"
-
-                ).length
-
-              }
-
-            </h2>
+              </h2>
 
           </div>
 
@@ -223,20 +236,9 @@ export default function DeliveryDashboardPage() {
 
             </p>
 
-            <h2 className="text-3xl font-bold text-blue-600">
-
-              {
-
-                deliveries.filter(
-
-                  d => d.status === "Out For Delivery"
-
-                ).length
-
-              }
-
-            </h2>
-
+           <h2 className="text-3xl font-bold text-blue-600">
+  {outForDelivery}
+</h2>
           </div>
 
           <div className="bg-white rounded-2xl p-6 shadow">
@@ -249,35 +251,65 @@ export default function DeliveryDashboardPage() {
 
             <h2 className="text-3xl font-bold text-green-600">
 
-              {
-
-                deliveries.filter(
-
-                  d => d.status === "Delivered"
-
-                ).length
-
-              }
-
+              {deliveredDeliveries}
+               
             </h2>
 
           </div>
 
         </div>
 
-        <input
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
 
-          placeholder="Search delivery..."
+  <input
 
-          value={search}
+    placeholder="Search delivery..."
 
-          onChange={(e) =>
-            setSearch(e.target.value)
-          }
+    value={search}
 
-          className="w-full border rounded-2xl p-4 mb-6"
+    onChange={(e)=>
+      setSearch(e.target.value)
+    }
 
-        />
+    className="
+      flex-1
+      border
+      rounded-2xl
+      p-4
+    "
+
+  />
+
+  <select
+
+    value={statusFilter}
+
+    onChange={(e)=>
+      setStatusFilter(e.target.value)
+    }
+
+    className="
+      border
+      rounded-2xl
+      p-4
+      md:w-64
+    "
+
+  >
+
+    <option>All</option>
+
+    <option>Pending</option>
+
+    <option>Assigned</option>
+
+    <option>Out For Delivery</option>
+
+    <option>Delivered</option>
+
+  </select>
+
+</div>
 
         {loading ? (
 
@@ -344,22 +376,101 @@ export default function DeliveryDashboardPage() {
                       📞 {delivery.phone}
 
                     </p>
+                    <div className="
+flex
+flex-wrap
+gap-3
+mt-4
+">
+
+<a
+
+  href={`tel:${delivery.phone}`}
+
+  className="
+    bg-green-600
+    text-white
+    px-4
+    py-2
+    rounded-xl
+    text-sm
+  "
+
+>
+
+  📞 Call Customer
+
+</a>
+
+<a
+
+  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    delivery.address || ""
+  )}`}
+
+  target="_blank"
+
+  rel="noopener noreferrer"
+
+  className="
+    bg-blue-600
+    text-white
+    px-4
+    py-2
+    rounded-xl
+    text-sm
+  "
+
+>
+
+  🗺️ Open Maps
+
+</a>
+
+</div>
 
                   </div>
 
                   <div className="text-right">
 
-                    <p>
+                    <span
+  className={`
+    inline-block
+    px-4
+    py-2
+    rounded-full
+    text-sm
+    font-semibold
 
-                      🚚 {delivery.status}
+    ${
+      delivery.status === "Delivered"
+        ? "bg-green-100 text-green-700"
 
-                    </p>
+        : delivery.status === "Out For Delivery"
+        ? "bg-blue-100 text-blue-700"
+
+        : delivery.status === "Assigned"
+        ? "bg-yellow-100 text-yellow-700"
+
+        : "bg-gray-100 text-gray-700"
+    }
+  `}
+>
+
+  {delivery.status}
+
+</span>
 
                     <p>
 
                       📦 {delivery.trackingNumber}
 
                     </p>
+                    <p>
+
+  📍 {delivery.address}
+
+</p>
 
                     <p>
 
