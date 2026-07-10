@@ -23,6 +23,8 @@ import {
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+
 
 type Vendor = {
   id: string;
@@ -423,6 +425,96 @@ export default function AdminPage() {
             <p className="text-gray-500">Manage refund requests</p>
           </div>
         </div>
+</div>
+
+{/* MANAGEMENT MODULES */}
+
+<div className="bg-white rounded-2xl shadow p-8 mb-10">
+
+  <h2 className="text-3xl font-bold mb-8">
+    🚀 Management Modules
+  </h2>
+
+  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
+
+    <Link href="/admin/orders" className="bg-blue-50 p-6 rounded-xl text-center hover:shadow-lg">
+      📦
+      <p className="font-bold mt-2">Orders</p>
+    </Link>
+
+    <Link href="/admin/users" className="bg-green-50 p-6 rounded-xl text-center hover:shadow-lg">
+      👥
+      <p className="font-bold mt-2">Users</p>
+    </Link>
+
+    <Link href="/admin/delivery" className="bg-orange-50 p-6 rounded-xl text-center hover:shadow-lg">
+      🚚
+      <p className="font-bold mt-2">Delivery</p>
+    </Link>
+
+    <Link href="/admin/delivery-partners" className="bg-yellow-50 p-6 rounded-xl text-center hover:shadow-lg">
+      🛵
+      <p className="font-bold mt-2">Delivery Partners</p>
+    </Link>
+
+    <Link href="/admin/analytics" className="bg-purple-50 p-6 rounded-xl text-center hover:shadow-lg">
+      📊
+      <p className="font-bold mt-2">Analytics</p>
+    </Link>
+
+    <Link href="/admin/reports" className="bg-pink-50 p-6 rounded-xl text-center hover:shadow-lg">
+      📈
+      <p className="font-bold mt-2">Reports</p>
+    </Link>
+
+    <Link href="/admin/payouts" className="bg-cyan-50 p-6 rounded-xl text-center hover:shadow-lg">
+      💰
+      <p className="font-bold mt-2">Payouts</p>
+    </Link>
+
+    <Link href="/admin/refunds" className="bg-red-50 p-6 rounded-xl text-center hover:shadow-lg">
+      💸
+      <p className="font-bold mt-2">Refunds</p>
+    </Link>
+
+    <Link href="/admin/returns" className="bg-indigo-50 p-6 rounded-xl text-center hover:shadow-lg">
+      🔄
+      <p className="font-bold mt-2">Returns</p>
+    </Link>
+
+    <Link href="/admin/support" className="bg-gray-100 p-6 rounded-xl text-center hover:shadow-lg">
+      💬
+      <p className="font-bold mt-2">Support</p>
+    </Link>
+
+    <Link href="/admin/kyc" className="bg-lime-50 p-6 rounded-xl text-center hover:shadow-lg">
+      🆔
+      <p className="font-bold mt-2">Vendor KYC</p>
+    </Link>
+
+    <Link href="/admin/coupons" className="bg-emerald-50 p-6 rounded-xl text-center hover:shadow-lg">
+      🎟️
+      <p className="font-bold mt-2">Coupons</p>
+    </Link>
+
+    <Link href="/admin/notifications" className="bg-amber-50 p-6 rounded-xl text-center hover:shadow-lg">
+      🔔
+      <p className="font-bold mt-2">Notifications</p>
+    </Link>
+
+    <Link href="/admin/withdrawals" className="bg-sky-50 p-6 rounded-xl text-center hover:shadow-lg">
+      🏦
+      <p className="font-bold mt-2">Withdrawals</p>
+    </Link>
+
+  </div>
+
+</div>
+
+{/* NOTIFICATIONS */}
+
+<div className="bg-white rounded-2xl shadow p-8 mb-10">
+
 
         {/* NOTIFICATIONS */}
         <div className="bg-white rounded-2xl shadow p-8 mb-10">
