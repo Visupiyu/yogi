@@ -446,7 +446,16 @@ export default function AdminPage() {
       👥
       <p className="font-bold mt-2">Users</p>
     </Link>
-
+   <Link
+  href="/admin/products"
+  className="bg-green-50 p-6 rounded-xl text-center hover:shadow-lg"
+>
+  📦
+  <p className="font-bold mt-2">
+    Marketplace Products
+  </p>
+</Link>
+    
     <Link href="/admin/delivery" className="bg-orange-50 p-6 rounded-xl text-center hover:shadow-lg">
       🚚
       <p className="font-bold mt-2">Delivery</p>
