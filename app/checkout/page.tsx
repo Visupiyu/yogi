@@ -6,6 +6,7 @@ import { collection, addDoc, Timestamp, doc, updateDoc, increment, getDocs, quer
 
 import { db } from "@/lib/firebase";
 import {useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase";
 
 export default function CheckoutPage() {
 
@@ -331,15 +332,25 @@ localStorage.removeItem(
 
   const rewardPoints =Math.floor(grandTotal / 100 );
 
+  const firebaseUser = auth.currentUser;
+
+if (!firebaseUser) {
+
+  alert("Please login again.");
+
+  router.push("/login");
+
+  setLoading(false);
+
+  return;
+
+}
+
   try{const orderRef = await addDoc(collection( db, "orders" ),
 
     { customerName:name, phone:phone, address:address, userEmail:
 
-  JSON.parse(localStorage.getItem( "user" ) || "{}" ).email,
-
-  userId:
-
-JSON.parse(localStorage.getItem("user") || "{}" ).uid,
+  firebaseUser.email, userId: firebaseUser.uid,
 
         items:items,
 
@@ -431,9 +442,7 @@ JSON.parse(localStorage.getItem("user") || "{}" ).uid,
 await addDoc(
   collection(db, "notifications"),
   {
-    userId: JSON.parse(
-      localStorage.getItem("user") || "{}"
-    ).uid,
+    userId: firebaseUser.uid,
 
     role: "customer",
 
@@ -464,11 +473,7 @@ await fetch(
       customerName:name,
 
       customerEmail:
-        JSON.parse(
-          localStorage.getItem(
-            "user"
-          ) || "{}"
-        ).email,
+        firebaseUser.email,
 
       orderId:
         orderRef.id,
@@ -790,6 +795,16 @@ if(items.length === 0){
           verifyData.success
         ){
 
+          const firebaseUser = auth.currentUser;
+
+if (!firebaseUser) {
+
+  alert("Please login again.");
+
+  return;
+
+}
+
           setLoading(true);
 
           try{
@@ -879,12 +894,8 @@ discount:
 );
 await addDoc(
   collection(db, "notifications"),
-  {
-    userId: JSON.parse(
-      localStorage.getItem("user") || "{}"
-    ).uid,
-
-    role: "customer",
+  { userId: firebaseUser.uid,
+     role: "customer",
 
     title: "✅ Order Placed",
 
