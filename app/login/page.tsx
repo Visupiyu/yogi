@@ -57,6 +57,7 @@ localStorage.setItem(
   JSON.stringify({
 
     uid: firebaseUser.uid,
+    
 
     email: firebaseUser.email,
 

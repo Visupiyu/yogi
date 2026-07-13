@@ -205,12 +205,15 @@ setOrders(unique);
 
   </div>
 
- <div className="
-  flex
-  flex-col
-  items-end
-  gap-3
-">
+ <div
+  className="
+    w-full
+    md:w-72
+    flex
+    flex-col
+    gap-3
+  "
+>
 <div>
 
   <p className="
@@ -237,16 +240,21 @@ setOrders(unique);
   mt-2
 ">
   Payment:
-  <span
-    className={
-      order.paymentStatus === "Paid"
-        ? "text-green-600"
-        : "text-red-600"
-    }
+  <div className="flex justify-center my-4">
+   <span
+    className="
+      px-4
+      py-2
+      rounded-full
+      bg-yellow-100
+      text-yellow-700
+      font-semibold
+    "
   >
-    {" "}
-    {order.paymentStatus || "Pending"}
-  </span>
+    Pending
+     </span>
+</div>
+
 </p>
 <p className="
   text-sm
@@ -264,12 +272,17 @@ setOrders(unique);
   target="_blank"
   rel="noopener noreferrer"
   className="
-    bg-blue-600
-    text-white
-    px-4
-    py-2
-    rounded-lg
-  "
+w-full
+h-12
+bg-blue-600
+hover:bg-blue-700
+rounded-xl
+font-semibold
+text-white
+flex
+items-center
+justify-center
+"
 >
   Download Invoice
 </a>
@@ -295,13 +308,17 @@ setOrders(unique);
   <button
     disabled
     className="
-      bg-gray-300
-      text-gray-500
-      px-4
-      py-2
-      rounded-lg
-      mt-2
-    "
+w-full
+h-12
+bg-gray-300
+text-gray-600
+rounded-xl
+font-semibold
+flex
+items-center
+justify-center
+cursor-not-allowed
+"
   >
     💬 Chat Unavailable
   </button>
@@ -310,54 +327,66 @@ setOrders(unique);
 <a
   href={`/orders/${order.id}`}
   className="
-    bg-indigo-600
-    text-white
-    px-4
-    py-2
-    rounded-lg
-    mt-2
-    inline-block
-  "
+w-full
+h-12
+bg-purple-600
+hover:bg-purple-700
+rounded-xl
+font-semibold
+text-white
+flex
+items-center
+justify-center
+"
 >
   📍 Track Order
 </a>
 
-  <span className={`
-  px-4
-  py-2
-  rounded-full
-  text-sm
-  font-semibold
+ <div
+  className="
+    border
+    rounded-xl
+    p-4
+    text-center
+  "
+>
 
-  ${
-    order.status ===
-    "Delivered"
+  <span
+    className={`
+      inline-block
+      px-4
+      py-2
+      rounded-full
+      text-sm
+      font-semibold
 
-    ? "bg-green-100 text-green-700"
+      ${
+        order.status === "Delivered"
 
-    : order.status ===
-      "Shipped"
+          ? "bg-green-100 text-green-700"
 
-    ? "bg-blue-100 text-blue-700"
+          : order.status === "Shipped"
 
-    : order.status ===
-      "Out For Delivery"
+          ? "bg-blue-100 text-blue-700"
 
-    ? "bg-orange-100 text-orange-700"
+          : order.status === "Out For Delivery"
 
-    : "bg-yellow-100 text-yellow-700"
-  }
-`}>
+          ? "bg-orange-100 text-orange-700"
 
-  {order.status}
+          : "bg-yellow-100 text-yellow-700"
+      }
+    `}
+  >
 
-  <p className="
-  text-xs
-  text-gray-500
-  mt-1
-">
-  Tracking Updated
-</p>
+    {order.status}
+
+  </span>
+
+  <p className="text-xs text-gray-500 mt-2">
+
+    Tracking Updated
+
+  </p> 
 
 {order.expectedDelivery && (
 
@@ -419,20 +448,23 @@ setOrders(unique);
 </p>
 
 )}
-</span>
+</div>
 
 {order.status === "Pending" && (
 
    <button
     className="
-      mt-3
-      bg-red-500
-      text-white
-      px-4
-      py-2
-      rounded-lg
-      text-sm
-    "
+w-full
+h-12
+bg-red-600
+hover:bg-red-700
+rounded-xl
+font-semibold
+text-white
+flex
+items-center
+justify-center
+"
   >
     Cancel Order
   </button>
