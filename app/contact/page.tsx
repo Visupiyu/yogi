@@ -49,7 +49,7 @@ export default function ContactPage() {
                 </span>
 
               </div>
-
+              
               <div className="flex items-center gap-4">
 
                 <MapPin className="text-red-600" />
@@ -63,6 +63,46 @@ export default function ContactPage() {
             </div>
 
           </div>
+
+          <div className="mt-8 bg-green-50 border border-green-200 rounded-xl p-5">
+
+  <h3 className="font-bold text-lg mb-2">
+
+    Customer Support
+
+  </h3>
+
+  <p className="text-gray-700">
+
+    Our support team aims to respond to all inquiries within
+    24–48 business hours.
+
+  </p>
+
+</div>
+          <div className="flex items-start gap-4">
+
+  <span className="text-2xl">
+    🕒
+  </span>
+
+  <div>
+
+    <p className="font-semibold">
+      Business Hours
+    </p>
+
+    <p>
+      Monday - Saturday
+    </p>
+
+    <p>
+      9:00 AM - 6:00 PM (IST)
+    </p>
+
+  </div>
+
+</div>
 
           {/* Contact Form */}
 
@@ -122,6 +162,13 @@ export default function ContactPage() {
                 "
               />
 
+              <p className="text-sm text-gray-500">
+
+By submitting this form, you agree to our
+Privacy Policy and Terms & Conditions.
+
+</p>
+
               <button
                 type="submit"
                 className="
@@ -140,6 +187,36 @@ export default function ContactPage() {
             </form>
 
           </div>
+
+          <div className="mt-12 text-center">
+
+  <h2 className="text-2xl font-bold mb-6">
+
+    Helpful Links
+
+  </h2>
+
+  <div className="flex flex-wrap justify-center gap-4">
+
+    <a href="/privacy-policy" className="text-green-600 hover:underline">
+      Privacy Policy
+    </a>
+
+    <a href="/terms" className="text-green-600 hover:underline">
+      Terms & Conditions
+    </a>
+
+    <a href="/shipping-policy" className="text-green-600 hover:underline">
+      Shipping Policy
+    </a>
+
+    <a href="/return-refund" className="text-green-600 hover:underline">
+      Return & Refund Policy
+    </a>
+
+  </div>
+
+</div>
 
         </div>
 

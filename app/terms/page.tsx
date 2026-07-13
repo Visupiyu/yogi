@@ -18,35 +18,163 @@ export default function TermsPage() {
           </p>
 
           <p className="text-center text-gray-500 mb-8">
-  Last Updated: June 2026
+ Last Updated: July 2026
 </p>
 
           <div>
 
-            <h2 className="text-2xl font-bold mb-2">
-              User Accounts
-            </h2>
+            <div>
 
-            <p>
-              Users are responsible for maintaining the confidentiality
-              of their account information and passwords.
-            </p>
+<h2 className="text-2xl font-bold mb-2">
 
-          </div>
+Eligibility
 
-          <div>
+</h2>
 
-            <h2 className="text-2xl font-bold mb-2">
-              Orders & Payments
-            </h2>
+<p>
 
-            <p>
-              All orders are subject to product availability and payment
-              verification. Prices may change without prior notice.
-            </p>
+By using Yogi-Mart, you confirm that you are at least 18 years of age or are using the platform under the supervision of a parent or legal guardian.
 
-          </div>
+</p>
 
+</div>
+
+           <div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+User Accounts
+
+</h2>
+
+<p>
+
+You are responsible for maintaining the confidentiality of your account credentials. You agree to provide accurate information and are responsible for all activities that occur under your account.
+
+</p>
+
+</div>
+
+<div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+Orders and Payments
+
+</h2>
+
+<p>
+
+All orders placed through Yogi-Mart are subject to product availability and seller acceptance. Payments are processed through secure payment gateways. Prices, taxes, and delivery charges are displayed during checkout.
+
+</p>
+
+</div>
+<div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+Delivery
+
+</h2>
+
+<p>
+
+Estimated delivery dates are provided for convenience only. Actual delivery times may vary depending on the seller, courier, weather conditions, or other circumstances beyond our control.
+
+</p>
+
+</div>
+<div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+Returns and Refunds
+
+</h2>
+
+<p>
+
+Returns, replacements, and refunds are governed by our Return & Refund Policy. Certain products may not be eligible for return due to hygiene, legal, or seller-specific restrictions.
+
+</p>
+
+</div>
+<div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+Prohibited Activities
+
+</h2>
+
+<p>
+
+Users must not engage in fraudulent activities, upload harmful content, misuse the platform, interfere with security, or violate applicable laws while using Yogi-Mart.
+
+</p>
+
+</div>
+<div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+Intellectual Property
+
+</h2>
+
+<p>
+
+All trademarks, logos, graphics, software, content, and branding displayed on Yogi-Mart are the property of Yogi-Mart or their respective owners and are protected under applicable intellectual property laws.
+
+</p>
+
+</div>
+<div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+Limitation of Liability
+
+</h2>
+
+<p>
+
+Yogi-Mart acts as a marketplace connecting customers and sellers. To the maximum extent permitted by law, Yogi-Mart shall not be liable for indirect, incidental, or consequential damages arising from the use of the platform.
+
+</p>
+
+</div>
+<div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+Governing Law
+
+</h2>
+
+<p>
+
+These Terms and Conditions shall be governed by and interpreted in accordance with the laws of India. Any disputes shall be subject to the jurisdiction of the competent courts in India.
+
+</p>
+
+</div>
+<div>
+
+<h2 className="text-2xl font-bold mb-2">
+
+Contact Us
+
+</h2>
+
+<p>
+
+If you have any questions regarding these Terms and Conditions, please contact the Yogi-Mart Support Team through the Contact Us page.
+
+</p>
+
+</div>
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
@@ -59,48 +187,11 @@ export default function TermsPage() {
             </p>
 
           </div>
+     
 
-          <div>
-
-            <h2 className="text-2xl font-bold mb-2">
-              Returns & Refunds
-            </h2>
-
-            <p>
-              Refunds and returns are subject to the policies applicable
-              to the specific product and seller.
-            </p>
-
-          </div>
-
-          <div>
-
-            <h2 className="text-2xl font-bold mb-2">
-              Prohibited Activities
-            </h2>
-
-            <p>
-              Users must not misuse the platform, engage in fraudulent
-              activities, or violate any applicable laws.
-            </p>
-
-          </div> 
-
-          <div>
-
-            <div>
-
-  <h2 className="text-2xl font-bold mb-2">
-    Limitation of Liability
-  </h2>
-
-  <p>
-    Yogi-Mart shall not be liable for indirect, incidental, or consequential damages arising from the use of the platform.
-  </p>
-
-</div>
-
-            <h2 className="text-2xl font-bold mb-2">
+    <div>
+   
+           <h2 className="text-2xl font-bold mb-2">
               Changes to Terms
             </h2>
 
@@ -127,9 +218,9 @@ export default function TermsPage() {
         </div>
 
       </div>
-
-    </div>
-
+</div>
+</div>
+   
   );
 
 }
