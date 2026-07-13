@@ -37,10 +37,16 @@ export default function ProfilePage() {
 
     const userData = JSON.parse(savedUser);
     setUser(userData);
+    const userId = userData.uid || userData.id;
 
     const loadProfile = async () => {
       try {
-        const ref = doc(db, "users", userData.uid);
+        if (!userId) {
+  console.error("User ID not found");
+  return;
+}
+
+const ref = doc(db, "users", userId);
         const snap = await getDoc(ref);
         if (snap.exists()) {
           const data: any = snap.data();
@@ -56,16 +62,20 @@ export default function ProfilePage() {
 
     const loadOrders = async () => {
       try {
-        const snapshot = await getDocs(
-          query(
-            collection(db, "orders"),
-            where("userEmail", "==", userData.email),
-            orderBy("createdAt", "desc")
-          )
-        );
-        const data: any[] = [];
-        snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
-        setRecentOrders(data.slice(0, 3));
+       const snapshot = await getDocs(
+  query(
+    collection(db, "orders"),
+    where("userEmail", "==", userData.email)
+  )
+);
+const data: any[] = [];
+snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
+
+// Sort newest-first in code, then take the 3 most recent
+data.sort(
+  (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+);
+setRecentOrders(data.slice(0, 3));
       } catch (error) {
         console.error(error);
       }
@@ -84,9 +94,9 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       await setDoc(
-        doc(db, "users", user.uid),
+       doc(db, "users", user.uid || user.id),
         {
-          uid: user.uid,
+          uid: user.uid || user.id,
           email: user.email,
           name: fullName,
           phone,

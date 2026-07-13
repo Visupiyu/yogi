@@ -96,12 +96,17 @@ export default function ProductPage() {
   }, [params]);
 
   const colors = product?.color
-    ? product.color.split(",").map((c: string) => c.trim())
+    ? product.color.split(",").map((c: string) => c.trim()).filter(Boolean)
     : [];
+
+  // Filter out empty entries — an empty sizes field can be stored as [""].
+  const sizes = (product?.sizes || []).filter(
+    (s: string) => s && s.trim()
+  );
 
   // Shared cart logic. Returns false if a required option is missing.
   const addItemToCart = (): boolean => {
-    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+    if (sizes.length > 0 && !selectedSize) {
       alert("Please select a size");
       return false;
     }
@@ -216,45 +221,34 @@ export default function ProductPage() {
       return;
     }
 
-   const snapshot = await getDocs(
-  query(
-    collection(db, "chats"),
-    where("customerEmail", "==", user.email),
-    where("sellerId", "==", product.vendorId),
-    where("productId", "==", product.id)
-  )
-);
+    const snapshot = await getDocs(
+      query(
+        collection(db, "chats"),
+        where("customerEmail", "==", user.email),
+        where("sellerId", "==", product.vendorId)
+      )
+    );
 
     if (!snapshot.empty) {
       router.push(`/chat/${snapshot.docs[0].id}`);
       return;
     }
 
-   const docRef = await addDoc(collection(db, "chats"), {
-  customerId: user.uid || "",
-  customerEmail: user.email,
-  customerName: user.name,
-
-  sellerId: product.vendorId,
-  sellerEmail: product.vendorEmail || "",
-  sellerName: product.vendorName,
-
-  sellerImage: "",
-  customerImage: "",
-
-  productId: product.id,
-  productName: product.name,
-
-  lastMessage: "",
-
-  customerUnread: 0,
-  sellerUnread: 0,
-
-  status: "active",
-
-  createdAt: serverTimestamp(),
-  lastMessageAt: serverTimestamp(),
-});
+    const docRef = await addDoc(collection(db, "chats"), {
+      customerEmail: user.email,
+      customerName: user.name,
+      sellerId: product.vendorId,
+      sellerName: product.vendorName,
+      sellerImage: "",
+      customerImage: "",
+      productId: product.id,
+      productName: product.name,
+      lastMessage: "",
+      customerUnread: 0,
+      sellerUnread: 0,
+      createdAt: serverTimestamp(),
+      lastMessageAt: serverTimestamp(),
+    });
 
     router.push(`/chat/${docRef.id}`);
   };
@@ -426,7 +420,7 @@ export default function ProductPage() {
                     )}
                   </div>
 
-                  {product.sizes && product.sizes.length > 0 && (
+                  {sizes.length > 0 && (
                     <div className="mb-4 mt-3">
                       <div className="flex justify-between items-center mb-2">
                         <p className="font-semibold">Select Size</p>
@@ -440,7 +434,7 @@ export default function ProductPage() {
                       </div>
 
                       <div className="flex gap-2 flex-wrap">
-                        {product.sizes.map(
+                        {sizes.map(
                           (size: string, index: number) => (
                             <button
                               key={index}
@@ -782,7 +776,7 @@ export default function ProductPage() {
           className="flex-1 bg-blue-600 disabled:opacity-50 text-white py-3 rounded-xl text-center font-bold"
         >
           Buy Now
-        </button>
+ </button>
       </div>
     </>
   );

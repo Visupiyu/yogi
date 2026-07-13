@@ -254,7 +254,7 @@ export default function SellerPage() {
         gender,
         color,
         material,
-        sizes: sizes.split(",").map((s) => s.trim()),
+       sizes: sizes.split(",").map((s) => s.trim()).filter(Boolean),
         countryOfOrigin,
         price: Number(price),
         stock: Number(stock),

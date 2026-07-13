@@ -40,21 +40,29 @@ export default function LoginPage(){
 
       setLoading(true);
 
-      await signInWithEmailAndPassword(
+     const userCredential = await signInWithEmailAndPassword(
 
-        auth,
-        email,
-        password
+  auth,
+  email,
+  password
 
-      );
+);
 
-      localStorage.setItem(
+const firebaseUser = userCredential.user;
+
+localStorage.setItem(
 
   "user",
 
   JSON.stringify({
 
-    email
+    uid: firebaseUser.uid,
+
+    email: firebaseUser.email,
+
+    name: firebaseUser.displayName || "",
+
+    photoURL: firebaseUser.photoURL || "",
 
   })
 

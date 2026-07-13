@@ -2,8 +2,12 @@
 
 import {useEffect,useState,
 } from "react";
-import {collection,getDocs,orderBy,query,
-} from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  } from "firebase/firestore";
 import { db }
 from "@/lib/firebase";
 import {useRouter
@@ -18,57 +22,40 @@ if(!user){alert("Please login first");
   router.push("/login");
   return;
 }
-   const fetchOrders =async()=>{
-  try{const userData =
-      JSON.parse(
-        localStorage.getItem(
-          "user"
-        ) || "{}"
-      );
-    const q = query(
-      collection(db,"orders"),
+   const fetchOrders = async () => {
+  try {
+    const userData = JSON.parse(localStorage.getItem("user") || "{}");
 
-      orderBy("createdAt","desc")
+    const q = query(
+      collection(db, "orders"),
+      where("userEmail", "==", userData.email)
     );
 
-    const snapshot =
-      await getDocs(q);
-
-    const items:any[] = [];
-
-    snapshot.forEach((doc)=>{
-
-      const order:any =
-        doc.data();
-
-      if(
-
-        order.userEmail ===
-        userData.email
-      ){
-        items.push({
-          id:doc.id,
-
-          ...order,
-
-        });
-
-      }
-
+    const snapshot = await getDocs(q);
+    const items: any[] = [];
+    snapshot.forEach((doc) => {
+      items.push({ id: doc.id, ...doc.data() });
     });
-    
+
+    const unique = Array.from(new Map(items.map((o) => [o.id, o])).values());
+
+unique.sort(
+  (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+);
+
+setOrders(unique);
+
+    // Newest first (no composite index needed)
+    items.sort(
+      (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+    );
 
     setOrders(items);
-
-  }catch(error){
-
-   console.error(
-  "Failed to load orders:",
-  error
-);
+  } catch (error) {
+    console.error("Failed to load orders:", error);
+  } finally {
+    setLoading(false);
   }
-
-  setLoading(false);
 };
     fetchOrders();
 
@@ -165,10 +152,9 @@ if(!user){alert("Please login first");
             space-y-8
           ">
 
-            {orders.map((order:any,index:number)=>(
-
-              <div
-                key={index}
+            {orders.map((order: any) => (
+  <div
+    key={order.id}
                 className="
                   bg-white
                   rounded-3xl
