@@ -1,74 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
 import Link from "next/link";
 import { toast } from "sonner";
-
 import { useParams } from "next/navigation";
-
-import {
-
-  doc,
-
-  getDoc,
-
-  updateDoc,
-
-  addDoc,
-
-  collection,
-
-  serverTimestamp
-
-} from "firebase/firestore";
-
+import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export default function SellerOrderDetailsPage(){
 
   const params = useParams();
-
   const id = params.id as string;
-
-  const [loading,setLoading] =
-    useState(true);
-
-  const [order,setOrder] =
-    useState<any>(null);
-
-  const [status,setStatus] =
-    useState("Pending");
-
-  const [trackingNumber,setTrackingNumber] =
-    useState("");
-    const [saving, setSaving] =
-  useState(false);
-
-  const [courierPartner,setCourierPartner] =
-    useState("");
-
-  const [dispatchDate,setDispatchDate] =
-    useState("");
-
-  const [expectedDelivery,setExpectedDelivery] =
-    useState("");
-
-  const [sellerNotes,setSellerNotes] =
-    useState("");
+  const [loading,setLoading] = useState(true);
+  const [order,setOrder] = useState<any>(null);
+  const [status,setStatus] =useState("Pending");
+  const [trackingNumber,setTrackingNumber] =useState("");
+  const [saving, setSaving] =useState(false);
+  const [courierPartner,setCourierPartner] =useState("");
+  const [dispatchDate,setDispatchDate] =useState("");
+  const [expectedDelivery,setExpectedDelivery] =useState("");
+  const [sellerNotes,setSellerNotes] = useState("");
    
-  useEffect(()=>{
-
-    loadOrder();
-
-  },[]);
+  useEffect(()=>{loadOrder();},[]);
 
   const loadOrder = async()=>{
-
     try{
-
       const snap = await getDoc(
-
         doc(
           db,
           "orders",

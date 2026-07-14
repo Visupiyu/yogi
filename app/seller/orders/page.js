@@ -1,254 +1,98 @@
 "use client";
-
 import { useEffect, useState } from "react";
-
 import Link from "next/link";
-
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  doc,
-  updateDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-
-import { auth, db }
-from "@/lib/firebase";
-
+import {collection,getDocs,query,orderBy,doc,updateDoc,addDoc,serverTimestamp,} from "firebase/firestore";
+import { auth, db }from "@/lib/firebase";
 export default function SellerOrdersPage(){
-
-  const [orders,setOrders] =
-    useState([]);
-
-  const [loading,setLoading] =
-    useState(true);
-
-    const [search,setSearch] =
-  useState("");
+  const [orders,setOrders] =    useState([]);
+  const [loading,setLoading] =    useState(true);
+    const [search,setSearch] =  useState("");
 
   useEffect(()=>{
-
     const fetchOrders =
       async ()=>{
+    const vendor = JSON.parse(
+  localStorage.getItem("vendor") || "{}" );
 
-      const user =
-        auth.currentUser;
+if(!vendor.uid){setLoading(false); return; }
 
-      if(!user){
-
-        setLoading(false);
-
-        return;
-      }
-
-      const vendorId =
-        user.uid;
+const vendorId = vendor.uid;
+console.log("Logged-in Vendor UID:", vendorId);
 
       const q = query(
-
         collection(
           db,
-          "orders"
-        ),
+          "orders"),
 
-        orderBy(
-          "createdAt",
-          "desc"
-        )
+        orderBy("createdAt","desc"));
 
-      );
+      const snapshot =await getDocs(q);
 
-      const snapshot =
-        await getDocs(q);
-
-      const sellerOrders =
-        [];
+      const sellerOrders =[];
 
       snapshot.forEach((docSnap)=>{
 
-        const order = {
+        const order = {id: docSnap.id,...docSnap.data()};
 
-          id: docSnap.id,
+       console.log("Logged-in Vendor UID:", vendorId);
 
-          ...docSnap.data()
+console.log("Order Items:", order.items);
 
-        };
+const myItems = order.items.filter((item) => {
 
-        const myItems =
+  console.log(
+    "Item Vendor ID:",
+    item.vendorId
+  );
 
-          order.items.filter(
+  return item.vendorId === vendorId;
 
-            (item)=>
+});
 
-              item.vendorId ===
-              vendorId
+console.log("Matching Items:", myItems);
 
-          );
+        if(myItems.length > 0){sellerOrders.push({...order,items: myItems});}});
 
-        if(
-          myItems.length > 0
-        ){
+      setOrders( sellerOrders );
 
-          sellerOrders.push({
+      setLoading(false); };
 
-            ...order,
+    fetchOrders(); },[]);
 
-            items: myItems
+  const updateStatus = async( orderId, newStatus )=>{
 
-          });
-
-        }
-
-      });
-
-      setOrders(
-        sellerOrders
-      );
-
-      setLoading(false);
-
-    };
-
-    fetchOrders();
-
-  },[]);
-
-  const updateStatus =
-    async(
-      orderId,
-      newStatus
-    )=>{
-
-    try{
-
-      await updateDoc(
-
-        doc(
-          db,
-          "orders",
-          orderId
-        ),
-
-        {
-
-  status:newStatus,
-
-  updatedAt:
-    serverTimestamp()
-
-}
-      );
+    try{ await updateDoc( doc( db, "orders", orderId ),
+    { status:newStatus, updatedAt: serverTimestamp() } );
 
       const currentOrder = orders.find(
-  (order) => order.id === orderId
-);
+  (order) => order.id === orderId );
 
-if (currentOrder?.userId) {
+if (currentOrder?.userId) { await addDoc(
 
-  await addDoc(
+    collection(db, "notifications"), { userId: currentOrder.userId, role: "customer",
+      title: "📦 Order Updated", message: `Your order is now ${newStatus}.`,
 
-    collection(db, "notifications"),
-
-    {
-
-      userId: currentOrder.userId,
-
-      role: "customer",
-
-      title: "📦 Order Updated",
-
-      message: `Your order is now ${newStatus}.`,
-
-      type: "order",
-
-      read: false,
-
-      createdAt: serverTimestamp(),
-
-    }
-
-  );
-
-}
-await addDoc(
-
-  collection(db, "notifications"),
-
-  {
-
-    role: "seller",
-
-    userId: auth.currentUser?.uid,
-
-    title: "✅ Order Status Changed",
-
+      type: "order", read: false, createdAt: serverTimestamp(), } );}
+await addDoc( collection(db, "notifications"), {
+    role: "seller", userId: auth.currentUser?.uid, title: "✅ Order Status Changed",
     message: `Order ${orderId.slice(0,8)} updated to ${newStatus}.`,
-
-    type: "order",
-
-    read: false,
-
-    createdAt: serverTimestamp(),
-
-  }
-
-);
+    type: "order", read: false, createdAt: serverTimestamp(), } );
 
       setOrders((prev)=>
-
         prev.map((order)=>
+          order.id === orderId ? { ...order, status:newStatus }
+         : order ) );
 
-          order.id === orderId
+      alert("Status Updated");
 
-            ? {
+   }catch(err){console.error(
+    "Failed to update order:",err);
 
-                ...order,
+  alert("Error Updating Status");}};
 
-                status:newStatus
+  if(loading){ return(
 
-              }
-
-            : order
-
-        )
-
-      );
-
-      alert(
-        "Status Updated"
-      );
-
-   }catch(err){
-
-  console.error(
-    "Failed to update order:",
-    err
-  );
-
-  alert(
-    "Error Updating Status"
-  );
-
-}
-
-  };
-
-  if(loading){
-
-    return(
-
-      <div className="p-5">
-
-        Loading...
-
-      </div>
-
-    );
-
-  }
-
+  <div className="p-5"> Loading... </div> ); }
   return(
 
     <div className="p-5">

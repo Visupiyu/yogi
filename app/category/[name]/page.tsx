@@ -1,13 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductCard from "@/components/ProductCard";
-
-type Props = {
-  params: Promise<{ name: string }>;
-};
 
 type Product = {
   id: string;
@@ -17,7 +14,11 @@ type Product = {
   stock: number;
 };
 
-export default function CategoryPage({ params }: Props) {
+export default function CategoryPage() {
+
+  const params = useParams();
+
+  const name = decodeURIComponent(params.name as string);
   const [products, setProducts] = useState<Product[]>([]);
   const [category, setCategory] = useState("");
   const [loading, setLoading] = useState(true);
@@ -26,13 +27,12 @@ export default function CategoryPage({ params }: Props) {
     async function loadProducts() {
       setLoading(true);
 
-      const { name } = await params;
-      setCategory(name);
+     setCategory(name);
 
       const q = query(
-        collection(db, "products"),
-        where("category", "==", name)
-      );
+  collection(db, "products"),
+  where("category", "==", name),
+  );
 
       const snapshot = await getDocs(q);
       const items: Product[] = [];
@@ -53,7 +53,7 @@ export default function CategoryPage({ params }: Props) {
     }
 
     loadProducts();
-  }, [params]);
+   }, [name]);
 
   if (loading) {
     return (
