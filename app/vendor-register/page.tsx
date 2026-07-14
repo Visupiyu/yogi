@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword,  signOut, } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
@@ -173,8 +173,11 @@ export default function VendorRegisterPage() {
         createdAt: serverTimestamp(),
       });
 
-      alert("Vendor Registration Submitted");
-      window.location.href = "/vendor-login";
+      await signOut(auth);
+      alert(
+  "Vendor Registration Submitted.\n\nYour account is awaiting admin approval.");
+   window.location.href = "/vendor-login";
+
     } catch (err: any) {
       if (err.code === "auth/email-already-in-use") {
         alert("Email already registered");

@@ -75,11 +75,10 @@ to-blue-700
     Products
   </Link>
 
-  <Link
-    href="/store"
+  <Link href="/seller/store"
     className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
   >
-    View Stores
+    My Stores
   </Link>
 
   <Link

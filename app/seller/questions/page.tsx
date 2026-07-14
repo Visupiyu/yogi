@@ -9,7 +9,9 @@ import {
   collection,
   getDocs,
   updateDoc,
-  doc
+  doc,
+  query,
+  where
 } from "firebase/firestore";
 
 import { db }
@@ -31,49 +33,57 @@ export default function SellerQuestionsPage(){
 
   },[]);
 
-  const loadQuestions =
-  async()=>{
+ const loadQuestions = async () => {
 
-    try{
+  try {
 
-      const snapshot =
-        await getDocs(
+    const vendor = JSON.parse(
+      localStorage.getItem("vendor") || "{}"
+    );
 
-          collection(
-            db,
-            "productQuestions"
-          )
+    const snapshot = await getDocs(
 
-        );
+      query(
 
-      const data:any[] = [];
+        collection(db, "productQuestions"),
 
-      snapshot.forEach((docSnap)=>{
+        where(
+          "vendorId",
+          "==",
+          vendor.vendorId
+        )
 
-        data.push({
+      )
 
-          id:docSnap.id,
+    );
 
-          ...docSnap.data()
+    const data: any[] = [];
 
-        });
+    snapshot.forEach((docSnap) => {
+
+      data.push({
+
+        id: docSnap.id,
+
+        ...docSnap.data(),
 
       });
 
-      setQuestions(data);
+    });
 
-    }catch(error){
+    setQuestions(data);
 
-      console.log(error);
+  } catch (error) {
 
-    }finally{
+    console.log(error);
 
-      setLoading(false);
+  } finally {
 
-    }
+    setLoading(false);
 
-  };
+  }
 
+};
   const saveAnswer =
   async(
     id:string,
