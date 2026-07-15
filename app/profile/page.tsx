@@ -11,9 +11,9 @@ import {
   doc,
   query,
   where,
-  orderBy,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { db, auth } from "@/lib/firebase";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -21,7 +21,6 @@ export default function ProfilePage() {
   const [user, setUser] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
-  // Editable profile fields
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -29,25 +28,22 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    if (!savedUser) {
-      router.push("/login");
-      return;
-    }
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        router.push("/login");
+        return;
+      }
 
-    const userData = JSON.parse(savedUser);
-    setUser(userData);
-    const userId = userData.uid || userData.id;
+      const saved = JSON.parse(localStorage.getItem("user") || "{}");
+      setUser({
+        ...saved,
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+      });
 
-    const loadProfile = async () => {
+      // Load profile document
       try {
-        if (!userId) {
-  console.error("User ID not found");
-  return;
-}
-
-const ref = doc(db, "users", userId);
-        const snap = await getDoc(ref);
+        const snap = await getDoc(doc(db, "users", firebaseUser.uid));
         if (snap.exists()) {
           const data: any = snap.data();
           setFullName(data.name || data.fullName || "");
@@ -58,31 +54,27 @@ const ref = doc(db, "users", userId);
       } catch (error) {
         console.error(error);
       }
-    };
 
-    const loadOrders = async () => {
+      // Load recent orders (sorted in code — no composite index needed)
       try {
-       const snapshot = await getDocs(
-  query(
-    collection(db, "orders"),
-    where("userEmail", "==", userData.email)
-  )
-);
-const data: any[] = [];
-snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
-
-// Sort newest-first in code, then take the 3 most recent
-data.sort(
-  (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-);
-setRecentOrders(data.slice(0, 3));
+        const snapshot = await getDocs(
+          query(
+            collection(db, "orders"),
+            where("userEmail", "==", firebaseUser.email)
+          )
+        );
+        const data: any[] = [];
+        snapshot.forEach((d) => data.push({ id: d.id, ...d.data() }));
+        data.sort(
+          (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+        );
+        setRecentOrders(data.slice(0, 3));
       } catch (error) {
         console.error(error);
       }
-    };
+    });
 
-    loadProfile();
-    loadOrders();
+    return () => unsub();
   }, [router]);
 
   const saveProfile = async () => {
@@ -91,12 +83,19 @@ setRecentOrders(data.slice(0, 3));
       return;
     }
 
+    const uid = auth.currentUser?.uid || user?.uid;
+    if (!uid) {
+      alert("Please login again.");
+      router.push("/login");
+      return;
+    }
+
     setSaving(true);
     try {
       await setDoc(
-       doc(db, "users", user.uid || user.id),
+        doc(db, "users", uid),
         {
-          uid: user.uid || user.id,
+          uid,
           email: user.email,
           name: fullName,
           phone,
@@ -124,151 +123,170 @@ setRecentOrders(data.slice(0, 3));
 
   const memberTier =
     rewardPoints >= 500
-      ? "🥇 Gold Member"
+      ? { label: "Gold Member", icon: "🥇", next: null, floor: 500 }
       : rewardPoints >= 200
-      ? "🥈 Silver Member"
-      : "🥉 Bronze Member";
+      ? { label: "Silver Member", icon: "🥈", next: 500, floor: 200 }
+      : { label: "Bronze Member", icon: "🥉", next: 200, floor: 0 };
+
+  const tierProgress = memberTier.next
+    ? Math.min(
+        100,
+        ((rewardPoints - memberTier.floor) /
+          (memberTier.next - memberTier.floor)) *
+          100
+      )
+    : 100;
+
+  const initial = (fullName || user?.email || "U").charAt(0).toUpperCase();
+
+  const statusColor = (status: string) =>
+    status === "Delivered"
+      ? "bg-green-100 text-green-700"
+      : status === "Cancelled"
+      ? "bg-red-100 text-red-700"
+      : "bg-yellow-100 text-yellow-700";
+
+  const quickActions = [
+    { href: "/orders", icon: "📦", title: "My Orders", desc: "Track and manage your orders" },
+    { href: "/wishlist", icon: "❤️", title: "Wishlist", desc: "Your saved favourite products" },
+    { href: "/cart", icon: "🛒", title: "Cart", desc: "Review your shopping cart" },
+    { href: "/profile/rewards", icon: "🏆", title: "Rewards", desc: "Points & transaction history" },
+    { href: "/profile/refunds", icon: "↩️", title: "My Refunds", desc: "Track returns & refund status" },
+    { href: "/settings", icon: "⚙️", title: "Settings", desc: "Manage account preferences" },
+  ];
 
   return (
-    <section className="min-h-screen bg-gray-100 py-10 px-4 pb-28">
-      <div className="max-w-6xl mx-auto">
+    <section className="min-h-screen bg-gray-50 py-8 px-4 pb-28">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* HEADER */}
-        <div className="bg-gradient-to-r from-green-500 to-green-700 text-white rounded-3xl p-10 mb-10 shadow-lg">
-          <h1 className="text-4xl font-bold">My Account</h1>
-
-          {fullName && <p className="mt-3 text-xl font-semibold">{fullName}</p>}
-
-          <p className="mt-2 text-lg opacity-90">
-            Welcome {user?.email || "Customer"}
-          </p>
-
-          <p className="mt-1 text-lg opacity-90">
-            📞 {phone ? phone : "Add your mobile number below"}
-          </p>
-
-          <p className="mt-3 font-semibold">{memberTier}</p>
-        </div>
-
-        {/* LOGOUT */}
-        <div className="flex justify-end mb-8">
-          <button
-            onClick={logout}
-            className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-2xl font-semibold"
-          >
-            Logout
-          </button>
+        <div className="bg-gradient-to-r from-green-500 to-emerald-700 text-white rounded-3xl p-8 shadow-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+            <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-4xl font-bold shrink-0">
+              {initial}
+            </div>
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold">
+                {fullName || "My Account"}
+              </h1>
+              <p className="mt-1 opacity-90">{user?.email || "Customer"}</p>
+              <p className="mt-1 opacity-90">
+                📞 {phone || "Add your mobile number below"}
+              </p>
+              <span className="inline-block mt-3 bg-white/20 px-4 py-1 rounded-full text-sm font-semibold">
+                {memberTier.icon} {memberTier.label}
+              </span>
+            </div>
+            <button
+              onClick={logout}
+              className="bg-white/20 hover:bg-white/30 px-5 py-2.5 rounded-2xl font-semibold transition self-start"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* REWARD WALLET */}
-        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-3xl p-6 mb-10">
-          <p className="text-sm opacity-90">Reward Wallet</p>
-          <h2 className="text-4xl font-bold mt-2">🏆 {rewardPoints} Points</h2>
-          <p className="mt-3 font-semibold">{memberTier}</p>
+        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-3xl p-6 shadow-md">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-sm opacity-90">Reward Wallet</p>
+              <h2 className="text-4xl font-bold mt-1">🏆 {rewardPoints}</h2>
+              <p className="text-sm opacity-90 mt-1">points available</p>
+            </div>
+            <div className="text-right">
+              <p className="font-semibold">
+                {memberTier.icon} {memberTier.label}
+              </p>
+              {memberTier.next && (
+                <p className="text-xs opacity-90 mt-1">
+                  {memberTier.next - rewardPoints} pts to next tier
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="mt-4 h-2 w-full bg-white/25 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-white/90 transition-all duration-500"
+              style={{ width: `${tierProgress}%` }}
+            />
+          </div>
         </div>
 
         {/* QUICK ACTIONS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Link href="/orders">
-            <div className="bg-white rounded-3xl shadow-md p-8 hover:shadow-xl transition duration-300 cursor-pointer">
-              <h2 className="text-2xl font-bold mb-3">My Orders</h2>
-              <p className="text-gray-500 leading-7">
-                Track and manage your orders
-              </p>
-            </div>
-          </Link>
-
-          <Link href="/wishlist">
-            <div className="bg-white rounded-3xl shadow-md p-8 hover:shadow-xl transition duration-300 cursor-pointer">
-              <h2 className="text-2xl font-bold mb-3">Wishlist</h2>
-              <p className="text-gray-500 leading-7">
-                View saved favorite products
-              </p>
-            </div>
-          </Link>
-
-          <Link href="/cart">
-            <div className="bg-white rounded-3xl shadow-md p-8 hover:shadow-xl transition duration-300 cursor-pointer">
-              <h2 className="text-2xl font-bold mb-3">Cart</h2>
-              <p className="text-gray-500 leading-7">
-                Review your shopping cart
-              </p>
-            </div>
-          </Link>
-
-          <Link href="/profile/rewards">
-            <div className="bg-white rounded-3xl shadow-md p-8 hover:shadow-xl transition duration-300 cursor-pointer">
-              <h2 className="text-2xl font-bold mb-3">Rewards</h2>
-              <p className="text-gray-500 leading-7">
-                View reward points and transaction history
-              </p>
-            </div>
-          </Link>
-
-          <Link href="/profile/refunds">
-            <div className="bg-white rounded-3xl shadow-md p-8 hover:shadow-xl transition duration-300 cursor-pointer">
-              <h2 className="text-2xl font-bold mb-3">My Refunds</h2>
-              <p className="text-gray-500 leading-7">
-                Track return requests and refund status
-              </p>
-            </div>
-          </Link>
-
-          <Link href="/settings">
-            <div className="bg-white rounded-3xl shadow-md p-8 hover:shadow-xl transition duration-300 cursor-pointer">
-              <h2 className="text-2xl font-bold mb-3">Settings</h2>
-              <p className="text-gray-500 leading-7">
-                Manage account preferences
-              </p>
-            </div>
-          </Link>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {quickActions.map((a) => (
+            <Link key={a.href} href={a.href}>
+              <div className="bg-white rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 p-6 cursor-pointer h-full">
+                <div className="text-3xl mb-3">{a.icon}</div>
+                <h2 className="text-lg font-bold mb-1">{a.title}</h2>
+                <p className="text-gray-500 text-sm">{a.desc}</p>
+              </div>
+            </Link>
+          ))}
         </div>
 
-        {/* PROFILE DETAILS (editable) */}
-        <div className="bg-white rounded-3xl shadow-md p-10 mt-10">
-          <h2 className="text-3xl font-bold mb-6">Profile Details</h2>
+        {/* PROFILE DETAILS */}
+        <div className="bg-white rounded-3xl shadow-sm p-8">
+          <h2 className="text-2xl font-bold mb-6">Profile Details</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
-              <label className="block text-gray-500 mb-2">Full Name</label>
+              <label className="block text-sm text-gray-500 mb-1">
+                Full Name
+              </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Your full name"
-                className="w-full p-4 border rounded-2xl"
+                className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
               />
             </div>
 
             <div>
-              <label className="block text-gray-500 mb-2">Mobile Number</label>
+              <label className="block text-sm text-gray-500 mb-1">
+                Mobile Number
+              </label>
               <input
-                type="text"
+                type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="10 digit mobile number"
-                className="w-full p-4 border rounded-2xl"
+                className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
               />
             </div>
 
             <div>
-              <label className="block text-gray-500 mb-2">Email</label>
+              <label className="block text-sm text-gray-500 mb-1">Email</label>
               <input
                 type="text"
                 value={user?.email || ""}
                 disabled
-                className="w-full p-4 border rounded-2xl bg-gray-50 text-gray-500"
+                className="w-full p-3.5 border rounded-xl bg-gray-50 text-gray-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-500 mb-1">
+                Account Type
+              </label>
+              <input
+                type="text"
+                value="Customer Account"
+                disabled
+                className="w-full p-3.5 border rounded-xl bg-gray-50 text-gray-500"
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-gray-500 mb-2">
+              <label className="block text-sm text-gray-500 mb-1">
                 Delivery Address
               </label>
               <textarea
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="House no, street, city, state, PIN"
-                className="w-full p-4 border rounded-2xl h-28"
+                className="w-full p-3.5 border rounded-xl h-28 outline-none focus:ring-2 focus:ring-green-500 transition"
               />
             </div>
           </div>
@@ -276,62 +294,61 @@ setRecentOrders(data.slice(0, 3));
           <button
             onClick={saveProfile}
             disabled={saving}
-            className="mt-6 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:opacity-60 text-white px-8 py-4 rounded-2xl font-semibold"
+            className="mt-6 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:opacity-60 text-white px-8 py-3.5 rounded-2xl font-semibold transition"
           >
             {saving ? "Saving..." : "Save Profile"}
           </button>
         </div>
 
-        {/* ACCOUNT INFORMATION */}
-        <div className="bg-white rounded-3xl shadow-md p-10 mt-10">
-          <h2 className="text-3xl font-bold mb-6">Account Information</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-gray-500 mb-2">Account Type</p>
-              <h3 className="text-xl font-semibold">Customer Account</h3>
-            </div>
-
-            <div>
-              <p className="text-gray-500 mb-2">Marketplace</p>
-              <h3 className="text-xl font-semibold">Yogi Mart</h3>
-            </div>
-          </div>
-        </div>
-
-        {/* SAVED ADDRESS */}
-        <div className="bg-white rounded-3xl shadow-md p-10 mt-10">
-          <h2 className="text-3xl font-bold mb-6">Saved Address</h2>
-          {address ? (
-            <p className="text-gray-700 leading-8 whitespace-pre-line">
-              {address}
-            </p>
-          ) : (
-            <p className="text-gray-500 leading-8">
-              Add your delivery address above for a faster checkout experience.
-            </p>
-          )}
-        </div>
-
         {/* RECENT ORDERS */}
-        <div className="bg-white rounded-3xl shadow-md p-10 mt-10">
-          <h2 className="text-3xl font-bold mb-6">Recent Orders</h2>
+        <div className="bg-white rounded-3xl shadow-sm p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">Recent Orders</h2>
+            <Link
+              href="/orders"
+              className="text-green-600 font-semibold text-sm hover:underline"
+            >
+              View all →
+            </Link>
+          </div>
 
           {recentOrders.length === 0 ? (
-            <p className="text-gray-500">No orders found</p>
+            <div className="text-center py-8">
+              <div className="text-4xl mb-2">📦</div>
+              <p className="text-gray-500">No orders yet</p>
+              <Link href="/">
+                <button className="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-semibold transition">
+                  Start Shopping
+                </button>
+              </Link>
+            </div>
           ) : (
-            recentOrders.map((order: any) => (
-              <div key={order.id} className="border-b py-4">
-                <p className="font-semibold">
-                  Order ID: {order.id.slice(0, 8)}
-                </p>
-                <p>Status: {order.status}</p>
-                <p>
-                  Total: ₹
-                  {(order.finalTotal || order.total)?.toLocaleString("en-IN")}
-                </p>
-              </div>
-            ))
+            <div className="space-y-3">
+              {recentOrders.map((order: any) => (
+                <Link key={order.id} href={`/orders/${order.id}`}>
+                  <div className="flex items-center justify-between border rounded-2xl p-4 hover:shadow-md transition">
+                    <div>
+                      <p className="font-semibold">
+                        Order #{order.id.slice(0, 8)}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        ₹
+                        {(order.finalTotal || order.total)?.toLocaleString(
+                          "en-IN"
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(
+                        order.status
+                      )}`}
+                    >
+                      {order.status}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
           )}
         </div>
       </div>

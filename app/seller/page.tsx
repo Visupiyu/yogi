@@ -396,98 +396,67 @@ export default function SellerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50">
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-green-700 via-teal-600 to-blue-700 text-white">
-        <div className="flex items-center gap-3 whitespace-nowrap">
-          <div className="w-64 h-28 flex items-center justify-center border-r border-white/20">
-            <img src="/logo.png" alt="Yogi Mart" className="h-20" />
-          </div>
-
-          <div>
-            <p className="text-sm uppercase tracking-wider opacity-80">
-              Yogi Mart Seller Dashboard
-            </p>
-            <h1 className="text-4xl font-bold">{vendorName}</h1>
-            <p className="opacity-90">Manage Products, Orders and Revenue</p>
-          </div>
-        </div>
+      <div className="bg-gradient-to-r from-green-700 via-teal-600 to-blue-700 text-white px-8 py-6">
+        <p className="text-sm uppercase tracking-wider opacity-80">
+          Yogi Mart Seller Dashboard
+        </p>
+        <h1 className="text-3xl md:text-4xl font-bold">{vendorName}</h1>
+        <p className="opacity-90">Manage products, orders and revenue</p>
       </div>
 
-      <div className="max-w-7xl mx-auto p-8">
+      <div className="max-w-7xl mx-auto p-6 md:p-8">
         {/* STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
-          <div className="bg-white rounded-3xl shadow-md p-6 h-44">
-            <p className="text-gray-500">Total Products</p>
-            <h2 className="text-4xl font-bold text-blue-600 mt-4">
-              {totalProducts}
-            </h2>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-md p-6 h-44">
-            <p className="text-gray-500">Total Orders</p>
-            <h2 className="text-4xl font-bold text-green-600 mt-4">
-              {totalOrders}
-            </h2>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-md p-6 h-44">
-            <p className="text-gray-500">Pending Orders</p>
-            <h2 className="text-4xl font-bold text-yellow-500 mt-4">
-              {pendingOrders}
-            </h2>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-md p-6 h-44">
-            <p className="text-gray-500">Earnings</p>
-            <h2 className="text-3xl font-bold text-pink-600 mt-4 break-all">
-              ₹{earnings.toLocaleString("en-IN")}
-            </h2>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-md p-6 h-44">
-            <p className="text-gray-500">Commission</p>
-            <h2 className="text-3xl font-bold text-orange-600 mt-4 break-all">
-              ₹{commissionPaid.toLocaleString("en-IN")}
-            </h2>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-md p-6 h-44">
-            <p className="text-gray-500">Net Earnings</p>
-            <h2 className="text-3xl font-bold text-green-700 mt-4 break-all">
-              ₹{netEarnings.toLocaleString("en-IN")}
-            </h2>
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+          {[
+            { label: "Total Products", value: totalProducts, color: "text-blue-600", icon: "📦" },
+            { label: "Total Orders", value: totalOrders, color: "text-green-600", icon: "🛒" },
+            { label: "Pending Orders", value: pendingOrders, color: "text-yellow-500", icon: "⏳" },
+            { label: "Earnings", value: `₹${earnings.toLocaleString("en-IN")}`, color: "text-pink-600", icon: "💰" },
+            { label: "Commission", value: `₹${commissionPaid.toLocaleString("en-IN")}`, color: "text-orange-600", icon: "📊" },
+            { label: "Net Earnings", value: `₹${netEarnings.toLocaleString("en-IN")}`, color: "text-green-700", icon: "✅" },
+          ].map((s) => (
+            <div
+              key={s.label}
+              className="bg-white rounded-2xl shadow-sm hover:shadow-md transition p-5"
+            >
+              <div className="text-2xl mb-2">{s.icon}</div>
+              <p className="text-gray-500 text-sm">{s.label}</p>
+              <h2 className={`text-2xl font-bold mt-1 break-all ${s.color}`}>
+                {s.value}
+              </h2>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-xl font-bold mb-2">Total Views</h2>
-            <p className="text-4xl font-bold text-indigo-600">{totalViews}</p>
+        {/* SECONDARY STATS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-white p-6 rounded-2xl shadow-sm">
+            <p className="text-gray-500 flex items-center gap-2">👁 Total Views</p>
+            <p className="text-3xl font-bold text-indigo-600 mt-2">{totalViews}</p>
           </div>
-
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-xl font-bold mb-2">Units Sold</h2>
-            <p className="text-4xl font-bold text-green-600">{totalSales}</p>
+          <div className="bg-white p-6 rounded-2xl shadow-sm">
+            <p className="text-gray-500 flex items-center gap-2">📦 Units Sold</p>
+            <p className="text-3xl font-bold text-green-600 mt-2">{totalSales}</p>
           </div>
-
-          <div className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-xl font-bold mb-2">Best Seller</h2>
-            <p className="text-xl font-bold text-orange-600">{bestSeller}</p>
+          <div className="bg-white p-6 rounded-2xl shadow-sm">
+            <p className="text-gray-500 flex items-center gap-2">🏆 Best Seller</p>
+            <p className="text-xl font-bold text-orange-600 mt-2">{bestSeller}</p>
           </div>
         </div>
 
         {/* NOTIFICATIONS */}
-        <div className="bg-white rounded-2xl shadow p-8 mb-8">
-          <h2 className="text-2xl font-bold mb-5">Notifications</h2>
+        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
+          <h2 className="text-xl font-bold mb-4">🔔 Notifications</h2>
           {notifications.length === 0 ? (
             <p className="text-gray-500">No notifications</p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {notifications.map((note) => (
-                <div key={note.id} className="border p-4 rounded-xl">
+                <div key={note.id} className="border rounded-xl p-4 bg-gray-50">
                   <h3 className="font-bold">{note.title}</h3>
-                  <p>{note.message}</p>
+                  <p className="text-gray-600 text-sm">{note.message}</p>
                 </div>
               ))}
             </div>
@@ -497,142 +466,165 @@ export default function SellerPage() {
         {/* MAIN GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* FORM */}
-          <div id="add-product" className="bg-white p-8 rounded-2xl shadow">
-            <h2 className="text-3xl font-bold mb-8">
-              {editingId ? "Edit Product" : "Add Product"}
+          <div id="add-product" className="bg-white p-6 rounded-2xl shadow-sm h-fit lg:sticky lg:top-6">
+            <h2 className="text-2xl font-bold mb-6">
+              {editingId ? "✏️ Edit Product" : "➕ Add Product"}
             </h2>
 
-            <div className="space-y-5">
+            <div className="space-y-4">
               <input
                 type="text"
                 placeholder="Product Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full p-4 border rounded-xl"
+                className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
               />
-              <input
-                type="number"
-                placeholder="Price"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="number"
-                placeholder="Stock"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="text"
-                placeholder="Brand Name"
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="number"
-                placeholder="MRP"
-                value={mrp}
-                onChange={(e) => setMrp(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <select
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              >
-                <option>Men</option>
-                <option>Women</option>
-                <option>Kids</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="text"
-                placeholder="Material"
-                value={material}
-                onChange={(e) => setMaterial(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="text"
-                placeholder="Sizes (S,M,L,XL)"
-                value={sizes}
-                onChange={(e) => setSizes(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
-              <input
-                type="text"
-                placeholder="Country Of Origin"
-                value={countryOfOrigin}
-                onChange={(e) => setCountryOfOrigin(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  placeholder="Price"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                />
+                <input
+                  type="number"
+                  placeholder="Stock"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  placeholder="MRP"
+                  value={mrp}
+                  onChange={(e) => setMrp(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                />
+                <input
+                  type="text"
+                  placeholder="Brand Name"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                >
+                  <option>Grocery</option>
+                  <option>Men Fashion</option>
+                  <option>Women Fashion</option>
+                  <option>Kids Fashion</option>
+                  <option>Beauty</option>
+                  <option>Electronics</option>
+                  <option>Furniture</option>
+                  <option>Mobiles</option>
+                  <option>Appliances</option>
+                  <option>Books</option>
+                </select>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                >
+                  <option>Men</option>
+                  <option>Women</option>
+                  <option>Kids</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="Color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                />
+                <input
+                  type="text"
+                  placeholder="Material"
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  placeholder="Sizes (S,M,L,XL)"
+                  value={sizes}
+                  onChange={(e) => setSizes(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                />
+                <input
+                  type="text"
+                  placeholder="Country Of Origin"
+                  value={countryOfOrigin}
+                  onChange={(e) => setCountryOfOrigin(e.target.value)}
+                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+                />
+              </div>
+
               <textarea
                 placeholder="Product Description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full p-4 border rounded-2xl h-32"
-              />
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-4 border rounded-xl"
-              >
-                <option>Grocery</option>
-                <option>Men Fashion</option>
-                <option>Women Fashion</option>
-                <option>Kids Fashion</option>
-                <option>Beauty</option>
-                <option>Electronics</option>
-                <option>Furniture</option>
-                <option>Mobiles</option>
-                <option>Appliances</option>
-                <option>Books</option>
-              </select>
-
-              <input
-                type="file"
-                multiple
-                accept="image/*"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length > 5) {
-                    alert("Maximum 5 images allowed");
-                    return;
-                  }
-                  setImageFiles(files);
-                  const previews = files.map((file) =>
-                    URL.createObjectURL(file)
-                  );
-                  setImages(previews);
-                  setImage(previews[0] || "");
-                }}
-                className="w-full border p-4 rounded-xl"
+                className="w-full p-3.5 border rounded-xl h-28 outline-none focus:ring-2 focus:ring-green-500 transition"
               />
 
-              <div className="grid grid-cols-5 gap-2">
-                {images.map((img, index) => (
-                  <img
-                    key={index}
-                    src={img}
-                    alt=""
-                    className="w-20 h-20 object-cover rounded-xl"
-                  />
-                ))}
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  Product Images (up to 5)
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (files.length > 5) {
+                      alert("Maximum 5 images allowed");
+                      return;
+                    }
+                    setImageFiles(files);
+                    const previews = files.map((file) =>
+                      URL.createObjectURL(file)
+                    );
+                    setImages(previews);
+                    setImage(previews[0] || "");
+                  }}
+                  className="w-full border p-3 rounded-xl"
+                />
               </div>
+
+              {images.length > 0 && (
+                <div className="grid grid-cols-5 gap-2">
+                  {images.map((img, index) => (
+                    <img
+                      key={index}
+                      src={img}
+                      alt=""
+                      className="w-full h-16 object-cover rounded-xl border border-gray-100"
+                    />
+                  ))}
+                </div>
+              )}
 
               <button
                 onClick={addOrUpdateProduct}
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:opacity-60 text-white py-4 rounded-xl text-lg font-semibold"
+                className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:opacity-60 text-white py-4 rounded-xl text-lg font-semibold transition"
               >
                 {loading
                   ? "Saving..."
@@ -644,27 +636,25 @@ export default function SellerPage() {
           </div>
 
           {/* PRODUCTS */}
-          <div
-            id="products"
-            className="lg:col-span-2 bg-white p-8 rounded-2xl shadow"
-          >
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
-              <h2 className="text-3xl font-bold">
+          <div id="products" className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+              <h2 className="text-2xl font-bold">
                 Products ({products.length})
               </h2>
               <input
                 type="text"
-                placeholder="Search Products..."
+                placeholder="Search products…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border p-3 rounded-xl w-full md:w-72"
+                className="border p-3 rounded-xl w-full md:w-72 outline-none focus:ring-2 focus:ring-green-500 transition"
               />
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               {products.length === 0 && (
-                <div className="text-center py-10">
-                  <p className="text-gray-500 text-lg">No products added yet.</p>
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-2">📦</div>
+                  <p className="text-gray-500">No products added yet.</p>
                 </div>
               )}
 
@@ -678,50 +668,53 @@ export default function SellerPage() {
                 .map((product) => (
                   <div
                     key={product.id}
-                    className="flex items-center justify-between border-b pb-6"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-2xl p-4 hover:shadow-md transition"
                   >
-                    <div className="flex gap-5">
+                    <div className="flex gap-4">
                       <div className="flex gap-2">
                         {(product.images || [product.image])
-                          .slice(0, 5)
+                          .slice(0, 3)
                           .map((img, index) => (
                             <img
                               key={index}
                               src={img}
                               alt=""
-                              className="w-16 h-16 object-cover rounded-lg"
+                              className="w-16 h-16 object-cover rounded-xl border border-gray-100"
                             />
                           ))}
                       </div>
 
                       <div>
-                        <h3 className="text-2xl font-bold">{product.name}</h3>
-                        <p className="text-lg">
+                        <h3 className="text-lg font-bold line-clamp-1">
+                          {product.name}
+                        </h3>
+                        <p className="text-green-600 font-bold">
                           ₹{product.price?.toLocaleString("en-IN")}
                         </p>
                         <p className="text-sm text-gray-500">
                           {product.category}
                         </p>
-                        <p className="text-sm">Stock: {product.stock}</p>
-
-                        {product.stock > 0 && product.stock <= 5 && (
-                          <p className="text-red-500 font-semibold text-sm mt-1">
-                            Low Stock
-                          </p>
-                        )}
+                        <p className="text-sm">
+                          Stock: {product.stock}
+                          {product.stock > 0 && product.stock <= 5 && (
+                            <span className="text-red-500 font-semibold ml-2">
+                              Low Stock
+                            </span>
+                          )}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                       <button
                         onClick={() => editProduct(product)}
-                        className="bg-blue-600 text-white px-5 py-3 rounded-xl"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition"
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => deleteProduct(product.id)}
-                        className="bg-red-500 text-white px-5 py-3 rounded-xl"
+                        className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-semibold transition"
                       >
                         Delete
                       </button>
@@ -733,33 +726,35 @@ export default function SellerPage() {
         </div>
 
         {/* ORDERS */}
-        <div id="orders" className="bg-white p-8 rounded-2xl shadow mt-10">
-          <h2 className="text-3xl font-bold mb-8">Recent Orders</h2>
+        <div id="orders" className="bg-white p-6 rounded-2xl shadow-sm mt-8">
+          <h2 className="text-2xl font-bold mb-6">Recent Orders</h2>
 
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-4">Order ID</th>
-                  <th className="text-left py-4">Customer</th>
-                  <th className="text-left py-4">Amount</th>
-                  <th className="text-left py-4">Status</th>
-                  <th className="text-left py-4">Date</th>
+                <tr className="border-b text-left text-gray-500 text-sm">
+                  <th className="py-3">Order ID</th>
+                  <th className="py-3">Customer</th>
+                  <th className="py-3">Amount</th>
+                  <th className="py-3">Status</th>
+                  <th className="py-3">Date</th>
                 </tr>
               </thead>
               <tbody>
                 {orders.map((order) => (
                   <tr key={order.id} className="border-b">
-                    <td className="py-5">{order.id}</td>
+                    <td className="py-4">{order.id?.slice(0, 8)}</td>
                     <td>{order.customer}</td>
-                    <td>₹{order.amount?.toLocaleString("en-IN")}</td>
+                    <td className="font-semibold">
+                      ₹{order.amount?.toLocaleString("en-IN")}
+                    </td>
                     <td>
                       <select
                         value={order.status}
                         onChange={(e) =>
                           updateOrderStatus(order.id, e.target.value)
                         }
-                        className="border p-2 rounded-lg"
+                        className="border p-2 rounded-lg outline-none"
                       >
                         <option>Pending</option>
                         <option>Confirmed</option>

@@ -1,143 +1,81 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
-export default function SellerLayout({
-  children
-}) {
+const navItems = [
+  { href: "/seller", label: "Dashboard", icon: "📊" },
+  { href: "/seller/orders", label: "Orders", icon: "📦" },
+  { href: "/seller#add-product", label: "Add Product", icon: "➕" },
+  { href: "/seller#products", label: "Products", icon: "🏷️" },
+  { href: "/seller/store", label: "My Stores", icon: "🏬" },
+  { href: "/seller/questions", label: "Questions", icon: "❓" },
+  { href: "/seller/analytics", label: "Analytics", icon: "📈" },
+  { href: "/seller/reports", label: "Reports", icon: "📄" },
+  { href: "/seller/assistant", label: "AI Assistant", icon: "🤖" },
+  { href: "/seller/chat", label: "Customer Chats", icon: "💬" },
+];
+
+export default function SellerLayout({ children }) {
+  const pathname = usePathname();
+
+  const logout = async () => {
+    await signOut(auth);
+    localStorage.removeItem("vendor");
+    window.location.href = "/vendor-login";
+  };
 
   return (
-
-    <div className="flex">
-
-      <div
-        className="
-          w-64
-          min-h-screen
-         bg-gradient-to-b
-from-green-700
-to-blue-700
-          text-white
-          p-5
-        "
-      >
-
-        <div className="mb-8 text-center">
-
-  <img
-    src="/logo.png"
-    alt="Yogi Mart"
-    className="
-      w-72
-      mx-auto
-      mb-3
-    "
-  />
-
-  <h1
-    className="
-      text-2xl
-      font-bold
-    "
-  >
-    Seller Panel
-  </h1>
-
-</div>
-
-        <div className="space-y-3">
-
-  <Link
-    href="/seller"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    Dashboard
-  </Link>
-
-  <Link
-    href="/seller/orders"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    Orders
-  </Link>
-
-  <Link
-    href="/seller#add-product"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    Add Product
-  </Link>
-
-  <Link
-   href="/seller#products"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    Products
-  </Link>
-
-  <Link href="/seller/store"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    My Stores
-  </Link>
-
-  <Link
-    href="/seller/questions"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    Questions
-  </Link>
-
-  <Link
-    href="/seller/analytics"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    Analytics
-  </Link>
-
-  <Link
-    href="/seller/reports"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    Reports
-  </Link>
-
-  <Link
-    href="/seller/assistant"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    AI Assistant
-  </Link>
-
-  <Link
-    href="/seller/chat"
-    className="block whitespace-nowrap px-4 py-3 rounded-xl hover:bg-white/20 transition"
-  >
-    💬 Customer Chats
-  </Link>
-
-  <button
-    onClick={() => {
-      localStorage.removeItem("vendor");
-      window.location.href = "/vendor-login";
-    }}
-    className="w-full text-left whitespace-nowrap px-4 py-3 rounded-xl hover:bg-red-500 transition"
-  >
-    Logout
-  </button>
-
+    <div className="flex min-h-screen bg-gray-50">
+      {/* SIDEBAR */}
+      <aside className="w-64 shrink-0 bg-gradient-to-b from-green-700 to-blue-700 text-white flex flex-col sticky top-0 h-screen">
+        <div className="p-5 text-center border-b border-white/10">
+          <img
+            src="/logo.png"
+            alt="Yogi Mart"
+            className="w-32 mx-auto mb-2"
+          />
+          <h1 className="text-xl font-bold">Seller Panel</h1>
         </div>
 
-      </div>
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1.5">
+          {navItems.map((item) => {
+            const base = item.href.split("#")[0];
+            const active =
+              base === "/seller"
+                ? pathname === "/seller"
+                : pathname.startsWith(base);
 
-      <div className="flex-1">
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl whitespace-nowrap transition ${
+                  active ? "bg-white/20 font-semibold" : "hover:bg-white/10"
+                }`}
+              >
+                <span>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
-        {children}
+        <div className="p-4 border-t border-white/10">
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 text-left whitespace-nowrap px-4 py-3 rounded-xl hover:bg-red-500 transition font-semibold"
+          >
+            <span>🚪</span>
+            <span>Logout</span>
+          </button>
+        </div>
+      </aside>
 
-      </div>
-
+      {/* CONTENT */}
+      <main className="flex-1 min-w-0">{children}</main>
     </div>
-
   );
-
 }

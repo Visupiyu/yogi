@@ -162,32 +162,41 @@ async()=>{
 
   await signOut(auth);
 
-  localStorage.removeItem(
-    "user"
-  );
+ localStorage.removeItem("user");
+localStorage.removeItem("vendor");
+localStorage.removeItem("admin");
 
   setUser(null);
 
-  router.push("/login");
+  router.push("/");
 
 };
 
-useEffect(()=>{
+useEffect(() => {
 
-  const savedUser =
-    localStorage.getItem(
-      "user"
-    );
+  const savedUser = localStorage.getItem("user");
+  const savedVendor = localStorage.getItem("vendor");
+  const savedAdmin = localStorage.getItem("admin");
 
-  if(savedUser){
+  if (savedAdmin) {
 
-    setUser(
-      JSON.parse(savedUser)
-    );
+    setUser(JSON.parse(savedAdmin));
+
+  } else if (savedVendor) {
+
+    setUser(JSON.parse(savedVendor));
+
+  } else if (savedUser) {
+
+    setUser(JSON.parse(savedUser));
+
+  } else {
+
+    setUser(null);
 
   }
 
-},[]);
+}, []);
 
 useEffect(()=>{
 
@@ -622,10 +631,19 @@ hover:to-blue-500
 ">
 
  {
-  user?.email
-    ? user.email.length > 18
-  ? user.email.substring(0,18) + "..."
-  : user.email
+  user?.businessName
+    ? user.businessName
+
+    : user?.name
+    ? user.name
+
+    : user?.email
+    ? (
+        user.email.length > 18
+          ? user.email.substring(0,18) + "..."
+          : user.email
+      )
+
     : "Login"
 }
 

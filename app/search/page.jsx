@@ -1,594 +1,243 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
-
-
-
-import {
-  Suspense
-} from "react";
-
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-import {
-  useSearchParams
-} from "next/navigation";
+const CATEGORIES = [
+  "Men Fashion",
+  "Women Fashion",
+  "Kids Fashion",
+  "Electronics",
+  "Beauty",
+  "Appliances",
+  "Furniture",
+  "Grocery",
+  "Mobiles",
+  "Books",
+];
 
-import {
-  collection,
-  getDocs,
-} from "firebase/firestore";
+function SearchContent() {
+  const searchParams = useSearchParams();
+  const query = searchParams.get("q") || "";
 
-import { db }
-from "@/lib/firebase";
+  const [products, setProducts] = useState([]);
+  const [filtered, setFiltered] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState("");
+  const [stockOnly, setStockOnly] = useState(false);
+  const [category, setCategory] = useState("");
 
-function SearchContent(){
-
-  const searchParams =
-    useSearchParams();
-
-  const query =
-    searchParams.get("q") || "";
-
-  const [products,setProducts] =
-   useState([]);
-
-const [filtered,setFiltered] =
-   useState([]);
-  const [loading,setLoading] =
-    useState(true);
-
-  const [sort,setSort] =
-    useState("");
-
-  const [stockOnly,setStockOnly] =
-    useState(false);
-
-    const [category,setCategory] =
-  useState("");
-
-  useEffect(()=>{
-
-    const fetchProducts =
-    async()=>{
-
-      try{
-
-        const snapshot =
-          await getDocs(
-            collection(db,"products")
-          );
-
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, "products"));
         const items = [];
-
-        snapshot.forEach((doc)=>{
-
+        snapshot.forEach((doc) => {
           const data = doc.data();
+          const searchText = `${data.name || ""} ${data.category || ""} ${
+            data.description || ""
+          }`.toLowerCase();
 
-         const searchText =
-`
-${data.name || ""}
-${data.category || ""}
-${data.description || ""}
-`
-.toLowerCase();
-
-if(
-  searchText.includes(
-    query.trim().toLowerCase()
-  )
-){
-
-            items.push({
-              id:doc.id,
-              ...data,
-            });
-
+          if (searchText.includes(query.trim().toLowerCase())) {
+            items.push({ id: doc.id, ...data });
           }
-
         });
-
         setProducts(items);
-
-      }catch(error){
-
-        console.log(error);
-
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
-
     };
 
     fetchProducts();
+  }, [query]);
 
-  },[query]);
-
-  useEffect(()=>{
-
+  useEffect(() => {
     let items = [...products];
 
-    if(category){
-
-  items = items.filter(
-    (item)=>
-      item.category === category
-  );
-
-}
-
-    /* STOCK FILTER */
-
-    if(stockOnly){
-
-      items = items.filter(
-        (item)=>
-          item.stock > 0
-      );
-
+    if (category) {
+      items = items.filter((item) => item.category === category);
     }
-
-    /* SORT */
-
-    if(sort === "low"){
-
-      items.sort(
-        (a,b)=>
-          a.price - b.price
-      );
-
+    if (stockOnly) {
+      items = items.filter((item) => item.stock > 0);
     }
+    if (sort === "low") items.sort((a, b) => a.price - b.price);
+    if (sort === "high") items.sort((a, b) => b.price - a.price);
+    if (sort === "stock") items.sort((a, b) => b.stock - a.stock);
 
-    if(sort === "high"){
+    setFiltered(items);
+  }, [products, sort, stockOnly, category]);
 
-  items.sort(
-    (a,b)=>
-      b.price - a.price
-  );
+  const clearFilters = () => {
+    setSort("");
+    setStockOnly(false);
+    setCategory("");
+  };
 
-}
-
-if(sort === "stock"){
-
-  items.sort(
-    (a,b)=>
-      b.stock - a.stock
-  );
-
-}
-
-     setFiltered(items);
-
-  },[
-    products,
-    sort,
-      stockOnly,
-  category,
-  ]);
+  const quickChips = ["Shoes", "Mobiles", "Beauty", "Grocery", "Fashion"];
 
   return (
+    <section className="py-8 px-4 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        {/* HEADER */}
+        <div className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold">
+            {query ? (
+              <>
+                Search results for{" "}
+                <span className="text-green-600">&quot;{query}&quot;</span>
+              </>
+            ) : (
+              "All Products"
+            )}
+          </h1>
+          <p className="text-gray-500 mt-1">
+            {filtered.length} product{filtered.length === 1 ? "" : "s"} found
+          </p>
 
-     <section className="
-      py-10
-      px-4
-    ">
-
-      <div className="
-        max-w-7xl
-        mx-auto
-      ">
-
-        {/* TOP */}
-
-        <div className="
-          flex
-          flex-col
-          lg:flex-row
-          lg:items-center
-          lg:justify-between
-          gap-5
-          mb-8
-        ">
-
-          <div>
-
-  <h1 className="
-    text-3xl
-    font-bold
-  ">
-
-    Search Results:
-    {" "}
-    "{query}"
-
-  </h1>
-
-  <p className="
-    text-gray-500
-    mt-2
-  ">
-
-    {filtered.length}
-
-    {" "}
-
-    Products Found
-
-  </p>
-
-  <div className="
-    flex
-    flex-wrap
-    gap-3
-    mt-4
-  ">
-
-    {[
-      "Shoes",
-      "Mobile",
-      "Beauty",
-      "Grocery",
-      "Fashion"
-    ].map((item)=>(
-
-      <Link
-        key={item}
-        href={`/search?q=${item}`}
-      >
-
-        <button className="
-          bg-white
-          border
-          px-4
-          py-2
-          rounded-full
-          hover:bg-gray-100
-        ">
-
-          {item}
-
-        </button>
-
-      </Link>
-
-    ))}
-
-  </div>
-
-</div>
-
-          {/* FILTERS */}
-
-          <div className="
-            flex
-            flex-wrap
-            gap-4
-          ">
-
-            <select
-              value={sort}
-              onChange={(e)=>
-                setSort(
-                  e.target.value
-                )
-              }
-              className="
-                border
-                rounded-xl
-                px-4
-                py-2
-              "
-            >
-
-              <option value="">
-                Sort By
-              </option>
-
-              <option value="low">
-                Price: Low to High
-              </option>
-
-              <option value="high">
-  Price: High to Low
-</option>
-
-<option value="stock">
-  Stock Available
-</option>
-              
-            </select>
-
-            <label className="
-              flex
-              items-center
-              gap-2
-              border
-              rounded-xl
-              px-4
-              py-2
-              bg-white
-            ">
-
-              <input
-                type="checkbox"
-                checked={stockOnly}
-                onChange={(e)=>
-                  setStockOnly(
-                    e.target.checked
-                  )
-                }
-              />
-
-              In Stock Only
-
-            </label>
-
-            <button
-
-  onClick={()=>{
-
-    setSort("");
-
-    setStockOnly(false);
-
-  }}
-
-  className="
-    bg-red-500
-    hover:bg-red-600
-    text-white
-    px-4
-    py-2
-    rounded-xl
-    font-semibold
-  "
->
-
-  <select
-  value={category}
-  onChange={(e)=>
-    setCategory(
-      e.target.value
-    )
-  }
-  className="
-    border
-    rounded-xl
-    px-4
-    py-2
-  "
->
-
-  <option value="">
-    All Categories
-  </option>
-
-  <option value="Fashion">
-    Fashion
-  </option>
-
-  <option value="Electronics">
-    Electronics
-  </option>
-
-  <option value="Beauty">
-    Beauty
-  </option>
-
-  <option value="Grocery">
-    Grocery
-  </option>
-
-</select>
-
-  Clear Filters
-
-</button>
-
+          <div className="flex flex-wrap gap-2 mt-4">
+            {quickChips.map((item) => (
+              <Link key={item} href={`/search?q=${encodeURIComponent(item)}`}>
+                <button className="bg-white border border-gray-200 hover:border-green-500 hover:text-green-600 px-4 py-1.5 rounded-full text-sm font-medium shadow-sm transition">
+                  {item}
+                </button>
+              </Link>
+            ))}
           </div>
-
         </div>
 
-        {/* LOADING */}
+        {/* FILTER BAR */}
+        <div className="bg-white rounded-2xl shadow-sm p-4 mb-8 flex flex-wrap gap-3 items-center">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="">Sort By</option>
+            <option value="low">Price: Low to High</option>
+            <option value="high">Price: High to Low</option>
+            <option value="stock">Stock Available</option>
+          </select>
 
-        {loading ? (
-
-          <div className="
-  text-center
-  py-20
-">
-  Loading Products...
-</div>
-
-        ) : filtered.length === 0 ? (
-
-          <div className="
-  bg-white
-  rounded-3xl
-  shadow-md
-  p-10
-  text-center
-">
-
-  <img
-    src="/empty-search.png"
-    alt="No Products"
-    className="
-      w-40
-      mx-auto
-      mb-6
-    "
-  />
-
-  <h2 className="
-    text-3xl
-    font-bold
-    mb-3
-  ">
-
-    No Products Found
-
-  </h2>
-
-  <p className="
-    text-gray-500
-    text-lg
-  ">
-
-    Try another keyword
-
-  </p>
-
-  <Link href="/">
-
-    <button className="
-      mt-6
-      bg-green-600
-      hover:bg-green-700
-      text-white
-      px-6
-      py-3
-      rounded-xl
-      font-semibold
-    ">
-
-      Continue Shopping
-
-    </button>
-
-  </Link>
-
-</div>
-
-        ) : (
-
-          <div className="
-            grid
-            grid-cols-2
-            md:grid-cols-3
-            lg:grid-cols-4
-            gap-6
-          ">
-
-            {filtered.map((product)=>(  
-
-              <Link
-                key={product?.id}
-                href={`/product/${product?.id}`}
-              >
-
-                <div className="
-                  bg-white
-                  rounded-2xl
-                  shadow-md
-                  overflow-hidden
-                  hover:shadow-xl
-                  transition
-                  duration-300
-                ">
-
-                  <div className="
-                    h-52
-                    bg-gray-100
-                  ">
-
-                    <img
-                      src={
-                        product?.image ||
-                        "/no-image.png"
-                      }
-                      alt={product?.name}
-                      className="
-                        w-full
-                        h-full
-                        object-cover
-                      "
-                    />
-
-                  </div>
-
-                  <div className="p-2">
-
-                    <h3 className="
-                      font-semibold
-                      line-clamp-2
-                      min-h-[48px]
-                    ">
-                      {product?.name}
-                    </h3>
-
-                    <p className="
-    text-gray-400
-    line-through
-    text-sm
-  ">
-    ₹{Math.round(product.price * 1.25)}
-  </p>
-  
-
-                    {product?.stock > 0 ? (
-
-                      <p className="
-                        text-sm
-                        text-green-600
-                        mt-2
-                      ">
-                        In Stock
-                      </p>
-
-                    ) : (
-
-                      <p className="
-                        text-sm
-                        text-red-500
-                        mt-2
-                      ">
-                        Out of Stock
-                      </p>
-
-                    )}
-
-                  </div>
-
-                </div>
-
-              </Link>
-
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="">All Categories</option>
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
             ))}
+          </select>
 
+          <label className="flex items-center gap-2 border rounded-xl px-4 py-2.5 bg-white cursor-pointer">
+            <input
+              type="checkbox"
+              checked={stockOnly}
+              onChange={(e) => setStockOnly(e.target.checked)}
+              className="accent-green-600"
+            />
+            In Stock Only
+          </label>
+
+          {(sort || stockOnly || category) && (
+            <button
+              onClick={clearFilters}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl font-semibold transition"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+
+        {/* RESULTS */}
+        {loading ? (
+          <div className="text-center py-20 text-gray-500">
+            Loading products…
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+            <div className="text-5xl mb-4">🔍</div>
+            <h2 className="text-2xl font-bold mb-2">No products found</h2>
+            <p className="text-gray-500 mb-6">Try another keyword or filter.</p>
+            <Link href="/">
+              <button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold transition">
+                Continue Shopping
+              </button>
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {filtered.map((product) => {
+              const hasMrp =
+                Number(product.mrp) && Number(product.mrp) > Number(product.price);
+              const off = hasMrp
+                ? Math.round(
+                    ((product.mrp - product.price) / product.mrp) * 100
+                  )
+                : 0;
 
+              return (
+                <Link key={product.id} href={`/product/${product.id}`}>
+                  <div className="bg-white rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden h-full">
+                    <div className="h-48 bg-gray-100 relative">
+                      <img
+                        src={product.image || "/no-image.png"}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {hasMrp && (
+                        <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
+                          {off}% OFF
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="p-3">
+                      <h3 className="font-semibold text-sm line-clamp-2 min-h-[40px]">
+                        {product.name}
+                      </h3>
+
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-green-600 font-bold">
+                          ₹{Number(product.price).toLocaleString("en-IN")}
+                        </span>
+                        {hasMrp && (
+                          <span className="text-gray-400 line-through text-xs">
+                            ₹{Number(product.mrp).toLocaleString("en-IN")}
+                          </span>
+                        )}
+                      </div>
+
+                      <p
+                        className={`text-xs mt-2 font-medium ${
+                          product.stock > 0 ? "text-green-600" : "text-red-500"
+                        }`}
+                      >
+                        {product.stock > 0 ? "In Stock" : "Out of Stock"}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         )}
-
       </div>
-
     </section>
-
-    );
-
+  );
 }
 
-
-       
-export default function SearchPage(){
-
-  return(
-
-    <Suspense
-      fallback={
-        <div>
-          Loading...
-        </div>
-      }
-    >
-
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="p-10 text-center">Loading…</div>}>
       <SearchContent />
-
     </Suspense>
-
   );
-
 }

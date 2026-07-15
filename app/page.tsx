@@ -30,6 +30,18 @@ type Product = {
   category: string;
 };
 
+// Category rows rendered on the home page (only shown if they have products).
+const CATEGORY_ROWS = [
+  { title: "📱 Mobiles", name: "Mobiles" },
+  { title: "👔 Men Fashion", name: "Men Fashion" },
+  { title: "👗 Women Fashion", name: "Women Fashion" },
+  { title: "🧒 Kids Fashion", name: "Kids Fashion" },
+  { title: "💻 Electronics", name: "Electronics" },
+  { title: "💄 Beauty", name: "Beauty" },
+  { title: "🏠 Appliances", name: "Appliances" },
+  { title: "🛒 Grocery", name: "Grocery" },
+];
+
 async function loadProducts(): Promise<Product[]> {
   try {
     const snapshot = await getDocs(collection(db, "products"));
@@ -76,7 +88,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-100">
       <CategoryStrip />
-
       <FeatureStrip />
 
       <section className="max-w-7xl mx-auto px-2 py-1 grid grid-cols-1 lg:grid-cols-4 gap-3">
@@ -90,14 +101,12 @@ export default function Home() {
       <CouponPopup />
       <FlashSale />
 
-      <CategoryRow title="📱 Mobiles" products={byCategory("Mobiles")} />
-      <CategoryRow title="👔 Men Fashion" products={byCategory("Men Fashion")} />
-      <CategoryRow title="👗 Women Fashion" products={byCategory("Women Fashion")} />
-      <CategoryRow title="🧒 Kids Fashion" products={byCategory("Kids Fashion")} />
-      <CategoryRow title="💻 Electronics" products={byCategory("Electronics")} />
-      <CategoryRow title="💄 Beauty" products={byCategory("Beauty")} />
-      <CategoryRow title="🏠 Appliances" products={byCategory("Appliances")} />
-      <CategoryRow title="🛒 Grocery" products={byCategory("Grocery")} />
+      {/* Category rows — only rendered when the category has products */}
+      {CATEGORY_ROWS.map(({ title, name }) => {
+        const products = byCategory(name);
+        if (products.length === 0) return null;
+        return <CategoryRow key={name} title={title} products={products} />;
+      })}
 
       <TrendingProducts />
       <BestSellers />

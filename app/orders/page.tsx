@@ -1,303 +1,501 @@
 "use client";
 
-import {useEffect,useState,
-} from "react";
+import { useEffect, useState } from "react";
 import {
   collection,
   getDocs,
   query,
   where,
-  } from "firebase/firestore";
-import { db }
-from "@/lib/firebase";
-import {useRouter
-} from "next/navigation";
+  updateDoc,
+  doc,
+} from "firebase/firestore";
 
-export default function OrdersPage(){
-  const router =useRouter();
- const [orders,setOrders] =useState<any[]>([]);
-  const [loading,setLoading] =useState(true);
-  useEffect(()=>{const user =localStorage.getItem("user");
-if(!user){alert("Please login first");
-  router.push("/login");
-  return;
-}
-   const fetchOrders = async () => {
-  try {
-    const userData = JSON.parse(localStorage.getItem("user") || "{}");
+import { onAuthStateChanged } from "firebase/auth";
 
-    const q = query(
-      collection(db, "orders"),
-      where("userEmail", "==", userData.email)
+import { useRouter } from "next/navigation";
+
+import { auth, db } from "@/lib/firebase";
+
+export default function OrdersPage() {
+
+  const router = useRouter();
+
+  const [orders, setOrders] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+
+    const unsub = onAuthStateChanged(
+
+      auth,
+
+      (firebaseUser) => {
+
+        if (!firebaseUser) {
+
+          setLoading(false);
+
+          alert("Please login first");
+
+          router.push("/login");
+
+          return;
+
+        }
+
+        const fetchOrders = async () => {
+
+          try {
+
+            const q = query(
+
+              collection(db, "orders"),
+
+              where(
+                "userEmail",
+                "==",
+                firebaseUser.email
+              )
+
+            );
+
+            const snapshot =
+              await getDocs(q);
+
+            const items: any[] = [];
+
+            snapshot.forEach((docSnap) => {
+
+              items.push({
+
+                id: docSnap.id,
+
+                ...docSnap.data(),
+
+              });
+
+            });
+
+            const unique = Array.from(
+
+              new Map(
+
+                items.map((o) => [
+
+                  o.id,
+
+                  o,
+
+                ])
+
+              ).values()
+
+            );
+
+            unique.sort(
+
+              (a, b) =>
+
+                (b.createdAt?.seconds || 0) -
+
+                (a.createdAt?.seconds || 0)
+
+            );
+
+            setOrders(unique);
+
+          } catch (error) {
+
+            console.error(error);
+
+          } finally {
+
+            setLoading(false);
+
+          }
+
+        };
+
+        fetchOrders();
+
+      }
+
     );
 
-    const snapshot = await getDocs(q);
-    const items: any[] = [];
-    snapshot.forEach((doc) => {
-      items.push({ id: doc.id, ...doc.data() });
-    });
+    return () => unsub();
 
-    const unique = Array.from(new Map(items.map((o) => [o.id, o])).values());
-
-unique.sort(
-  (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-);
-
-setOrders(unique);
-
-    // Newest first (no composite index needed)
-    items.sort(
-      (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-    );
-
-    setOrders(items);
-  } catch (error) {
-    console.error("Failed to load orders:", error);
-  } finally {
-    setLoading(false);
-  }
-};
-    fetchOrders();
-
-  },[]);
+  }, [router]);
 
   const getStep = (
-  status:string = ""
-) => {
 
-  switch(status){
+    status: string = ""
 
-    case "Pending":
-      return 1;
+  ) => {
 
-    case "Confirmed":
-      return 2;
+    switch (status) {
 
-    case "Packed":
-      return 3;
+      case "Pending":
+        return 1;
 
-    case "Shipped":
-      return 4;
+      case "Confirmed":
+        return 2;
 
-    case "Out For Delivery":
-      return 5;
+      case "Packed":
+        return 3;
 
-    case "Delivered":
-      return 6;
+      case "Shipped":
+        return 4;
 
-    default:
-      return 1;
+      case "Out For Delivery":
+        return 5;
 
-  }
+      case "Delivered":
+        return 6;
 
-};
+      default:
+        return 1;
 
-  if(loading){
+    }
 
-    return(
+  };
 
-      <div className="
-        py-20
-        text-center
-      ">
-        Loading orders...
+  const cancelOrder = async (
+
+    id: string
+
+  ) => {
+
+    if (
+
+      !confirm(
+
+        "Cancel this order?"
+
+      )
+
+    )
+
+      return;
+
+    try {
+
+      await updateDoc(
+
+        doc(db, "orders", id),
+
+        {
+
+          status: "Cancelled",
+
+        }
+
+      );
+
+      setOrders((prev) =>
+
+        prev.map((o) =>
+
+          o.id === id
+
+            ? {
+
+                ...o,
+
+                status: "Cancelled",
+
+              }
+
+            : o
+
+        )
+
+      );
+
+    } catch (error) {
+
+      console.log(error);
+
+    }
+
+  };
+
+  const steps = [
+
+    "📝 Placed",
+
+    "✅ Confirmed",
+
+    "📦 Packed",
+
+    "🚚 Shipped",
+
+    "🏍️ Out For Delivery",
+
+    "🎉 Delivered",
+
+  ];
+
+  if (loading) {
+
+    return (
+
+      <div className="py-20 text-center">
+
+        Loading Orders...
+
       </div>
 
     );
 
   }
 
-  return(
+  return (
 
-    <section className="
-      py-10
-      px-4
-    ">
+  <section className="bg-gray-50 min-h-screen py-10">
 
-      <div className="
-        max-w-7xl
-        mx-auto
-      ">
+      <div className="max-w-6xl mx-auto px-5">
 
-        <h1 className="
-          text-4xl
-          font-bold
-          mb-10
-        ">
+        <h1 className="text-4xl font-bold mb-10">
+
           My Orders
+
         </h1>
 
         {orders.length === 0 ? (
 
-          <div className="
-            bg-white
-            rounded-3xl
-            shadow-md
-            p-10
-            text-center
-          ">
+          <div className="bg-white rounded-3xl shadow-md p-10 text-center">
 
-            <p className="
-              text-gray-500
-              text-lg
-            ">
-              No orders found
+            <p className="text-gray-500 text-lg">
+
+              No Orders Found
+
             </p>
 
           </div>
 
         ) : (
 
-          <div className="
-            space-y-8
-          ">
+          <div className="space-y-8">
 
             {orders.map((order: any) => (
-  <div
-    key={order.id}
-                className="
-                  bg-white
-                  rounded-3xl
-                  shadow-md
-                  p-8
-                "
+
+              <div
+
+                key={order.id}
+
+                className="bg-white rounded-3xl shadow-md border overflow-hidden"
+
               >
 
-                {/* TOP */}
+                {/* ORDER SUMMARY */}
 
-                <div className="
-                  flex
-                  flex-col
-                  md:flex-row
-                  md:items-center
-                  md:justify-between
-                  gap-4
-                  border-b
-                  pb-5
-                  mb-6
-                ">
+                <div className="grid lg:grid-cols-3 gap-8 p-8 border-b">
+
+                  {/* LEFT */}
 
                   <div>
 
-                    <h2 className="
-                      text-2xl
-                      font-bold
-                    ">
-                      Order ID: {order.id.slice(0,8)}
+                    <h2 className="text-2xl font-bold">
+
+                      Order #
+
+                      {order.id.slice(0, 8)}
+
                     </h2>
 
-                    <p className="
-                      text-gray-500
-                      mt-1
-                    ">
-                      {order.customerName}
+                    <p className="mt-4">
+
+                      👤 {order.customerName}
+
                     </p>
-                    <p className="
-  text-sm
-  text-gray-400
-">
-  {order.createdAt?.seconds
-    ? new Date(
-        order.createdAt.seconds * 1000
-      ).toLocaleDateString()
-    : "Date unavailable"}
-</p>
+
+                    <p className="mt-2 text-gray-500">
+
+                      📅
+
+                      {" "}
+
+                      {order.createdAt?.seconds
+
+                        ? new Date(
+
+                            order.createdAt.seconds *
+
+                              1000
+
+                          ).toLocaleString()
+
+                        : "-"}
+
+                    </p>
+
+                    <p className="mt-2">
+
+                      📧
+
+                      {" "}
+
+                      {order.userEmail}
+
+                    </p>
+
+                    <p className="mt-2">
+
+                      📞
+
+                      {" "}
+
+                      {order.phone}
+
+                    </p>
+
+                    <p className="mt-2">
+
+                      📍
+
+                      {" "}
+
+                      {order.address}
+
+                    </p>
+
+                  </div>
+
+                  {/* CENTER */}
+
+                  <div className="bg-gray-50 rounded-3xl border p-6">
+
+                    <p className="text-4xl font-bold text-green-700">
+
+                      ₹
+
+                      {(
+
+                        order.finalTotal ||
+
+                        order.total
+
+                      )?.toLocaleString(
+
+                        "en-IN"
+
+                      )}
+
+                    </p>
+
+                    <p className="text-gray-500 mt-2">
+
+                      Total Amount
+
+                    </p>
+
+                    <hr className="my-5" />
+
+<div className="space-y-4">
+
+  <div className="flex justify-between">
+
+    <span>Items</span>
+
+    <span>{order.items?.length}</span>
 
   </div>
 
- <div
-  className="
-    w-full
-    md:w-72
-    flex
-    flex-col
-    gap-3
-  "
->
-<div>
+  <div className="flex justify-between">
 
-  <p className="
-    text-xl
-    font-bold
-  ">
-    ₹{
-      order.finalTotal ||
-      order.total
-    }
-  </p>
+    <span>Payment</span>
 
-  <p className="
-    text-sm
-    text-gray-500
-  ">
-    {
-      order.items?.length || 0
-    } Items
-  </p>
-  <p className="
-  text-sm
-  font-semibold
-  mt-2
-">
-  Payment:
-  <div className="flex justify-center my-4">
-   <span
-    className="
-      px-4
-      py-2
-      rounded-full
-      bg-yellow-100
-      text-yellow-700
-      font-semibold
-    "
-  >
-    Pending
-     </span>
-</div>
+    <span
+      className={
+        order.paymentStatus === "Paid"
+          ? "text-green-600 font-semibold"
+          : "text-red-600 font-semibold"
+      }
+    >
+      {order.paymentStatus || "Pending"}
+    </span>
 
-</p>
-<p className="
-  text-sm
-  text-gray-500
-">
-  Method:
-  {" "}
-  {order.paymentMethod || "COD"}
-</p>
+  </div>
+
+  <div className="flex justify-between">
+
+    <span>Method</span>
+
+    <span>
+
+      {order.paymentMethod || "COD"}
+
+    </span>
+
+  </div>
+
+  <div className="flex justify-between">
+
+    <span>Status</span>
+
+    <span className="text-blue-600 font-semibold">
+
+      {order.status}
+
+    </span>
+
+  </div>
+
+  <div className="flex justify-between">
+
+    <span>Shipping</span>
+
+    <span>
+
+      Free
+
+    </span>
+
+  </div>
 
 </div>
+</div>
+                  {/* RIGHT */}
 
- <a
+                  <div className="space-y-3">
+                    {/* ACTION BUTTONS */}
+
+<a
   href={`/invoice/${order.id}`}
   target="_blank"
   rel="noopener noreferrer"
   className="
-w-full
-h-12
-bg-blue-600
-hover:bg-blue-700
-rounded-xl
-font-semibold
-text-white
-flex
-items-center
-justify-center
-"
+    w-full
+    h-12
+    rounded-xl
+    bg-blue-600
+    hover:bg-blue-700
+    text-white
+    font-semibold
+    flex
+    items-center
+    justify-center
+  "
 >
-  Download Invoice
+  📄 Download Invoice
 </a>
+
 {order.chatId ? (
 
   <a
     href={`/chat/${order.chatId}`}
     className="
+      w-full
+      h-12
+      rounded-xl
       bg-green-600
+      hover:bg-green-700
       text-white
-      px-4
-      py-2
-      rounded-lg
-      mt-2
-      inline-block
+      font-semibold
+      flex
+      items-center
+      justify-center
     "
   >
     💬 Contact Seller
@@ -308,364 +506,520 @@ justify-center
   <button
     disabled
     className="
-w-full
-h-12
-bg-gray-300
-text-gray-600
-rounded-xl
-font-semibold
-flex
-items-center
-justify-center
-cursor-not-allowed
-"
+      w-full
+      h-12
+      rounded-xl
+      bg-gray-300
+      text-gray-600
+      cursor-not-allowed
+      font-semibold
+    "
   >
     💬 Chat Unavailable
   </button>
 
 )}
+
 <a
   href={`/orders/${order.id}`}
   className="
-w-full
-h-12
-bg-purple-600
-hover:bg-purple-700
-rounded-xl
-font-semibold
-text-white
-flex
-items-center
-justify-center
-"
+    w-full
+    h-12
+    rounded-xl
+    bg-purple-600
+    hover:bg-purple-700
+    text-white
+    font-semibold
+    flex
+    items-center
+    justify-center
+  "
 >
   📍 Track Order
 </a>
 
- <div
-  className="
-    border
-    rounded-xl
-    p-4
-    text-center
-  "
->
-
-  <span
-    className={`
-      inline-block
-      px-4
-      py-2
-      rounded-full
-      text-sm
-      font-semibold
-
-      ${
-        order.status === "Delivered"
-
-          ? "bg-green-100 text-green-700"
-
-          : order.status === "Shipped"
-
-          ? "bg-blue-100 text-blue-700"
-
-          : order.status === "Out For Delivery"
-
-          ? "bg-orange-100 text-orange-700"
-
-          : "bg-yellow-100 text-yellow-700"
-      }
-    `}
-  >
-
-    {order.status}
-
-  </span>
-
-  <p className="text-xs text-gray-500 mt-2">
-
-    Tracking Updated
-
-  </p> 
-
-{order.expectedDelivery && (
-
-  <p className="
-    text-sm
-    text-green-600
-  ">
-    📅 Expected Delivery:
-    {" "}
-    {order.expectedDelivery}
-  </p>
-
-)}
-
-{order.courierName && (
-
-  <p className="
-    text-sm
-    text-blue-600
-  ">
-    🚚 Delivery Partner:
-    {" "}
-    {order.courierName}
-  </p>
-
-)}
-
-{order.trackingNumber && (
-
-  <p className="
-  text-sm
-  text-purple-600
-">
-  📦 Tracking:
-  {" "}
-  {order.trackingNumber}
-
-  <button
-    onClick={() => {
-
-  if (order.trackingNumber) {
-
-    navigator.clipboard.writeText(
-      order.trackingNumber
-    );
-
-    alert("Tracking number copied!");
-
-  }
-
-}}
-    className="
-      ml-2
-      text-blue-600
-    "
-  >
-    Copy
-  </button>
-</p>
-
-)}
-</div>
-
 {order.status === "Pending" && (
 
-   <button
+  <button
+    onClick={() =>
+      cancelOrder(order.id)
+    }
     className="
-w-full
-h-12
-bg-red-600
-hover:bg-red-700
-rounded-xl
-font-semibold
-text-white
-flex
-items-center
-justify-center
-"
+      w-full
+      h-12
+      rounded-xl
+      bg-red-600
+      hover:bg-red-700
+      text-white
+      font-semibold
+    "
   >
-    Cancel Order
+    ❌ Cancel Order
   </button>
 
 )}
 
-{order.status === "Delivered" && (
+{/* ORDER STATUS */}
 
-  
-
-  <div className="
-    bg-green-100
-    text-green-700
-    px-4
-    py-2
-    rounded-xl
-    text-sm
-    font-semibold
-  ">
-
-    🎉 Order Delivered Successfully
-
-    <a
-  href={`/returns?orderId=${order.id}`}
-  className="
-    mt-3
-    bg-orange-500
-    text-white
-    px-4
-    py-2
-    rounded-lg
-    text-sm
-    inline-block
-  "
->
-  Request Return
-</a>
-
-
-
-  </div>
-
-)}
-
-                  </div>
-
-                </div>
-                 <div className="
-  mt-8
+<div className="
+  mt-5
+  rounded-3xl
+  border
+  bg-gray-50
+  p-5
 ">
 
   <div className="
     flex
     justify-between
     items-center
-    gap-2
+    mb-4
   ">
 
-    {[  
-  "📝 Placed",
-  "✅ Confirmed",
-  "📦 Packed",
-  "🚚 Shipped",
-  "🏍️ Out For Delivery",
-  "🎉 Delivered"
-    ].map(
+    <h3 className="
+      font-bold
+      text-lg
+    ">
+      Order Status
+    </h3>
 
-      (
-        step,
-        index
-      )=>(
+    <span
+      className={`
 
-      <div
-     key={order.id}
+        px-4
+        py-2
+        rounded-full
+        text-sm
+        font-semibold
+
+        ${
+
+          order.status === "Delivered"
+
+            ? "bg-green-100 text-green-700"
+
+          : order.status === "Out For Delivery"
+
+            ? "bg-orange-100 text-orange-700"
+
+          : order.status === "Shipped"
+
+            ? "bg-purple-100 text-purple-700"
+
+          : order.status === "Packed"
+
+            ? "bg-indigo-100 text-indigo-700"
+
+          : order.status === "Confirmed"
+
+            ? "bg-blue-100 text-blue-700"
+
+          : order.status === "Cancelled"
+
+            ? "bg-red-100 text-red-700"
+
+          : "bg-yellow-100 text-yellow-700"
+
+        }
+
+      `}
+    >
+
+      {order.status}
+
+    </span>
+
+<div className="mt-4 border-t pt-4">
+
+  <p className="text-xs text-gray-500">
+
+    Last Updated
+
+  </p>
+
+  <p className="font-medium">
+
+    {order.createdAt?.seconds
+      ? new Date(
+          order.createdAt.seconds * 1000
+        ).toLocaleString()
+      : "-"}
+
+  </p>
+
+</div>
+
+  </div>
+
+  {order.expectedDelivery && (
+
+    <p className="mb-2">
+
+      📅 Expected Delivery:
+
+      {" "}
+
+      <span className="font-semibold">
+
+        {order.expectedDelivery}
+
+      </span>
+
+    </p>
+
+  )}
+
+  {order.courierName && (
+
+    <p className="mb-2">
+
+      🚚 Delivery Partner:
+
+      {" "}
+
+      <span className="font-semibold">
+
+        {order.courierName}
+
+      </span>
+
+    </p>
+
+  )}
+
+  {order.trackingNumber && (
+
+    <div className="flex items-center gap-2 flex-wrap">
+
+      <span>
+
+        📦 Tracking:
+
+      </span>
+
+      <span className="font-semibold">
+
+        {order.trackingNumber}
+
+      </span>
+
+      <button
+        onClick={() => {
+
+          navigator.clipboard.writeText(
+            order.trackingNumber
+          );
+
+          alert(
+            "Tracking copied"
+          );
+
+        }}
         className="
-          flex-1
-          text-center
+          text-blue-600
+          underline
+          text-sm
         "
       >
+        Copy
+      </button>
 
-        <div className={`
-          w-10
-          h-10
-          mx-auto
-          rounded-full
-          flex
-          items-center
-          justify-center
-          text-white
-          font-bold
-          ${
-           getStep( 
-              order.status
-            ) >= index + 1
+    </div>
 
-            ? "bg-green-600"
+  )}
 
-            : "bg-gray-300"
-          }
-        `}>
+</div>
 
+</div>
+
+</div>
+
+{/* ORDER TRACKING */}
+
+<div className="
+  p-8
+  border-b
+">
+
+  <h2 className="
+    text-2xl
+    font-bold
+    mb-8
+  ">
+    🚚 Order Tracking
+  </h2>
+
+  <div className="flex items-center justify-between">
+
+  {steps.map((step, index) => (
+
+    <div
+      key={index}
+      className="flex items-center flex-1"
+    >
+
+      {/* Circle */}
+
+      <div className="flex flex-col items-center">
+
+        <div
+          className={`
+            w-12
+            h-12
+            rounded-full
+            flex
+            items-center
+            justify-center
+            text-white
+            font-bold
+
+            ${
+              getStep(order.status) >= index + 1
+                ? "bg-green-600"
+                : "bg-gray-300"
+            }
+          `}
+        >
           {index + 1}
-
         </div>
 
-        <p className="
-          text-xs
-          mt-2
-          leading-5
-        ">
+        <p className="mt-3 text-sm text-center whitespace-nowrap">
           {step}
         </p>
 
       </div>
 
-    ))}
+      {/* CONNECTING LINE */}
 
-  </div>
+      {index < steps.length - 1 && (
+
+        <div
+          className={`
+            flex-1
+            h-1
+            mx-3
+            rounded-full
+
+            ${
+              getStep(order.status) > index + 1
+                ? "bg-green-600"
+                : "bg-gray-300"
+            }
+          `}
+        />
+
+      )}
+
+    </div>
+
+  ))}
 
 </div>
-                
+</div>
+{/* ORDERED PRODUCTS */}
 
-                {/* ITEMS */}
+<div className="p-8">
 
-                <div className="
-                  space-y-5
-                ">
+  <h2 className="text-2xl font-bold mb-8">
 
-                  {order.items?.map(
-                    (item:any,i:number)=>(
+    📦 Ordered Item
 
-                    <div
-                      key={i}
-                      className="
-                        flex
-                        items-center
-                        gap-4
-                      "
-                    >
+  </h2>
 
-                      <img
-                        src={
-                          item.image ||
-                          "/no-image.png"
-                        }
-                        alt=""
-                        className="
-                          w-20
-                          h-20
-                          rounded-2xl
-                          object-cover
-                        "
-                      />
+  <div className="space-y-5">
 
-                      <div className="
-                        flex-1
-                      ">
+    {order.items?.map(
 
-                        <h3 className="
-                          font-bold
-                        ">
-                          {item.name}
-                        </h3>
+      (item: any, index: number) => (
 
-                        <p className="
-                          text-gray-500
-                          text-sm
-                        ">
-                          Qty:
-                          {" "}
-                          {item.qty}
-                        </p>
+        <div
+          key={index}
+          className="
+            border
+            rounded-3xl
+            p-6
+            shadow-sm
+            hover:shadow-md
+            transition
+            flex
+            flex-col
+            md:flex-row
+            gap-6
+            items-center
+          "
+        >
 
-                      </div>
+          <img
+            src={
+              item.image ||
+              "/no-image.png"
+            }
+            alt={item.name}
+            className="
+              w-28
+              h-28
+              rounded-2xl
+              object-cover
+              border
+            "
+          />
 
-                      <p className="
-                        font-bold
-                      ">
-                        ₹
-                        {item.price *
-                         item.qty}
-                      </p>
+          <div className="flex-1">
 
-                    </div>
+            <h3 className="text-xl font-bold">
 
-                  ))}
+              {item.name}
 
-                </div>
+            </h3>
 
-              </div>
+            <div className="mt-3 space-y-2 text-gray-600">
 
-            ))}
+              <p>
+
+                🏬 Sold By:
+                {" "}
+                <span className="font-semibold">
+
+                  {item.vendorName || "Yogi Mart"}
+
+                </span>
+
+              </p>
+
+              <p>
+
+                📦 Quantity:
+                {" "}
+                <span className="font-semibold">
+
+                  {item.qty}
+
+                </span>
+
+              </p>
+
+              {item.color && (
+
+                <p>
+
+                  🎨 Color:
+                  {" "}
+                  {item.color}
+
+                </p>
+
+              )}
+
+              {item.size && (
+
+                <p>
+
+                  📏 Size:
+                  {" "}
+                  {item.size}
+
+                </p>
+
+              )}
+
+            </div>
 
           </div>
 
-        )}
+          <div className="text-right self-start">
 
-      </div>
+            <p className="text-3xl font-bold text-green-700">
 
-    </section>
+              ₹
 
-  );
+              {(
+                item.price *
+                item.qty
+              ).toLocaleString("en-IN")}
+
+            </p>
+
+            <p className="text-gray-500 mt-2">
+
+              Item Total
+
+            </p>
+
+          </div>
+
+        </div>
+
+      )
+
+    )}
+
+  </div>
+
+  {order.status === "Delivered" && (
+
+    <div
+      className="
+        mt-8
+        bg-green-50
+        border
+        border-green-200
+        rounded-3xl
+        p-6
+      "
+    >
+
+      <h3 className="text-green-700 text-xl font-bold">
+
+        🎉 Order Delivered Successfully
+
+      </h3>
+
+      <p className="mt-2 text-gray-600">
+
+        Thank you for shopping with
+        Yogi Mart.
+
+      </p>
+
+      <a
+        href={`/returns?orderId=${order.id}`}
+        className="
+          inline-flex
+          mt-5
+          bg-orange-500
+          hover:bg-orange-600
+          text-white
+          px-6
+          py-3
+          rounded-xl
+          font-semibold
+        "
+      >
+
+        Request Return
+
+      </a>
+
+    </div>
+
+  )}
+
+</div>
+
+</div>
+
+))
+
+}
+
+</div>
+
+)}
+
+</div>
+
+</section>
+
+);
 
 }

@@ -16,7 +16,7 @@ import { db, auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 
 // Free shipping threshold — keep this in sync with TopStrip/cart.
-const FREE_SHIPPING_THRESHOLD = 2000;
+const FREE_SHIPPING_THRESHOLD = 999;
 const SHIPPING_FEE = 99;
 
 export default function CheckoutPage() {
@@ -368,163 +368,300 @@ export default function CheckoutPage() {
   };
 
   return (
-    <section className="py-10 px-4">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* LEFT */}
-        <div className="lg:col-span-2 bg-white rounded-3xl shadow-md p-8">
-          <h1 className="text-3xl font-bold mb-8">Checkout</h1>
-
-          <div className="space-y-5">
-            <input
-              type="text"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border rounded-xl px-5 py-4 outline-none"
-            />
-            <input
-              type="text"
-              placeholder="Phone Number"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="w-full border rounded-xl px-5 py-4 outline-none"
-            />
-            <textarea
-              placeholder="Delivery Address"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              rows={5}
-              className="w-full border rounded-xl px-5 py-4 outline-none"
-            />
-          </div>
+    <section className="py-8 px-4 bg-gray-50 min-h-screen">
+      <div className="max-w-6xl mx-auto">
+        {/* CHECKOUT PROGRESS BAR */}
+        <div className="flex items-center justify-center gap-2 sm:gap-4 mb-8">
+          {[
+            { label: "Cart", done: true },
+            { label: "Address", done: false },
+            { label: "Payment", done: false },
+          ].map((s, i) => (
+            <div key={s.label} className="flex items-center gap-2 sm:gap-4">
+              <div className="flex flex-col items-center">
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${
+                    s.done || i === 1
+                      ? "bg-green-600 text-white"
+                      : "bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  {s.done ? "✓" : i + 1}
+                </div>
+                <span
+                  className={`text-xs mt-1 ${
+                    s.done || i === 1
+                      ? "text-green-700 font-semibold"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {s.label}
+                </span>
+              </div>
+              {i < 2 && (
+                <div
+                  className={`w-10 sm:w-20 h-1 rounded-full ${
+                    i === 0 ? "bg-green-600" : "bg-gray-200"
+                  }`}
+                />
+              )}
+            </div>
+          ))}
         </div>
 
-        {/* RIGHT */}
-        <div className="bg-white rounded-3xl shadow-md p-8 h-fit">
-          <h2 className="text-2xl font-bold mb-6">Order Summary</h2>
-
-          <div className="space-y-5">
-            {items.map((item: any, index) => (
-              <div key={index} className="flex items-center gap-4">
-                <img
-                  src={item?.image || "/no-image.png"}
-                  alt=""
-                  className="w-20 h-20 object-cover rounded-xl"
-                />
-                <div className="flex-1">
-                  <h3 className="font-semibold">{item?.name}</h3>
-                  <p className="text-gray-500 text-sm">Qty: {item?.qty}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* LEFT: ADDRESS + PAYMENT */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* DELIVERY ADDRESS */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+                📍 Delivery Address
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
+                  />
                 </div>
-                <p className="font-bold">
-                  ₹{((item?.price || 0) * (item?.qty || 0)).toLocaleString("en-IN")}
-                </p>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="10 digit mobile number"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">
+                    Delivery Address
+                  </label>
+                  <textarea
+                    placeholder="House no, street, area, city, state, PIN"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    rows={4}
+                    className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
+                  />
+                </div>
               </div>
-            ))}
-          </div>
-
-          <div className="border-t mt-8 pt-6">
-            <div className="flex justify-between text-xl font-bold">
-              <span>Total</span>
-              <span>₹{total.toLocaleString("en-IN")}</span>
-            </div>
-
-            <div className="flex justify-between mt-4 text-green-600 font-semibold">
-              <span>Discount</span>
-              <span>- ₹{discount.toLocaleString("en-IN")}</span>
-            </div>
-
-            <div className="flex justify-between mt-4 text-blue-600 font-semibold">
-              <span>Shipping</span>
-              <span>{shipping === 0 ? "FREE" : `₹${shipping}`}</span>
-            </div>
-
-            <div className="flex justify-between mt-4 text-gray-600 text-sm">
-              <span>Estimated Delivery</span>
-              <span>{deliveryDate}</span>
-            </div>
-
-            <div className="mt-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={redeemPoints}
-                  onChange={() => setRedeemPoints(!redeemPoints)}
-                />
-                <span>
-                  Redeem Reward Points ({availablePoints} Available)
-                </span>
-              </label>
-            </div>
-
-            {redeemPoints && (
-              <div className="flex justify-between mt-4 text-purple-600 font-semibold">
-                <span>Reward Discount</span>
-                <span>- ₹{rewardValue.toLocaleString("en-IN")}</span>
-              </div>
-            )}
-
-            <div className="flex justify-between mt-5 text-2xl font-bold">
-              <span>Final Total</span>
-              <span>₹{grandTotal.toLocaleString("en-IN")}</span>
             </div>
 
             {/* PAYMENT METHOD */}
-            <div className="mt-8">
-              <h3 className="text-xl font-bold mb-4">Payment Method</h3>
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
+                💳 Payment Method
+              </h2>
               <div className="space-y-3">
-                <label className="flex items-center gap-3">
+                <label
+                  className={`flex items-center gap-3 border-2 rounded-xl p-4 cursor-pointer transition ${
+                    paymentMethod === "COD"
+                      ? "border-green-600 bg-green-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
                   <input
                     type="radio"
                     value="COD"
                     checked={paymentMethod === "COD"}
                     onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-4 h-4 accent-green-600"
                   />
-                  Cash On Delivery
+                  <div>
+                    <p className="font-semibold">Cash on Delivery</p>
+                    <p className="text-sm text-gray-500">
+                      Pay when your order arrives
+                    </p>
+                  </div>
                 </label>
-                <label className="flex items-center gap-3">
+
+                <label
+                  className={`flex items-center gap-3 border-2 rounded-xl p-4 cursor-pointer transition ${
+                    paymentMethod === "ONLINE"
+                      ? "border-green-600 bg-green-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
                   <input
                     type="radio"
                     value="ONLINE"
                     checked={paymentMethod === "ONLINE"}
                     onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="w-4 h-4 accent-green-600"
                   />
-                  Online Payment
+                  <div>
+                    <p className="font-semibold">Online Payment</p>
+                    <p className="text-sm text-gray-500">
+                      UPI, Cards &amp; Netbanking via Razorpay
+                    </p>
+                  </div>
                 </label>
               </div>
             </div>
 
-            <button
-              onClick={handlePlaceOrder}
-              disabled={loading}
-              className="w-full mt-6 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-4 rounded-2xl font-bold text-lg transition"
+            {/* TRUST BADGES */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-center text-gray-600">
+                <div>🔒<br />Secure payment</div>
+                <div>✅<br />Genuine products</div>
+                <div>↩️<br />Easy returns</div>
+                <div>🚚<br />Fast delivery</div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: SUMMARY */}
+          <div className="lg:sticky lg:top-24 h-fit space-y-5">
+            {/* FREE DELIVERY NOTE */}
+            <div
+              className={`rounded-2xl p-4 text-sm font-medium ${
+                shipping === 0
+                  ? "bg-green-50 text-green-700"
+                  : "bg-yellow-50 text-yellow-700"
+              }`}
             >
-              {loading ? "Processing..." : "Place Order"}
-            </button>
+              {shipping === 0
+                ? "🎉 You have unlocked FREE delivery"
+                : `🚚 Add ₹${Math.max(
+                    0,
+                    FREE_SHIPPING_THRESHOLD - finalAmount
+                  ).toLocaleString("en-IN")} more for FREE delivery`}
+            </div>
 
-            {/* COUPON */}
-            <div className="bg-white rounded-3xl shadow-md p-6 mt-8">
-              <h2 className="text-2xl font-bold mb-5">Apply Coupon</h2>
-              <div className="flex gap-4">
+            {/* ORDER SUMMARY */}
+            <div className="bg-white rounded-2xl shadow-sm p-6">
+              <h2 className="text-xl font-bold mb-5">Order Summary</h2>
+
+              <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
+                {items.map((item: any, index: number) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <img
+                      src={item?.image || "/no-image.png"}
+                      alt=""
+                      className="w-16 h-16 object-cover rounded-xl border border-gray-100"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm line-clamp-1">
+                        {item?.name}
+                      </h3>
+                      <p className="text-gray-500 text-xs">
+                        Qty: {item?.qty}
+                        {item?.size ? ` • ${item.size}` : ""}
+                        {item?.color ? ` • ${item.color}` : ""}
+                      </p>
+                    </div>
+                    <p className="font-bold text-sm">
+                      ₹
+                      {((item?.price || 0) * (item?.qty || 0)).toLocaleString(
+                        "en-IN"
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* COUPON */}
+              <div className="mt-6">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="🎟 Coupon code"
+                    value={coupon}
+                    onChange={(e) => setCoupon(e.target.value)}
+                    className="flex-1 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <button
+                    onClick={applyCoupon}
+                    disabled={couponApplied}
+                    className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-5 rounded-xl font-semibold transition"
+                  >
+                    {couponApplied ? "Applied" : "Apply"}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-gray-400">
+                  Try YOGI10 or SAVE500
+                </p>
+              </div>
+
+              {/* REDEEM POINTS */}
+              <label className="flex items-center gap-2 mt-5 cursor-pointer">
                 <input
-                  type="text"
-                  placeholder="Enter coupon code"
-                  value={coupon}
-                  onChange={(e) => setCoupon(e.target.value)}
-                  className="flex-1 border rounded-2xl px-4 py-3"
+                  type="checkbox"
+                  checked={redeemPoints}
+                  onChange={() => setRedeemPoints(!redeemPoints)}
+                  className="w-4 h-4 accent-green-600"
                 />
-                <button
-                  onClick={applyCoupon}
-                  disabled={couponApplied}
-                  className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-6 rounded-2xl font-semibold"
-                >
-                  {couponApplied ? "Applied" : "Apply"}
-                </button>
+                <span className="text-sm">
+                  Redeem Reward Points ({availablePoints} available)
+                </span>
+              </label>
+
+              {/* PRICE BREAKDOWN */}
+              <div className="border-t mt-5 pt-5 space-y-3 text-gray-700">
+                <div className="flex justify-between">
+                  <span>Subtotal</span>
+                  <span>₹{total.toLocaleString("en-IN")}</span>
+                </div>
+
+                {discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Coupon discount</span>
+                    <span>- ₹{discount.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between">
+                  <span>Delivery</span>
+                  <span
+                    className={shipping === 0 ? "text-green-600 font-semibold" : ""}
+                  >
+                    {shipping === 0 ? "FREE" : `₹${shipping}`}
+                  </span>
+                </div>
+
+                {redeemPoints && rewardValue > 0 && (
+                  <div className="flex justify-between text-purple-600">
+                    <span>Reward discount</span>
+                    <span>- ₹{rewardValue.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Estimated delivery</span>
+                  <span>{deliveryDate}</span>
+                </div>
+
+                <div className="flex justify-between text-2xl font-bold border-t pt-4">
+                  <span>Total</span>
+                  <span>₹{grandTotal.toLocaleString("en-IN")}</span>
+                </div>
               </div>
 
-              <div className="mt-5 text-sm text-gray-500 leading-7">
-                Try: <span className="font-bold">YOGI10</span> or{" "}
-                <span className="font-bold">SAVE500</span>
-              </div>
+              <button
+                onClick={handlePlaceOrder}
+                disabled={loading}
+                className="w-full mt-6 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-4 rounded-2xl font-bold text-lg transition"
+              >
+                {loading
+                  ? "Processing..."
+                  : paymentMethod === "ONLINE"
+                  ? `Pay ₹${grandTotal.toLocaleString("en-IN")}`
+                  : "Place Order"}
+              </button>
+
+              <p className="text-center text-xs text-gray-400 mt-3">
+                🔒 100% secure &amp; encrypted checkout
+              </p>
             </div>
           </div>
         </div>

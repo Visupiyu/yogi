@@ -20,24 +20,35 @@ export default function AdminLoginPage() {
       return;
     }
 
-    try {
-      setLoading(true);
+    try { setLoading(true);
 
-      const result = await signInWithEmailAndPassword(
-        auth,
-        email.trim().toLowerCase(),
-        password
-      );
+const result = await signInWithEmailAndPassword( auth, email.trim().toLowerCase(), password);
 
-      const userEmail = (result.user.email || "").toLowerCase();
+const userEmail = (result.user.email || "").toLowerCase();
 
-      if (!adminEmails.includes(userEmail)) {
-        await signOut(auth);
-        alert("Not Admin Account");
-        return;
-      }
+if (!adminEmails.includes(userEmail)) {
+  await signOut(auth);
+  alert("Not Admin Account");
+  return;
+}
 
-      router.push("/admin");
+// 👇 ADD HERE
+localStorage.removeItem("user");
+localStorage.removeItem("vendor");
+
+localStorage.setItem(
+  "admin",
+  JSON.stringify({
+    uid: result.user.uid,
+    email: result.user.email,
+    name: "Administrator",
+  })
+);
+
+alert("Admin Login Successful");
+
+router.push("/admin");
+
     } catch (error: any) {
       if (error.code === "auth/invalid-credential") {
         alert("Invalid email or password");

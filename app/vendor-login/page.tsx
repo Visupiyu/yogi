@@ -14,12 +14,13 @@ export default function VendorLoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    const vendor = localStorage.getItem("vendor");
-    if (vendor) {
-      router.push("/seller");
-    }
-  }, []);
+ useEffect(() => {
+  const vendor = localStorage.getItem("vendor");
+
+  if (vendor && auth.currentUser) {
+    router.push("/seller");
+  }
+}, [router]);
 
   const loginVendor = async () => {
     if (!email || !password) {
@@ -80,20 +81,25 @@ export default function VendorLoginPage() {
         return;
       }
 
-      localStorage.setItem(
-        "vendor",
-        JSON.stringify({
-          uid: userCredential.user.uid,
-          email: userCredential.user.email,
-          vendorId: snapshot.docs[0].id,
-          businessName: vendorData.businessName,
-          commissionRate: vendorData.commissionRate || 10,
-          pendingPayout: vendorData.pendingPayout || 0,
-          totalSales: vendorData.totalSales || 0,
-          totalOrders: vendorData.totalOrders || 0,
-          totalRevenue: vendorData.totalRevenue || 0,
-        })
-      );
+     // Clear previous customer/admin session
+localStorage.removeItem("user");
+localStorage.removeItem("admin");
+
+// Save seller session
+localStorage.setItem(
+  "vendor",
+  JSON.stringify({
+    uid: userCredential.user.uid,
+    email: userCredential.user.email,
+    vendorId: snapshot.docs[0].id,
+    businessName: vendorData.businessName,
+    commissionRate: vendorData.commissionRate || 10,
+    pendingPayout: vendorData.pendingPayout || 0,
+    totalSales: vendorData.totalSales || 0,
+    totalOrders: vendorData.totalOrders || 0,
+    totalRevenue: vendorData.totalRevenue || 0,
+  })
+);
 
       alert("Vendor Login Successful");
       router.push("/seller");
