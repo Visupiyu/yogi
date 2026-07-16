@@ -182,7 +182,7 @@ async(id:string)=>{
             text-4xl
             font-bold
           ">
-            Notifications Center
+           🔔 Notifications Center
           </h1>
 
           <p>
@@ -207,7 +207,7 @@ async(id:string)=>{
     rounded-3xl
     p-10
     text-center
-    shadow
+   shadow-lg hover:shadow-2xl hover:-translate-y-1 transition duration-300
   ">
 
     <h2 className="
@@ -309,7 +309,7 @@ async(id:string)=>{
                 }
 
                 className="
-                  bg-green-600
+               bg-green-600 hover:bg-green-700 transition
                   text-white
                   px-4
                   py-2
@@ -330,7 +330,7 @@ async(id:string)=>{
               }
 
               className="
-                bg-red-600
+              bg-red-600 hover:bg-red-700 transition
                 text-white
                 px-4
                 py-2
@@ -352,6 +352,7 @@ async(id:string)=>{
 )}
 
       </div>
+      <div className="text-center py-8 text-gray-500">Marketplace Notification Center</div>
 
     </div>
 

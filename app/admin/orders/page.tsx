@@ -317,10 +317,9 @@ if (currentOrder?.userId) {
   grid-cols-1
   md:grid-cols-4
   gap-6
-  mb-8
-">
+  mb-8">
 
-  <div className="bg-white p-6 rounded-2xl shadow">
+  <div className="bg-white p-6 rounded-3xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition duration-300">
     <h3>📦 Total Orders</h3>
     <p className="text-3xl font-bold">
       {totalOrders}
@@ -367,7 +366,7 @@ if (currentOrder?.userId) {
     w-full
     border
     p-4
-    rounded-2xl
+    rounded-3xl shadow-lg
     mb-6
   "
 />
@@ -404,7 +403,7 @@ if (currentOrder?.userId) {
 
               <thead>
 
-                <tr className="border-b">
+              <tr className="bg-gray-100 border-b">
 
                   <th className="text-left py-4">
                     Order ID
@@ -481,30 +480,22 @@ if (currentOrder?.userId) {
     (order)=>(
                   <tr
                     key={order.id}
-                    className="
-                      border-b
-                    "
-                  >
+                  className="border-b hover:bg-gray-50 transition">
 
                     <td className="py-4">
                       {order.id.slice(0,8)}
                     </td>
-
                     <td>
                       {order.customerName}
                     </td>
-
                     <td>
                      ₹{
   (order as any).finalTotal ||
   order.total
 }
                     </td>
-
                     <td>
-
   <div className="mb-2"> </div>
-
     <span
       className={` px-3 py-1 rounded-full text-sm font-semibold ${
           order.status === "Delivered"
@@ -669,9 +660,7 @@ if (currentOrder?.userId) {
     target="_blank"
     rel="noopener noreferrer"
     className="
-     bg-gradient-to-r
-from-green-600
-to-blue-600
+    bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 transition
       text-white
       px-3
       py-2
@@ -688,6 +677,7 @@ to-blue-600
 </div>
 )}
 </div>
+<div className="text-center py-8 text-gray-500">Order Management powered by Yogi Mart</div>
 </div> 
 );
 }

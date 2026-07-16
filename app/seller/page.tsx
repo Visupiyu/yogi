@@ -399,18 +399,19 @@ export default function SellerPage() {
     <div className="min-h-screen bg-gray-50">
       {/* HEADER */}
       <div className="bg-gradient-to-r from-green-700 via-teal-600 to-blue-700 text-white px-8 py-6">
-        <p className="text-sm uppercase tracking-wider opacity-80">
-          Yogi Mart Seller Dashboard
-        </p>
-        <h1 className="text-3xl md:text-4xl font-bold">{vendorName}</h1>
-        <p className="opacity-90">Manage products, orders and revenue</p>
+        <p className="text-sm uppercase tracking-widest opacity-80">
+  Yogi Mart Seller Dashboard </p>
+<h1 className="text-4xl md:text-5xl font-bold mt-2">
+👋 Welcome Back,</h1>
+<h2 className="text-2xl mt-2"> {vendorName} </h2>
+<p className="mt-3 opacity-90">
+Manage products, inventory, orders and earnings from one place.</p>
       </div>
-
       <div className="max-w-7xl mx-auto p-6 md:p-8">
         {/* STATS */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           {[
-            { label: "Total Products", value: totalProducts, color: "text-blue-600", icon: "📦" },
+            { label:"Products", value: totalProducts, subtitle:"Live Products", color: "text-blue-600", icon: "📦" },
             { label: "Total Orders", value: totalOrders, color: "text-green-600", icon: "🛒" },
             { label: "Pending Orders", value: pendingOrders, color: "text-yellow-500", icon: "⏳" },
             { label: "Earnings", value: `₹${earnings.toLocaleString("en-IN")}`, color: "text-pink-600", icon: "💰" },
@@ -423,6 +424,7 @@ export default function SellerPage() {
             >
               <div className="text-2xl mb-2">{s.icon}</div>
               <p className="text-gray-500 text-sm">{s.label}</p>
+              <p className="text-xs text-gray-400 mt-1">{s.subtitle}</p>
               <h2 className={`text-2xl font-bold mt-1 break-all ${s.color}`}>
                 {s.value}
               </h2>
@@ -449,6 +451,7 @@ export default function SellerPage() {
         {/* NOTIFICATIONS */}
         <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
           <h2 className="text-xl font-bold mb-4">🔔 Notifications</h2>
+          <p className="text-gray-500 mb-6">Inventory alerts and important seller updates.</p>
           {notifications.length === 0 ? (
             <p className="text-gray-500">No notifications</p>
           ) : (
@@ -468,6 +471,8 @@ export default function SellerPage() {
           {/* FORM */}
           <div id="add-product" className="bg-white p-6 rounded-2xl shadow-sm h-fit lg:sticky lg:top-6">
             <h2 className="text-2xl font-bold mb-6">
+              <p className="text-gray-500 mb-5">
+              Create a new product listing for your customers.</p>
               {editingId ? "✏️ Edit Product" : "➕ Add Product"}
             </h2>
 
@@ -609,16 +614,25 @@ export default function SellerPage() {
               </div>
 
               {images.length > 0 && (
-                <div className="grid grid-cols-5 gap-2">
-                  {images.map((img, index) => (
-                    <img
-                      key={index}
-                      src={img}
-                      alt=""
-                      className="w-full h-16 object-cover rounded-xl border border-gray-100"
-                    />
-                  ))}
-                </div>
+                <div>
+
+<img
+src={images[0]}
+className="w-full h-56 object-cover rounded-2xl mb-4"
+/>
+<div className="grid grid-cols-5 gap-2">
+{images.map((img,index)=>(
+<img
+key={index}
+src={img}
+className="h-16 w-full object-cover rounded-xl"
+/>
+
+))}
+
+</div>
+
+</div>
               )}
 
               <button
@@ -654,7 +668,7 @@ export default function SellerPage() {
               {products.length === 0 && (
                 <div className="text-center py-12">
                   <div className="text-4xl mb-2">📦</div>
-                  <p className="text-gray-500">No products added yet.</p>
+                  <p className="text-gray-500">📦 No Products Yet<br/>Start adding products to grow your business.</p>
                 </div>
               )}
 
@@ -688,6 +702,16 @@ export default function SellerPage() {
                         <h3 className="text-lg font-bold line-clamp-1">
                           {product.name}
                         </h3>
+                        <div className="flex gap-2 mt-2">
+<span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
+🟢 Active
+</span>
+{product.stock<=5 && (
+<span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs">
+⚠ Low Stock
+</span>
+)}
+</div>
                         <p className="text-green-600 font-bold">
                           ₹{product.price?.toLocaleString("en-IN")}
                         </p>
@@ -748,7 +772,18 @@ export default function SellerPage() {
                     <td className="font-semibold">
                       ₹{order.amount?.toLocaleString("en-IN")}
                     </td>
-                    <td>
+                     <td>
+                      <div className="mb-2">
+<span
+className={`px-3 py-1 rounded-full text-xs font-semibold
+${order.status==="Delivered"?
+"bg-green-100 text-green-700":
+order.status==="Pending"?
+"bg-yellow-100 text-yellow-700":
+"bg-blue-100 text-blue-700"}`}>
+{order.status}
+</span>
+</div>
                       <select
                         value={order.status}
                         onChange={(e) =>

@@ -341,14 +341,14 @@ export default function AdminPage() {
           />
           <div>
             <h1 className="text-5xl font-bold">Yogi Mart</h1>
+            <p className="mt-3 text-lg opacity-90">Manage your complete marketplace from one dashboard.</p>
             <p>👑 Admin Dashboard</p>
-
             <div className="mt-4">
               <button
                 onClick={() => router.push("/admin/notifications")}
                 className="relative bg-white text-black px-5 py-3 rounded-full font-bold shadow"
               >
-                🔔 Notifications
+                🔔 System Notifications
                 {unreadCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full">
                     {unreadCount}
@@ -370,11 +370,12 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto p-8">
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-6 gap-5 mb-10">
-          <div className="bg-white p-8 rounded-2xl shadow">
+          <div className="bg-white p-8 rounded-3xl shadow-lg hover:shadow-2xl transition duration-300 hover:-translate-y-1">
             <h2 className="text-2xl font-bold mb-4">Total Vendors</h2>
             <p className="text-3xl font-bold text-blue-600">
               {vendors.length}
             </p>
+            <p className="text-gray-400 mt-2 text-sm">Marketplace Summary</p>
           </div>
 
           <div className="bg-white p-8 rounded-2xl shadow">
@@ -382,6 +383,7 @@ export default function AdminPage() {
             <p className="text-3xl font-bold text-green-600">
               {vendors.filter((v) => v.status === "Approved").length}
             </p>
+             <p className="text-gray-400 mt-2 text-sm">Marketplace Summary</p>
           </div>
 
           <div className="bg-white p-8 rounded-2xl shadow">
@@ -389,11 +391,13 @@ export default function AdminPage() {
             <p className="text-3xl font-bold text-pink-600">
               {products.length}
             </p>
+             <p className="text-gray-400 mt-2 text-sm">Marketplace Summary</p>      
           </div>
 
           <div className="bg-white p-8 rounded-2xl shadow">
             <h2 className="text-2xl font-bold mb-4">Total Orders</h2>
             <p className="text-3xl font-bold text-orange-600">{totalOrders}</p>
+             <p className="text-gray-400 mt-2 text-sm">Marketplace Summary</p>
           </div>
 
           <div className="bg-white p-8 rounded-2xl shadow">
@@ -401,6 +405,7 @@ export default function AdminPage() {
             <p className="text-3xl font-bold text-yellow-600">
               {pendingOrders}
             </p>
+             <p className="text-gray-400 mt-2 text-sm">Marketplace Summary</p>
           </div>
 
           <div className="bg-white p-8 rounded-2xl shadow">
@@ -415,6 +420,7 @@ export default function AdminPage() {
             <p className="text-3xl font-bold text-purple-600">
               {customers.length}
             </p>
+             <p className="text-gray-400 mt-2 text-sm">Marketplace Summary</p>
           </div>
 
           <div
@@ -428,15 +434,12 @@ export default function AdminPage() {
 </div>
 
 {/* MANAGEMENT MODULES */}
-
 <div className="bg-white rounded-2xl shadow p-8 mb-10">
-
   <h2 className="text-3xl font-bold mb-8">
     🚀 Management Modules
   </h2>
-
+  <p className="text-gray-500 mb-8"> Quick access to every marketplace administration tool.</p>
   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
-
     <Link href="/admin/orders" className="bg-blue-50 p-6 rounded-xl text-center hover:shadow-lg">
       📦
       <p className="font-bold mt-2">Orders</p>
@@ -527,13 +530,15 @@ export default function AdminPage() {
 
     <Link href="/admin/notifications" className="bg-amber-50 p-6 rounded-xl text-center hover:shadow-lg">
       🔔
-      <p className="font-bold mt-2">Notifications</p>
+      <p className="font-bold mt-2">🔔 System Notifications</p>
     </Link>
 
     <Link href="/admin/withdrawals" className="bg-sky-50 p-6 rounded-xl text-center hover:shadow-lg">
       🏦
       <p className="font-bold mt-2">Withdrawals</p>
     </Link>
+
+    <p className="text-gray-500 mb-6">Marketplace alerts and important activities.</p>
 
   </div>
 
@@ -559,7 +564,7 @@ export default function AdminPage() {
 
         {/* ANALYTICS CHART */}
         <div className="bg-white rounded-2xl shadow p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-8">Marketplace Analytics</h2>
+          <h2 className="text-3xl font-bold mb-8">📊 Marketplace Analytics</h2>
           <p className="text-gray-500 mb-6">
             Real-time marketplace performance overview
           </p>
@@ -577,7 +582,8 @@ export default function AdminPage() {
 
         {/* COUPONS */}
         <div className="bg-white rounded-2xl shadow p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-8">Coupon Management</h2>
+          <h2 className="text-3xl font-bold mb-8">🎟 Coupon Management</h2>
+          <p className="text-gray-500 mb-6">Create promotional offers for customers.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <input
@@ -650,8 +656,30 @@ export default function AdminPage() {
           </div>
         </div>
 
-   </div>                    
-</div>
-        
+   </div>  
+   <div className="text-center py-10 text-gray-500 border-t mt-10">
+Need Help?
+<Link
+href="/admin/support"
+className="text-green-600 ml-2 hover:underline"
+>
+Admin Support
+</Link>
+<span className="mx-3">|</span>
+<Link
+href="/admin/reports"
+className="text-green-600 hover:underline"
+>
+Reports
+</Link>
+<span className="mx-3">|</span>
+<Link
+href="/admin/analytics"
+className="text-green-600 hover:underline"
+>
+Analytics
+</Link>
+</div>                  
+</div>  
   );
 }

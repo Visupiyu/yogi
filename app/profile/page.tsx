@@ -172,6 +172,8 @@ export default function ProfilePage() {
               <p className="mt-1 opacity-90">
                 📞 {phone || "Add your mobile number below"}
               </p>
+              <p className="mt-2 text-sm opacity-80">
+               Manage your profile, orders, rewards and account settings.</p>
               <span className="inline-block mt-3 bg-white/20 px-4 py-1 rounded-full text-sm font-semibold">
                 {memberTier.icon} {memberTier.label}
               </span>
@@ -180,7 +182,7 @@ export default function ProfilePage() {
               onClick={logout}
               className="bg-white/20 hover:bg-white/30 px-5 py-2.5 rounded-2xl font-semibold transition self-start"
             >
-              Logout
+          🚪 Logout
             </button>
           </div>
         </div>
@@ -189,7 +191,7 @@ export default function ProfilePage() {
         <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-3xl p-6 shadow-md">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <p className="text-sm opacity-90">Reward Wallet</p>
+              <p className="text-sm opacity-90">🏆 Reward Wallet</p>
               <h2 className="text-4xl font-bold mt-1">🏆 {rewardPoints}</h2>
               <p className="text-sm opacity-90 mt-1">points available</p>
             </div>
@@ -211,13 +213,44 @@ export default function ProfilePage() {
             />
           </div>
         </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+
+  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+    <p className="text-gray-500 text-sm">Orders</p>
+    <h2 className="text-3xl font-bold mt-2">
+      {recentOrders.length}
+    </h2>
+  </div>
+
+  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+    <p className="text-gray-500 text-sm">Reward Points</p>
+    <h2 className="text-3xl font-bold mt-2">
+      {rewardPoints}
+    </h2>
+  </div>
+
+  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+    <p className="text-gray-500 text-sm">Wishlist</p>
+    <h2 className="text-3xl font-bold mt-2">
+      ❤️
+    </h2>
+  </div>
+
+  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+    <p className="text-gray-500 text-sm">Member</p>
+    <h2 className="text-2xl font-bold mt-2">
+      {memberTier.icon}
+    </h2>
+  </div>
+
+</div>
 
         {/* QUICK ACTIONS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {quickActions.map((a) => (
             <Link key={a.href} href={a.href}>
               <div className="bg-white rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 p-6 cursor-pointer h-full">
-                <div className="text-3xl mb-3">{a.icon}</div>
+                <div className="text-5xl mb-4">{a.icon}</div>
                 <h2 className="text-lg font-bold mb-1">{a.title}</h2>
                 <p className="text-gray-500 text-sm">{a.desc}</p>
               </div>
@@ -226,8 +259,8 @@ export default function ProfilePage() {
         </div>
 
         {/* PROFILE DETAILS */}
-        <div className="bg-white rounded-3xl shadow-sm p-8">
-          <h2 className="text-2xl font-bold mb-6">Profile Details</h2>
+        <div className="bg-white rounded-3xl shadow-lg hover:shadow-xl transition p-8">
+          <h2 className="text-2xl font-bold mb-6">👤 Profile Details</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
@@ -296,14 +329,14 @@ export default function ProfilePage() {
             disabled={saving}
             className="mt-6 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:opacity-60 text-white px-8 py-3.5 rounded-2xl font-semibold transition"
           >
-            {saving ? "Saving..." : "Save Profile"}
+            {saving ? "Saving..." : "💾 Save Profile"}
           </button>
         </div>
 
         {/* RECENT ORDERS */}
         <div className="bg-white rounded-3xl shadow-sm p-8">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Recent Orders</h2>
+            <h2 className="text-2xl font-bold">📦 Recent Orders</h2>
             <Link
               href="/orders"
               className="text-green-600 font-semibold text-sm hover:underline"
@@ -352,6 +385,18 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+      <div className="text-center text-gray-400 text-sm py-8">
+
+Need help?
+
+<Link
+  href="/support"
+  className="text-green-600 ml-1 hover:underline"
+>
+Contact Support
+</Link>
+
+</div>
     </section>
   );
 }

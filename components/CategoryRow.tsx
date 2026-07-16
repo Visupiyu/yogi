@@ -11,9 +11,26 @@ export default function CategoryRow({ title, products }: any) {
     <section className="max-w-7xl mx-auto px-2 py-6">
       <h2 className="text-2xl md:text-3xl font-bold mb-4">{title}</h2>
 
-      <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-hide">
+     <div
+  className="
+    flex
+    flex-nowrap
+    gap-4
+    overflow-x-scroll
+    overflow-y-hidden
+    pb-4
+    border-2
+    border-red-500
+  "
+>
         {products.map((product: any) => (
-          <div key={product.id} className="min-w-[200px] md:min-w-[220px]">
+          <div
+  key={product.id}
+  className="
+    flex-shrink-0
+    w-[220px]
+  "
+>
             <ProductCard
               id={product.id}
               name={product.name}

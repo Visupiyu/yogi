@@ -363,7 +363,7 @@ setDailyCapacity(
 
         </div>
 
-        <div className="bg-white rounded-3xl shadow p-6 mb-8 grid md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 grid md:grid-cols-2 gap-4">
 
           <input
             placeholder="Partner Name"
@@ -485,7 +485,7 @@ setDailyCapacity(
   className="
     w-full
     border
-    rounded-2xl
+    rounded-3xl shadow-lg
     p-4
     mb-6
   "
@@ -510,7 +510,7 @@ setDailyCapacity(
 
                 key={partner.id}
 
-                className="bg-white rounded-3xl shadow p-6 flex justify-between items-center"
+                className="bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition duration-300 p-6 flex justify-between items-center"
 
               >
 
@@ -550,24 +550,21 @@ setDailyCapacity(
 
                   <p>📍 {partner.serviceArea}</p>
 
-                  <span className="inline-block mt-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm">
+                  className="inline-block mt-2 px-2 py-1 rounded-full text-sm font-semibold
 
-                    {partner.status}
-
-                  </span>
+                  ${partner.status==="Active"
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+            }     
 
                 </div>
 
                 <div className="flex gap-3">
 
                     <button
-
   onClick={()=>
-
     editPartner(partner)
-
   }
-
   className="
     bg-blue-600
     text-white
@@ -575,27 +572,16 @@ setDailyCapacity(
     py-2
     rounded-xl
   "
-
 >
-
   Edit
-
 </button>
-
 <button
-
   onClick={()=>
-
     togglePartnerStatus(
-
       partner.id,
-
       partner.status
-
     )
-
   }
-
   className={`
 
     px-5
@@ -654,29 +640,19 @@ setDailyCapacity(
 </button>
 
 </div>
-
-              </div>
-
+            </div>
             ))}
-
             {filteredPartners.length === 0 && (
-
               <div className="bg-white rounded-3xl p-10 text-center shadow">
-
-                No delivery partners added.
-
+                🚚 No Delivery Partners Added Yet.
               </div>
-
             )}
-
           </div>
-
         )}
 
       </div>
-
+      <div className="text-center py-8 text-gray-500">Manage your delivery fleet from one dashboard.</div>
     </div>
 
   );
-
 }

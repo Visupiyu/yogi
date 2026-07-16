@@ -84,34 +84,20 @@ function SearchContent() {
     <section className="py-8 px-4 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* HEADER */}
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">
-            {query ? (
-              <>
-                Search results for{" "}
-                <span className="text-green-600">&quot;{query}&quot;</span>
-              </>
-            ) : (
-              "All Products"
-            )}
-          </h1>
-          <p className="text-gray-500 mt-1">
-            {filtered.length} product{filtered.length === 1 ? "" : "s"} found
-          </p>
-
-          <div className="flex flex-wrap gap-2 mt-4">
-            {quickChips.map((item) => (
-              <Link key={item} href={`/search?q=${encodeURIComponent(item)}`}>
-                <button className="bg-white border border-gray-200 hover:border-green-500 hover:text-green-600 px-4 py-1.5 rounded-full text-sm font-medium shadow-sm transition">
-                  {item}
-                </button>
-              </Link>
-            ))}
-          </div>
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-8 mb-8">
+  <h1 className="text-4xl font-bold">
+    {query
+      ? `🔍 Search: "${query}"`
+      : "🔍 Explore Products"}
+  </h1>
+  <p className="mt-2 text-lg opacity-90">
+    {filtered.length} product{filtered.length !== 1 ? "s" : ""} found
+  </p>
+</div>
         </div>
 
         {/* FILTER BAR */}
-        <div className="bg-white rounded-2xl shadow-sm p-4 mb-8 flex flex-wrap gap-3 items-center">
+        <div className="bg-white rounded-3xl shadow-lg p-4 mb-8 flex flex-wrap gap-3 items-center">
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
@@ -164,15 +150,34 @@ function SearchContent() {
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-2xl font-bold mb-2">No products found</h2>
+            <h2 className="text-2xl font-bold mb-2">🔍 No products found</h2>
             <p className="text-gray-500 mb-6">Try another keyword or filter.</p>
             <Link href="/">
               <button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold transition">
                 Continue Shopping
               </button>
+              <div className="mt-8">
+<p className="font-bold mb-4">
+Popular Searches
+</p>
+<div className="flex justify-center gap-3 flex-wrap">
+<span className="bg-white shadow rounded-full px-4 py-2">
+📱 Mobiles
+</span>
+<span className="bg-white shadow rounded-full px-4 py-2">
+👗 Fashion
+</span>
+<span className="bg-white shadow rounded-full px-4 py-2">
+💄 Beauty
+</span>
+<span className="bg-white shadow rounded-full px-4 py-2">
+🛒 Grocery
+</span>
+</div>
+</div>
             </Link>
           </div>
-        ) : (
+          ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {filtered.map((product) => {
               const hasMrp =
@@ -185,12 +190,12 @@ function SearchContent() {
 
               return (
                 <Link key={product.id} href={`/product/${product.id}`}>
-                  <div className="bg-white rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden h-full">
+                  <div className="bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden h-full">
                     <div className="h-48 bg-gray-100 relative">
                       <img
                         src={product.image || "/no-image.png"}
                         alt={product.name}
-                        className="w-full h-full object-cover"
+                       className="w-full h-full object-cover hover:scale-105 transition duration-500"
                       />
                       {hasMrp && (
                         <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-semibold px-2 py-1 rounded-full">
@@ -203,8 +208,10 @@ function SearchContent() {
                       <h3 className="font-semibold text-sm line-clamp-2 min-h-[40px]">
                         {product.name}
                       </h3>
+                      <div className="flex items-center gap-1 mt-2 text-yellow-500">
+                       ★★★★★ <span className="text-xs text-gray-500">(4.9)</span></div>
 
-                      <div className="flex items-center gap-2 mt-1">
+                    <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-3 mt-6">
                         <span className="text-green-600 font-bold">
                           ₹{Number(product.price).toLocaleString("en-IN")}
                         </span>
@@ -220,8 +227,8 @@ function SearchContent() {
                           product.stock > 0 ? "text-green-600" : "text-red-500"
                         }`}
                       >
-                        {product.stock > 0 ? "In Stock" : "Out of Stock"}
-                      </p>
+                        {product.stock > 0 ? "In Stock" : "Out of Stock"}</p>
+                      <p className="text-xs text-green-600 mt-1">🚚 Free Delivery </p>
                     </div>
                   </div>
                 </Link>
@@ -229,11 +236,18 @@ function SearchContent() {
             })}
           </div>
         )}
-      </div>
+        <div className="text-center py-10 text-gray-400">
+Need help finding something?
+<Link
+href="/support"
+className="text-green-600 ml-2 hover:underline"
+>
+Contact Support
+</Link>
+</div>
     </section>
   );
 }
-
 export default function SearchPage() {
   return (
     <Suspense fallback={<div className="p-10 text-center">Loading…</div>}>

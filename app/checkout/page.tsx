@@ -370,6 +370,17 @@ export default function CheckoutPage() {
   return (
     <section className="py-8 px-4 bg-gray-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
+  <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-8 mb-8">
+
+  <h1 className="text-4xl font-bold">
+    💳 Secure Checkout
+  </h1>
+
+  <p className="mt-2 text-lg opacity-90">
+    Complete your purchase safely with Yogi Mart
+  </p>
+
+</div>      
         {/* CHECKOUT PROGRESS BAR */}
         <div className="flex items-center justify-center gap-2 sm:gap-4 mb-8">
           {[
@@ -380,7 +391,7 @@ export default function CheckoutPage() {
             <div key={s.label} className="flex items-center gap-2 sm:gap-4">
               <div className="flex flex-col items-center">
                 <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${
+                  className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm ${
                     s.done || i === 1
                       ? "bg-green-600 text-white"
                       : "bg-gray-200 text-gray-500"
@@ -400,7 +411,7 @@ export default function CheckoutPage() {
               </div>
               {i < 2 && (
                 <div
-                  className={`w-10 sm:w-20 h-1 rounded-full ${
+                  className={`w-10 sm:w-20 h-2 rounded-full ${
                     i === 0 ? "bg-green-600" : "bg-gray-200"
                   }`}
                 />
@@ -414,13 +425,16 @@ export default function CheckoutPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* DELIVERY ADDRESS */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
-                📍 Delivery Address
-              </h2>
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+📍 Delivery Address
+</h2>
+<p className="text-gray-500 mb-6">
+Please enter your shipping details.
+</p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
-                    Full Name
+                 👤 Full Name
                   </label>
                   <input
                     type="text"
@@ -432,7 +446,7 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
-                    Phone Number
+                 📞 Phone Number
                   </label>
                   <input
                     type="tel"
@@ -444,7 +458,7 @@ export default function CheckoutPage() {
                 </div>
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
-                    Delivery Address
+                 🏠 Delivery Address
                   </label>
                   <textarea
                     placeholder="House no, street, area, city, state, PIN"
@@ -456,12 +470,14 @@ export default function CheckoutPage() {
                 </div>
               </div>
             </div>
-
+ 
             {/* PAYMENT METHOD */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
               <h2 className="text-xl font-bold mb-5 flex items-center gap-2">
                 💳 Payment Method
               </h2>
+              <p className="text-gray-500 mb-5">
+Choose your preferred payment option.</p>
               <div className="space-y-3">
                 <label
                   className={`flex items-center gap-3 border-2 rounded-xl p-4 cursor-pointer transition ${
@@ -510,16 +526,33 @@ export default function CheckoutPage() {
             </div>
 
             {/* TRUST BADGES */}
-            <div className="bg-white rounded-2xl shadow-sm p-5">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm text-center text-gray-600">
-                <div>🔒<br />Secure payment</div>
-                <div>✅<br />Genuine products</div>
-                <div>↩️<br />Easy returns</div>
-                <div>🚚<br />Fast delivery</div>
-              </div>
-            </div>
-          </div>
-
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+<div className="bg-green-50 rounded-xl p-4 text-center">
+🔒
+<p className="font-semibold mt-2">
+100% Secure
+</p>
+</div>
+<div className="bg-blue-50 rounded-xl p-4 text-center">
+🚚
+<p className="font-semibold mt-2">
+Fast Delivery
+</p>
+</div>
+<div className="bg-yellow-50 rounded-xl p-4 text-center">
+🛡
+<p className="font-semibold mt-2">
+Buyer Protection
+</p>
+</div>
+<div className="bg-purple-50 rounded-xl p-4 text-center">
+↩
+<p className="font-semibold mt-2">
+Easy Returns
+</p>
+</div>
+</div>
+ </div>
           {/* RIGHT: SUMMARY */}
           <div className="lg:sticky lg:top-24 h-fit space-y-5">
             {/* FREE DELIVERY NOTE */}
@@ -589,11 +622,18 @@ export default function CheckoutPage() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-gray-400">
-                  Try YOGI10 or SAVE500
+                💡 Try SAVE10 to get instant discount.
                 </p>
               </div>
 
               {/* REDEEM POINTS */}
+              <div className="border rounded-2xl p-5 mt-5 bg-yellow-50">
+
+<p className="font-semibold mb-3">
+
+⭐ Reward Points
+
+</p>
               <label className="flex items-center gap-2 mt-5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -605,6 +645,7 @@ export default function CheckoutPage() {
                   Redeem Reward Points ({availablePoints} available)
                 </span>
               </label>
+              </div>
 
               {/* PRICE BREAKDOWN */}
               <div className="border-t mt-5 pt-5 space-y-3 text-gray-700">
@@ -640,8 +681,11 @@ export default function CheckoutPage() {
                   <span>Estimated delivery</span>
                   <span>{deliveryDate}</span>
                 </div>
-
-                <div className="flex justify-between text-2xl font-bold border-t pt-4">
+                <div className="flex justify-between">
+                 <span> GST </span>
+                 <span className="text-green-600"> Included </span>
+                  </div>
+                   <div className="flex justify-between text-2xl font-bold border-t pt-4">
                   <span>Total</span>
                   <span>₹{grandTotal.toLocaleString("en-IN")}</span>
                 </div>
@@ -655,8 +699,8 @@ export default function CheckoutPage() {
                 {loading
                   ? "Processing..."
                   : paymentMethod === "ONLINE"
-                  ? `Pay ₹${grandTotal.toLocaleString("en-IN")}`
-                  : "Place Order"}
+                  ? `💳 Pay Securely ₹${grandTotal.toLocaleString("en-IN")}`
+                  : "🔒 Place Secure Order"}
               </button>
 
               <p className="text-center text-xs text-gray-400 mt-3">
@@ -665,6 +709,7 @@ export default function CheckoutPage() {
             </div>
           </div>
         </div>
+        
       </div>
     </section>
   );

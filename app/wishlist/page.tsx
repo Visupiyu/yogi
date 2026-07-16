@@ -158,13 +158,94 @@ window.dispatchEvent(
         mx-auto
       ">
 
-        <h1 className="
-          text-4xl
-          font-bold
-          mb-10
-        ">
-          My Wishlist
-        </h1>
+       <div
+  className="
+    bg-gradient-to-r
+    from-green-600
+    to-blue-600
+    rounded-3xl
+    text-white
+    p-8
+    mb-8
+  "
+>
+  <h1 className="text-4xl font-bold">
+    ❤️ My Wishlist
+  </h1>
+
+  <p className="mt-2 text-lg opacity-90">
+    Your favourite products in one place
+  </p>
+
+  <p className="opacity-80">
+    Move products to your cart anytime.
+  </p>
+</div>
+
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+
+  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+    <p className="text-gray-500 text-sm">
+      Wishlist Items
+    </p>
+
+    <h2 className="text-3xl font-bold mt-2">
+      {wishlist.length}
+    </h2>
+  </div>
+
+  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+    <p className="text-gray-500 text-sm">
+      In Stock
+    </p>
+
+    <h2 className="text-3xl font-bold mt-2">
+      {
+        wishlist.filter(
+          i=>i.stock>0
+        ).length
+      }
+    </h2>
+  </div>
+
+  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+    <p className="text-gray-500 text-sm">
+      Total Value
+    </p>
+
+    <h2 className="text-3xl font-bold mt-2">
+      ₹{
+        wishlist.reduce(
+          (sum,item)=>
+          sum+Number(item.price),
+          0
+        ).toLocaleString("en-IN")
+      }
+    </h2>
+  </div>
+
+  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+    <p className="text-gray-500 text-sm">
+      Free Delivery
+    </p>
+
+    <h2 className="text-3xl mt-2">
+      🚚
+    </h2>
+  </div>
+
+</div>
+<div className="flex items-center gap-1 mt-2 text-yellow-500">
+
+★★★★★
+
+<span className="text-gray-500 text-xs">
+
+(4.9)
+
+</span>
+
+</div>
 
         {wishlist.length === 0 ? (
 
@@ -180,7 +261,7 @@ window.dispatchEvent(
               text-gray-500
               text-lg
             ">
-              Your wishlist is empty
+             ❤️ Your Wishlist is Empty
             </p>
 
             <Link href="/">
@@ -199,9 +280,46 @@ window.dispatchEvent(
               </button>
 
             </Link>
+            <div className="mt-10">
+
+<p className="font-bold mb-4">
+
+Popular Categories
+
+</p>
+
+<div className="flex justify-center gap-3 flex-wrap">
+
+<span className="bg-white shadow rounded-full px-4 py-2">
+
+📱 Mobiles
+
+</span>
+
+<span className="bg-white shadow rounded-full px-4 py-2">
+
+👗 Fashion
+
+</span>
+
+<span className="bg-white shadow rounded-full px-4 py-2">
+
+💻 Electronics
+
+</span>
+
+<span className="bg-white shadow rounded-full px-4 py-2">
+
+🛒 Grocery
+
+</span>
+
+</div>
+
+</div>
 
           </div>
-
+          
         ) : (
 
           <div className="
@@ -224,7 +342,10 @@ window.dispatchEvent(
                 className="
                   bg-white
                   rounded-3xl
-                  shadow-md
+                  shadow-lg
+hover:shadow-2xl
+transition
+duration-300
                   overflow-hidden
                 "
               >
@@ -237,12 +358,15 @@ window.dispatchEvent(
       "/no-image.png"
     }
     alt={item.name}
-    className="
-      w-full
-      h-60
-      object-cover
-      cursor-pointer
-    "
+   className="
+w-full
+h-64
+object-cover
+cursor-pointer
+hover:scale-105
+transition
+duration-500
+"
   />
 
 </Link>
@@ -282,7 +406,7 @@ window.dispatchEvent(
   ">
     ✓ In Stock
   </p>
-
+  
 ) : (
 
   <p className="
@@ -294,6 +418,12 @@ window.dispatchEvent(
   </p>
 
 )}
+
+<p className="text-sm text-green-600 mt-1">
+
+🚚 Free Delivery
+
+</p>
 
                   {/* BUTTONS */}
 
@@ -321,7 +451,7 @@ window.dispatchEvent(
                         moveToCart(item)
                       }
                      >
-                      Move To Cart
+                    🛒 Move To Cart
                     </button>
 
                     <button
@@ -339,7 +469,7 @@ window.dispatchEvent(
   "
 >
 
-                      Remove
+                    🗑 Remove
                     </button>
 
                   
@@ -357,6 +487,20 @@ window.dispatchEvent(
         )}
 
       </div>
+      <div className="text-center py-10 text-gray-400">
+
+Need Help?
+
+<Link
+href="/support"
+className="text-green-600 ml-2 hover:underline"
+>
+
+Contact Support
+
+</Link>
+
+</div>
 
     </section>
 

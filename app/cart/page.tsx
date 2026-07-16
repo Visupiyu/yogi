@@ -115,15 +115,31 @@ export default function CartPage() {
             </div>
           ))}
         </div>
+ </div>
 
-        <h1 className="text-3xl md:text-4xl font-bold mb-6">
-          Shopping Cart
-          {cart.length > 0 && (
-            <span className="text-gray-400 text-xl font-semibold ml-3">
-              ({totalItems} {totalItems === 1 ? "item" : "items"})
-            </span>
-          )}
-        </h1>
+       <div
+  className="
+    bg-gradient-to-r
+    from-green-600
+    to-blue-600
+    rounded-3xl
+    text-white
+    p-8
+    mb-8
+  "
+>
+  <h1 className="text-4xl font-bold">
+    🛒 Shopping Cart
+  </h1>
+
+  <p className="mt-2 text-lg opacity-90">
+    {totalItems} {totalItems === 1 ? "item" : "items"} ready for checkout
+  </p>
+
+  <p className="opacity-80 mt-1">
+    Everything looks good!
+  </p>
+</div>
 
         {cart.length === 0 ? (
           <div className="bg-white rounded-3xl shadow-md p-16 text-center">
@@ -136,8 +152,40 @@ export default function CartPage() {
               <button className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-xl font-semibold transition">
                 Start Shopping
               </button>
-            </Link>
+                </Link>
+
+              <div className="mt-10">
+
+<p className="font-bold mb-4">
+
+Popular Categories
+
+</p>
+
+<div className="flex justify-center gap-4 flex-wrap">
+
+<span className="px-4 py-2 bg-white rounded-full shadow">
+📱 Mobiles
+</span>
+
+<span className="px-4 py-2 bg-white rounded-full shadow">
+👗 Fashion
+</span>
+
+<span className="px-4 py-2 bg-white rounded-full shadow">
+💻 Electronics
+</span>
+
+<span className="px-4 py-2 bg-white rounded-full shadow">
+🛒 Grocery
+</span>
+
+</div>
+
+</div>
+          
           </div>
+        
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* LEFT: ITEMS */}
@@ -171,6 +219,10 @@ export default function CartPage() {
                   Number(item.mrp) && Number(item.mrp) > Number(item.price);
                 const lineTotal =
                   (Number(item.price) || 0) * (Number(item.qty) || 1);
+                  console.log("Cart Item:", item);
+console.log("MRP:", item.mrp);
+console.log("Price:", item.price);
+console.log("hasMrp:", hasMrp);
 
                 return (
                   <div
@@ -186,20 +238,41 @@ export default function CartPage() {
                     </Link>
 
                     <div className="flex-1">
-                      <div className="flex justify-between gap-3">
-                        <Link href={`/product/${item.id}`}>
+                      <div className="flex justify-between items-start gap-3">
+                       <div className="flex-1">
+
+                         <Link href={`/product/${item.id}`}>
                           <h2 className="text-lg font-bold hover:text-green-700 transition line-clamp-2">
                             {item.name}
                           </h2>
                         </Link>
+                        </div>
+
+                        <div className="text-right">
+
+                        <p className="text-2xl font-bold text-green-700">
+                        ₹{Number(item.price).toLocaleString("en-IN")}
+                        </p>
+
+                        </div>
                         <button
-                          onClick={() => removeItem(index)}
-                          className="text-gray-400 hover:text-red-500 transition shrink-0"
-                          title="Remove"
-                        >
-                          🗑 Remove
-                        </button>
-                      </div>
+  onClick={() => removeItem(index)}
+  className="
+    border
+    border-red-500
+    text-red-600
+    px-3
+    py-2
+    rounded-xl
+    hover:bg-red-500
+    hover:text-white
+    transition
+  "
+>
+  🗑 Remove Item
+</button>
+      </div>
+      
 
                       {/* size / color */}
                       {(item.size || item.color) && (
@@ -209,27 +282,7 @@ export default function CartPage() {
                           {item.color ? `Color: ${item.color}` : ""}
                         </p>
                       )}
-
-                      {/* price */}
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-green-600 font-bold text-xl">
-                          ₹{Number(item.price).toLocaleString("en-IN")}
-                        </span>
-                        {hasMrp && (
-                          <>
-                            <span className="text-gray-400 line-through text-sm">
-                              ₹{Number(item.mrp).toLocaleString("en-IN")}
-                            </span>
-                            <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                              {Math.round(
-                                ((item.mrp - item.price) / item.mrp) * 100
-                              )}
-                              % OFF
-                            </span>
-                          </>
-                        )}
-                      </div>
-
+                
                       {/* stock */}
                       <p
                         className={`text-sm mt-1 ${
@@ -249,7 +302,7 @@ export default function CartPage() {
                           <button
                             onClick={() => updateQty(index, "dec")}
                             disabled={item.qty <= 1}
-                            className="w-10 h-10 text-xl text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                            className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white transition disabled:bg-gray-300"
                           >
                             −
                           </button>
@@ -259,7 +312,7 @@ export default function CartPage() {
                           <button
                             onClick={() => updateQty(index, "inc")}
                             disabled={item.qty >= item.stock}
-                            className="w-10 h-10 text-xl text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                           className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white transition disabled:bg-gray-300"
                           >
                             +
                           </button>
@@ -274,12 +327,16 @@ export default function CartPage() {
                 );
               })}
 
-              <button
-                onClick={clearCart}
-                className="text-sm text-gray-500 hover:text-red-500 transition font-medium"
-              >
-                Clear entire cart
-              </button>
+              <div className="flex flex-wrap gap-4 pt-2">
+
+  <button
+    onClick={clearCart}
+    className="text-sm text-gray-500 hover:text-red-500 transition font-medium"
+  >
+    🗑 Clear Cart
+  </button>
+
+</div>
             </div>
 
             {/* RIGHT: SUMMARY */}
@@ -314,6 +371,9 @@ export default function CartPage() {
                     Apply
                   </button>
                 </div>
+                <p className="text-xs text-gray-500 mt-3">
+                  Try <b>TEST50</b> to get ₹100 OFF.
+                  </p>
                 {discount > 0 && (
                   <p className="text-green-600 text-sm mt-2 font-medium">
                     ✓ Coupon applied — ₹{discount} off
@@ -353,6 +413,10 @@ export default function CartPage() {
                       <span>- ₹{discount.toLocaleString("en-IN")}</span>
                     </div>
                   )}
+                  <div className="flex justify-between">
+                  <span>GST</span>
+                  <span className="text-green-600">Included</span>
+                  </div>
 
                   <div className="flex justify-between text-2xl font-bold border-t pt-4 mt-2">
                     <span>Total</span>
@@ -364,7 +428,7 @@ export default function CartPage() {
                   onClick={proceedCheckout}
                   className="w-full mt-6 bg-green-600 hover:bg-green-700 text-white py-4 rounded-2xl font-bold text-lg transition"
                 >
-                  Proceed to Checkout
+                 🔒 Secure Checkout
                 </button>
 
                 <Link href="/">
@@ -378,23 +442,23 @@ export default function CartPage() {
               <div className="bg-white rounded-2xl shadow-sm p-5">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center gap-2 text-gray-600">
-                    🔒 Secure payments
+                     🔒 100% Secure Payments
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
-                    ✅ Genuine products
+                    🚚 Fast Delivery
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
-                    ↩️ Easy 7-day returns
+                    ↩ Easy Returns
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
-                    🚚 Fast delivery
+                  🛡 Buyer Protection
                   </div>
                 </div>
+                
               </div>
             </div>
           </div>
         )}
-      </div>
     </section>
   );
 }

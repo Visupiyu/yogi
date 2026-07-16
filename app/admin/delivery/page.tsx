@@ -437,7 +437,7 @@ const exportCSV = () => {
 
        <div className="grid md:grid-cols-5 gap-5 mb-8">
 
-  <div className="bg-white rounded-2xl p-6 shadow">
+  <div className="bg-white rounded-3xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-1 transition">
 
     <p className="text-gray-500">
       Total Deliveries
@@ -607,7 +607,7 @@ Delivery Failed
 
                 href={`/delivery/${order.id}`}
 
-                className="block bg-white rounded-3xl shadow hover:shadow-lg transition p-6"
+                className="block bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition duration-300 transition p-6"
 
               >
 
@@ -629,12 +629,46 @@ Delivery Failed
 
                     </p>
 
-                    <p className="text-sm mt-2">
+                    <div className="mt-2">
 
-                      📦 {order.status}
+<span
+className={`
 
-                    </p>
+px-3
+py-1
+rounded-full
+text-xs
+font-semibold
 
+${
+order.status==="Delivered"
+
+? "bg-green-100 text-green-700"
+
+: order.status==="Assigned"
+
+? "bg-indigo-100 text-indigo-700"
+
+: order.status==="Out For Delivery"
+
+? "bg-blue-100 text-blue-700"
+
+: order.status==="Delivery Failed"
+
+? "bg-red-100 text-red-700"
+
+: "bg-yellow-100 text-yellow-700"
+
+}
+
+`}
+>
+
+{order.status}
+
+</span>
+
+</div>
                   </div>
 
                  <div className="text-right">
@@ -712,56 +746,30 @@ Delivery Failed
     }}
 
   >
-
     <option value="">
-
       Assign Delivery Partner
-
     </option>
-
     {
-
       partners.map(
-
         (partner)=>(
-
           <option
-
             key={partner.id}
-
             value={partner.id}
-
           >
-
             {partner.name}
-
           </option>
-
         )
-
       )
-
     }
-
-  </select>
-
+ </select>
 </div>
-
                 </div>
-
               </Link>
-
             ))}
-
           </div>
-
         )}
-
       </div>
-
-      </div>
-
-   
+      <div className="text-center py-8 text-gray-500">Delivery Management powered by Yogi Mart</div>
+      </div>   
   );
-
 }

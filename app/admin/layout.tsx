@@ -21,39 +21,43 @@ export default function AdminLayout({
             alt="Yogi Mart"
             className="w-40 mx-auto mb-3"
           />
-
-          <h1 className="text-2xl font-bold">
-            Admin Panel
-          </h1>
-
+<h1 className="text-3xl font-bold">
+👑 Admin Panel
+</h1>
+<p className="text-gray-400 mt-2">
+Marketplace Control Center
+</p>
+<div className="mt-4 bg-green-600 rounded-full px-4 py-2 inline-block">
+🟢 System Online
+</div>
         </div>
 
         <div className="space-y-3">
 
           <Link
             href="/admin"
-            className="block px-4 py-3 rounded-xl hover:bg-gray-800"
+           className="block px-4 py-3 rounded-xl hover:bg-green-600 transition duration-300"
           >
             Dashboard
           </Link>
 
           <Link
             href="/admin/orders"
-            className="block px-4 py-3 rounded-xl hover:bg-gray-800"
+           className="block px-4 py-3 rounded-xl hover:bg-green-600 transition duration-300"
           >
             Orders
           </Link>
 
           <Link
             href="/admin/users"
-            className="block px-4 py-3 rounded-xl hover:bg-gray-800"
+            className="block px-4 py-3 rounded-xl hover:bg-green-600 transition duration-300"
           >
             Users
           </Link>
 
           <Link
             href="/admin/vendors"
-            className="block px-4 py-3 rounded-xl hover:bg-gray-800"
+           className="block px-4 py-3 rounded-xl hover:bg-green-600 transition duration-300"
           >
             Vendors
           </Link>

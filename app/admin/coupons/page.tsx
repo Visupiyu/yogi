@@ -155,12 +155,51 @@ if(exists){
     text-4xl
     font-bold
   ">
-    Coupon Management
+   🎟 Coupon Management
   </h1>
 
   <p className="opacity-90">
     Create and manage marketplace discount coupons
   </p>
+
+</div>
+<div className="grid md:grid-cols-3 gap-5 mb-8">
+
+<div className="bg-white rounded-3xl shadow-lg p-6 text-center">
+
+<p>Total Coupons</p>
+
+<h2 className="text-3xl font-bold">
+
+{coupons.length}
+
+</h2>
+
+</div>
+
+<div className="bg-white rounded-3xl shadow-lg p-6 text-center">
+
+<p>Active</p>
+
+<h2 className="text-3xl font-bold text-green-600">
+
+{coupons.filter(c=>c.active).length}
+
+</h2>
+
+</div>
+
+<div className="bg-white rounded-3xl shadow-lg p-6 text-center">
+
+<p>Inactive</p>
+
+<h2 className="text-3xl font-bold text-red-600">
+
+{coupons.filter(c=>!c.active).length}
+
+</h2>
+
+</div>
 
 </div>
 
@@ -178,14 +217,7 @@ if(exists){
   onChange={(e)=>
     setSearch(e.target.value)
   }
-  className="
-    w-full
-    border
-    p-4
-    rounded-2xl
-    mb-6
-  "
-/>
+  className=" w-full border rounded-3xl p-5 shadow-lg mb-6" />
 
       <div className="
         bg-white
@@ -231,107 +263,54 @@ if(exists){
           onClick={
             createCoupon
           }
-          className="
-           bg-gradient-to-r
-from-green-600
-to-blue-600
-            text-white
-            px-5
-            py-3
-            rounded-lg
-          "
-        >
-          Create Coupon
-        </button>
-
+          className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-5 py-3 rounded-lg " >
+         ➕ Create Coupon
+       </button>
       </div>
-
-      <div className="
-        bg-white
-        p-6
-        rounded-2xl
-        shadow
-      ">
-
-        <table className="w-full">
-
+      <div className="bg-white p-6 rounded-2xl shadow ">
+  <div className="overflow-x-auto">
+    <table className="w-full">
           <thead>
-
-            <tr>
-
-              <th>
-                Code
-              </th>
-
-              <th>
-                Discount
-              </th>
-
-              <th>
-                Status
-              </th>
-
-            </tr>
-
-          </thead>
-
-       {coupons.length === 0 && (
-
-  <tr>
-
-    <td
-      colSpan={3}
-      className="
-        text-center
-        py-10
-        text-gray-500
-      "
-    >
-
-      No Coupons Found
-
-    </td>
-
+  <tr className="bg-gray-100">
+    <th className="py-3 rounded-l-xl">
+      Code
+    </th>
+    <th>
+      Discount
+    </th>
+    <th className="rounded-r-xl">
+      Status
+    </th>
   </tr>
-
+</thead>
+       {coupons.length === 0 && (
+  <tr>
+    <td colSpan={3} className=" text-center py-10 text-gray-500 " >
+      🎟 No Coupons Found
+    </td>
+  </tr>
 )}
-
           <tbody>
-
            {coupons
   .filter((coupon)=>
-
     coupon.code
       .toLowerCase()
       .includes(
         search.toLowerCase()
       )
-
   )
   .map(
     (coupon)=>(
-              <tr
-                key={coupon.id}
-              >
-
+              <tr key={coupon.id} className=" border-b hover:bg-gray-50 transition " >
                 <td>
                   {coupon.code}
                 </td>
-
                 <td>
                   {coupon.discount}%
                 </td>
-
                 <td>
-
   <span
-    className={`
-      px-3
-      py-1
-      rounded-full
-      text-sm
-      font-semibold
-
+    className={`px-3 py-1 rounded-full text-sm font-semibold
       ${
         coupon.active
         ? "bg-green-100 text-green-700"
@@ -339,29 +318,20 @@ to-blue-600
       }
     `}
   >
-
     {
       coupon.active
       ? "Active"
       : "Inactive"
     }
-
   </span>
-
 </td>
-
               </tr>
-
             ))}
-
           </tbody>
-
-        </table>
-
-      </div>
-
+    </table>
+</div>
+</div>
+      <div className="text-center py-8 text-gray-500">Manage promotional campaigns for your marketplace.</div>
     </div>
-
   );
-
 }

@@ -335,7 +335,7 @@ export default function ProductPage() {
 
               {/* DETAILS */}
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold mb-2">
+               <h1 className="text-3xl md:text-4xl font-extrabold leading-tight mb-2">
                   {product.name}
                 </h1>
 
@@ -355,7 +355,8 @@ export default function ProductPage() {
                       : "No ratings yet"}
                   </span>
                 </div>
-
+                <div className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-full text-sm font-bold mb-4">
+                 🔥 Limited Time Deal</div>
                 {/* PRICE */}
                 <div className="mb-4">
                   <div className="flex items-center gap-3 flex-wrap">
@@ -384,6 +385,32 @@ export default function ProductPage() {
                 </div>
 
                 {/* TRUST CHIPS */}
+                <div className="grid grid-cols-2 gap-3 mt-5">
+<div className="bg-green-50 rounded-xl p-3 text-center">
+🛡
+<p className="text-sm font-semibold">
+Buyer Protection
+</p>
+</div>
+<div className="bg-blue-50 rounded-xl p-3 text-center">
+🔒
+<p className="text-sm font-semibold">
+Secure Payment
+</p>
+</div>
+<div className="bg-yellow-50 rounded-xl p-3 text-center">
+🚚
+<p className="text-sm font-semibold">
+Fast Delivery
+</p>
+</div>
+<div className="bg-purple-50 rounded-xl p-3 text-center">
+↩
+<p className="text-sm font-semibold">
+Easy Returns
+</p>
+</div>
+</div>
                 <div className="flex flex-wrap gap-2 mb-5">
                   <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
                     🚚 Free Delivery
@@ -486,12 +513,25 @@ export default function ProductPage() {
                   <h3 className="font-bold mb-3">Delivery &amp; Services</h3>
                   <div className="grid grid-cols-2 gap-y-2 text-sm text-gray-600">
                     <p>🚚 Free delivery</p>
+                    <p>📅 Delivery by Tomorrow</p>
                     <p>📦 3–5 days</p>
                     <p>↩️ 7-day returns</p>
                     <p>💳 COD available</p>
                   </div>
                 </div>
-
+                <div className="mb-6">
+<p className="font-semibold mb-2">
+Quantity
+</p>
+<select
+className="border rounded-xl px-4 py-2"
+>
+<option>1</option>
+<option>2</option>
+<option>3</option>
+<option>4</option>
+</select>
+</div>
                 {/* ACTION BUTTONS */}
                 <div className="flex gap-3 mb-3">
                   <button
@@ -542,7 +582,7 @@ export default function ProductPage() {
                     className="w-14 flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl text-lg transition"
                     title="Share"
                   >
-                    🔗
+                  📤
                   </button>
                 </div>
 
@@ -597,7 +637,7 @@ export default function ProductPage() {
           {/* RELATED PRODUCTS */}
           {relatedProducts.length > 0 && (
             <div className="mt-10">
-              <h2 className="text-2xl font-bold mb-5">Related Products</h2>
+              <h2 className="text-3xl font-bold mb-6">🔥 Related Products</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {relatedProducts.map((item) => (
                   <Link key={item.id} href={`/product/${item.id}`}>
@@ -624,7 +664,7 @@ export default function ProductPage() {
 
           {/* QUESTIONS */}
           <div className="mt-10 bg-white rounded-3xl shadow-sm p-6">
-            <h2 className="text-2xl font-bold mb-5">Product Questions</h2>
+            <h2 className="text-2xl font-bold mb-5">❓ Product Questions</h2>
             <div className="flex gap-3 mb-6">
               <input
                 type="text"
@@ -665,7 +705,7 @@ export default function ProductPage() {
 
           {/* REVIEWS */}
           <div className="mt-8 bg-white rounded-3xl shadow-sm p-6">
-            <h2 className="text-2xl font-bold mb-5">Reviews &amp; Ratings</h2>
+            <h2 className="text-2xl font-bold mb-5"> ⭐ Reviews &amp; Ratings</h2>
 
             {avgRating && (
               <div className="flex items-center gap-4 mb-6 pb-6 border-b">
@@ -759,14 +799,14 @@ export default function ProductPage() {
           disabled={product.stock <= 0}
           className="flex-1 bg-green-600 disabled:opacity-50 text-white py-3 rounded-xl font-bold"
         >
-          Add to Cart
+         🛒 Add to Cart
         </button>
         <button
           onClick={buyNow}
           disabled={product.stock <= 0}
           className="flex-1 bg-blue-600 disabled:opacity-50 text-white py-3 rounded-xl font-bold text-center"
         >
-          Buy Now
+         ⚡ Buy Now
         </button>
       </div>
     </>

@@ -625,27 +625,15 @@ key={product.id}
 className="bg-white rounded-3xl shadow p-5"
 
 >
-
 <div className="relative h-48">
-
 <Image
-
-src={
-
-product.image ||
-
-"/placeholder.png"
-
-}
-
-alt={product.name}
-
-fill
-
-className="object-cover rounded-2xl"
-
+  src={product.image || "/placeholder.png"}
+  alt={product.name}
+  fill  
+  loading="eager"
+  sizes="(max-width:768px) 100vw, (max-width:1200px) 50vw, 33vw"
+  className="object-cover rounded-2xl"
 />
-
 </div>
 
 <h2 className="text-xl font-bold mt-4">

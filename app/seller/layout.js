@@ -38,6 +38,7 @@ export default function SellerLayout({ children }) {
             className="w-32 mx-auto mb-2"
           />
           <h1 className="text-xl font-bold">Seller Panel</h1>
+          <p className="text-sm opacity-80 mt-2">🟢 Online</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-1.5">
@@ -71,11 +72,18 @@ export default function SellerLayout({ children }) {
             <span>🚪</span>
             <span>Logout</span>
           </button>
+          <div className="text-center py-10 text-gray-500">
+Need Help?
+<Link href="/seller/support" className="text-green-600 ml-2 hover:underline" >
+Seller Support
+</Link>
+</div>
         </div>
       </aside>
 
       {/* CONTENT */}
       <main className="flex-1 min-w-0">{children}</main>
+      
     </div>
   );
 }

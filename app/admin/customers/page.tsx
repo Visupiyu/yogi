@@ -62,28 +62,17 @@ export default function AdminCustomersPage(){
 
         const data:any=docSnap.data();
 
-        if(data.role==="Customer"){
+      const role = (data.role || "").toLowerCase();
 
-          items.push({
-
-            id:docSnap.id,
-
-            name:
-              data.name || "Customer",
-
-            email:
-              data.email || "-",
-
-            phone:
-              data.phone || "-",
-
-            status:
-              data.status || "Active",
-
-          });
-
-        }
-
+if (role === "customer") {
+  items.push({
+    id: docSnap.id,
+    name: data.name || "Customer",
+    email: data.email || "-",
+    phone: data.phone || "-",
+    status: data.status || "Active",
+  });
+}
       });
 
       setCustomers(items);
@@ -278,7 +267,7 @@ className="bg-green-600 text-white px-6 py-3 rounded-xl"
 
 <div className="grid md:grid-cols-3 gap-5 mb-8">
 
-<div className="bg-white rounded-2xl shadow p-6">
+<div className="bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition duration-300 p-6">
 
 <p>Total Customers</p>
 
@@ -290,7 +279,7 @@ className="bg-green-600 text-white px-6 py-3 rounded-xl"
 
 </div>
 
-<div className="bg-white rounded-2xl shadow p-6">
+<div className="w-full border rounded-3xl p-5 shadow-lg mb-6">
 
 <p>Active</p>
 
@@ -368,7 +357,7 @@ Loading...
 
 <thead>
 
-<tr className="border-b">
+<tr className="bg-gray-100 border-b">
 
 <th className="p-4 text-left">
 
@@ -413,7 +402,7 @@ filtered.map((customer)=>(
 
 key={customer.id}
 
-className="border-b"
+className="border-b hover:bg-gray-50 transition"
 
 >
 
@@ -555,6 +544,8 @@ Profile
 }
 
 </div>
+
+<div className="text-center py-8 text-gray-500">Manage all marketplace customers efficiently.</div>
 
 </div>
 

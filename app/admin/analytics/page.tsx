@@ -477,18 +477,22 @@ setRecentOrders(
           gap-6
         ">
 
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
+         <div className="
+bg-white
+rounded-3xl
+p-6
+shadow-lg
+hover:shadow-2xl
+hover:-translate-y-1
+transition
+duration-300
+">
 
             <p className="
               text-gray-500
               text-sm
             ">
-              Total Revenue
+             💰 Total Revenue
             </p>
 
             <h2 className="
@@ -514,7 +518,7 @@ setRecentOrders(
               text-gray-500
               text-sm
             ">
-              Total Orders
+             📦 Total Orders
             </p>
 
             <h2 className="
@@ -538,7 +542,7 @@ setRecentOrders(
               text-gray-500
               text-sm
             ">
-              Total Vendors
+             🏪 Total Vendors
             </p>
 
             <h2 className="
@@ -562,7 +566,7 @@ setRecentOrders(
               text-gray-500
               text-sm
             ">
-              Total Customers
+             👥 Total Customers
             </p>
 
             <h2 className="
@@ -586,7 +590,7 @@ setRecentOrders(
               text-gray-500
               text-sm
             ">
-              Avg Order Value
+             📈 Avg Order Value
             </p>
 
             <h2 className="
@@ -630,7 +634,7 @@ setRecentOrders(
         mb-4
       "
     >
-      Monthly Revenue
+      📈 Monthly Revenue
     </h2>
 
     <ResponsiveContainer
@@ -681,7 +685,7 @@ setRecentOrders(
         mb-4
       "
     >
-      Monthly Orders
+     📦 Monthly Orders
     </h2>
 
     <ResponsiveContainer
@@ -734,7 +738,7 @@ setRecentOrders(
       mb-6
     "
   >
-    Refund Statistics
+   💸 Refund Statistics
   </h2>
 
   <div
@@ -784,7 +788,7 @@ setRecentOrders(
       mb-4
     "
   >
-    Top Selling Products
+  🏆 Top Selling Products
   </h2>
 
   <table
@@ -868,7 +872,7 @@ setRecentOrders(
       mb-4
     "
   >
-    Top Vendors
+  🏪 Top Vendors
   </h2>
 
   <div
@@ -976,7 +980,7 @@ setRecentOrders(
       mb-4
     "
   >
-    Recent Orders
+  📦 Recent Orders
   </h2>
 
   <table
@@ -1028,9 +1032,25 @@ setRecentOrders(
               ₹{order.finalTotal}
             </td>
 
-            <td>
-              {order.status}
-            </td>
+           <td>
+  <span
+    className={`px-3 py-1 rounded-full text-xs font-semibold ${
+      order.status === "Delivered"
+        ? "bg-green-100 text-green-700"
+        : order.status === "Pending"
+        ? "bg-yellow-100 text-yellow-700"
+        : order.status === "Cancelled"
+        ? "bg-red-100 text-red-700"
+        : order.status === "Shipped"
+        ? "bg-purple-100 text-purple-700"
+        : order.status === "Out For Delivery"
+        ? "bg-blue-100 text-blue-700"
+        : "bg-gray-100 text-gray-700"
+    }`}
+  >
+    {order.status}
+  </span>
+</td>
 
           </tr>
         )
@@ -1046,6 +1066,7 @@ setRecentOrders(
         </div>
 
       </div>
+      <div className="text-center py-10 text-gray-500">Marketplace Analytics powered by Yogi Mart</div>
 
     </div>
 

@@ -164,9 +164,7 @@ export default function AdminKYCPage() {
           ">
             Loading...
           </div>
-
         ) : (
-
           <div className="
             bg-white
             rounded-3xl
@@ -174,59 +172,41 @@ export default function AdminKYCPage() {
             overflow-x-auto
             p-6
           ">
-
             <table className="
               w-full
             ">
-
               <thead>
-
-                <tr className="
-                  border-b
-                ">
-
+               <tr className="bg-gray-100 border-b">
                   <th className="
                     text-left
                     py-4
                   ">
                     Vendor
                   </th>
-
                   <th>
                     GST
                   </th>
-
                   <th>
                     PAN
                   </th>
-
                   <th>
                     Aadhaar
                   </th>
-
                   <th>
                     KYC Status
                   </th>
-
                   <th>
                     Action
                   </th>
-
                 </tr>
-
               </thead>
-
               <tbody>
-
                 {vendors.map(
                   (vendor)=>(
 
                   <tr
                     key={vendor.id}
-                    className="
-                      border-b
-                    "
-                  >
+                    className="border-b hover:bg-gray-50 transition">
 
                     <td className="
                       py-4
@@ -246,10 +226,17 @@ export default function AdminKYCPage() {
                       {vendor.aadhaarNumber}
                     </td>
 
-                    <td>
-                      {vendor.kycStatus ||
-                       "Pending"}
-                    </td>
+                    <span
+className={`px-3 py-1 rounded-full text-sm font-semibold ${
+  vendor.kycStatus === "Approved"
+    ? "bg-green-100 text-green-700"
+    : vendor.kycStatus === "Rejected"
+    ? "bg-red-100 text-red-700"
+    : "bg-yellow-100 text-yellow-700"
+}`}
+>
+  {vendor.kycStatus || "Pending"}
+</span>
 
                     <td>
 
@@ -273,7 +260,7 @@ export default function AdminKYCPage() {
                           }
 
                           className="
-                            bg-green-600
+                            bg-green-600 hover:bg-green-700 transition
                             text-white
                             px-4
                             py-2
@@ -300,7 +287,7 @@ export default function AdminKYCPage() {
                           }
 
                           className="
-                            bg-red-600
+                           bg-red-600 hover:bg-red-700 transition
                             text-white
                             px-4
                             py-2
@@ -329,6 +316,7 @@ export default function AdminKYCPage() {
         )}
 
       </div>
+      <div className="text-center py-8 text-gray-500">Manage your delivery fleet from one dashboard.</div>
 
     </div>
 
