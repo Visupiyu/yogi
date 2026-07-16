@@ -2,323 +2,94 @@
 
 import Link from "next/link";
 
-
-
-export default function Footer(){
-
-  return(
-
-    <footer className="
-  bg-gradient-to-br
-from-slate-50
-via-white
-to-green-50
-  border-t
-  mt-*
-">
-
+export default function Footer() {
+  return (
+    <footer className="bg-gradient-to-br from-slate-50 via-white to-green-50 border-t mt-10">
       {/* TOP */}
-
-      <div className="
-        max-w-7xl
-        mx-auto
-        px-3
-        py-3
-        grid
-        grid-cols-1
-        md:grid-cols-2
-        lg:grid-cols-5
-        gap-*
-      ">
-
+      <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
         {/* BRAND */}
-
         <div>
-
           <img
             src="/logo.png"
             alt="Yogi Mart"
-            className="
-            h-36
-md:h-42
-w-auto
-object-contain
-            "
+            className="h-36 md:h-40 w-auto object-contain"
           />
-
-          <p className="
-            text-gray-600
-            leading-7
-          ">
-
-          India's trusted multi-vendor marketplace connecting customers with quality sellers across Grocery, Fashion, Electronics, Beauty and Home Essentials.
-            
+          <p className="text-gray-600 leading-7">
+            India&apos;s trusted multi-vendor marketplace connecting customers
+            with quality sellers across Grocery, Fashion, Electronics, Beauty
+            and Home Essentials.
           </p>
-
         </div>
 
         {/* COMPANY */}
-
         <div>
-
-          <h3 className="
-            text-lg
-            font-bold
-            mb-2          ">
-
-            Company
-
-          </h3>
-
-          <ul className="
-            space-y-3
-           text-gray-600
-hover:text-green-600
-transition
-          ">
-
-            <li>
-              <Link href="/about">
-  About Us
-</Link>
-            </li>
-
-            <li>
-              <Link href="/">
-                Careers
-              </Link>
-            </li>
-
-            <li>
-              <Link href="/">
-                Press
-              </Link>
-            </li>
-
-            <li>
-              <Link href="/">
-                Blog
-              </Link>
-            </li>
-
+          <h3 className="text-lg font-bold mb-3">Company</h3>
+          <ul className="space-y-3 text-gray-600">
+            <li><Link href="/about" className="hover:text-green-600 transition">About Us</Link></li>
+            <li><Link href="/" className="hover:text-green-600 transition">Careers</Link></li>
+            <li><Link href="/" className="hover:text-green-600 transition">Press</Link></li>
+            <li><Link href="/" className="hover:text-green-600 transition">Blog</Link></li>
           </ul>
-
         </div>
 
         {/* HELP */}
-
         <div>
-
-          <h3 className="
-            text-lg
-            font-bold
-            mb-2
-          ">
-
-            Help
-
-          </h3>
-
-          <ul className="
-            space-y-3
-            text-gray-600
-          ">
-
-            <li>
-              <Link href="/contact">
-  Contact Us
-</Link>
-            </li>
-
-            <li>
-              <Link href="/">
-                Returns
-              </Link>
-            </li>
-
-            <li>
-              <Link href="/">
-                Shipping
-              </Link>
-            </li>
-
-            <li>
-              <Link href="/privacy-policy">
-  Privacy Policy
-</Link>
-            </li>
-
-            <li>
-  <Link href="/terms">
-    Terms & Conditions
-  </Link>
-</li>
-
+          <h3 className="text-lg font-bold mb-3">Help</h3>
+          <ul className="space-y-3 text-gray-600">
+            <li><Link href="/contact" className="hover:text-green-600 transition">Contact Us</Link></li>
+            <li><Link href="/returns" className="hover:text-green-600 transition">Returns</Link></li>
+            <li><Link href="/shipping" className="hover:text-green-600 transition">Shipping</Link></li>
+            <li><Link href="/privacy-policy" className="hover:text-green-600 transition">Privacy Policy</Link></li>
+            <li><Link href="/terms" className="hover:text-green-600 transition">Terms &amp; Conditions</Link></li>
           </ul>
-
         </div>
 
         {/* SELLER */}
-
         <div>
-
-          <h3 className="
-            text-lg
-            font-bold
-            mb-2
-          ">
-
-            Seller
-
-          </h3>
-
-          <ul className="
-            space-y-3
-            text-gray-600
-          ">
-
-            <li>
-
-              <Link href="/vendor-login">
-
-                Sell on Yogi Mart
-
-              </Link>
-
-            </li>
-
-            <li>
-
-              <Link href="/vendor-register">
-
-                Become a Seller
-
-              </Link>
-
-            </li>
-
-            <li>
-
-              <Link href="/vendor-login">
-
-                Seller Login
-
-              </Link>
-
-            </li>
-
+          <h3 className="text-lg font-bold mb-3">Seller</h3>
+          <ul className="space-y-3 text-gray-600">
+            <li><Link href="/vendor-login" className="hover:text-green-600 transition">Sell on Yogi Mart</Link></li>
+            <li><Link href="/vendor-register" className="hover:text-green-600 transition">Become a Seller</Link></li>
+            <li><Link href="/vendor-login" className="hover:text-green-600 transition">Seller Login</Link></li>
           </ul>
-
         </div>
 
         {/* DOWNLOAD */}
-
         <div>
-
-          <h3 className="
-            text-lg
-            font-bold
-            mb-2
-          ">
-
-            Download App
-
-          </h3>
-
-          <div className="
-            flex
-            flex-col
-            gap-3
-          ">
-
-            <button className="
-              bg-black
-              text-white
-              py-3
-              rounded-xl
-              font-semibold
-            ">
-
+          <h3 className="text-lg font-bold mb-3">Download App</h3>
+          <div className="flex flex-col gap-3">
+            <button className="bg-black text-white py-3 rounded-xl font-semibold">
               Coming Soon
-
             </button>
-
-            <button className="
-              bg-black
-              text-white
-              py-3
-              rounded-xl
-              font-semibold
-            ">
-
-            Coming Soon
-
+            <button className="bg-black text-white py-3 rounded-xl font-semibold">
+              Coming Soon
             </button>
-
           </div>
-
         </div>
-
       </div>
 
-      <div className="
-  border-t
-  border-b
-  py-4
-  px-4
-">
+      {/* TRUST ROW */}
+      <div className="border-t border-b py-4 px-4">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-gray-700">
+          <div>🚚 Fast Delivery</div>
+          <div>🔒 Secure Payments</div>
+          <div>↩ Easy Returns</div>
+          <div>✅ Trusted Sellers</div>
+        </div>
+      </div>
 
-  <div className="
-    max-w-7xl
-    mx-auto
-    grid
-    grid-cols-2
-    md:grid-cols-4
-    gap-4
-    text-center
-  ">
-
-    <div>🚚 Fast Delivery</div>
-
-    <div>🔒 Secure Payments</div>
-
-    <div>↩ Easy Returns</div>
-
-    <div>✅ Trusted Sellers</div>
-
-  </div>
-
-</div>
-
-<div className="
-  flex
-  justify-center
-  gap-4
-  py-4
-">
-
-  <span className="text-2xl cursor-pointer">📘</span>
-  <span className="text-2xl cursor-pointer">📷</span>
-  <span className="text-2xl cursor-pointer">▶️</span>
-  <span className="text-2xl cursor-pointer">🐦</span>
-
-</div>
+      {/* SOCIAL */}
+      <div className="flex justify-center gap-4 py-4">
+        <span className="text-2xl cursor-pointer">📘</span>
+        <span className="text-2xl cursor-pointer">📷</span>
+        <span className="text-2xl cursor-pointer">▶️</span>
+        <span className="text-2xl cursor-pointer">🐦</span>
+      </div>
 
       {/* BOTTOM */}
-
-      <div className="
-        border-t
-        py-2
-        text-center
-        text-gray-500
-        text-sm
-      ">
-
-       © 2026 Yogi Mart • Made in India 🇮🇳 • All Rights Reserved
-
-      </div>    
+      <div className="border-t py-4 text-center text-gray-500 text-sm">
+        © 2026 Yogi Mart • Made in India 🇮🇳 • All Rights Reserved
+      </div>
     </footer>
-
   );
-
 }

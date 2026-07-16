@@ -197,7 +197,7 @@ export default function CartPage() {
                           className="text-gray-400 hover:text-red-500 transition shrink-0"
                           title="Remove"
                         >
-                          🗑
+                          🗑 Remove
                         </button>
                       </div>
 
