@@ -1,1075 +1,221 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-import {
-  collection,
-  getDocs,
-} from "firebase/firestore";
-
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-
 import {
-  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
+  ResponsiveContainer,
   PieChart,
   Pie,
+  Cell,
+  Legend,
 } from "recharts";
 
-interface AnalyticsStats {
-  revenue: number;
-  orders: number;
-  vendors: number;
-  customers: number;
-  averageOrderValue: number;
-}
+const COLORS = ["#16a34a", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4"];
 
 export default function AdminAnalyticsPage() {
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [stats, setStats] =
-    useState<AnalyticsStats>({
-      revenue: 0,
-      orders: 0,
-      vendors: 0,
-      customers: 0,
-      averageOrderValue: 0,
-    });
-
-    const [monthlyData, setMonthlyData] =
-  useState([
-    { month: "Jan", revenue: 0, orders: 0 },
-    { month: "Feb", revenue: 0, orders: 0 },
-    { month: "Mar", revenue: 0, orders: 0 },
-    { month: "Apr", revenue: 0, orders: 0 },
-    { month: "May", revenue: 0, orders: 0 },
-    { month: "Jun", revenue: 0, orders: 0 },
-    { month: "Jul", revenue: 0, orders: 0 },
-    { month: "Aug", revenue: 0, orders: 0 },
-    { month: "Sep", revenue: 0, orders: 0 },
-    { month: "Oct", revenue: 0, orders: 0 },
-    { month: "Nov", revenue: 0, orders: 0 },
-    { month: "Dec", revenue: 0, orders: 0 },
-  ]);
-
-  const [refundStats, setRefundStats] =
-  useState<any[]>([]);
-
-const [topProducts, setTopProducts] =
-  useState<any[]>([]);
-
-const [recentOrders, setRecentOrders] =
-  useState<any[]>([]);
-
-  const [topVendors, setTopVendors] =
-  useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
 
   useEffect(() => {
+    const load = async () => {
+      try {
+        const [oSnap, pSnap, vSnap, uSnap] = await Promise.all([
+          getDocs(collection(db, "orders")),
+          getDocs(collection(db, "products")),
+          getDocs(collection(db, "vendors")),
+          getDocs(collection(db, "users")),
+        ]);
 
-    loadAnalytics();
-
+        setOrders(oSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setProducts(pSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setVendors(vSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setCustomers(
+          uSnap.docs
+            .map((d) => ({ id: d.id, ...(d.data() as any) }))
+            .filter((u) => (u.role || "customer") === "customer")
+        );
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
-  const loadAnalytics =
-    async () => {
-
-      try {
-
-        const ordersSnapshot =
-          await getDocs(
-            collection(
-              db,
-              "orders"
-            )
-          );
-
-        const vendorsSnapshot =
-          await getDocs(
-            collection(
-              db,
-              "vendors"
-            )
-          );
-
-        const usersSnapshot =
-          await getDocs(
-            collection(
-              db,
-              "users"
-            )
-          );
-
-          const returnsSnapshot =
-  await getDocs(
-    collection(
-      db,
-      "returns"
-    )
+  // Revenue excludes cancelled orders
+  const validOrders = orders.filter((o) => o.status !== "Cancelled");
+  const totalRevenue = validOrders.reduce(
+    (sum, o) => sum + (o.finalTotal || o.total || 0),
+    0
   );
-
-        let revenue = 0;
-
-        ordersSnapshot.forEach(
-          (docSnap) => {
-
-            const order: any =
-              docSnap.data();
-
-            revenue += Number(
-              order.finalTotal || 0
-            );
-
-          }
-        );
-
-        const totalOrders =
-          ordersSnapshot.size;
-
-          const monthly = [
-  { month: "Jan", revenue: 0, orders: 0 },
-  { month: "Feb", revenue: 0, orders: 0 },
-  { month: "Mar", revenue: 0, orders: 0 },
-  { month: "Apr", revenue: 0, orders: 0 },
-  { month: "May", revenue: 0, orders: 0 },
-  { month: "Jun", revenue: 0, orders: 0 },
-  { month: "Jul", revenue: 0, orders: 0 },
-  { month: "Aug", revenue: 0, orders: 0 },
-  { month: "Sep", revenue: 0, orders: 0 },
-  { month: "Oct", revenue: 0, orders: 0 },
-  { month: "Nov", revenue: 0, orders: 0 },
-  { month: "Dec", revenue: 0, orders: 0 },
-];
-
-ordersSnapshot.forEach((docSnap) => {
-
-  const order: any =
-    docSnap.data();
-
-  if (order.createdAt?.seconds) {
-
-    const date =
-      new Date(
-        order.createdAt.seconds * 1000
-      );
-
-    const month =
-      date.getMonth();
-
-    monthly[month].revenue +=
-      Number(
-        order.finalTotal || 0
-      );
-
-    monthly[month].orders += 1;
-
-  }
-
-});
-
-setMonthlyData(monthly);
-
-const pendingRefunds =
-  returnsSnapshot.docs.filter(
-    (doc:any)=>
-      doc.data().status ===
-      "Pending"
-  ).length;
-
-const approvedRefunds =
-  returnsSnapshot.docs.filter(
-    (doc:any)=>
-      doc.data().status ===
-      "Approved"
-  ).length;
-
-const refundedOrders =
-  returnsSnapshot.docs.filter(
-    (doc:any)=>
-      doc.data().status ===
-      "Refunded"
-  ).length;
-
-setRefundStats([
-  {
-    name:"Pending",
-    value:pendingRefunds,
-  },
-  {
-    name:"Approved",
-    value:approvedRefunds,
-  },
-  {
-    name:"Refunded",
-    value:refundedOrders,
-  },
-]);
-
-const productSales:any = {};
-
-ordersSnapshot.forEach(
-  (docSnap)=>{
-
-    const order:any =
-      docSnap.data();
-
-    if(order.items){
-
-      order.items.forEach(
-        (item:any)=>{
-
-          if(
-            !productSales[
-              item.name
-            ]
-          ){
-
-            productSales[
-              item.name
-            ] = 0;
-
-          }
-
-          productSales[
-            item.name
-          ] += item.qty || 0;
-
-        }
-      );
-
-    }
-
-  }
-);
-
-setTopProducts(
-
-  Object.entries(
-    productSales
-  )
-
-  .map(
-    ([name,qty])=>({
-      name,
-      qty,
-    })
-  )
-
-  .sort(
-    (a:any,b:any)=>
-      b.qty-a.qty
-  )
-
-  .slice(0,5)
-
-);
-
-const vendorSales:any = {};
-
-ordersSnapshot.forEach(
-  (docSnap)=>{
-
-    const order:any =
-      docSnap.data();
-
-    if(order.items){
-
-      order.items.forEach(
-        (item:any)=>{
-
-          const vendor =
-            item.vendorName ||
-            "Unknown Vendor";
-
-          if(
-            !vendorSales[vendor]
-          ){
-
-            vendorSales[vendor] = {
-
-              revenue:0,
-
-              orders:0,
-
-            };
-
-          }
-
-          vendorSales[vendor]
-            .revenue +=
-
-            Number(
-              item.price || 0
-            ) *
-
-            Number(
-              item.qty || 0
-            );
-
-          vendorSales[vendor]
-            .orders +=
-            Number(
-              item.qty || 0
-            );
-
-        }
-      );
-
-    }
-
-  }
-);
-
-setTopVendors(
-
-  Object.entries(
-    vendorSales
-  )
-
-  .map(
-    ([name,data]:any)=>({
-
-      name,
-
-      revenue:
-        data.revenue,
-
-      orders:
-        data.orders,
-
-    })
-  )
-
-  .sort(
-    (a,b)=>
-      b.revenue -
-      a.revenue
-  )
-
-  .slice(0,5)
-
-);
-
-setRecentOrders(
-
-  ordersSnapshot.docs
-
-  .slice(-5)
-
-  .map((doc)=>({
-
-    id:doc.id,
-
-    ...(doc.data() as any),
-
-  }))
-
-);
-
-        setStats({
-
-          revenue,
-
-          orders:
-            totalOrders,
-
-          vendors:
-            vendorsSnapshot.size,
-
-          customers:
-            usersSnapshot.size,
-
-          averageOrderValue:
-
-            totalOrders > 0
-              ? revenue /
-                totalOrders
-              : 0,
-
-        });
-
-      } catch (error) {
-
-        console.log(error);
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
-    };
+  const avgOrderValue = validOrders.length
+    ? Math.round(totalRevenue / validOrders.length)
+    : 0;
+
+  // Orders by status (for pie)
+  const statusCounts: Record<string, number> = {};
+  orders.forEach((o) => {
+    const s = o.status || "Pending";
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  });
+  const statusData = Object.entries(statusCounts).map(([name, value]) => ({
+    name,
+    value,
+  }));
+
+  // Revenue by category (from order items)
+  const categoryRevenue: Record<string, number> = {};
+  validOrders.forEach((o) => {
+    (o.items || []).forEach((item: any) => {
+      const cat = item.category || "Other";
+      categoryRevenue[cat] =
+        (categoryRevenue[cat] || 0) + (item.price || 0) * (item.qty || 0);
+    });
+  });
+  const categoryData = Object.entries(categoryRevenue)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6);
+
+  // Top products by units sold
+  const topProducts = [...products]
+    .sort((a, b) => (b.sales || 0) - (a.sales || 0))
+    .slice(0, 5);
+
+  const stats = [
+    { label: "Total Revenue", value: `₹${totalRevenue.toLocaleString("en-IN")}`, icon: "💰", color: "text-green-600" },
+    { label: "Total Orders", value: orders.length, icon: "📦", color: "text-blue-600" },
+    { label: "Avg Order Value", value: `₹${avgOrderValue.toLocaleString("en-IN")}`, icon: "📊", color: "text-purple-600" },
+    { label: "Products", value: products.length, icon: "🏷️", color: "text-orange-600" },
+    { label: "Vendors", value: vendors.length, icon: "🏬", color: "text-cyan-600" },
+    { label: "Customers", value: customers.length, icon: "👥", color: "text-pink-600" },
+  ];
 
   if (loading) {
-
     return (
-
-      <div className="
-        min-h-screen
-        flex
-        items-center
-        justify-center
-      ">
-
-        <div className="
-          text-xl
-          font-semibold
-        ">
-          Loading Analytics...
-        </div>
-
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Loading analytics…
       </div>
-
     );
-
   }
 
   return (
-
-    <div className="
-      min-h-screen
-      bg-gray-100
-      p-6
-    ">
-
-      <div className="
-        max-w-7xl
-        mx-auto
-      ">
-
-        <div className="
-          bg-gradient-to-r
-          from-indigo-600
-          to-blue-600
-          text-white
-          p-8
-          rounded-3xl
-          mb-8
-        ">
-
-          <h1 className="
-            text-4xl
-            font-bold
-          ">
-            Admin Analytics
-          </h1>
-
-          <p className="
-            mt-2
-            opacity-90
-          ">
-            Marketplace Performance Overview
-          </p>
-
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-3xl p-8 mb-8">
+          <h1 className="text-4xl font-bold">📈 Analytics</h1>
+          <p className="mt-2 opacity-90">Marketplace performance overview</p>
         </div>
 
-        <div className="
-          grid
-          grid-cols-1
-          md:grid-cols-2
-          xl:grid-cols-5
-          gap-6
-        ">
-
-         <div className="
-bg-white
-rounded-3xl
-p-6
-shadow-lg
-hover:shadow-2xl
-hover:-translate-y-1
-transition
-duration-300
-">
-
-            <p className="
-              text-gray-500
-              text-sm
-            ">
-             💰 Total Revenue
-            </p>
-
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-2
-              text-green-600
-            ">
-              ₹
-              {stats.revenue.toLocaleString()}
-            </h2>
-
-          </div>
-
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
-
-            <p className="
-              text-gray-500
-              text-sm
-            ">
-             📦 Total Orders
-            </p>
-
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-2
-            ">
-              {stats.orders}
-            </h2>
-
-          </div>
-
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
-
-            <p className="
-              text-gray-500
-              text-sm
-            ">
-             🏪 Total Vendors
-            </p>
-
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-2
-            ">
-              {stats.vendors}
-            </h2>
-
-          </div>
-
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
-
-            <p className="
-              text-gray-500
-              text-sm
-            ">
-             👥 Total Customers
-            </p>
-
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-2
-            ">
-              {stats.customers}
-            </h2>
-
-          </div>
-
-          <div className="
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-          ">
-
-            <p className="
-              text-gray-500
-              text-sm
-            ">
-             📈 Avg Order Value
-            </p>
-
-            <h2 className="
-              text-3xl
-              font-bold
-              mt-2
-              text-blue-600
-            ">
-              ₹
-              {Math.round(
-                stats.averageOrderValue
-              ).toLocaleString()}
-            </h2>
-
-          </div>
-
-          <div
-  className="
-    grid
-    grid-cols-1
-    lg:grid-cols-2
-    gap-6
-    mt-8
-  "
->
-
-  <div
-    className="
-      bg-white
-      rounded-3xl
-      p-6
-      shadow
-      h-[400px]
-    "
-  >
-
-    <h2
-      className="
-        text-xl
-        font-bold
-        mb-4
-      "
-    >
-      📈 Monthly Revenue
-    </h2>
-
-    <ResponsiveContainer
-      width="100%"
-      height="100%"
-    >
-
-      <BarChart
-        data={monthlyData}
-      >
-
-        <CartesianGrid
-          strokeDasharray="3 3"
-        />
-
-        <XAxis
-          dataKey="month"
-        />
-
-        <YAxis />
-
-        <Tooltip />
-
-        <Bar
-          dataKey="revenue"
-        />
-
-      </BarChart>
-
-    </ResponsiveContainer>
-
-  </div>
-
-  <div
-    className="
-      bg-white
-      rounded-3xl
-      p-6
-      shadow
-      h-[400px]
-    "
-  >
-
-    <h2
-      className="
-        text-xl
-        font-bold
-        mb-4
-      "
-    >
-     📦 Monthly Orders
-    </h2>
-
-    <ResponsiveContainer
-      width="100%"
-      height="100%"
-    >
-
-      <BarChart
-        data={monthlyData}
-      >
-
-        <CartesianGrid
-          strokeDasharray="3 3"
-        />
-
-        <XAxis
-          dataKey="month"
-        />
-
-        <YAxis />
-
-        <Tooltip />
-
-        <Bar
-          dataKey="orders"
-        />
-
-      </BarChart>
-
-    </ResponsiveContainer>
-
-  </div>
-
-</div>
-
-<div
-  className="
-    bg-white
-    rounded-3xl
-    p-6
-    shadow
-    mt-8
-  "
->
-
-  <h2
-    className="
-      text-xl
-      font-bold
-      mb-6
-    "
-  >
-   💸 Refund Statistics
-  </h2>
-
-  <div
-    className="
-      h-[350px]
-    "
-  >
-
-    <ResponsiveContainer
-      width="100%"
-      height="100%"
-    >
-
-      <PieChart>
-
-        <Pie
-          data={refundStats}
-          dataKey="value"
-          nameKey="name"
-          outerRadius={120}
-        />
-
-        <Tooltip />
-
-      </PieChart>
-
-    </ResponsiveContainer>
-
-  </div>
-
-</div>
-
-<div
-  className="
-    bg-white
-    rounded-3xl
-    shadow
-    p-6
-    mt-8
-  "
->
-
-  <h2
-    className="
-      text-xl
-      font-bold
-      mb-4
-    "
-  >
-  🏆 Top Selling Products
-  </h2>
-
-  <table
-    className="
-      w-full
-    "
-  >
-
-    <thead>
-
-      <tr>
-
-        <th
-          className="
-            text-left
-            py-3
-          "
-        >
-          Product
-        </th>
-
-        <th
-          className="
-            text-left
-          "
-        >
-          Sold
-        </th>
-
-      </tr>
-
-    </thead>
-
-    <tbody>
-
-      {topProducts.map(
-        (product:any)=>(
-          <tr
-            key={product.name}
-            className="
-              border-t
-            "
-          >
-
-            <td
-              className="
-                py-3
-              "
-            >
-              {product.name}
-            </td>
-
-            <td>
-              {product.qty}
-            </td>
-
-          </tr>
-        )
-      )}
-      
-
-    </tbody>
-
-  </table>
-
-</div>
-<div
-  className="
-    bg-white
-    rounded-3xl
-    shadow
-    p-6
-    mt-8
-  "
->
-
-  <h2
-    className="
-      text-xl
-      font-bold
-      mb-4
-    "
-  >
-  🏪 Top Vendors
-  </h2>
-
-  <div
-    className="
-      overflow-x-auto
-    "
-  >
-
-    <table
-      className="
-        w-full
-      "
-    >
-
-      <thead>
-
-        <tr>
-
-          <th
-            className="
-              text-left
-              py-3
-            "
-          >
-            Vendor
-          </th>
-
-          <th
-            className="
-              text-left
-            "
-          >
-            Orders
-          </th>
-
-          <th
-            className="
-              text-left
-            "
-          >
-            Revenue
-          </th>
-
-        </tr>
-
-      </thead>
-
-      <tbody>
-
-        {topVendors.map(
-          (vendor:any)=>(
-
-            <tr
-              key={vendor.name}
-              className="
-                border-t
-              "
-            >
-
-              <td
-                className="
-                  py-3
-                "
-              >
-                {vendor.name}
-              </td>
-
-              <td>
-                {vendor.orders}
-              </td>
-
-              <td>
-                ₹
-                {vendor.revenue.toLocaleString()}
-              </td>
-
-            </tr>
-
-          )
-        )}
-
-      </tbody>
-
-    </table>
-
-  </div>
-
-</div>
-
-
-<div
-  className="
-    bg-white
-    rounded-3xl
-    shadow
-    p-6
-    mt-8
-  "
->
-
-  <h2
-    className="
-      text-xl
-      font-bold
-      mb-4
-    "
-  >
-  📦 Recent Orders
-  </h2>
-
-  <table
-    className="
-      w-full
-    "
-  >
-
-    <thead>
-
-      <tr>
-
-        <th className="text-left py-3">
-          Customer
-        </th>
-
-        <th className="text-left">
-          Amount
-        </th>
-
-        <th className="text-left">
-          Status
-        </th>
-
-      </tr>
-
-    </thead>
-
-    <tbody>
-
-      {recentOrders.map(
-        (order:any)=>(
-          <tr
-            key={order.id}
-            className="
-              border-t
-            "
-          >
-
-            <td
-              className="
-                py-3
-              "
-            >
-              {order.customerName}
-            </td>
-
-            <td>
-              ₹{order.finalTotal}
-            </td>
-
-           <td>
-  <span
-    className={`px-3 py-1 rounded-full text-xs font-semibold ${
-      order.status === "Delivered"
-        ? "bg-green-100 text-green-700"
-        : order.status === "Pending"
-        ? "bg-yellow-100 text-yellow-700"
-        : order.status === "Cancelled"
-        ? "bg-red-100 text-red-700"
-        : order.status === "Shipped"
-        ? "bg-purple-100 text-purple-700"
-        : order.status === "Out For Delivery"
-        ? "bg-blue-100 text-blue-700"
-        : "bg-gray-100 text-gray-700"
-    }`}
-  >
-    {order.status}
-  </span>
-</td>
-
-          </tr>
-        )
-      )}
-
-    </tbody>
-
-  </table>
-
-</div>
-
-
+        {/* STATS */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          {stats.map((s) => (
+            <div key={s.label} className="bg-white rounded-2xl shadow-sm p-5">
+              <div className="text-2xl mb-2">{s.icon}</div>
+              <p className="text-gray-500 text-sm">{s.label}</p>
+              <h2 className={`text-2xl font-bold mt-1 break-all ${s.color}`}>
+                {s.value}
+              </h2>
+            </div>
+          ))}
         </div>
 
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          {/* REVENUE BY CATEGORY */}
+          <div className="bg-white rounded-3xl shadow-sm p-6">
+            <h2 className="text-xl font-bold mb-4">Revenue by Category</h2>
+            {categoryData.length === 0 ? (
+              <p className="text-gray-400 text-center py-16">No sales data yet</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={categoryData}>
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(v: any) => `₹${Number(v).toLocaleString("en-IN")}`}
+                  />
+                  <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                    {categoryData.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          {/* ORDERS BY STATUS */}
+          <div className="bg-white rounded-3xl shadow-sm p-6">
+            <h2 className="text-xl font-bold mb-4">Orders by Status</h2>
+            {statusData.length === 0 ? (
+              <p className="text-gray-400 text-center py-16">No orders yet</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label
+                  >
+                    {statusData.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* TOP PRODUCTS */}
+        <div className="bg-white rounded-3xl shadow-sm p-6">
+          <h2 className="text-xl font-bold mb-4">Top Products</h2>
+          {topProducts.length === 0 ? (
+            <p className="text-gray-400 text-center py-8">No products yet</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-100 border-b text-left">
+                    <th className="p-3">Product</th>
+                    <th className="p-3">Price</th>
+                    <th className="p-3">Units Sold</th>
+                    <th className="p-3">Stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topProducts.map((p) => (
+                    <tr key={p.id} className="border-b hover:bg-gray-50">
+                      <td className="p-3">{p.name}</td>
+                      <td className="p-3">
+                        ₹{Number(p.price || 0).toLocaleString("en-IN")}
+                      </td>
+                      <td className="p-3">{p.sales || 0}</td>
+                      <td className="p-3">{p.stock ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="text-center py-10 text-gray-500">Marketplace Analytics powered by Yogi Mart</div>
-
     </div>
-
   );
-
 }

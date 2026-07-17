@@ -135,26 +135,37 @@ export default function CheckoutPage() {
       createdAt: Timestamp.now(),
     });
 
-    // Stock + sales per item, and seller notifications
+   // Stock + sales per item, and seller notifications
     for (const item of items) {
-      await updateDoc(doc(db, "products", item.id), {
-        sales: increment(item.qty),
-        stock: increment(-item.qty),
-      });
+      try {
+        await updateDoc(doc(db, "products", item.id), {
+          sales: increment(item.qty),
+          stock: increment(-item.qty),
+        });
+        console.log("✅ Product updated:", item.name);
+      } catch (e) {
+        console.error("❌ Product update failed:", item.name, e);
+        // Do NOT throw — a stock-write hiccup shouldn't fail the whole order
+      }
 
       if (item.vendorId) {
-        await addDoc(collection(db, "notifications"), {
-          userId: item.vendorId,
-          role: "seller",
-          title: "🛒 New Order",
-          message: `${name} ordered ${item.name}`,
-          type: "order",
-          read: false,
-          createdAt: Timestamp.now(),
-        });
+        try {
+          await addDoc(collection(db, "notifications"), {
+            userId: item.vendorId,
+            role: "seller",
+            title: "🛒 New Order",
+            message: `${name} ordered ${item.name}`,
+            type: "order",
+            read: false,
+            createdAt: Timestamp.now(),
+          });
+          console.log("✅ Seller notification:", item.name);
+        } catch (e) {
+          console.error("❌ Seller notification failed:", item.name, e);
+          // Do NOT throw
+        }
       }
     }
-
     // Customer notification
     await addDoc(collection(db, "notifications"), {
       userId: firebaseUser.uid,

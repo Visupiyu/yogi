@@ -1,361 +1,177 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-
 import {
   collection,
   onSnapshot,
-  updateDoc,
-  deleteDoc,
-  doc,
   query,
-  orderBy,
+  where,
+  updateDoc,
+  doc,
 } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-export default function AdminNotificationsPage() {
-
-    type Notification = {
+type Notification = {
   id: string;
   title: string;
   message: string;
-  read: boolean;
-  role?: string;
   type?: string;
-  userId?: string;
+  read: boolean;
   createdAt?: any;
 };
 
-const [notifications, setNotifications] =
-  useState<Notification[]>([]);
+export default function AdminNotificationsPage() {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [filter, setFilter] = useState<"all" | "unread">("all");
 
-const [loading,setLoading] =
-  useState(true);
-useEffect(() => {
+  useEffect(() => {
+    // Admin notifications only (role == "admin"). No orderBy → no composite index.
+    const q = query(
+      collection(db, "notifications"),
+      where("role", "==", "admin")
+    );
 
-  const q = query(
-
-    collection(db, "notifications"),
-
-    orderBy("createdAt", "desc")
-
-  );
-
-  const unsubscribe = onSnapshot(
-
-    q,
-
-    (snapshot) => {
-
-      const items: Notification[] = [];
-
-      snapshot.forEach((docSnap) => {
-
-        items.push({
-
-          id: docSnap.id,
-
-          ...(docSnap.data() as Omit<Notification, "id">),
-
-        });
-
-      });
-
-      setNotifications(items);
-
-      setLoading(false);
-
-    }
-
-  );
-
-  return () => unsubscribe();
-
-}, []);
-const markAsRead =
-async(id:string)=>{
-
-  try{
-
-    await updateDoc(
-
-      doc(
-        db,
-        "notifications",
-        id
-      ),
-
-      {
-        read:true
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const items: Notification[] = [];
+        snapshot.forEach((docSnap) =>
+          items.push({
+            id: docSnap.id,
+            ...(docSnap.data() as Omit<Notification, "id">),
+          })
+        );
+        items.sort(
+          (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+        );
+        setNotifications(items);
+      },
+      (error) => {
+        console.error(error);
       }
-
     );
 
-    setNotifications(
+    return () => unsubscribe();
+  }, []);
 
-      notifications.map(
-        (item)=>
+  const markRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "notifications", id), { read: true });
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-          item.id === id
+  const markAllRead = async () => {
+    for (const item of notifications) {
+      if (!item.read) {
+        try {
+          await updateDoc(doc(db, "notifications", item.id), { read: true });
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    }
+  };
 
-            ? {
-                ...item,
-                read:true
-              }
+  const unreadCount = notifications.filter((n) => !n.read).length;
+  const shown =
+    filter === "unread"
+      ? notifications.filter((n) => !n.read)
+      : notifications;
 
-            : item
+  const icon = (type?: string) =>
+    type === "order"
+      ? "🛒"
+      : type === "delivery"
+      ? "🚚"
+      : type === "vendor"
+      ? "🏬"
+      : "🔔";
 
-      )
-
-    );
-
-  }catch(error){
-
-    console.error(
-      "Failed to mark notification as read:",
-      error
-    );
-
-  }
-
-};
-
-const deleteNotification =
-async(id:string)=>{
-
-  try{
-
-    await deleteDoc(
-
-      doc(
-        db,
-        "notifications",
-        id
-      )
-
-    );
-
-    setNotifications(
-
-      notifications.filter(
-        (item)=>
-          item.id !== id
-      )
-
-    );
-
-  }catch(error){
-
-  console.error(
-  "Failed to delete notification:",
-  error
-);
-
-  }
-
-};
-
- return (
-
-     <div className="
-      min-h-screen
-      bg-gray-100
-      p-6
-    ">
-
-      <div className="
-        max-w-7xl
-        mx-auto
-      ">
-
-        <div className="
-          bg-gradient-to-r
-          from-yellow-500
-          to-orange-500
-          text-white
-          p-8
-          rounded-3xl
-          mb-8
-        ">
-
-          <h1 className="
-            text-4xl
-            font-bold
-          ">
-           🔔 Notifications Center
-          </h1>
-
-          <p>
-            Marketplace Alerts & Updates
+  return (
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-8 mb-8">
+          <h1 className="text-4xl font-bold">🔔 Notifications</h1>
+          <p className="mt-2 opacity-90">
+            {unreadCount} unread of {notifications.length}
           </p>
-
         </div>
-      {loading ? (
 
-  <div className="
-    bg-white
-    p-8
-    rounded-3xl
-  ">
-    Loading...
-  </div>
-
-) : notifications.length === 0 ? (
-
-  <div className="
-    bg-white
-    rounded-3xl
-    p-10
-    text-center
-   shadow-lg hover:shadow-2xl hover:-translate-y-1 transition duration-300
-  ">
-
-    <h2 className="
-      text-2xl
-      font-bold
-    ">
-      🎉 No Notifications
-    </h2>
-
-    <p className="
-      text-gray-500
-      mt-2
-    ">
-      Everything is up to date.
-    </p>
-
-  </div>
-
-) : (
-
-  <div className="
-    space-y-4
-  ">
-
-    {notifications.map(
-      (item)=>(
-
-        <div
-          key={item.id}
-          className={`
-            bg-white
-            rounded-3xl
-            p-6
-            shadow
-
-            ${
-              item.read
-
-                ? "opacity-70"
-
-                : ""
-            }
-          `}
-        >
-
-         <span className="
-  inline-block
-  bg-blue-100
-  text-blue-700
-  text-xs
-  px-3
-  py-1
-  rounded-full
-  mb-2
-">
-  {item.type || "Info"}
-</span>
-
-<h2 className="
-  text-xl
-  font-bold
-">
-  {item.title}
-</h2>
-
-<p className="
-  mt-2
-  text-gray-600
-">
-  {item.message}
-</p>
-
-<p className="
-  text-sm
-  text-gray-400
-  mt-2
-">
-  {item.createdAt?.seconds
-    ? new Date(
-        item.createdAt.seconds * 1000
-      ).toLocaleString()
-    : ""}
-</p>
-
-          <div className="
-            flex
-            gap-3
-            mt-4
-          ">
-
-            {!item.read && (
-
-              <button
-
-                onClick={()=>
-                  markAsRead(
-                    item.id
-                  )
-                }
-
-                className="
-               bg-green-600 hover:bg-green-700 transition
-                  text-white
-                  px-4
-                  py-2
-                  rounded-lg
-                "
-              >
-                Mark Read
-              </button>
-
-            )}
-
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex gap-2">
             <button
-
-              onClick={()=>
-                deleteNotification(
-                  item.id
-                )
-              }
-
-              className="
-              bg-red-600 hover:bg-red-700 transition
-                text-white
-                px-4
-                py-2
-                rounded-lg
-              "
+              onClick={() => setFilter("all")}
+              className={`px-5 py-2 rounded-xl font-semibold transition ${
+                filter === "all"
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-700"
+              }`}
             >
-              Delete
+              All
             </button>
-
+            <button
+              onClick={() => setFilter("unread")}
+              className={`px-5 py-2 rounded-xl font-semibold transition ${
+                filter === "unread"
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-700"
+              }`}
+            >
+              Unread ({unreadCount})
+            </button>
           </div>
 
+          {unreadCount > 0 && (
+            <button
+              onClick={markAllRead}
+              className="text-green-600 font-semibold hover:underline"
+            >
+              Mark all read
+            </button>
+          )}
         </div>
 
-      )
-    )}
-
-  </div>
-
-)}
-
+        {shown.length === 0 ? (
+          <div className="bg-white rounded-3xl p-12 text-center text-gray-500 shadow">
+            <div className="text-4xl mb-2">🔔</div>
+            No notifications.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {shown.map((note) => (
+              <div
+                key={note.id}
+                className={`rounded-2xl p-5 shadow-sm border flex items-start gap-4 ${
+                  note.read ? "bg-white" : "bg-green-50 border-green-200"
+                }`}
+              >
+                <div className="text-2xl">{icon(note.type)}</div>
+                <div className="flex-1">
+                  <h3 className="font-bold">{note.title}</h3>
+                  <p className="text-gray-600 text-sm mt-1">{note.message}</p>
+                  {note.createdAt?.seconds && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      {new Date(
+                        note.createdAt.seconds * 1000
+                      ).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                {!note.read && (
+                  <button
+                    onClick={() => markRead(note.id)}
+                    className="text-sm text-green-600 font-semibold shrink-0"
+                  >
+                    Mark read
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      <div className="text-center py-8 text-gray-500">Marketplace Notification Center</div>
-
     </div>
-
   );
-
 }

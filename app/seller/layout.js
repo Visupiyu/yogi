@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import {usePathname, useRouter, } from "next/navigation";
+import { useEffect } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
@@ -20,6 +21,15 @@ const navItems = [
 
 export default function SellerLayout({ children }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+useEffect(() => {
+  const vendor = localStorage.getItem("vendor");
+
+  if (!vendor) {
+    router.replace("/vendor-login");
+  }
+}, [router]);
 
   const logout = async () => {
     await signOut(auth);
