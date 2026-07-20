@@ -1,14 +1,27 @@
 import { Resend } from "resend";
 
-const resend = new Resend(
-  process.env.RESEND_API_KEY
-);
+const apiKey = process.env.RESEND_API_KEY;
+
+const resend = apiKey
+  ? new Resend(apiKey)
+  : null;
 
 export async function POST(
   request: Request
 ) {
-
   try {
+
+    if (!resend) {
+      return Response.json(
+        {
+          success: false,
+          error: "RESEND_API_KEY is missing",
+        },
+        {
+          status: 500,
+        }
+      );
+    }
 
     const {
       customerName,
@@ -17,63 +30,69 @@ export async function POST(
       total,
     } = await request.json();
 
-   const result =
-  await resend.emails.send({
+    const result =
+      await resend.emails.send({
 
-      from:
-        "Yogi Mart <onboarding@resend.dev>",
+        from:
+          "YOMICO <onboarding@resend.dev>",
 
-   to: "adminyogimart@gmail.com",
+        to:
+          "adminyogimart@gmail.com",
 
-      subject:
-        "Order Confirmation",
+        subject:
+          "Order Confirmation",
 
-      html: `
-        <h2>
-          Thank you for your order,
-          ${customerName}
-        </h2>
+        html: `
+          <h2>
+            Thank you for your order,
+            ${customerName}
+          </h2>
 
-        <p>
-          Order ID:
-          ${orderId}
-        </p>
+          <p>
+            Order ID:
+            ${orderId}
+          </p>
 
-        <p>
-          Total:
-          ₹${total}
-        </p>
+          <p>
+            Customer Email:
+            ${customerEmail}
+          </p>
 
-        <p>
-          Your order has been placed
-          successfully.
-        </p>
-      `,
-    });
+          <p>
+            Total:
+            ₹${total}
+          </p>
+
+          <p>
+            Your order has been placed successfully.
+          </p>
+        `,
+      });
 
     console.log(
-  "Resend Result:",
-  result
-);
-
-
+      "Resend Result:",
+      result
+    );
 
     return Response.json({
-      success:true,
+      success: true,
     });
 
-  } catch(error){
+  } catch (error) {
 
-  console.error(
-    "Email Error:",
-    error
-  );
+    console.error(
+      "Email Error:",
+      error
+    );
 
-  return Response.json({
-    success:false,
-    error:String(error),
-  });
-
-}
-
+    return Response.json(
+      {
+        success: false,
+        error: String(error),
+      },
+      {
+        status: 500,
+      }
+    );
+  }
 }
