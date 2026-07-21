@@ -63,22 +63,26 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-6">
       <div className="bg-white backdrop-blur-sm border border-gray-100 p-10 rounded-3xl shadow-xl w-full max-w-md">
         <div className="text-center mb-5">
-          <img
-            src="/logo.png"
-            alt="Yogi Mart"
-            className="w-20 mx-auto mb-3"
-          />
-        </div>
+  <img
+    src="/logo.png"
+    alt="YOMICO"
+    className="w-20 mx-auto mb-3"
+  />
+
+  <h2 className="text-3xl font-extrabold text-green-700 tracking-wide">
+    YOMICO
+  </h2>
+</div>
 
         <p className="text-center text-green-600 font-semibold text-sm mb-2">
-          Yogi Mart Customer Portal
-        </p>
+  YOMICO Customer Portal
+</p>
 
         <h1 className="text-4xl font-bold text-center mb-3">Customer Login</h1>
 
         <p className="text-center text-gray-500 mb-8">
-          Login to your Yogi Mart account
-        </p>
+  Login to your YOMICO account
+</p>
 
         <div className="space-y-5">
           <input

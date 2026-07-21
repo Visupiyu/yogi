@@ -123,20 +123,33 @@ export default function Navbar() {
       <div className="max-w-screen-2xl mx-auto px-4">
         <div className="h-16 flex items-center justify-between gap-6">
           {/* LOGO */}
-          <Link href="/" className="shrink-0">
-            <img
-              src="/logo.png"
-              alt="Yogi-Mart"
-              className="h-11 md:h-12 w-auto object-contain"
-            />
-          </Link>
+          <Link
+  href="/"
+  className="shrink-0 flex items-center gap-3"
+>
+  <img
+    src="/logo.png"
+    alt="YOMICO"
+    className="h-11 md:h-12 w-auto object-contain"
+  />
+
+  <div className="hidden md:block">
+    <h1 className="text-2xl font-extrabold tracking-wide text-green-700">
+      YOMICO
+    </h1>
+
+    <p className="text-xs text-gray-600 -mt-1">
+      India's Multi-Vendor Marketplace
+    </p>
+  </div>
+</Link>
 
           {/* SEARCH */}
           <div className="flex-1 flex">
             <div className="w-full relative max-w-2xl mx-auto" ref={searchRef}>
               <input
                 type="text"
-                placeholder="Search products..."
+                placeholder="Search on YOMICO..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {

@@ -279,7 +279,7 @@ export default function SellerPage() {
           vendorName,
           views: 0,
           sales: 0,
-          createdAt: new Date(),
+          createdAt: serverTimestamp(),
         });
         await lowStockNotify(name, Number(stock));
         alert("Product Added");
@@ -400,12 +400,12 @@ export default function SellerPage() {
       {/* HEADER */}
       <div className="bg-gradient-to-r from-green-700 via-teal-600 to-blue-700 text-white px-8 py-6">
         <p className="text-sm uppercase tracking-widest opacity-80">
-  Yogi Mart Seller Dashboard </p>
+  YOMICO Seller Dashboard</p>
 <h1 className="text-4xl md:text-5xl font-bold mt-2">
 👋 Welcome Back,</h1>
 <h2 className="text-2xl mt-2"> {vendorName} </h2>
 <p className="mt-3 opacity-90">
-Manage products, inventory, orders and earnings from one place.</p>
+Manage your products, inventory, orders and business growth from one dashboard.</p>
       </div>
       <div className="max-w-7xl mx-auto p-6 md:p-8">
         {/* STATS */}
@@ -598,10 +598,10 @@ Manage products, inventory, orders and earnings from one place.</p>
                   accept="image/*"
                   onChange={(e) => {
                     const files = Array.from(e.target.files || []);
-                    if (files.length > 5) {
-                      alert("Maximum 5 images allowed");
-                      return;
-                    }
+                    for (const file of files) {
+  if (!file.type.startsWith("image/")) {alert("Only image files are allowed."); return;}
+
+  if (file.size > 5 * 1024 * 1024) {alert("Each image must be under 5 MB."); return; } }                   
                     setImageFiles(files);
                     const previews = files.map((file) =>
                       URL.createObjectURL(file)
@@ -675,10 +675,10 @@ className="h-16 w-full object-cover rounded-xl"
               {products
                 .filter((product) => {
                   if (!search.trim()) return true;
-                  return (product.name || "")
-                    .toLowerCase()
-                    .includes(search.toLowerCase());
-                })
+                 const q = search.toLowerCase();
+return ( (product.name || "").toLowerCase().includes(q) ||
+  ((product as any).brand || "").toLowerCase().includes(q) ||
+  (product.category || "").toLowerCase().includes(q)); })
                 .map((product) => (
                   <div
                     key={product.id}
@@ -700,6 +700,9 @@ className="h-16 w-full object-cover rounded-xl"
 
                       <div>
                         <h3 className="text-lg font-bold line-clamp-1">
+                          <p className="text-sm text-gray-500">
+  Brand: {(product as any).brand || "N/A"}
+</p>
                           {product.name}
                         </h3>
                         <div className="flex gap-2 mt-2">
@@ -765,6 +768,13 @@ className="h-16 w-full object-cover rounded-xl"
                 </tr>
               </thead>
               <tbody>
+                {orders.length === 0 && (
+  <tr> <td
+      colSpan={5}  className="text-center py-12 text-gray-500">
+      🛒 No Orders Yet
+      <br />
+      Orders from customers will appear here.
+    </td> </tr> )}
                 {orders.map((order) => (
                   <tr key={order.id} className="border-b">
                     <td className="py-4">{order.id?.slice(0, 8)}</td>
@@ -785,6 +795,7 @@ order.status==="Pending"?
 </span>
 </div>
                       <select
+disabled={order.status === "Cancelled"}
                         value={order.status}
                         onChange={(e) =>
                           updateOrderStatus(order.id, e.target.value)

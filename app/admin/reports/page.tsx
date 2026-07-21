@@ -4,10 +4,12 @@ import { saveAs } from "file-saver";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs,  query, orderBy,  } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useState } from "react";
 
 export default function AdminReportsPage() {
+  const [exporting, setExporting] = useState(false);
   // Flatten Firestore timestamps so Excel shows a readable date, not {seconds,...}
   const flatten = (obj: any) => {
     const out: any = {};
@@ -39,7 +41,7 @@ export default function AdminReportsPage() {
 
       const worksheet = XLSX.utils.json_to_sheet(data);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
+      XLSX.utils.book_append_sheet(workbook, worksheet,  collectionName);
 
       const excelBuffer = XLSX.write(workbook, {
         bookType: "xlsx",
@@ -48,16 +50,24 @@ export default function AdminReportsPage() {
       const fileData = new Blob([excelBuffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      saveAs(fileData, `${fileName}.xlsx`);
+      saveAs(
+  fileData,
+  `${fileName}-${new Date().toISOString().split("T")[0]}.xlsx`
+);
     } catch (error) {
-      console.error(error);
+      console.error("Export Error:", error);
       alert("Export failed. Check the console for details.");
     }
   };
 
   const exportOrdersPDF = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "orders"));
+      const snapshot = await getDocs(
+  query(
+    collection(db, "orders"),
+    orderBy("createdAt", "desc")
+  )
+);
       const rows: any[] = [];
       snapshot.forEach((docSnap) => {
         const order: any = docSnap.data();
@@ -77,15 +87,23 @@ export default function AdminReportsPage() {
 
       const pdf = new jsPDF();
       pdf.setFontSize(18);
-      pdf.text("Yogi Mart Orders Report", 14, 20);
+      pdf.text("YOMICO Orders Report", 14, 20);
+      pdf.setFontSize(10);
+pdf.text(
+  `Generated: ${new Date().toLocaleString("en-IN")}`,
+  14,
+  27
+);
       autoTable(pdf, {
         startY: 30,
         head: [["Customer", "Amount", "Status"]],
         body: rows,
       });
-      pdf.save("orders-report.pdf");
+      pdf.save(
+  `orders-report-${new Date().toISOString().split("T")[0]}.pdf`
+);
     } catch (error) {
-      console.error(error);
+      console.error("Export Error:", error);
       alert("PDF export failed. Check the console for details.");
     }
   };

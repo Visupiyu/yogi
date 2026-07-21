@@ -336,11 +336,11 @@ export default function AdminPage() {
         <div className="flex items-center gap-4">
           <img
             src="/logo.png"
-            alt="Yogi Mart"
+            alt="YOMICO"
             className="w-24 h-24 rounded-full bg-white p-3"
           />
           <div>
-            <h1 className="text-5xl font-bold">Yogi Mart</h1>
+            <h1 className="text-5xl font-bold"> YOMICO</h1>
             <p className="mt-3 text-lg opacity-90">Manage your complete marketplace from one dashboard.</p>
             <p>👑 Admin Dashboard</p>
             <div className="mt-4">
@@ -541,26 +541,27 @@ export default function AdminPage() {
     <p className="text-gray-500 mb-6">Marketplace alerts and important activities.</p>
 
   </div>
-
-</div>
-
 {/* NOTIFICATIONS */}
-
 <div className="bg-white rounded-2xl shadow p-8 mb-10">
+  <h2 className="text-3xl font-bold mb-8">
+    🔔 Notifications
+  </h2>
 
+  <div className="space-y-4">
+    {notifications.length === 0 && (
+      <p>No Notifications</p>
+    )}
 
-        {/* NOTIFICATIONS */}
-        <div className="bg-white rounded-2xl shadow p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-8">Notifications</h2>
-          <div className="space-y-4">
-            {notifications.length === 0 && <p>No Notifications</p>}
-            {notifications.map((item, index) => (
-              <div key={index} className="bg-gray-100 p-4 rounded-xl">
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
+    {notifications.map((item, index) => (
+      <div
+        key={index}
+        className="bg-gray-100 p-4 rounded-xl"
+      >
+        {item}
+      </div>
+    ))}
+  </div>
+</div>
 
         {/* ANALYTICS CHART */}
         <div className="bg-white rounded-2xl shadow p-8 mb-10">

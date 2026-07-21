@@ -9,16 +9,18 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 py-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
         {/* BRAND */}
         <div>
+          <h2 className="text-3xl font-extrabold text-green-700 mb-2 tracking-wide">YOMICO</h2>
           <img
             src="/logo.png"
-            alt="Yogi Mart"
+            alt="YOMICO"
             className="h-36 md:h-40 w-auto object-contain"
           />
           <p className="text-gray-600 leading-7">
-            India&apos;s trusted multi-vendor marketplace connecting customers
-            with quality sellers across Grocery, Fashion, Electronics, Beauty
-            and Home Essentials.
-          </p>
+  <span className="font-bold text-green-700">YOMICO</span> is India's
+  modern multi-vendor marketplace connecting customers with trusted
+  sellers for groceries, fashion, electronics, beauty, home essentials
+  and much more.
+</p>
         </div>
 
         {/* COMPANY */}
@@ -48,7 +50,7 @@ export default function Footer() {
         <div>
           <h3 className="text-lg font-bold mb-3">Seller</h3>
           <ul className="space-y-3 text-gray-600">
-            <li><Link href="/vendor-login" className="hover:text-green-600 transition">Sell on Yogi Mart</Link></li>
+            <li><Link href="/vendor-login" className="hover:text-green-600 transition">Sell on YOMICO</Link></li>
             <li><Link href="/vendor-register" className="hover:text-green-600 transition">Become a Seller</Link></li>
             <li><Link href="/vendor-login" className="hover:text-green-600 transition">Seller Login</Link></li>
           </ul>
@@ -88,7 +90,7 @@ export default function Footer() {
 
       {/* BOTTOM */}
       <div className="border-t py-4 text-center text-gray-500 text-sm">
-        © 2026 Yogi Mart • Made in India 🇮🇳 • All Rights Reserved
+       © 2026 YOMICO • Made in India 🇮🇳 • All Rights Reserved
       </div>
     </footer>
   );

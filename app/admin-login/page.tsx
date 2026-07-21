@@ -13,6 +13,7 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -53,7 +54,7 @@ router.push("/admin");
       if (error.code === "auth/invalid-credential") {
         alert("Invalid email or password");
       } else {
-        alert(error.message);
+        alert("Login failed. Please check your credentials and try again.");
       }
     } finally {
       setLoading(false);
@@ -61,13 +62,14 @@ router.push("/admin");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 p-6">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-xl p-10">
-        <h1 className="text-4xl font-bold mb-3 text-center">👑 Admin Login</h1>
+        <div className="flex justify-center mb-6">
+       <img src="/logo.png" alt="YOMICO" className="h-20 w-auto" /></div>
+        <h1 className="text-4xl font-bold mb-3 text-center">👑 YOMICO Admin</h1>
         <p className="text-gray-500 text-center mb-10">
-          Yogi Mart Admin Panel
+        YOMICO Administration Portal
         </p>
-
         <div className="space-y-5">
           <input
             type="email"
@@ -78,17 +80,19 @@ router.push("/admin");
           />
 
           <input
-            type="password"
+           type={showPassword ? "text" : "password"}
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full border p-4 rounded-xl"
+            onKeyDown={(e) => {if (e.key === "Enter") {handleLogin();}}}
           />
+          
 
           <button
             onClick={handleLogin}
             disabled={loading}
-            className="w-full bg-black disabled:opacity-60 text-white p-4 rounded-xl text-lg font-bold"
+            className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500disabled:opacity-60 text-white p-4 rounded-xl text-lg font-bold"
           >
             {loading ? "Logging in..." : "Login"}
           </button>

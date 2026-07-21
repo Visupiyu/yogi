@@ -69,7 +69,7 @@ export default function AdminLayout({
       {/* SIDEBAR */}
       <aside className="w-64 shrink-0 bg-black text-white flex flex-col sticky top-0 h-screen">
         <div className="p-5 text-center border-b border-white/10">
-          <img src="/logo.png" alt="Yogi Mart" className="w-32 mx-auto mb-3" />
+          <img src="/logo.png" alt="YOMICO" className="w-32 mx-auto mb-3" />
           <h1 className="text-2xl font-bold">👑 Admin Panel</h1>
           <p className="text-gray-400 mt-1 text-sm">Marketplace Control Center</p>
           <div className="mt-3 bg-green-600 rounded-full px-4 py-1.5 inline-block text-sm">

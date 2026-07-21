@@ -42,7 +42,14 @@ export default function AdminUsersPage() {
           status: data.status || "Active",
         });
       });
-      setUsers(items);
+    items.sort((a, b) => {
+  if (a.status === b.status) return 0;
+  if (a.status === "Active") return -1;
+  if (b.status === "Active") return 1;
+  return 0;
+});
+
+setUsers(items);
     } catch (error) {
       console.error(error);
     } finally {
@@ -65,7 +72,16 @@ export default function AdminUsersPage() {
 
   const deleteStaff = async (id: string) => {
     if (!confirm("Delete this staff member?")) return;
-    try {
+    try { const currentAdmin = localStorage.getItem("admin");
+
+if (
+  currentAdmin &&
+  JSON.parse(currentAdmin).email ===
+    users.find((u) => u.id === id)?.email
+) {
+  toast.error("You cannot delete your own account.");
+  return;
+}
       await deleteDoc(doc(db, "adminUsers", id));
       toast.success("Staff deleted.");
       loadUsers();
@@ -85,16 +101,22 @@ export default function AdminUsersPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "admin-users.csv";
+    a.download = `admin-users-${new Date()
+  .toISOString()
+  .split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const filtered = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase())
+ const filtered = users.filter((user) => {
+  const term = search.toLowerCase();
+
+  return (
+    user.name.toLowerCase().includes(term) ||
+    user.email.toLowerCase().includes(term) ||
+    user.role.toLowerCase().includes(term)
   );
+});
 
   const activeStaff = users.filter((u) => u.status === "Active").length;
   const inactiveStaff = users.filter((u) => u.status === "Inactive").length;
@@ -105,8 +127,8 @@ export default function AdminUsersPage() {
         <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-8 rounded-3xl mb-8">
           <h1 className="text-4xl font-bold">Admin Staff Management</h1>
           <p className="opacity-90">
-            Manage Yogi Mart administrators and staff
-          </p>
+  Manage YOMICO administrators and staff
+</p>
         </div>
 
         <div className="flex justify-end mb-6">
@@ -149,7 +171,7 @@ export default function AdminUsersPage() {
 
         {loading ? (
           <div className="bg-white rounded-2xl shadow p-10 text-center">
-            Loading Users...
+           Loading admin staff...
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow p-6 overflow-x-auto">
@@ -184,8 +206,8 @@ export default function AdminUsersPage() {
                         <span
                           className={`px-3 py-1 rounded-full text-sm font-semibold ${
                             user.status === "Active"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
+                              ? "bg-green-600 text-white"
+                              : "bg-red-600 text-white"
                           }`}
                         >
                           {user.status}
@@ -194,7 +216,8 @@ export default function AdminUsersPage() {
                       <td>
                         <div className="flex flex-wrap gap-2">
                           <button
-                            onClick={() => toggleStatus(user)}
+                          onClick={() => {if (confirm(
+      `${user.status === "Active" ? "Deactivate" : "Activate"} ${user.name}?`)) {toggleStatus(user);}}}
                             className={`px-3 py-1 rounded-lg text-white transition ${
                               user.status === "Active"
                                 ? "bg-yellow-600 hover:bg-yellow-700"

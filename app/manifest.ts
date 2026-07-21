@@ -1,15 +1,13 @@
 import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
-
   return {
+    name: "YOMICO",
 
-    name: "Yogi Mart",
-
-    short_name: "YogiMart",
+    short_name: "YOMICO",
 
     description:
-      "Multi Vendor Marketplace",
+      "India's Modern Multi-Vendor Marketplace",
 
     start_url: "/",
 
@@ -20,7 +18,6 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#16a34a",
 
     icons: [
-
       {
         src: "/icon-192.png",
         sizes: "192x192",
@@ -32,9 +29,6 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: "512x512",
         type: "image/png",
       },
-
     ],
-
   };
-
 }

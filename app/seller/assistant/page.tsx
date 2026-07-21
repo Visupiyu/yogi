@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 export default function SellerAssistantPage(){
 
   const [productName,setProductName] =useState("");
@@ -31,21 +32,21 @@ const copyText = (
 
   navigator.clipboard.writeText(text);
 
-  alert("Copied");
+ toast.success("Copied to clipboard.");
 
 };
 
- const generateContent = ()=>{if(!productName){alert("Enter product name");
+ const generateContent = ()=>{if(!productName){toast.error("Please enter a product name.");
     return;
   }
   setDescription(
     `${productName} is a premium quality ${category || "product"} designed for durability, excellent performance and everyday use. Carefully selected for customers looking for quality and value.`
   );
 
-  setSeoTitle(`Buy ${productName} Online at Best Price | Yogi Mart`
+  setSeoTitle(`Buy ${productName} Online at Best Price | YOMICO`
   );
 
-  setTags(`${productName}, ${category}, Online Shopping, Best Price, Yogi Mart`
+  setTags(`${productName}, ${category}, Online Shopping, Best Price, YOMICO`
   );
 
   setTips(["📈 Keep at least 20 units in stock.",
@@ -61,7 +62,7 @@ const copyText = (
     "🔥 Add 5–10 SEO keywords to improve search visibility."
 
   ]);
-  setSocialPost(`🔥 ${productName} is now available on Yogi Mart!
+  setSocialPost(`🔥 ${productName} is now available on YOMICO!
 
 ✨ Premium Quality
 🚚 Fast Delivery
@@ -69,7 +70,7 @@ const copyText = (
 
 Order today and enjoy a great shopping experience!
 
-#YogiMart #${productName.replace(/\s+/g,"")}`
+#YOMICO #${productName.replace(/\s+/g,"")}`
 
 );
 
@@ -83,17 +84,17 @@ We're excited to introduce our latest ${productName}.
 ✔ Affordable Price
 ✔ Fast Delivery
 
-Visit Yogi Mart today and place your order.
+Visit YOMICO today and place your order.
 
 Thank you for shopping with us.
 
-Team Yogi Mart`
+Team YOMICO`
 
 );
 
 setOfferText(`🎉 Limited Time Offer!
 
-Buy ${productName} today and enjoy amazing savings only on Yogi Mart.
+Buy ${productName} today and enjoy amazing savings only on YOMICO.
 
 Shop Now!`
 
@@ -101,7 +102,7 @@ Shop Now!`
 
 setHindiDescription(
 
-`${productName} एक उच्च गुणवत्ता वाला ${category || "उत्पाद"} है जो बेहतर प्रदर्शन, टिकाऊ गुणवत्ता और उचित कीमत के साथ उपलब्ध है। केवल योगी मार्ट पर खरीदें।`
+`${productName} एक उच्च गुणवत्ता वाला ${category || "उत्पाद"} है जो बेहतर प्रदर्शन, टिकाऊ गुणवत्ता और उचित कीमत के साथ उपलब्ध है। केवल YOMICO पर खरीदें।`
 
 );
 
@@ -113,15 +114,15 @@ setWhatsappMessage(
 🚚 Fast Delivery
 💰 Best Price
 
-Shop now on Yogi Mart!
+Shop now on YOMICO!
 
-https://yogi-mart.com`
+https://yomico.in`
 
 );
 
 setGoogleHeadline(
 
-`Buy ${productName} Online | Best Price | Yogi Mart`
+`Buy ${productName} Online | Best Price | YOMICO`
 
 );
 

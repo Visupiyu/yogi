@@ -1,7 +1,7 @@
 {
-  "name": "Yogi Mart",
-  "short_name": "YogiMart",
-  "description": "Multi Vendor Marketplace",
+  "name": "YOMICO",
+  "short_name": "YOMICO",
+  "description": "India's Modern Multi-Vendor Marketplace",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

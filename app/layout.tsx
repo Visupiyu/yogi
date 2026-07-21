@@ -1,112 +1,72 @@
-import type {
-  Metadata
-} from "next";
+import type { Metadata } from "next";
 
 import "./globals.css";
 
-import { Geist }
-from "next/font/google";
+import { Geist } from "next/font/google";
 
-import { cn }
-from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 import { Toaster } from "sonner";
 
-import ClientLayout
-from "@/components/ClientLayout";
+import ClientLayout from "@/components/ClientLayout";
 
 const geist = Geist({
-
-  subsets:["latin"],
-
-  variable:"--font-sans"
-
+  subsets: ["latin"],
+  variable: "--font-sans",
 });
 
 export const metadata: Metadata = {
-
   title: {
-
-    default:
-      "Yogi Mart",
-
-    template:
-      "%s | Yogi Mart",
-
+    default: "YOMICO",
+    template: "%s | YOMICO",
   },
 
   description:
-    "Buy groceries, electronics, fashion, furniture and more from local vendors on Yogi Mart.",
+    "YOMICO is India's modern multi-vendor marketplace for groceries, electronics, fashion, furniture, beauty, home essentials and more.",
 
   keywords: [
-
-    "Yogi Mart",
-
-    "Online Shopping",
-
+    "YOMICO",
+    "Yomico",
+    "Online Shopping India",
     "Multi Vendor Marketplace",
-
-    "Grocery Delivery",
-
+    "Ecommerce",
+    "Groceries",
     "Electronics",
-
     "Fashion",
-
     "Furniture",
-
+    "Home Essentials",
+    "Beauty",
+    "Shopping",
   ],
 
-  manifest:
-    "/manifest.json",
+  manifest: "/manifest.json",
 
-    openGraph: {
+  openGraph: {
+    title: "YOMICO",
+    description:
+      "India's Modern Multi-Vendor Marketplace",
+    type: "website",
+    siteName: "YOMICO",
+  },
 
-  title:
-    "Yogi Mart",
-
-  description:
-    "Multi Vendor Marketplace",
-
-  type:
-    "website",
-
-},
-
-twitter: {
-
-  card:
-    "summary_large_image",
-
-  title:
-    "Yogi Mart",
-
-  description:
-    "Multi Vendor Marketplace",
-
-},
-
+  twitter: {
+    card: "summary_large_image",
+    title: "YOMICO",
+    description:
+      "India's Modern Multi-Vendor Marketplace",
+  },
 };
 
 export default function RootLayout({
-
   children,
-
-}:{
-
+}: {
   children: React.ReactNode;
-
 }) {
-
   return (
-
     <html
       lang="en"
-      className={cn(
-        "font-sans",
-        geist.variable
-      )}
+      className={cn("font-sans", geist.variable)}
     >
-
       <body
         className="
           bg-gradient-to-br
@@ -116,23 +76,16 @@ export default function RootLayout({
           min-h-screen
         "
       >
-
         <ClientLayout>
-
           {children}
 
-           <Toaster
-    position="top-right"
-    richColors
-    closeButton
-  />
-
+          <Toaster
+            position="top-right"
+            richColors
+            closeButton
+          />
         </ClientLayout>
-
       </body>
-
     </html>
-
   );
-
 }

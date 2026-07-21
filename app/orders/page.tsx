@@ -15,6 +15,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 import { auth, db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 export default function OrdersPage() {
 
@@ -242,7 +243,7 @@ export default function OrdersPage() {
 
       <div className="py-20 text-center">
 
-        Loading Orders...
+      Loading your orders...
 
       </div>
 
@@ -460,7 +461,7 @@ export default function OrdersPage() {
 
                   <div className="space-y-3">
                     {/* ACTION BUTTONS */}
-
+{order.paymentStatus === "Paid" ? (
 <a
   href={`/invoice/${order.id}`}
   target="_blank"
@@ -480,6 +481,14 @@ export default function OrdersPage() {
 >
   📄 Download Invoice
 </a>
+) : (
+  <button
+    disabled
+    className="w-full h-12 rounded-xl bg-gray-300 text-gray-600 cursor-not-allowed font-semibold"
+  >
+    📄 Invoice Unavailable
+  </button>
+)}
 
 {order.chatId ? (
 
@@ -596,7 +605,7 @@ export default function OrdersPage() {
 
           order.status === "Delivered"
 
-            ? "bg-green-100 text-green-700"
+            ? "bg-green-600 text-white"
 
           : order.status === "Out For Delivery"
 
@@ -616,7 +625,7 @@ export default function OrdersPage() {
 
           : order.status === "Cancelled"
 
-            ? "bg-red-100 text-red-700"
+            ? "bg-red-600 text-white"
 
           : "bg-yellow-100 text-yellow-700"
 
@@ -661,7 +670,7 @@ export default function OrdersPage() {
 
       <span className="font-semibold">
 
-        {order.expectedDelivery}
+      {new Date(order.expectedDelivery).toLocaleDateString("en-IN")}
 
       </span>
 
@@ -710,9 +719,7 @@ export default function OrdersPage() {
             order.trackingNumber
           );
 
-          alert(
-            "Tracking copied"
-          );
+         toast.success("Tracking number copied.");
 
         }}
         className="
@@ -749,14 +756,30 @@ export default function OrdersPage() {
     🚚 Order Tracking
   </h2>
 
+ {order.status === "Cancelled" ? (
+
+  <div className="bg-red-50 border border-red-200 rounded-3xl p-6">
+
+    <h3 className="text-xl font-bold text-red-700">
+      ❌ Order Cancelled
+    </h3>
+
+    <p className="mt-2 text-gray-600">
+      This order has been cancelled and will not be processed.
+    </p>
+
+  </div>
+
+) : (
+
   <div className="flex items-center justify-between">
 
-  {steps.map((step, index) => (
+    {steps.map((step, index) => (
 
-    <div
-      key={index}
-      className="flex items-center flex-1"
-    >
+      <div
+        key={index}
+        className="flex items-center flex-1"
+      >
 
       {/* Circle */}
 
@@ -812,9 +835,12 @@ export default function OrdersPage() {
 
     </div>
 
-  ))}
+   ))}
 
-</div>
+  </div>
+
+)}
+
 </div>
 {/* ORDERED PRODUCTS */}
 
@@ -880,7 +906,7 @@ export default function OrdersPage() {
                 {" "}
                 <span className="font-semibold">
 
-                  {item.vendorName || "Yogi Mart"}
+                 {item.vendorName || "YOMICO"}
 
                 </span>
 
@@ -977,7 +1003,7 @@ export default function OrdersPage() {
       <p className="mt-2 text-gray-600">
 
         Thank you for shopping with
-        Yogi Mart.
+       YOMICO.
 
       </p>
 

@@ -92,17 +92,43 @@ export default function VendorRegisterPage() {
       return;
     }
 
-    if (!/^\d{10}$/.test(formData.businessPhone)) {
-      alert("Enter valid 10 digit phone number");
-      return;
-    }
+   if (!/^\d{10}$/.test(formData.businessPhone)) {
+  alert("Enter valid 10 digit phone number");
+  return;
+}
 
-    if (!aadhaarDoc || !chequeDoc) {
-      alert(
-        "Please upload your Aadhaar Card and Cancelled Cheque for KYC verification"
-      );
-      return;
-    }
+// Aadhaar Validation
+if (
+  formData.aadhaarNumber &&
+  !/^\d{12}$/.test(formData.aadhaarNumber)
+) {
+  alert("Enter a valid 12-digit Aadhaar Number");
+  return;
+}
+
+// PAN Validation
+if (
+  formData.panNumber &&
+  !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber)
+) {
+  alert("Invalid PAN Number");
+  return;
+}
+
+// IFSC Validation
+if (
+  !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.ifsc)
+) {
+  alert("Invalid IFSC Code");
+  return;
+}
+
+if (!aadhaarDoc || !chequeDoc) {
+  alert(
+    "Please upload your Aadhaar Card and Cancelled Cheque for KYC verification"
+  );
+  return;
+}
 
     if (!formData.agreed) {
       alert("Please accept Terms & Conditions");
@@ -114,8 +140,8 @@ export default function VendorRegisterPage() {
 
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        formData.email.toLowerCase(),
-        formData.password
+        formData.email.trim().toLowerCase(),
+        formData.password.trim()
       );
 
       const uid = userCredential.user.uid;
@@ -128,7 +154,7 @@ export default function VendorRegisterPage() {
       await addDoc(collection(db, "vendors"), {
         uid,
         fullName: formData.fullName,
-        email: formData.email.toLowerCase(),
+        email: formData.email.trim().toLowerCase(),
         businessPhone: formData.businessPhone,
         businessName: formData.businessName,
         gstNumber: formData.gstNumber,
@@ -176,7 +202,7 @@ export default function VendorRegisterPage() {
       await signOut(auth);
       alert(
   "Vendor Registration Submitted.\n\nYour account is awaiting admin approval.");
-   window.location.href = "/vendor-login";
+   window.location.replace("/vendor-login");
 
     } catch (err: any) {
       if (err.code === "auth/email-already-in-use") {
@@ -199,11 +225,11 @@ export default function VendorRegisterPage() {
         <div className="text-center mb-6">
           <img
             src="/logo.png"
-            alt="Yogi Mart"
+           alt="YOMICO"
             className="w-60 mx-auto mb-3"
           />
           <p className="text-green-600 font-semibold">
-            Yogi Mart Seller Portal
+            YOMICO Seller Portal
           </p>
         </div>
 
@@ -211,7 +237,7 @@ export default function VendorRegisterPage() {
           <h1 className="text-5xl font-bold text-blue-600 mb-3">
             Become a Vendor
           </h1>
-          <p className="text-gray-500 text-lg">Start selling on Yogi Mart</p>
+          <p className="text-gray-500 text-lg">Start selling on YOMICO</p>
         </div>
 
         {/* BASIC */}
@@ -229,6 +255,7 @@ export default function VendorRegisterPage() {
             />
             <input
               type="email"
+               autoComplete="email"
               name="email"
               placeholder="Business Email"
               value={formData.email}
@@ -237,6 +264,7 @@ export default function VendorRegisterPage() {
             />
             <input
               type={showPassword ? "text" : "password"}
+               autoComplete="new-password"
               name="password"
               placeholder="Password"
               value={formData.password}
@@ -244,8 +272,10 @@ export default function VendorRegisterPage() {
               className="p-4 border rounded-2xl"
             />
             <input
-              type="text"
-              name="businessPhone"
+             type="tel"name="businessPhone"
+             inputMode="numeric"
+             maxLength={10}
+             autoComplete="tel"
               placeholder="Business Phone"
               value={formData.businessPhone}
               onChange={handleChange}
@@ -283,14 +313,19 @@ export default function VendorRegisterPage() {
               onChange={handleChange}
               className="p-4 border rounded-2xl"
             />
-            <input
-              type="text"
-              placeholder="PAN Number"
-              name="panNumber"
-              value={formData.panNumber}
-              onChange={handleChange}
-              className="w-full border p-4 rounded-2xl"
-            />
+           <input
+  type="text"
+  placeholder="PAN Number"
+  name="panNumber"
+  value={formData.panNumber}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      panNumber: e.target.value.toUpperCase(),
+    })
+  }
+  className="w-full border p-4 rounded-2xl"
+/>
             <input
               type="text"
               placeholder="Aadhaar Number"
@@ -337,7 +372,7 @@ export default function VendorRegisterPage() {
             />
             <input
               type="text"
-              name="zipCode"
+              name="zipCode" inputMode="numeric"maxLength={6}autoComplete="postal-code"
               placeholder="ZIP Code"
               value={formData.zipCode}
               onChange={handleChange}
@@ -359,7 +394,12 @@ export default function VendorRegisterPage() {
             <select
               name="city"
               value={formData.city}
-              onChange={handleChange}
+            onChange={(e) =>
+  setFormData({
+    ...formData,
+    gstNumber: e.target.value.toUpperCase(),
+  })
+}
               className="p-4 border rounded-2xl"
             >
               <option value="">Select City</option>
@@ -496,7 +536,7 @@ export default function VendorRegisterPage() {
 
         <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
           <p className="text-green-700 text-sm">
-            Your application will be reviewed by Yogi Mart before approval.
+            Your application will be reviewed by the YOMICO team before approval.
           </p>
         </div>
 

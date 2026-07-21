@@ -32,10 +32,10 @@ export default function VendorLoginPage() {
       setLoading(true);
 
       const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email.toLowerCase(),
-        password
-      );
+  auth,
+  email.trim().toLowerCase(),
+  password.trim()
+);
 
       const vendorQuery = query(
         collection(db, "vendors"),
@@ -102,11 +102,13 @@ localStorage.setItem(
 );
 
       alert("Vendor Login Successful");
-      router.push("/seller");
+     router.replace("/seller");
     } catch (err: any) {
       if (err.code === "auth/invalid-credential") {
         alert("Invalid email or password");
       } else {
+        alert("Unable to sign in. Please try again.");
+console.error(err);
         alert(err.message);
       }
     } finally {
@@ -120,13 +122,13 @@ localStorage.setItem(
         <div className="text-center mb-5">
           <img
             src="/logo.png"
-            alt="Yogi Mart"
+            alt="YOMICO"
             className="w-40 mx-auto mb-3"
           />
         </div>
 
         <p className="text-center text-green-600 font-semibold text-sm mb-2">
-          Yogi Mart Seller Portal
+          YOMICO Seller Portal
         </p>
 
         <h1 className="text-4xl font-bold text-center mb-3">Vendor Login</h1>
@@ -137,7 +139,7 @@ localStorage.setItem(
 
         <div className="space-y-5">
           <input
-            type="email"
+            type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off"
             placeholder="Business Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -145,7 +147,8 @@ localStorage.setItem(
           />
 
           <input
-            type={showPassword ? "text" : "password"}
+            type={showPassword ? "text" : "password"} 
+            autoComplete="current-password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -180,7 +183,7 @@ localStorage.setItem(
               : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500"
           }`}
         >
-          {loading ? "Logging In..." : "Vendor Login"}
+          {loading ? "Authenticating..." : "Vendor Login"}
         </button>
 
         <p className="text-center mt-5">

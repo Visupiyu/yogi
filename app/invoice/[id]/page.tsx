@@ -68,7 +68,7 @@ export default function InvoicePage(){
 
     return(
       <div className="p-10">
-        Loading...
+       Loading invoice...
       </div>
     );
 
@@ -77,9 +77,9 @@ export default function InvoicePage(){
   if(!order){
 
     return(
-      <div className="p-10">
-        Invoice Not Found
-      </div>
+      <div className="p-10 text-center text-gray-500">
+  Invoice not found.
+</div>
     );
 
   }
@@ -116,11 +116,11 @@ export default function InvoicePage(){
       text-4xl
       font-bold
     ">
-      YOGI MART
+      YOMICO
     </h1>
 
     <p className="text-gray-600">
-      Ahmedabad, Gujarat
+      Vadodara, Gujarat
     </p>
 
     <p className="text-gray-600">
@@ -141,6 +141,12 @@ export default function InvoicePage(){
     <p>
       #{order.id}
     </p>
+    <p>
+  Date:{" "}
+  {order.createdAt
+    ? order.createdAt.toDate().toLocaleDateString("en-IN")
+    : "-"}
+</p>
 
   </div>
 
@@ -240,50 +246,54 @@ export default function InvoicePage(){
 </thead>
         <tbody>
 
-          {order.items?.map(
-            (
-              item:any,
-              index:number
-            )=>(
+  {order.items && order.items.length > 0 ? (
 
-            <tr key={index}>
+    order.items.map(
+      (
+        item:any,
+        index:number
+      ) => (
 
-              <td className="
-  border
-  p-3
-">
-  {item.name}
-</td>
+        <tr key={index}>
 
-<td className="
-  border
-  p-3
-  text-center
-">
-  {item.qty}
-</td>
+          <td className="border p-3">
+            {item.name}
+          </td>
 
-<td className="
-  border
-  p-3
-  text-center
-">
-  ₹{item.price}
-</td>
+          <td className="border p-3 text-center">
+            {item.qty}
+          </td>
 
-<td className="
-  border
-  p-3
-  text-center
-">
-  ₹{item.price * item.qty}
-</td>
+          <td className="border p-3 text-center">
+            ₹{Number(item.price).toLocaleString("en-IN")}
+          </td>
 
-            </tr>
+          <td className="border p-3 text-center">
+            ₹{Number(item.price * item.qty).toLocaleString("en-IN")}
+          </td>
 
-          ))}
+        </tr>
 
-        </tbody>
+      )
+
+    )
+
+  ) : (
+
+    <tr>
+
+      <td
+        colSpan={4}
+        className="border p-6 text-center text-gray-500"
+      >
+        No items found.
+      </td>
+
+    </tr>
+
+  )}
+
+</tbody>
 
       </table>
 
@@ -301,13 +311,22 @@ export default function InvoicePage(){
           GST (18%):
           ₹{gst}
         </p>
+        <p>
+  Payment Method:
+  {order.paymentMethod || "-"}
+</p>
+
+<p>
+  Payment Status:
+  {order.paymentStatus || "-"}
+</p>
 
         <h2 className="
           text-2xl
           font-bold
         ">
           Grand Total:
-          ₹{order.total}
+          ₹{Number(order.total).toLocaleString("en-IN")}
         </h2>
 
       </div>
@@ -318,17 +337,18 @@ export default function InvoicePage(){
           window.print()
         }
 
-        className="
-          mt-8
-          bg-black
-          text-white
-          px-6
-          py-3
-          rounded-xl
-        "
+         className="
+    mt-8
+    bg-black
+    text-white
+    px-6
+    py-3
+    rounded-xl
+    print:hidden
+  "
       >
 
-        Print Invoice
+       🖨️ Print Invoice
 
       </button>
 

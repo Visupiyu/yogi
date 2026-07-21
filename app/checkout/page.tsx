@@ -43,6 +43,9 @@ export default function CheckoutPage() {
     setItems(storedItems);
 
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
+    setName(userData.name || "");
+setPhone(userData.phone || "");
+setAddress(userData.address || "");
     setAvailablePoints(Number(userData.rewardPoints || 0));
   }, []);
 
@@ -201,6 +204,8 @@ export default function CheckoutPage() {
       currentPoints + earnedPoints - rewardValue
     );
     localStorage.setItem("user", JSON.stringify(user));
+    user.name = name; user.phone = phone; user.address = address;
+localStorage.setItem( "user", JSON.stringify(user));
 
     // Reward transactions (must include userId to satisfy Firestore rules)
     await addDoc(collection(db, "rewardTransactions"), {
@@ -318,7 +323,7 @@ export default function CheckoutPage() {
       key: process.env.NEXT_PUBLIC_RAZORPAY_KEY,
       amount: data.amount,
       currency: data.currency,
-      name: "Yogi Mart",
+      name: "YOMICO",
       description: "Marketplace Payment",
       order_id: data.id,
       handler: async function (rzp: any) {
@@ -388,7 +393,7 @@ export default function CheckoutPage() {
   </h1>
 
   <p className="mt-2 text-lg opacity-90">
-    Complete your purchase safely with Yogi Mart
+    Complete your purchase safely with YOMICO
   </p>
 
 </div>      
@@ -448,36 +453,40 @@ Please enter your shipping details.
                  👤 Full Name
                   </label>
                   <input
-                    type="text"
-                    placeholder="Enter your full name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
-                  />
+  type="text"
+  autoComplete="name"
+  placeholder="Enter your full name"
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
+/>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
                  📞 Phone Number
                   </label>
                   <input
-                    type="tel"
-                    placeholder="10 digit mobile number"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
-                  />
+  type="tel"
+  maxLength={10}
+  inputMode="numeric"
+  placeholder="10 digit mobile number"
+  value={phone}
+  onChange={(e) => setPhone(e.target.value)}
+  className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
+/>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
                  🏠 Delivery Address
                   </label>
                   <textarea
-                    placeholder="House no, street, area, city, state, PIN"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    rows={4}
-                    className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
-                  />
+  placeholder="House no, street, area, city, state, PIN"
+  value={address}
+  autoComplete="street-address"
+  onChange={(e) => setAddress(e.target.value)}
+  rows={4}
+  className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
+/>
                 </div>
               </div>
             </div>

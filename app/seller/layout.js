@@ -43,10 +43,10 @@ useEffect(() => {
       <aside className="w-64 shrink-0 bg-gradient-to-b from-green-700 to-blue-700 text-white flex flex-col sticky top-0 h-screen">
         <div className="p-5 text-center border-b border-white/10">
           <img
-            src="/logo.png"
-            alt="Yogi Mart"
-            className="w-32 mx-auto mb-2"
-          />
+  src="/logo.png"
+  alt="YOMICO"
+  className="w-32 mx-auto mb-2"
+/>
           <h1 className="text-xl font-bold">Seller Panel</h1>
           <p className="text-sm opacity-80 mt-2">🟢 Online</p>
         </div>

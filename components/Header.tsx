@@ -20,23 +20,25 @@ export default function Header() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [suggestions, setSuggestions] = useState<Product[]>([]);
-
+  const [searched, setSearched] = useState(false);
   useEffect(() => {
-    if (search.trim().length < 2) {
-      setSuggestions([]);
-      return;
-    }
+   if (search.trim().length < 2) {
+  setSuggestions([]);
+  setSearched(false);
+  return;
+}
 
     // Debounce so we don't read the whole collection on every keystroke
-    const t = setTimeout(async () => {
+    const t = setTimeout(async () => {setSearched(true);
       try {
         const snapshot = await getDocs(collection(db, "products"));
         const items: Product[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
           if (
-            data.name?.toLowerCase().includes(search.toLowerCase())
-          ) {
+  data.name?.toLowerCase().includes(search.toLowerCase()) &&
+  Number(data.stock || 0) > 0
+) {
             items.push({
               id: doc.id,
               name: data.name || "",
@@ -69,7 +71,7 @@ export default function Header() {
           {/* LOGO */}
           <Link href="/">
             <h1 className="text-2xl font-extrabold text-green-600 whitespace-nowrap">
-              Yogi Mart
+              YOMICO
             </h1>
           </Link>
 
@@ -78,7 +80,7 @@ export default function Header() {
             <div className="w-full relative">
               <input
                 type="text"
-                placeholder="Search products..."
+                placeholder="Search on YOMICO..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -93,32 +95,40 @@ export default function Header() {
                 <Search size={18} />
               </button>
 
-              {suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-white rounded-2xl shadow-xl mt-2 overflow-hidden z-50">
-                  {suggestions.map((product) => (
-                    <Link
-                      key={product.id}
-                      href={`/product/${product.id}`}
-                      onClick={() => setSuggestions([])}
-                      className="flex items-center gap-4 p-3 hover:bg-gray-100"
-                    >
-                      <img
-                        src={product.image || "/no-image.png"}
-                        alt=""
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-green-600 font-bold">
-                          ₹{product.price?.toLocaleString("en-IN")}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
+             {searched && (
+  <div className="absolute top-full left-0 right-0 bg-white rounded-2xl shadow-xl mt-2 overflow-hidden z-50">
+    {suggestions.length > 0 ? (
+      suggestions.map((product) => (
+        <Link
+          key={product.id}
+          href={`/product/${product.id}`}
+          onClick={() => setSuggestions([])}
+          className="flex items-center gap-4 p-3 hover:bg-gray-100"
+        >
+          <img
+            src={product.image || "/no-image.png"}
+            alt=""
+            className="w-12 h-12 rounded-lg object-cover"
+          />
+
+          <div>
+            <p className="font-medium">{product.name}</p>
+
+            <p className="text-green-600 font-bold">
+              ₹{product.price?.toLocaleString("en-IN")}
+            </p>
           </div>
+        </Link>
+      ))
+    ) : (
+      <div className="p-4 text-center text-gray-500">
+        No matching products found.
+      </div>
+    )}
+  </div>
+)}
+</div>
+</div>
 
           {/* RIGHT SIDE */}
           <div className="flex items-center gap-5">

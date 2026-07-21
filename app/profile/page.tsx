@@ -12,7 +12,8 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged,} from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 
 export default function ProfilePage() {
@@ -104,7 +105,7 @@ export default function ProfilePage() {
         { merge: true }
       );
 
-      const updated = { ...user, name: fullName, phone };
+      const updated = { ...user, name: fullName, phone, address };
       localStorage.setItem("user", JSON.stringify(updated));
       setUser(updated);
       alert("Profile saved");
@@ -116,10 +117,11 @@ export default function ProfilePage() {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("user");
-    router.push("/login");
-  };
+ const logout = async () => {
+  await signOut(auth);
+  localStorage.removeItem("user");
+  router.push("/login");
+};
 
   const memberTier =
     rewardPoints >= 500
@@ -166,7 +168,7 @@ export default function ProfilePage() {
             </div>
             <div className="flex-1">
               <h1 className="text-3xl font-bold">
-                {fullName || "My Account"}
+                {fullName || "Welcome to YOMICO"}
               </h1>
               <p className="mt-1 opacity-90">{user?.email || "Customer"}</p>
               <p className="mt-1 opacity-90">
@@ -194,6 +196,7 @@ export default function ProfilePage() {
               <p className="text-sm opacity-90">🏆 Reward Wallet</p>
               <h2 className="text-4xl font-bold mt-1">🏆 {rewardPoints}</h2>
               <p className="text-sm opacity-90 mt-1">points available</p>
+              <p className="text-sm opacity-90">≈ ₹{rewardPoints} redeemable</p>
             </div>
             <div className="text-right">
               <p className="font-semibold">
@@ -234,7 +237,7 @@ export default function ProfilePage() {
     <h2 className="text-3xl font-bold mt-2">
       ❤️
     </h2>
-  </div>
+    </div>
 
   <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
     <p className="text-gray-500 text-sm">Member</p>
@@ -268,7 +271,7 @@ export default function ProfilePage() {
                 Full Name
               </label>
               <input
-                type="text"
+                type="text" autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Your full name"
@@ -281,7 +284,7 @@ export default function ProfilePage() {
                 Mobile Number
               </label>
               <input
-                type="tel"
+                type="tel" maxLength={10} inputMode="numeric" autoComplete="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="10 digit mobile number"
@@ -316,7 +319,7 @@ export default function ProfilePage() {
                 Delivery Address
               </label>
               <textarea
-                value={address}
+                value={address} autoComplete="street-address"
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="House no, street, city, state, PIN"
                 className="w-full p-3.5 border rounded-xl h-28 outline-none focus:ring-2 focus:ring-green-500 transition"
@@ -364,12 +367,11 @@ export default function ProfilePage() {
                       <p className="font-semibold">
                         Order #{order.id.slice(0, 8)}
                       </p>
-                      <p className="text-sm text-gray-500">
-                        ₹
-                        {(order.finalTotal || order.total)?.toLocaleString(
-                          "en-IN"
-                        )}
-                      </p>
+                     <p className="text-sm text-gray-500">
+  ₹
+  {(order.finalTotal || order.total)?.toLocaleString("en-IN")}</p>
+<p className="text-xs text-gray-400">{order.createdAt?.seconds ? new Date( order.createdAt.seconds * 1000
+      ).toLocaleDateString("en-IN"): "-"} </p>
                     </div>
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColor(

@@ -92,9 +92,12 @@ export default function AdminDeliveryPage() {
   ).length;
 
   const filtered = deliveries.filter((item) => {
-    const searchMatch =
-      item.customerName.toLowerCase().includes(search.toLowerCase()) ||
-      item.id.toLowerCase().includes(search.toLowerCase());
+  const searchMatch =
+  item.customerName.toLowerCase().includes(search.toLowerCase()) ||
+  item.id.toLowerCase().includes(search.toLowerCase()) ||
+  (item.trackingNumber || "")
+    .toLowerCase()
+    .includes(search.toLowerCase());
     const statusMatch = statusFilter === "All" || item.status === statusFilter;
     return searchMatch && statusMatch;
   });
@@ -142,7 +145,9 @@ export default function AdminDeliveryPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "delivery-report.csv";
+   a.download = `delivery-report-${new Date()
+  .toISOString()
+  .split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -218,7 +223,7 @@ export default function AdminDeliveryPage() {
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-3xl p-10 text-center">Loading...</div>
+          <div className="bg-white rounded-3xl p-10 text-center">Loading deliveries...</div>
         ) : (
           <div className="space-y-4">
             {filtered.map((order) => (
@@ -244,7 +249,7 @@ export default function AdminDeliveryPage() {
                             : order.status === "Out For Delivery"
                             ? "bg-blue-100 text-blue-700"
                             : order.status === "Delivery Failed"
-                            ? "bg-red-100 text-red-700"
+                             ? "bg-red-600 text-white"
                             : "bg-yellow-100 text-yellow-700"
                         }`}
                       >
@@ -256,18 +261,25 @@ export default function AdminDeliveryPage() {
                   <div className="text-right">
                     <p>🚚 {order.deliveryPartnerName || order.courierPartner || "Not Assigned"}</p>
                     <p>📍 {order.trackingNumber}</p>
-                    <p>📅 {order.expectedDelivery}</p>
-
+                  <p>📅{" "} {order.expectedDelivery &&  order.expectedDelivery !== "-"
+                   ? new Date(order.expectedDelivery).toLocaleDateString("en-IN") : "-"} </p>
                     <select
-                      className="mt-3 border rounded-lg p-2 w-full"
-                      defaultValue=""
-                      onChange={(e) => {
-                        const partner = partners.find(
-                          (p) => p.id === e.target.value
-                        );
-                        if (partner) assignPartner(order.id, partner);
-                      }}
-                    >
+  className="mt-3 border rounded-lg p-2 w-full"
+  defaultValue=""
+  disabled={order.status === "Delivered"}
+  onChange={(e) => {
+    const partner = partners.find(
+      (p) => p.id === e.target.value
+    );
+
+    if (
+      partner &&
+      confirm(`Assign ${partner.name} to this order?`)
+    ) {
+      assignPartner(order.id, partner);
+    }
+  }}
+>
                       <option value="">Assign Delivery Partner</option>
                       {partners.map((partner) => (
                         <option key={partner.id} value={partner.id}>
@@ -290,7 +302,7 @@ export default function AdminDeliveryPage() {
       </div>
 
       <div className="text-center py-8 text-gray-500">
-        Delivery Management powered by Yogi Mart
+       Delivery Management powered by YOMICO
       </div>
     </div>
   );

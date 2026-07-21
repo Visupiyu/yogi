@@ -16,10 +16,22 @@ export default function AdminKYCPage() {
     try {
       const snapshot = await getDocs(collection(db, "vendors"));
       const items: any[] = [];
-      snapshot.forEach((docSnap) =>
-        items.push({ id: docSnap.id, ...docSnap.data() })
-      );
-      setVendors(items);
+     snapshot.forEach((docSnap) =>
+  items.push({ id: docSnap.id, ...docSnap.data() })
+);
+
+items.sort((a, b) => {
+  const statusA = a.kycStatus || "Pending";
+  const statusB = b.kycStatus || "Pending";
+
+  if (statusA === statusB) return 0;
+  if (statusA === "Pending") return -1;
+  if (statusB === "Pending") return 1;
+
+  return 0;
+});
+
+setVendors(items);
     } catch (error) {
       console.error(error);
     } finally {
@@ -54,7 +66,7 @@ export default function AdminKYCPage() {
         </div>
 
         {loading ? (
-          <div className="bg-white p-8 rounded-3xl">Loading...</div>
+          <div className="bg-white p-8 rounded-3xl">Loading vendor KYC records...Loading vendor KYC records...</div>
         ) : vendors.length === 0 ? (
           <div className="bg-white p-10 rounded-3xl text-center text-gray-500">
             No vendors found.
@@ -70,6 +82,7 @@ export default function AdminKYCPage() {
                   <th className="text-left">Aadhaar</th>
                   <th className="text-left">KYC Status</th>
                   <th className="text-left">Action</th>
+                  <th className="text-left">Email</th>
                 </tr>
               </thead>
               <tbody>
@@ -82,13 +95,14 @@ export default function AdminKYCPage() {
                     <td>{vendor.gstNumber || "-"}</td>
                     <td>{vendor.panNumber || "-"}</td>
                     <td>{vendor.aadhaarNumber || "-"}</td>
+                    <td>{vendor.email || "-"}</td>
                     <td>
                       <span
                         className={`px-3 py-1 rounded-full text-sm font-semibold ${
                           vendor.kycStatus === "Approved"
-                            ? "bg-green-100 text-green-700"
+                            ? "bg-green-100 text-white"
                             : vendor.kycStatus === "Rejected"
-                            ? "bg-red-100 text-red-700"
+                            ? "bg-red-600 text-white"
                             : "bg-yellow-100 text-yellow-700"
                         }`}
                       >
@@ -98,16 +112,18 @@ export default function AdminKYCPage() {
                     <td>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => updateKYC(vendor.id, "Approved")}
-                          className="bg-green-600 hover:bg-green-700 transition text-white px-4 py-2 rounded-lg"
-                        >
-                          Approve
-                        </button>
+  onClick={() => updateKYC(vendor.id, "Approved")}
+  disabled={vendor.kycStatus === "Approved"}
+  className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-white px-4 py-2 rounded-lg"
+>
+  Approve
+</button>
                         <button
-                          onClick={() => updateKYC(vendor.id, "Rejected")}
-                          className="bg-red-600 hover:bg-red-700 transition text-white px-4 py-2 rounded-lg"
-                        >
-                          Reject
+  onClick={() => updateKYC(vendor.id, "Rejected")}
+  disabled={vendor.kycStatus === "Rejected"}
+  className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-white px-4 py-2 rounded-lg"
+>
+  Reject
                         </button>
                       </div>
                     </td>
@@ -120,7 +136,7 @@ export default function AdminKYCPage() {
       </div>
 
       <div className="text-center py-8 text-gray-500">
-        Vendor KYC verification for Yogi Mart.
+      Vendor KYC verification for YOMICO.
       </div>
     </div>
   );

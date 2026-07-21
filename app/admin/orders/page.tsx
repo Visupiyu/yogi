@@ -54,8 +54,7 @@ export default function AdminOrdersPage() {
           paymentMethod: data.paymentMethod || "",
           paymentStatus: data.paymentStatus || "",
           status: data.status || "Pending",
-          createdAt:
-            data.createdAt?.toDate?.()?.toLocaleDateString() || "-",
+          createdAt: data.createdAt || null,
           courierName: data.courierName || "",
           trackingNumber: data.trackingNumber || "",
           expectedDelivery: data.expectedDelivery || "",
@@ -63,7 +62,8 @@ export default function AdminOrdersPage() {
       });
       // newest-ish: sort by original timestamp if present is lost after formatting,
       // so leave insertion order; admin can search/filter.
-      setOrders(items);
+     items.sort((a, b) =>(b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0) );
+setOrders(items);
     } catch (error) {
       console.error("Failed to load orders:", error);
     } finally {
@@ -127,12 +127,17 @@ export default function AdminOrdersPage() {
       console.error(error);
     }
   };
-
-  const filtered = orders.filter(
-    (order) =>
-      order.id.toLowerCase().includes(search.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(search.toLowerCase())
-  );
+const filtered = orders.filter(
+  (order) =>
+    order.id.toLowerCase().includes(search.toLowerCase()) ||
+    order.customerName.toLowerCase().includes(search.toLowerCase()) ||
+    (order.userEmail || "")
+      .toLowerCase()
+      .includes(search.toLowerCase()) ||
+    (order.trackingNumber || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
+);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -173,7 +178,7 @@ export default function AdminOrdersPage() {
 
         <input
           type="text"
-          placeholder="Search Order ID or Customer..."
+          placeholder="Search Order ID, Customer, Email or Tracking Number..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full border p-4 rounded-3xl shadow-lg mb-6"
@@ -224,9 +229,9 @@ export default function AdminOrdersPage() {
                         <span
                           className={`px-3 py-1 rounded-full text-sm font-semibold ${
                             order.status === "Delivered"
-                              ? "bg-green-100 text-green-700"
-                              : order.status === "Cancelled"
-                              ? "bg-red-100 text-red-700"
+                              ? "bg-green-600 text-white"
+                              :order.status === "Cancelled"
+                               ? "bg-red-600 text-white"
                               : order.status === "Out For Delivery"
                               ? "bg-blue-100 text-blue-700"
                               : "bg-yellow-100 text-yellow-700"
@@ -255,11 +260,13 @@ export default function AdminOrdersPage() {
                           />
                         </div>
 
-                        <select
-                          value={order.status}
-                          onChange={(e) =>
-                            updateStatus(order.id, e.target.value)
-                          }
+                       <select
+  value={order.status}
+  onChange={(e) => {const value = e.target.value;
+    if (value === "Cancelled" && !confirm("Are you sure you want to cancel this order?")
+    ) {return;}
+    updateStatus(order.id, value);
+  }}
                           className="border p-2 rounded-lg mt-2"
                         >
                           <option>Pending</option>
@@ -271,14 +278,12 @@ export default function AdminOrdersPage() {
                           <option>Cancelled</option>
                         </select>
                       </td>
-                      <td>{order.createdAt}</td>
+                      <td>{order.createdAt ? order.createdAt.toDate().toLocaleDateString("en-IN"): "-"}</td>
                       <td>
                         <input
                           type="text"
                           defaultValue={order.courierName || ""}
-                          onBlur={(e) =>
-                            updateShipping(order.id, "courierName", e.target.value)
-                          }
+                         onBlur={(e) => updateShipping( order.id, "courierName", e.target.value.trim() )}
                           className="border p-2 rounded-lg w-32"
                         />
                       </td>
@@ -286,19 +291,14 @@ export default function AdminOrdersPage() {
                         <input
                           type="text"
                           defaultValue={order.trackingNumber || ""}
-                          onBlur={(e) =>
-                            updateShipping(
-                              order.id,
-                              "trackingNumber",
-                              e.target.value
-                            )
-                          }
+                        onBlur={(e) => updateShipping(order.id,"trackingNumber", e.target.value.trim())}
                           className="border p-2 rounded-lg w-40"
                         />
                       </td>
                       <td>
                         <input
                           type="date"
+                          min={new Date().toISOString().split("T")[0]}
                           defaultValue={order.expectedDelivery || ""}
                           onBlur={(e) =>
                             updateShipping(
@@ -311,6 +311,7 @@ export default function AdminOrdersPage() {
                         />
                       </td>
                       <td>
+                        {order.paymentStatus === "Paid" ? (
                         <a
                           href={`/invoice/${order.id}`}
                           target="_blank"
@@ -319,6 +320,7 @@ export default function AdminOrdersPage() {
                         >
                           Invoice
                         </a>
+                        ) : (<span className="bg-gray-300 text-gray-600 px-3 py-2 rounded-lg inline-block">Unpaid</span>)}
                       </td>
                     </tr>
                   ))
@@ -330,7 +332,7 @@ export default function AdminOrdersPage() {
       </div>
 
       <div className="text-center py-8 text-gray-500">
-        Order Management powered by Yogi Mart
+        Order Management powered by YOMICO
       </div>
     </div>
   );
