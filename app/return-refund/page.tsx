@@ -1,3 +1,9 @@
+import Link from "next/link";
+export const metadata = {
+  title: "Return & Refund Policy | YOMICO",
+  description:
+    "Read YOMICO's Return & Refund Policy, including eligibility, refunds, replacements, cancellations, and seller responsibilities.",
+};
 export default function ReturnRefundPolicyPage() {
 
   return (
@@ -13,12 +19,17 @@ export default function ReturnRefundPolicyPage() {
         <p className="text-center text-gray-500 mb-8">
           Last Updated: July 2026
         </p>
+        <p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
+  This Return & Refund Policy explains the eligibility, process, and
+  conditions for returns, replacements, cancellations, and refunds on
+  YOMICO.
+</p>
 
         <div className="bg-white p-8 rounded-2xl shadow space-y-6">
 
           <p>
 
-            At Yogi-Mart, customer satisfaction is important to us. This
+            At YOMICO, customer satisfaction is important to us. This
             Return & Refund Policy explains the conditions under which
             products may be returned, replaced, or refunded.
 
@@ -88,6 +99,19 @@ export default function ReturnRefundPolicyPage() {
               option used.
 
             </p>
+            <div>
+
+  <h2 className="text-2xl font-bold mb-2">
+    Refund Timeline
+  </h2>
+
+  <p>
+    Once a refund is approved, it is typically processed within
+    5–10 business days. The exact time may vary depending on your
+    payment method and financial institution.
+  </p>
+
+</div>
 
           </div>
 
@@ -115,7 +139,7 @@ export default function ReturnRefundPolicyPage() {
 
             <p>
 
-              Sellers are responsible for cooperating with Yogi-Mart in the
+              Sellers are responsible for cooperating with YOMICO in the
               return, replacement, and refund process and resolving genuine
               customer issues promptly.
 
@@ -132,25 +156,26 @@ export default function ReturnRefundPolicyPage() {
             <p>
 
               Depending on the reason for the return, return shipping may
-              be arranged by Yogi-Mart, the seller, or the customer in
+              be arranged by YOMICO, the seller, or the customer in
               accordance with the applicable return policy.
 
             </p>
 
           </div>
 
-           <h2 className="text-2xl font-bold mb-2">
-              8. Cancellation Before Dispatch
-            </h2>
+           <div>
 
-            <p>
+  <h2 className="text-2xl font-bold mb-2">
+    8. Cancellation Before Dispatch
+  </h2>
 
-              Orders may generally be cancelled before they are packed or
-              shipped. Once dispatched, cancellation may no longer be
-              possible and the Return Policy will apply instead.
+  <p>
+    Orders may generally be cancelled before they are packed or
+    shipped. Once dispatched, cancellation may no longer be
+    possible and the Return Policy will apply instead.
+  </p>
 
-            </p>
-
+</div>
           </div>
 
 
@@ -162,7 +187,7 @@ export default function ReturnRefundPolicyPage() {
 
             <p>
 
-              Yogi-Mart reserves the right to reject fraudulent, abusive,
+              YOMICO reserves the right to reject fraudulent, abusive,
               or repeated return requests that violate marketplace
               policies.
 
@@ -179,18 +204,35 @@ export default function ReturnRefundPolicyPage() {
             <p>
 
               If you have questions regarding returns or refunds, please
-              contact the Yogi-Mart Support Team through the Contact Us
+              contact the YOMICO Support Team through the Contact Us
               page.
 
             </p>
 
           </div>
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+
+  <h3 className="text-2xl font-bold mb-2">
+    Need Help With a Return?
+  </h3>
+
+  <p className="text-gray-600 mb-4">
+    If you have questions about returns, refunds, or replacements,
+    our support team is here to help.
+  </p>
+
+  <Link
+    href="/contact"
+    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+  >
+    Contact Support
+  </Link>
+
+</div>
 
         </div>
 
       </div>
-
-    
 
   );
 

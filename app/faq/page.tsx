@@ -1,3 +1,9 @@
+import Link from "next/link";
+export const metadata = {
+  title: "Frequently Asked Questions | YOMICO",
+  description:
+    "Find answers to common questions about shopping, selling, payments, orders, and support on YOMICO.",
+};
 export default function FAQPage() {
 
   const faqs = [
@@ -11,7 +17,7 @@ export default function FAQPage() {
     {
       question: "How can I become a seller?",
       answer:
-        "Click on 'Vendor Register' and complete the registration process."
+        "Click on Vendor Register, complete the registration process, and wait for your account to be reviewed and approved before you can start selling."
     },
 
     {
@@ -35,7 +41,7 @@ export default function FAQPage() {
     {
       question: "Can I cancel an order?",
       answer:
-        "Orders can be cancelled before they are shipped."
+        "Orders can be cancelled before they are shipped. Once shipped, you may be eligible for a return according to our Cancellation and Return Policy."
     },
 
  {
@@ -43,7 +49,7 @@ export default function FAQPage() {
     "Can I return a product?",
 
   answer:
-    "Yes. Eligible products can be returned according to our return policy."
+    "Yes. Eligible products can be returned within the applicable return period. Please refer to our Return Policy for complete details."
 },
 
 {
@@ -51,7 +57,7 @@ export default function FAQPage() {
     "When do vendors receive payouts?",
 
   answer:
-    "Vendor payouts are processed according to the Yogi-Mart payout schedule."
+    "Vendor payouts are processed according to the YOMICO payout schedule."
 },
 
 {
@@ -74,9 +80,13 @@ export default function FAQPage() {
           Frequently Asked Questions
         </h1>
 
-        <p className="text-center text-gray-600 mb-12">
-          Find answers to the most common questions about Yogi-Mart.
-        </p>
+        <p className="text-center text-gray-500 mb-4">
+  Last Updated: July 2026
+</p>
+<p className="text-center text-gray-600 max-w-3xl mx-auto mb-12">
+  Browse answers to the most frequently asked questions about shopping,
+  selling, payments, returns, and account management on YOMICO.
+</p>
 
         <div className="space-y-6">
 
@@ -107,6 +117,25 @@ export default function FAQPage() {
             </div>
 
           ))}
+
+          <div className="mt-12 bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+
+  <h2 className="text-2xl font-bold mb-2">
+    Didn't Find Your Answer?
+  </h2>
+
+  <p className="text-gray-600 mb-4">
+    Our support team is here to help with any additional questions.
+  </p>
+
+  <Link
+    href="/contact"
+    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+  >
+    Contact Support
+  </Link>
+
+</div>
 
         </div>
 

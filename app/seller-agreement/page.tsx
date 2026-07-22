@@ -1,3 +1,10 @@
+import Link from "next/link";
+
+export const metadata = {
+  title: "Seller Agreement | YOMICO",
+  description:
+    "Read the YOMICO Seller Agreement, including seller responsibilities, payouts, product compliance, and marketplace policies.",
+};
 export default function SellerAgreementPage() {
 
   return (
@@ -14,11 +21,16 @@ export default function SellerAgreementPage() {
           Last Updated: July 2026
         </p>
 
+        <p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
+  This Seller Agreement outlines the rights, responsibilities, and
+  obligations of sellers using the YOMICO marketplace.
+</p>
+
         <div className="bg-white p-8 rounded-2xl shadow space-y-6">
 
          <p>
 
-Welcome to Yogi-Mart. This Seller Agreement governs the relationship between Yogi-Mart and every seller who lists or sells products on the marketplace.
+Welcome to YOMICO. This Seller Agreement governs the relationship between YOMICO and every seller who lists or sells products on the marketplace.
 
 </p>
 
@@ -64,7 +76,7 @@ Sellers are responsible for maintaining accurate product listings, pricing, stoc
 
 <p>
 
-All products listed on Yogi-Mart must be genuine, legally permitted for sale, and comply with applicable consumer protection, GST, and product safety regulations.
+All products listed on YOMICO must be genuine, legally permitted for sale, and comply with applicable consumer protection, GST, and product safety regulations.
 
 </p>
 
@@ -96,7 +108,7 @@ Sellers must process confirmed orders promptly, dispatch products within the pro
 
 <p>
 
-Seller payouts will be processed according to Yogi-Mart's payout schedule after applicable marketplace fees, taxes, refunds, or other adjustments.
+Seller payouts will be processed according to YOMICO's payout schedule after applicable marketplace fees, taxes, refunds, or other adjustments.
 
 </p>
 
@@ -104,15 +116,30 @@ Seller payouts will be processed according to Yogi-Mart's payout schedule after 
 
 <div>
 
+  <div>
+
+  <h2 className="text-2xl font-bold mb-2">
+    6. Marketplace Fees
+  </h2>
+
+  <p>
+    Sellers agree to pay applicable marketplace commissions, payment
+    processing charges, taxes, and any other fees communicated by
+    YOMICO. Fee structures may be updated from time to time with
+    appropriate notice.
+  </p>
+
+</div>
+
 <h2 className="text-2xl font-bold mb-2">
 
-6. Returns & Refunds
+7. Returns & Refunds
 
 </h2>
 
 <p>
 
-Sellers agree to follow the Yogi-Mart Return & Refund Policy and cooperate in resolving customer issues fairly and promptly.
+Sellers agree to follow the YOMICO Return & Refund Policy and cooperate in resolving customer issues fairly and promptly.
 
 </p>
 
@@ -122,13 +149,13 @@ Sellers agree to follow the Yogi-Mart Return & Refund Policy and cooperate in re
 
 <h2 className="text-2xl font-bold mb-2">
 
-7. Suspension or Termination
+8. Suspension or Termination
 
 </h2>
 
 <p>
 
-Yogi-Mart may suspend or terminate seller accounts for fraud, counterfeit products, repeated policy violations, abusive conduct, or any activity that harms customers or the marketplace.
+YOMICO may suspend or terminate seller accounts for fraud, counterfeit products, repeated policy violations, abusive conduct, or any activity that harms customers or the marketplace.
 
 </p>
 
@@ -138,13 +165,13 @@ Yogi-Mart may suspend or terminate seller accounts for fraud, counterfeit produc
 
 <h2 className="text-2xl font-bold mb-2">
 
-8. Limitation of Liability
+9. Limitation of Liability
 
 </h2>
 
 <p>
 
-Yogi-Mart provides the marketplace platform but does not manufacture or own products sold by independent sellers. Sellers remain responsible for their products and legal obligations.
+YOMICO provides the marketplace platform but does not manufacture or own products sold by independent sellers. Sellers remain responsible for their products and legal obligations.
 
 </p>
 
@@ -154,7 +181,7 @@ Yogi-Mart provides the marketplace platform but does not manufacture or own prod
 
 <h2 className="text-2xl font-bold mb-2">
 
-9. Governing Law
+10. Governing Law
 
 </h2>
 
@@ -170,15 +197,33 @@ This Seller Agreement shall be governed by the laws of India, and disputes shall
 
 <h2 className="text-2xl font-bold mb-2">
 
-10. Seller Support
+11. Seller Support
 
 </h2>
 
 <p>
 
-For questions regarding this Seller Agreement, please contact the Yogi-Mart Seller Support Team through the Contact Us page.
+For questions regarding this Seller Agreement, please contact the YOMICO Seller Support Team through the Contact Us page.
 
 </p>
+
+</div>
+<div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+
+  <h3 className="text-2xl font-bold mb-2">
+    Need Help as a Seller?
+  </h3>
+
+  <p className="text-gray-600 mb-4">
+    If you have questions about your seller account, payouts, or marketplace policies, our support team is here to help.
+  </p>
+
+  <Link
+    href="/contact"
+    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+  >
+    Contact Seller Support
+  </Link>
 
 </div>
 

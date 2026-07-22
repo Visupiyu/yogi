@@ -1,7 +1,13 @@
+import Link from "next/link";
+
+export const metadata = {
+  title: "Cookie Policy | YOMICO",
+  description:
+    "Learn how YOMICO uses cookies to improve security, functionality, and your shopping experience.",
+};
+
 export default function CookiePolicyPage() {
-
   return (
-
     <div className="min-h-screen bg-gray-50">
 
       <div className="max-w-5xl mx-auto px-4 py-12">
@@ -13,12 +19,17 @@ export default function CookiePolicyPage() {
         <p className="text-center text-gray-500 mb-8">
           Last Updated: July 2026
         </p>
+        <p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
+  This Cookie Policy explains how YOMICO uses cookies and similar
+  technologies to improve your browsing experience, enhance website
+  performance, and provide secure marketplace services.
+</p>
 
         <div className="bg-white p-8 rounded-2xl shadow space-y-6">
 
           <p>
 
-            This Cookie Policy explains how Yogi-Mart uses cookies and
+            This Cookie Policy explains how YOMICO uses cookies and
             similar technologies to improve your browsing experience,
             provide essential website functionality, and enhance our
             marketplace services.
@@ -49,7 +60,7 @@ export default function CookiePolicyPage() {
 
             <p>
 
-              Yogi-Mart uses cookies to maintain user sessions,
+              YOMICO uses cookies to maintain user sessions,
               remember preferences, improve website performance,
               personalize your experience, and analyze website usage.
 
@@ -65,15 +76,15 @@ export default function CookiePolicyPage() {
 
             <ul className="list-disc ml-6 space-y-2">
 
-              <li>Essential Cookies</li>
+              <li><strong>Essential Cookies:</strong> Required for login, shopping cart, and secure website functionality.</li>
 
-              <li>Performance Cookies</li>
+<li><strong>Performance Cookies:</strong> Help improve website speed and reliability.</li>
 
-              <li>Analytics Cookies</li>
+<li><strong>Analytics Cookies:</strong> Measure visitor activity to improve user experience.</li>
 
-              <li>Preference Cookies</li>
+<li><strong>Preference Cookies:</strong> Remember language, theme, and other user preferences.</li>
 
-              <li>Security Cookies</li>
+<li><strong>Security Cookies:</strong> Protect user accounts and help prevent fraudulent activity.</li>
 
             </ul>
 
@@ -92,6 +103,11 @@ export default function CookiePolicyPage() {
               services, may place cookies as part of their services.
 
             </p>
+            <p className="mt-3">
+These services may include payment processors, authentication providers,
+analytics tools, and security services that help YOMICO operate safely
+and efficiently.
+</p>
 
           </div>
 
@@ -108,6 +124,12 @@ export default function CookiePolicyPage() {
               affect the functionality of some parts of the website.
 
             </p>
+            <p className="mt-3">
+You can manage or delete cookies through your browser settings in
+Google Chrome, Microsoft Edge, Mozilla Firefox, Safari, or other
+supported browsers. Please note that disabling essential cookies may
+affect website functionality.
+</p>
 
           </div>
 
@@ -136,16 +158,37 @@ export default function CookiePolicyPage() {
             <p>
 
               If you have any questions regarding this Cookie Policy,
-              please contact the Yogi-Mart Support Team through the
+              please contact the YOMICO Support Team through the
               Contact Us page.
 
             </p>
 
           </div>
 
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+
+  <h3 className="text-2xl font-bold mb-2">
+    Questions About Cookies?
+  </h3>
+
+  <p className="text-gray-600 mb-4">
+    If you have questions about how YOMICO uses cookies or your privacy,
+    please contact our support team.
+  </p>
+
+     <Link
+  href="/contact"
+  className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+>
+  Contact Support
+</Link>
+ 
+</div>
+
         </div>
 
       </div>
+      
 
     </div>
 

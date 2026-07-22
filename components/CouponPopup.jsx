@@ -7,8 +7,7 @@ export default function CouponPopup() {
   const [show, setShow] =
     useState(false);
 
-    const couponCode =
-  "YOGI10";
+    const couponCode = "YOMICO10";
 
   useEffect(() => {
 
@@ -57,9 +56,7 @@ let timer;
    couponCode
 );
 
-    alert(
-      `Coupon copied: ${couponCode}`
-    );
+    toast.success(`Coupon ${couponCode} copied successfully!`);
 
     localStorage.setItem(
       "couponShown",
@@ -121,15 +118,14 @@ let timer;
           font-bold
           mb-3
         ">
-          Welcome to Yogi-Mart
+          Welcome to YOMICO
         </h2>
 
         <p className="
           text-gray-600
           mb-6
         ">
-          Use this coupon and
-          save on your first order.
+         Use this exclusive welcome coupon and enjoy 10% OFF on your first order.
         </p>
 
         <div className="
@@ -170,6 +166,9 @@ let timer;
 ">
   Valid on first order only
 </p>
+<p className="text-xs text-gray-500 mt-1">
+  Terms & Conditions apply.
+</p>
 
         </div>
 
@@ -189,6 +188,22 @@ let timer;
         >
           Copy Coupon
         </button>
+
+        <button
+  onClick={closePopup}
+  aria-label="Close coupon popup"
+  className="w-full
+            bg-green-600
+            hover:bg-green-700
+            text-white
+            py-4
+            rounded-2xl
+            font-bold
+            text-lg
+            transition"
+>
+  × Close Coupon
+</button>
 
       </div>
 

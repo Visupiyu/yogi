@@ -13,12 +13,20 @@ export default function ContactPage() {
         <h1 className="text-4xl font-bold text-center mb-4">
           Contact Us
         </h1>
+        <p className="text-center text-gray-500 max-w-2xl mx-auto">
+  Whether you have questions about your order, need seller assistance,
+  or want to partner with YOMICO, our team is ready to help.
+</p>
 
         <p className="text-center text-gray-600 mb-10">
-          We'd love to hear from you. Get in touch with the Yogi-Mart team.
+          We'd love to hear from you. Get in touch with the YOMICO team.
         </p>
 
-        <div className="grid md:grid-cols-2 gap-10">
+       <div className="grid md:grid-cols-2 gap-10">
+
+  {/* Left Column */}
+
+  <div className="space-y-8">
 
           {/* Contact Info */}
 
@@ -34,9 +42,12 @@ export default function ContactPage() {
 
                 <Phone className="text-green-600" />
 
-                <span>
-                  +91 6358761569
-                </span>
+                <a
+  href="tel:+916358761569"
+  className="hover:text-green-600"
+>
+  +91 6358761569
+</a>
 
               </div>
 
@@ -45,7 +56,15 @@ export default function ContactPage() {
                 <Mail className="text-blue-600" />
 
                 <span>
-                  yogimart.help@gmail.com
+                 <a
+  href="mailto:yomico.help@gmail.com"
+  className="text-blue-600 hover:underline"
+>
+  yomico.help@gmail.com
+</a>
+<p className="text-sm text-gray-500 ml-10">
+  We typically reply within 24–48 business hours.
+</p>
                 </span>
 
               </div>
@@ -80,7 +99,9 @@ export default function ContactPage() {
   </p>
 
 </div>
-          <div className="flex items-start gap-4">
+          <div className="bg-white p-6 rounded-2xl shadow">
+
+  <div className="flex items-start gap-4">
 
   <span className="text-2xl">
     🕒
@@ -92,6 +113,7 @@ export default function ContactPage() {
       Business Hours
     </p>
 
+
     <p>
       Monday - Saturday
     </p>
@@ -99,9 +121,34 @@ export default function ContactPage() {
     <p>
       9:00 AM - 6:00 PM (IST)
     </p>
+    <div className="pt-4 border-t">
+
+  <h3 className="font-semibold mb-3">
+    Follow Us
+  </h3>
+
+  <div className="flex gap-4">
+
+    <a href="#" className="text-blue-600 hover:underline">
+  Facebook
+</a>
+
+<a href="#" className="text-pink-600 hover:underline">
+  Instagram
+</a>
+
+<a href="#" className="text-blue-700 hover:underline">
+  LinkedIn
+</a>
 
   </div>
 
+</div>
+
+  </div>
+
+</div>
+</div>
 </div>
 
           {/* Contact Form */}
@@ -109,7 +156,7 @@ export default function ContactPage() {
           <div className="bg-white p-8 rounded-2xl shadow">
 
             <h2 className="text-2xl font-bold mb-6">
-              Send Message
+              Submit Request
             </h2>
 
             <form className="space-y-4">
@@ -164,8 +211,7 @@ export default function ContactPage() {
 
               <p className="text-sm text-gray-500">
 
-By submitting this form, you agree to our
-Privacy Policy and Terms & Conditions.
+By submitting this form, you agree to our Privacy Policy and Terms & Conditions. We will only use your information to respond to your inquiry.
 
 </p>
 
@@ -181,14 +227,11 @@ Privacy Policy and Terms & Conditions.
                   font-semibold
                 "
               >
-                Send Message
+                Submit Request
               </button>
 
             </form>
-
-          </div>
-
-          <div className="mt-12 text-center">
+            <div className="mt-12 text-center">
 
   <h2 className="text-2xl font-bold mb-6">
 
@@ -216,6 +259,8 @@ Privacy Policy and Terms & Conditions.
 
   </div>
 
+  </div>
+  
 </div>
 
         </div>

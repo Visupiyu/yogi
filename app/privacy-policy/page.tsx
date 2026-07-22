@@ -1,3 +1,9 @@
+import Link from "next/link";
+export const metadata = {
+  title: "Privacy Policy | YOMICO",
+  description:
+    "Learn how YOMICO collects, uses, protects, and manages your personal information.",
+};
 export default function PrivacyPolicyPage() {
 
   return (
@@ -13,18 +19,23 @@ export default function PrivacyPolicyPage() {
         <p className="text-center text-gray-500 mb-8">
   Last Updated: July 2026
 </p>
+<p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
+  Your privacy is important to us. This Privacy Policy explains how
+  YOMICO collects, uses, stores, and protects your personal information
+  when you use our marketplace.
+</p>
 
         <div className="bg-white p-8 rounded-2xl shadow space-y-6">
 
           <p>
-            At Yogi-Mart, we respect your privacy and are committed to
+            At YOMICO, we respect your privacy and are committed to
             protecting your personal information.
           </p>
 
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              Information We Collect
+              1. Information We Collect
             </h2>
 
             <p>
@@ -38,7 +49,7 @@ export default function PrivacyPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              How We Use Your Information
+             2. How We Use Your Information
             </h2>
 
             <p>
@@ -52,12 +63,13 @@ export default function PrivacyPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              Data Security
+             3. Data Security
             </h2>
 
             <p>
-              We implement reasonable security measures to protect your
-              personal data from unauthorized access or misuse.
+             We implement industry-standard security measures to help protect your
+personal information from unauthorized access, alteration, disclosure,
+or misuse.
             </p>
 
           </div>
@@ -65,7 +77,7 @@ export default function PrivacyPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-                Third-Party Services
+              4. Third-Party Services
             </h2>
 
             <p>
@@ -80,11 +92,11 @@ export default function PrivacyPolicyPage() {
             <div>
 
   <h2 className="text-2xl font-bold mb-2">
-    Cookies
+   5. Cookies
   </h2>
 
   <p>
-    Yogi-Mart may use cookies and similar technologies to improve user experience and website performance.
+    YOMICO may use cookies and similar technologies to improve user experience and website performance.
   </p>
 
 </div>
@@ -93,7 +105,7 @@ export default function PrivacyPolicyPage() {
 
 <h2 className="text-2xl font-bold mb-2">
 
-Data Retention
+6. Data Retention
 
 </h2>
 
@@ -108,7 +120,7 @@ We retain personal information only for as long as necessary to provide our serv
 
 <h2 className="text-2xl font-bold mb-2">
 
-Your Rights
+7. Your Rights
 
 </h2>
 
@@ -124,13 +136,13 @@ You may request access to, correction of, or deletion of your personal informati
 
 <h2 className="text-2xl font-bold mb-2">
 
-Children's Privacy
+8. Children's Privacy
 
 </h2>
 
 <p>
 
-Yogi-Mart is not intended for children under 18 years of age. We do not knowingly collect personal information from children.
+YOMICO is not intended for children under 18 years of age. We do not knowingly collect personal information from children.
 
 </p>
 
@@ -139,7 +151,7 @@ Yogi-Mart is not intended for children under 18 years of age. We do not knowingl
 
 <h2 className="text-2xl font-bold mb-2">
 
-Changes to this Privacy Policy
+9. Changes to this Privacy Policy
 
 </h2>
 
@@ -152,14 +164,33 @@ We may update this Privacy Policy from time to time. Any changes will be publish
 </div>
 
             <h2 className="text-2xl font-bold mb-2">
-              Contact Us
+              1. Contact Us
             </h2>
 
             <p>
-              If you have any questions regarding this Privacy Policy or your personal information, please contact the Yogi-Mart Support Team through the Contact Us page. We will respond as soon as reasonably possible.
+              If you have any questions regarding this Privacy Policy or your personal information, please contact the YOMICO Support Team through the Contact Us page. We will respond as soon as reasonably possible.
             </p>
 
           </div>
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+
+  <h3 className="text-2xl font-bold mb-2">
+    Questions About Your Privacy?
+  </h3>
+
+  <p className="text-gray-600 mb-4">
+    If you need help understanding our Privacy Policy or how your data is
+    handled, our support team is here to assist you.
+  </p>
+
+  <Link
+    href="/contact"
+    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+  >
+    Contact Support
+  </Link>
+
+</div>
 
         </div>
 

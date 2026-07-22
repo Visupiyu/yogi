@@ -1,3 +1,10 @@
+import Link from "next/link";
+
+export const metadata = {
+  title: "Shipping Policy | YOMICO",
+  description:
+    "Learn about YOMICO's shipping process, delivery timelines, tracking, shipping charges, and customer support.",
+};
 export default function ShippingPolicyPage() {
 
   return (
@@ -13,13 +20,18 @@ export default function ShippingPolicyPage() {
         <p className="text-center text-gray-500 mb-8">
           Last Updated: July 2026
         </p>
+        <p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
+  This Shipping Policy explains how YOMICO processes, ships, tracks,
+  and delivers orders, along with important information about shipping
+  charges, delivery timelines, and customer responsibilities.
+</p>
 
         <div className="bg-white p-8 rounded-2xl shadow space-y-6">
 
           <p>
 
             This Shipping Policy explains how orders placed on the
-            Yogi-Mart Marketplace are processed, shipped, and delivered.
+            YOMICO Marketplace are processed, shipped, and delivered.
 
           </p>
 
@@ -48,7 +60,7 @@ export default function ShippingPolicyPage() {
 
             <p>
 
-              Yogi-Mart may use its own delivery network or trusted
+              YOMICO may use its own delivery network or trusted
               third-party logistics partners to deliver orders safely and
               efficiently.
 
@@ -113,9 +125,7 @@ export default function ShippingPolicyPage() {
 
             <p>
 
-              Customers can track the status of their orders through the
-              Yogi-Mart platform whenever tracking information is available.
-
+              Customers can track their orders through the YOMICO platform whenever tracking information is available. Tracking details will be updated as provided by the seller or delivery partner.
             </p>
 
           </div>
@@ -128,7 +138,7 @@ export default function ShippingPolicyPage() {
 
             <p>
 
-              While Yogi-Mart aims to ensure timely deliveries, we are not
+              While YOMICO aims to ensure timely deliveries, we are not
               responsible for delays caused by natural disasters,
               government restrictions, strikes, transportation issues, or
               other events beyond our reasonable control.
@@ -147,7 +157,7 @@ export default function ShippingPolicyPage() {
 
               Customers are encouraged to inspect packages upon delivery
               and report any damaged or missing items promptly through
-              Yogi-Mart Support.
+              YOMICO Support.
 
             </p>
 
@@ -161,7 +171,7 @@ export default function ShippingPolicyPage() {
 
             <p>
 
-              Unless specifically stated otherwise, Yogi-Mart currently
+              Unless specifically stated otherwise, YOMICO currently
               provides shipping services only within India.
 
             </p>
@@ -170,19 +180,52 @@ export default function ShippingPolicyPage() {
 
           <div>
 
+  <h2 className="text-2xl font-bold mb-2">
+    10. Delivery Coverage
+  </h2>
+
+  <p>
+    YOMICO delivers to most serviceable locations across India.
+    Delivery availability may vary depending on the seller's location,
+    courier partner coverage, and local serviceability.
+  </p>
+
+</div>
+
+          <div>
+
             <h2 className="text-2xl font-bold mb-2">
-              10. Contact Us
+              11. Contact Us
             </h2>
 
             <p>
 
               If you have questions regarding shipping or delivery, please
-              contact the Yogi-Mart Support Team through the Contact Us
+              contact the YOMICO Support Team through the Contact Us
               page.
 
             </p>
 
           </div>
+          <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+
+  <h3 className="text-2xl font-bold mb-2">
+    Need Help With Delivery?
+  </h3>
+
+  <p className="text-gray-600 mb-4">
+    If you have questions about shipping, delivery, or tracking your order,
+    our support team is here to help.
+  </p>
+
+  <Link
+    href="/contact"
+    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+  >
+    Contact Support
+  </Link>
+
+</div>
 
         </div>
 

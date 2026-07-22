@@ -1,3 +1,10 @@
+import Link from "next/link";
+
+export const metadata = {
+  title: "Terms & Conditions | YOMICO",
+  description:
+    "Read the Terms & Conditions for using the YOMICO marketplace, including user responsibilities, orders, payments, and legal policies.",
+};
 export default function TermsPage() {
 
   return (
@@ -10,16 +17,23 @@ export default function TermsPage() {
           Terms & Conditions
         </h1>
 
+        <p className="text-center text-gray-500 mb-8">
+ Last Updated: July 2026
+</p>
+<p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
+  These Terms & Conditions govern your access to and use of the YOMICO
+  marketplace. By using our platform, you agree to comply with these
+  terms and all applicable laws.
+</p>
+
         <div className="bg-white p-8 rounded-2xl shadow space-y-6">
 
           <p>
-            Welcome to Yogi-Mart. By using our platform, you agree to
+            Welcome to YOMICO. By using our platform, you agree to
             these Terms & Conditions.
           </p>
 
-          <p className="text-center text-gray-500 mb-8">
- Last Updated: July 2026
-</p>
+          
 
           <div>
 
@@ -27,13 +41,13 @@ export default function TermsPage() {
 
 <h2 className="text-2xl font-bold mb-2">
 
-Eligibility
+1. Eligibility
 
 </h2>
 
 <p>
 
-By using Yogi-Mart, you confirm that you are at least 18 years of age or are using the platform under the supervision of a parent or legal guardian.
+By using YOMICO, you confirm that you are at least 18 years of age or are using the platform under the supervision of a parent or legal guardian.
 
 </p>
 
@@ -43,7 +57,7 @@ By using Yogi-Mart, you confirm that you are at least 18 years of age or are usi
 
 <h2 className="text-2xl font-bold mb-2">
 
-User Accounts
+2. User Accounts
 
 </h2>
 
@@ -59,13 +73,13 @@ You are responsible for maintaining the confidentiality of your account credenti
 
 <h2 className="text-2xl font-bold mb-2">
 
-Orders and Payments
+3. Orders and Payments
 
 </h2>
 
 <p>
 
-All orders placed through Yogi-Mart are subject to product availability and seller acceptance. Payments are processed through secure payment gateways. Prices, taxes, and delivery charges are displayed during checkout.
+All orders placed through YOMICO are subject to product availability and seller acceptance. Payments are processed through secure payment gateways. Prices, taxes, and delivery charges are displayed during checkout.
 
 </p>
 
@@ -74,7 +88,7 @@ All orders placed through Yogi-Mart are subject to product availability and sell
 
 <h2 className="text-2xl font-bold mb-2">
 
-Delivery
+4. Delivery
 
 </h2>
 
@@ -89,7 +103,7 @@ Estimated delivery dates are provided for convenience only. Actual delivery time
 
 <h2 className="text-2xl font-bold mb-2">
 
-Returns and Refunds
+5. Returns and Refunds
 
 </h2>
 
@@ -104,13 +118,13 @@ Returns, replacements, and refunds are governed by our Return & Refund Policy. C
 
 <h2 className="text-2xl font-bold mb-2">
 
-Prohibited Activities
+6. Prohibited Activities
 
 </h2>
 
 <p>
 
-Users must not engage in fraudulent activities, upload harmful content, misuse the platform, interfere with security, or violate applicable laws while using Yogi-Mart.
+Users must not engage in fraudulent activities, upload harmful content, misuse the platform, interfere with security, or violate applicable laws while using YOMICO.
 
 </p>
 
@@ -119,13 +133,13 @@ Users must not engage in fraudulent activities, upload harmful content, misuse t
 
 <h2 className="text-2xl font-bold mb-2">
 
-Intellectual Property
+7. Intellectual Property
 
 </h2>
 
 <p>
 
-All trademarks, logos, graphics, software, content, and branding displayed on Yogi-Mart are the property of Yogi-Mart or their respective owners and are protected under applicable intellectual property laws.
+All trademarks, logos, graphics, software, content, and branding displayed on YOMICO are the property of YOMICO or their respective owners and are protected under applicable intellectual property laws.
 
 </p>
 
@@ -134,13 +148,13 @@ All trademarks, logos, graphics, software, content, and branding displayed on Yo
 
 <h2 className="text-2xl font-bold mb-2">
 
-Limitation of Liability
+8. Limitation of Liability
 
 </h2>
 
 <p>
 
-Yogi-Mart acts as a marketplace connecting customers and sellers. To the maximum extent permitted by law, Yogi-Mart shall not be liable for indirect, incidental, or consequential damages arising from the use of the platform.
+YOMICO acts as a marketplace connecting customers and sellers. To the maximum extent permitted by law, YOMICO shall not be liable for indirect, incidental, or consequential damages arising from the use of the platform.
 
 </p>
 
@@ -149,7 +163,7 @@ Yogi-Mart acts as a marketplace connecting customers and sellers. To the maximum
 
 <h2 className="text-2xl font-bold mb-2">
 
-Governing Law
+9. Governing Law
 
 </h2>
 
@@ -164,13 +178,13 @@ These Terms and Conditions shall be governed by and interpreted in accordance wi
 
 <h2 className="text-2xl font-bold mb-2">
 
-Contact Us
+10. Contact Us
 
 </h2>
 
 <p>
 
-If you have any questions regarding these Terms and Conditions, please contact the Yogi-Mart Support Team through the Contact Us page.
+If you have any questions regarding these Terms and Conditions, please contact the YOMICO Support Team through the Contact Us page.
 
 </p>
 
@@ -178,7 +192,7 @@ If you have any questions regarding these Terms and Conditions, please contact t
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              Seller Responsibilities
+             11. Seller Responsibilities
             </h2>
 
             <p>
@@ -192,24 +206,34 @@ If you have any questions regarding these Terms and Conditions, please contact t
     <div>
    
            <h2 className="text-2xl font-bold mb-2">
-              Changes to Terms
+              12. Changes to Terms
             </h2>
 
             <p>
-              Yogi-Mart reserves the right to update these terms at any
+              YOMICO reserves the right to update these terms at any
               time. Continued use of the platform constitutes acceptance
               of any changes.
             </p>
+     
+  
+</div>
 
-            <div>
+<div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
 
-  <h2 className="text-2xl font-bold mb-2">
-    Contact Information
-  </h2>
+  <h3 className="text-2xl font-bold mb-2">
+    Need Help?
+  </h3>
 
-  <p>
-    For questions regarding these Terms & Conditions, please contact us through the Contact Us page.
+  <p className="text-gray-600 mb-4">
+    If you have questions about these Terms & Conditions, our support team is here to help.
   </p>
+
+  <Link
+    href="/contact"
+    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+  >
+    Contact Support
+  </Link>
 
 </div>
 
@@ -218,7 +242,6 @@ If you have any questions regarding these Terms and Conditions, please contact t
         </div>
 
       </div>
-</div>
 </div>
    
   );

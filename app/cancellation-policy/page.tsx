@@ -13,13 +13,18 @@ export default function CancellationPolicyPage() {
         <p className="text-center text-gray-500 mb-8">
           Last Updated: July 2026
         </p>
+        <p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
+  This policy explains when and how orders can be cancelled,
+  refund eligibility, and the responsibilities of customers,
+  sellers, and YOMICO Marketplace.
+</p>
 
         <div className="bg-white p-8 rounded-2xl shadow space-y-6">
 
           <p>
 
             This Cancellation Policy explains when and how customers and
-            sellers may cancel orders placed through the Yogi-Mart
+            sellers may cancel orders placed through the YOMICO
             Marketplace.
 
           </p>
@@ -66,7 +71,7 @@ export default function CancellationPolicyPage() {
 
             <p>
 
-              Yogi-Mart reserves the right to cancel orders affected by
+              YOMICO reserves the right to cancel orders affected by
               suspected fraud, payment verification failures, prohibited
               products, technical errors, or violations of marketplace
               policies.
@@ -81,29 +86,39 @@ export default function CancellationPolicyPage() {
               4. Refund for Cancelled Orders
             </h2>
 
-            <p>
+             <p>
 
               If an order is cancelled after successful payment,
               eligible refunds will be processed according to the
-              Yogi-Mart Return & Refund Policy and the payment provider's
+              YOMICO Return & Refund Policy and the payment provider's
               processing timelines.
 
             </p>
+
+            <p className="mt-3">
+  Eligible refunds are generally initiated within 5–7 business days after
+  cancellation approval. The actual credit timeline may vary depending on
+  your payment method and financial institution.
+</p>
 
           </div>
 
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              5. Cash on Delivery Orders
+              5. Pay on Delivery (UPI only)
             </h2>
+
+            <p className="mt-3">
+  Customers are encouraged to place orders responsibly. Frequent order
+  cancellations may affect eligibility for Pay on Delivery (UPI only) on future
+  purchases.
+</p>
 
             <p>
 
-              Cash on Delivery (COD) orders may be cancelled before
-              dispatch. Repeated cancellation of COD orders may result in
-              restrictions on future COD purchases.
-
+   Repeated cancellation of Pay on Delivery (UPI only) orders
+may result in restrictions on using Pay on Delivery for future purchases.
             </p>
 
           </div>
@@ -118,7 +133,7 @@ export default function CancellationPolicyPage() {
 
               Repeated misuse of order cancellations, fraudulent
               activities, or abuse of marketplace policies may result in
-              account suspension or other actions by Yogi-Mart.
+              account suspension or other actions by YOMICO.
 
             </p>
 
@@ -130,10 +145,30 @@ export default function CancellationPolicyPage() {
               7. Contact Us
             </h2>
 
+            <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+
+  <h3 className="text-2xl font-bold mb-2">
+    Need Help?
+  </h3>
+
+  <p className="text-gray-600 mb-4">
+    If you have questions about cancellations or refunds, our support team
+    is here to help.
+  </p>
+
+  <a
+    href="/contact"
+    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
+  >
+    Contact Support
+  </a>
+
+</div>
+
             <p>
 
               If you have any questions regarding order cancellations,
-              please contact the Yogi-Mart Support Team through the
+              please contact the YOMICO Support Team through the
               Contact Us page.
 
             </p>
