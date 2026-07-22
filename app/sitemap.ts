@@ -1,24 +1,15 @@
-import type {
-  MetadataRoute
-} from "next";
+import type { MetadataRoute } from "next";
 
-export default function sitemap():
-MetadataRoute.Sitemap {
-
+export default function sitemap(): MetadataRoute.Sitemap {
   return [
-
     {
-      url:
-        "https://your-domain.com",
+      url: "https://yomico.in",
       priority: 1,
     },
 
     {
-      url:
-        "https://your-domain.com/store",
+      url: "https://yomico.in/store",
       priority: 0.9,
     },
-
   ];
-
 }

@@ -48,12 +48,3 @@ export const db = getFirestore(app);
 
 export const storage =
   getStorage(app);
-console.log(
-  "PROJECT:",
-  firebaseConfig.projectId
-);
-
-console.log(
-  "BUCKET:",
-  firebaseConfig.storageBucket
-);

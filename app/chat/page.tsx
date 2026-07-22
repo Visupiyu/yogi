@@ -70,17 +70,16 @@ const [chats, setChats] = useState<Chat[]>([]);
         .toLowerCase()
         .includes(search.toLowerCase())
   );
-
-  if (loading) {
-    return 
-    <div className="min-h-screen flex items-center justify-center">
-    <h2 className="text-2xl font-bold">
-        Loading Chats...
-    </h2>
-</div>;
-  }
-
+if (loading) {
   return (
+    <div className="min-h-screen flex items-center justify-center">
+      <h2 className="text-2xl font-bold">
+        Loading Chats...
+      </h2>
+    </div>
+  );
+}
+   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-5xl mx-auto">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-3xl p-8 mb-8">
@@ -89,7 +88,7 @@ const [chats, setChats] = useState<Chat[]>([]);
         </div>
 
         <input
-          placeholder="Search Seller or Product"
+          placeholder="Search seller or product..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full p-4 rounded-2xl border mb-6"

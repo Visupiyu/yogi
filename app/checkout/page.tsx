@@ -70,7 +70,13 @@ setAddress(userData.address || "");
 
     const d = new Date();
     d.setDate(d.getDate() + 5);
-    setDeliveryDate(d.toDateString());
+   setDeliveryDate(
+  d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+);
   }, [finalAmount]);
 
   const applyCoupon = async () => {
@@ -642,7 +648,7 @@ Easy Returns
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-gray-400">
-                💡 Try SAVE10 to get instant discount.
+                💡 Enter a valid coupon code to receive available discounts.
                 </p>
               </div>
 

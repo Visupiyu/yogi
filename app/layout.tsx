@@ -20,7 +20,6 @@ export const metadata: Metadata = {
     default: "YOMICO",
     template: "%s | YOMICO",
   },
-
   description:
     "YOMICO is India's modern multi-vendor marketplace for groceries, electronics, fashion, furniture, beauty, home essentials and more.",
 
@@ -42,19 +41,20 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 
   openGraph: {
-    title: "YOMICO",
-    description:
-      "India's Modern Multi-Vendor Marketplace",
-    type: "website",
-    siteName: "YOMICO",
-  },
+  title: "YOMICO",
+  description:
+    "India's Modern Multi-Vendor Marketplace",
+  url: "https://yomico.in",
+  siteName: "YOMICO",
+  type: "website",
+},
 
-  twitter: {
-    card: "summary_large_image",
-    title: "YOMICO",
-    description:
-      "India's Modern Multi-Vendor Marketplace",
-  },
+ twitter: {
+  card: "summary_large_image",
+  title: "YOMICO",
+  description:
+    "India's Modern Multi-Vendor Marketplace",
+},
 };
 
 export default function RootLayout({

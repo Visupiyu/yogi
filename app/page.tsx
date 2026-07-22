@@ -81,7 +81,21 @@ export default function Home() {
       </main>
     );
   }
+if (filteredData.length === 0) {
+  return (
+    <main className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="text-center py-20">
+        <h2 className="text-3xl font-bold text-gray-800">
+          No Products Available
+        </h2>
 
+        <p className="mt-2 text-gray-600">
+          Products will appear here soon.
+        </p>
+      </div>
+    </main>
+  );
+}
   const byCategory = (name: string) =>
     filteredData.filter((p) => p.category === name);
 
@@ -114,7 +128,6 @@ export default function Home() {
       <CustomerReviewsCarousel />
       <FeaturedProducts />
       <TopVendors />
-
       <Footer />
     </main>
   );

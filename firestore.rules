@@ -10,9 +10,13 @@ service cloud.firestore {
 
     // Public product catalog
     match /products/{productId} {
-      allow read: if true;
-      allow write: if signedIn();
-    }
+  allow read: if true;
+
+  allow create: if signedIn();
+
+  allow update, delete: if signedIn()
+    && resource.data.vendorId == request.auth.uid;
+}
 
     // Orders
     match /orders/{orderId} {

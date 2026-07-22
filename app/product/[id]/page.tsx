@@ -513,7 +513,7 @@ Easy Returns
                   <h3 className="font-bold mb-3">Delivery &amp; Services</h3>
                   <div className="grid grid-cols-2 gap-y-2 text-sm text-gray-600">
                     <p>🚚 Free delivery</p>
-                    <p>📅 Delivery by Tomorrow</p>
+                    <p>📅 Estimated delivery in 2–5 business days</p>
                     <p>📦 3–5 days</p>
                     <p>↩️ 7-day returns</p>
                     <p>💳 COD available</p>
