@@ -51,7 +51,9 @@ async function loadProducts(): Promise<Product[]> {
     });
     return items;
   } catch (err) {
-    console.error(err);
+   if (process.env.NODE_ENV === "development") {
+  console.error(err);
+}
     return [];
   }
 }
@@ -62,9 +64,10 @@ export default function Home() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["products"],
-    queryFn: loadProducts,
-  });
+  queryKey: ["products"],
+  queryFn: loadProducts,
+  staleTime: 1000 * 60 * 5,
+});
 
   if (error) {
     return <div className="p-10 text-center">Failed to load products</div>;

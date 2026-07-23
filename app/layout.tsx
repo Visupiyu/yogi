@@ -16,6 +16,12 @@ const geist = Geist({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://yomico.in"),
+
+  alternates: {
+    canonical: "https://yomico.in",
+  },
+
   title: {
     default: "YOMICO",
     template: "%s | YOMICO",
@@ -42,18 +48,29 @@ export const metadata: Metadata = {
 
   openGraph: {
   title: "YOMICO",
-  description:
-    "India's Modern Multi-Vendor Marketplace",
+  description: "India's Modern Multi-Vendor Marketplace",
   url: "https://yomico.in",
   siteName: "YOMICO",
   type: "website",
+  locale: "en_IN",
+  images: [
+    {
+      url: "/og-image.png",
+      width: 1200,
+      height: 630,
+      alt: "YOMICO",
+    },
+  ],
 },
-
- twitter: {
+twitter: {
   card: "summary_large_image",
   title: "YOMICO",
-  description:
-    "India's Modern Multi-Vendor Marketplace",
+  description: "India's Modern Multi-Vendor Marketplace",
+  images: ["/og-image.png"],
+},
+icons: {
+  icon: "/favicon.ico",
+  apple: "/apple-touch-icon.png",
 },
 };
 

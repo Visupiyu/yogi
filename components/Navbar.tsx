@@ -8,16 +8,31 @@ import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
+type ProductSuggestion = {
+  id: string;
+  name: string;
+  image?: string;
+  price?: number;
+};
+
+type User = {
+  name?: string;
+  email?: string;
+  businessName?: string;
+};
+type CartItem = {
+  qty?: number;
+};
+
 export default function Navbar() {
   const router = useRouter();
 
   const [search, setSearch] = useState("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<ProductSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
-  const [user, setUser] = useState<any>(null);
-
+  const [user, setUser] = useState<User | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = () => {
@@ -31,11 +46,14 @@ export default function Navbar() {
   /* CART + WISHLIST COUNTS */
   useEffect(() => {
     const updateCounts = () => {
-      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-      const totalQty = cart.reduce(
-        (sum: number, item: any) => sum + (item.qty || 0),
-        0
-      );
+      const cart: CartItem[] = JSON.parse(
+  localStorage.getItem("cart") || "[]"
+);
+
+const totalQty = cart.reduce(
+  (sum, item) => sum + (item.qty ?? 0),
+  0
+);
       setCartCount(totalQty);
 
       const wishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
@@ -80,13 +98,19 @@ export default function Navbar() {
     const t = setTimeout(async () => {
       try {
         const snapshot = await getDocs(collection(db, "products"));
-        const items: any[] = [];
+        const items: ProductSuggestion[] = [];
         snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.name?.toLowerCase().includes(trimmed.toLowerCase())) {
-            items.push({ id: doc.id, ...data });
-          }
-        });
+  const data = doc.data();
+
+  if (data.name?.toLowerCase().includes(trimmed.toLowerCase())) {
+    items.push({
+      id: doc.id,
+      name: data.name,
+      image: data.image,
+      price: data.price,
+    });
+  }
+});
         setSuggestions(items.slice(0, 5));
         setShowSuggestions(true);
       } catch (error) {
@@ -161,7 +185,7 @@ export default function Navbar() {
 
               {showSuggestions && suggestions.length > 0 && (
                 <div className="absolute top-full left-0 w-full bg-white border border-slate-200 shadow-xl rounded-2xl mt-2 z-50 overflow-hidden">
-                  {suggestions.map((item: any) => (
+                  {suggestions.map((item) => (
                     <Link
                       key={item.id}
                       href={`/product/${item.id}`}

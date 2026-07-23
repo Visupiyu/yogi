@@ -4,7 +4,7 @@ import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
-
+import Link from "next/link";
 export default function LoginPage() {
   const router = useRouter();
 
@@ -44,7 +44,7 @@ export default function LoginPage() {
         })
       );
 
-      alert("Login Successful");
+      alert("Sign In Successful");
       router.push("/");
     } catch (err: any) {
       if (err.code === "auth/invalid-credential") {
@@ -66,7 +66,7 @@ export default function LoginPage() {
   <img
     src="/logo.png"
     alt="YOMICO"
-    className="w-20 mx-auto mb-3"
+    className="w-28 mx-auto mb-3"
   />
 
   <h2 className="text-3xl font-extrabold text-green-700 tracking-wide">
@@ -78,31 +78,33 @@ export default function LoginPage() {
   YOMICO Customer Portal
 </p>
 
-        <h1 className="text-4xl font-bold text-center mb-3">Customer Login</h1>
+        <h1 className="text-4xl font-bold text-center mb-3">Customer Sign In</h1>
 
         <p className="text-center text-gray-500 mb-8">
-  Login to your YOMICO account
+  Sign In to your YOMICO account
 </p>
 
         <div className="space-y-5">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full p-4 border rounded-xl outline-none"
-          />
+         <input
+  type="email"
+  placeholder="Email"
+  autoComplete="email"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+  className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+/>
 
           <input
-            type={showPassword ? "text" : "password"}
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") login();
-            }}
-            className="w-full p-4 border rounded-2xl outline-none"
-          />
+  type={showPassword ? "text" : "password"}
+  placeholder="Password"
+  autoComplete="current-password"
+  value={password}
+  onChange={(e) => setPassword(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") login();
+  }}
+  className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+/>
 
           <div className="flex items-center justify-between mt-2">
             <label className="flex items-center gap-2">
@@ -114,12 +116,12 @@ export default function LoginPage() {
               <span className="text-sm text-gray-600">Show Password</span>
             </label>
 
-            <a
-              href="/forgot-password"
-              className="text-blue-600 font-semibold text-sm"
-            >
-              Forgot Password?
-            </a>
+            <Link
+  href="/forgot-password"
+  className="text-blue-600 font-semibold text-sm"
+>
+  Forgot Password?
+</Link>
           </div>
         </div>
 
@@ -129,17 +131,17 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full text-white py-4 rounded-2xl text-lg font-bold bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:opacity-60"
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "Logging in..." : "Sign In"}
           </button>
 
           <p className="text-center mt-6">
             Don&apos;t have account?
-            <span
-              onClick={() => router.push("/signup")}
-              className="text-blue-600 ml-2 cursor-pointer font-semibold"
-            >
-              Signup
-            </span>
+            <Link
+  href="/signup"
+  className="text-blue-600 ml-2 font-semibold"
+>
+  Signup
+</Link>
           </p>
         </div>
       </div>

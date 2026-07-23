@@ -1,46 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,} from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  images?: string[];
-  stock: number;
-  category: string;
-};
-
-type Notification = {
-  id: string;
-  title: string;
-  message: string;
-  read: boolean;
-};
-
-type Order = {
-  id: string;
-  customer: string;
-  amount: number;
-  status: string;
-  date: string;
-};
+type Product = { id: string; name: string; price: number; image: string; images?: string[]; stock: number; category: string;};
+type Notification = {id: string; title: string; message: string; read: boolean;};
+type Order = { id: string; customer: string; amount: number; status: string; date: string;};
 
 export default function SellerPage() {
   const router = useRouter();
@@ -53,11 +22,9 @@ export default function SellerPage() {
   const [netEarnings, setNetEarnings] = useState(0);
   const [totalViews, setTotalViews] = useState(0);
   const [totalSales, setTotalSales] = useState(0);
-
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [orders, setOrders] = useState<Order[]>([]);
-
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
@@ -69,16 +36,51 @@ export default function SellerPage() {
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState("");
-
   const [brand, setBrand] = useState("");
   const [mrp, setMrp] = useState("");
   const [gender, setGender] = useState("Men");
   const [color, setColor] = useState("");
   const [material, setMaterial] = useState("");
-  const [sizes, setSizes] = useState("");
+  const [sizes, setSizes] = useState<string[]>([]);
   const [countryOfOrigin, setCountryOfOrigin] = useState("India");
-  const [bestSeller, setBestSeller] = useState("None");
+  const [pattern, setPattern] = useState("Solid");
+const [fitType, setFitType] = useState("Regular");
+const [sleeveType, setSleeveType] = useState("Half Sleeve");
+const [neckType, setNeckType] = useState("Round Neck");
+const [modelNumber, setModelNumber] = useState("");
+const [ram, setRam] = useState("");
+const [storageCapacity, setStorageCapacity] = useState("");
+const [processor, setProcessor] = useState("");
+const [displaySize, setDisplaySize] = useState("");
+const [battery, setBattery] = useState("");
+const [camera, setCamera] = useState("");
+const [operatingSystem, setOperatingSystem] = useState("");
+const [warranty, setWarranty] = useState("No Warranty");
+const [powerSource, setPowerSource] = useState("");
+const [voltage, setVoltage] = useState("");
+const [accessories, setAccessories] = useState("");
+const [weight, setWeight] = useState("");
+const [unit, setUnit] = useState("g");
+const [expiryDate, setExpiryDate] = useState("");
+const [fssaiNumber, setFssaiNumber] = useState("");
+const [organic, setOrganic] = useState(false);
+const [skinType, setSkinType] = useState("Normal");
+const [hairType, setHairType] = useState("Normal");
+const [ingredients, setIngredients] = useState("");
+const [netQuantity, setNetQuantity] = useState("");
+const [dimensions, setDimensions] = useState("");
+const [weightCapacity, setWeightCapacity] = useState("");
+const [assemblyRequired, setAssemblyRequired] = useState(false);
+const [furnitureWarranty, setFurnitureWarranty] = useState("No Warranty");
 
+const [author, setAuthor] = useState("");
+const [publisher, setPublisher] = useState("");
+const [language, setLanguage] = useState("English");
+const [isbn, setIsbn] = useState("");
+const [edition, setEdition] = useState("");
+const [pages, setPages] = useState("");
+  const [bestSeller, setBestSeller] = useState("None");
+  const SIZE_OPTIONS = ["XS","S","M","L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL",];
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const buildNotifications = (items: Product[]) => {
@@ -96,29 +98,19 @@ export default function SellerPage() {
           id: product.id + "-low",
           title: "Low Stock",
           message: `${product.name} has only ${product.stock} left`,
-          read: false,
-        });
-      }
-    });
-    setNotifications(alerts);
-  };
+          read: false, });  }  });
+    setNotifications(alerts); };
 
-  async function loadProducts() {
-    if (!auth.currentUser) return;
+  async function loadProducts() { if (!auth.currentUser) return;
 
-    const q = query(
-      collection(db, "products"),
-      where("vendorId", "==", auth.currentUser.uid)
-    );
+    const q = query( collection(db, "products"), where("vendorId", "==", auth.currentUser.uid) );
     const productSnapshot = await getDocs(q);
     const items: Product[] = [];
     productSnapshot.forEach((docItem) => {
-      items.push({ id: docItem.id, ...docItem.data() } as Product);
-    });
+      items.push({ id: docItem.id, ...docItem.data() } as Product);});
 
     setProducts(items);
-    buildNotifications(items);
-  }
+    buildNotifications(items);}
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -157,10 +149,12 @@ export default function SellerPage() {
     if (!user) return;
     const vendorId = user.uid;
 
-    // NOTE: reads the whole orders collection and filters client-side.
-    // Restructure (e.g. a vendorIds array on each order) so reads can be
-    // scoped by Firestore rules.
-    const snapshot = await getDocs(collection(db, "orders"));
+   const snapshot = await getDocs(
+  query(
+    collection(db, "orders"),
+    where("vendorIds", "array-contains", vendorId)
+  )
+);
     const vendorOrders: Order[] = [];
 
     snapshot.forEach((docSnap) => {
@@ -201,8 +195,45 @@ export default function SellerPage() {
     setGender("Men");
     setColor("");
     setMaterial("");
-    setSizes("");
+    setSizes([]);
     setCountryOfOrigin("India");
+    setPattern("Solid");
+    setFitType("Regular");
+   setSleeveType("Half Sleeve");
+    setNeckType("Round Neck");
+    setModelNumber("");
+setRam("");
+setStorageCapacity("");
+setProcessor("");
+setDisplaySize("");
+setBattery("");
+setCamera("");
+setOperatingSystem("");
+setWarranty("No Warranty");
+setPowerSource("");
+setVoltage("");
+setAccessories("");
+setWeight("");
+setUnit("g");
+setExpiryDate("");
+setFssaiNumber("");
+setOrganic(false);
+
+setSkinType("Normal");
+setHairType("Normal");
+setIngredients("");
+setNetQuantity("");
+setDimensions("");
+setWeightCapacity("");
+setAssemblyRequired(false);
+setFurnitureWarranty("No Warranty");
+
+setAuthor("");
+setPublisher("");
+setLanguage("English");
+setIsbn("");
+setEdition("");
+setPages("");
   };
 
   const lowStockNotify = async (productName: string, qty: number) => {
@@ -247,20 +278,56 @@ export default function SellerPage() {
           : 0;
 
       const baseData = {
-        name,
-        brand,
-        mrp: mrp ? Number(mrp) : 0,
-        discountPercent,
-        gender,
-        color,
-        material,
-       sizes: sizes.split(",").map((s) => s.trim()).filter(Boolean),
-        countryOfOrigin,
-        price: Number(price),
-        stock: Number(stock),
-        category,
-        description,
-      };
+  name,
+  brand,
+  mrp: mrp ? Number(mrp) : 0,
+  discountPercent,
+  gender,
+  color,
+  material,
+  sizes,
+  pattern,
+  fitType,
+  sleeveType,
+  neckType,
+  countryOfOrigin,
+  price: Number(price),
+  stock: Number(stock),
+  category,
+  description,
+  modelNumber,
+ram,
+storageCapacity,
+processor,
+displaySize,
+battery,
+camera,
+operatingSystem,
+warranty,
+powerSource,
+voltage,
+accessories,
+weight,
+unit,
+expiryDate,
+fssaiNumber,
+organic,
+skinType,
+hairType,
+ingredients,
+netQuantity,
+dimensions,
+weightCapacity,
+assemblyRequired,
+furnitureWarranty,
+
+author,
+publisher,
+language,
+isbn,
+edition,
+pages,
+};
 
       if (editingId) {
         await updateDoc(doc(db, "products", editingId), {
@@ -308,10 +375,47 @@ export default function SellerPage() {
     setGender((product as any).gender || "Men");
     setColor((product as any).color || "");
     setMaterial((product as any).material || "");
-    setSizes(((product as any).sizes || []).join(","));
+    setPattern((product as any).pattern || "Solid");
+setFitType((product as any).fitType || "Regular");
+setSleeveType((product as any).sleeveType || "Half Sleeve");
+setNeckType((product as any).neckType || "Round Neck");
+    setSizes((product as any).sizes || []);
     setCountryOfOrigin((product as any).countryOfOrigin || "India");
     setEditingId(product.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    setModelNumber((product as any).modelNumber || "");
+setRam((product as any).ram || "");
+setStorageCapacity((product as any).storageCapacity || "");
+setProcessor((product as any).processor || "");
+setDisplaySize((product as any).displaySize || "");
+setBattery((product as any).battery || "");
+setCamera((product as any).camera || "");
+setOperatingSystem((product as any).operatingSystem || "");
+setWarranty((product as any).warranty || "No Warranty");
+setPowerSource((product as any).powerSource || "");
+setVoltage((product as any).voltage || "");
+setAccessories((product as any).accessories || "");
+setWeight((product as any).weight || "");
+setUnit((product as any).unit || "g");
+setExpiryDate((product as any).expiryDate || "");
+setFssaiNumber((product as any).fssaiNumber || "");
+setOrganic((product as any).organic || false);
+
+setSkinType((product as any).skinType || "Normal");
+setHairType((product as any).hairType || "Normal");
+setIngredients((product as any).ingredients || "");
+setNetQuantity((product as any).netQuantity || "");
+setDimensions((product as any).dimensions || "");
+setWeightCapacity((product as any).weightCapacity || "");
+setAssemblyRequired((product as any).assemblyRequired || false);
+setFurnitureWarranty((product as any).furnitureWarranty || "No Warranty");
+
+setAuthor((product as any).author || "");
+setPublisher((product as any).publisher || "");
+setLanguage((product as any).language || "English");
+setIsbn((product as any).isbn || "");
+setEdition((product as any).edition || "");
+setPages((product as any).pages || "");
   };
 
   const deleteProduct = async (id: string) => {
@@ -362,7 +466,12 @@ export default function SellerPage() {
     setTotalSales(sales);
     setBestSeller(topProduct || "None");
 
-    const ordersSnap = await getDocs(collection(db, "orders"));
+    const ordersSnap = await getDocs(
+  query(
+    collection(db, "orders"),
+    where("vendorIds", "array-contains", vendorId)
+  )
+);
     let ordersCount = 0;
     let pendingCount = 0;
     let totalEarnings = 0;
@@ -381,8 +490,6 @@ export default function SellerPage() {
         sellerItems.forEach((item: any) => {
           totalEarnings += item.price * item.qty;
         });
-        // order.commission / order.sellerEarning are not written by checkout
-        // yet, so these stay 0 until that data is added.
         totalCommission += order.commission || 0;
         totalNetEarnings += order.sellerEarning || 0;
       }
@@ -564,22 +671,548 @@ Manage your products, inventory, orders and business growth from one dashboard.<
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="Sizes (S,M,L,XL)"
-                  value={sizes}
-                  onChange={(e) => setSizes(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-                <input
-                  type="text"
-                  placeholder="Country Of Origin"
-                  value={countryOfOrigin}
-                  onChange={(e) => setCountryOfOrigin(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-              </div>
+             <div className="space-y-4">
+
+  <div>
+    <label className="block font-semibold mb-3">
+      Available Sizes
+    </label>
+
+    <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
+
+      {SIZE_OPTIONS.map((size) => (
+
+        <label
+          key={size}
+          className="flex items-center gap-2 border rounded-lg p-2 cursor-pointer hover:bg-gray-50"
+        >
+
+          <input
+            type="checkbox"
+            checked={sizes.includes(size)}
+            onChange={(e) => {
+
+              if (e.target.checked) {
+                setSizes([...sizes, size]);
+              } else {
+                setSizes(
+                  sizes.filter((s) => s !== size)
+                );
+              }
+
+            }}
+          />
+
+          <span>{size}</span>
+
+        </label>
+
+      ))}
+
+    </div>
+
+  </div>
+
+  <input
+    type="text"
+    placeholder="Country Of Origin"
+    value={countryOfOrigin}
+    onChange={(e) =>
+      setCountryOfOrigin(e.target.value)
+    }
+    className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+  />
+  {(
+  category === "Men Fashion" ||
+  category === "Women Fashion" ||
+  category === "Kids Fashion"
+) && (
+
+<div className="space-y-4 border rounded-xl p-4 bg-gray-50">
+
+  <h3 className="font-semibold text-lg">
+    👕 Fashion Details
+  </h3>
+
+  <div className="grid grid-cols-2 gap-3">
+
+    <select
+      value={pattern}
+      onChange={(e)=>setPattern(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    >
+      <option>Solid</option>
+      <option>Printed</option>
+      <option>Checked</option>
+      <option>Striped</option>
+      <option>Floral</option>
+    </select>
+
+    <select
+      value={fitType}
+      onChange={(e)=>setFitType(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    >
+      <option>Regular</option>
+      <option>Slim</option>
+      <option>Relaxed</option>
+      <option>Oversized</option>
+    </select>
+
+    <select
+      value={sleeveType}
+      onChange={(e)=>setSleeveType(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    >
+      <option>Half Sleeve</option>
+      <option>Full Sleeve</option>
+      <option>Sleeveless</option>
+    </select>
+
+    <select
+      value={neckType}
+      onChange={(e)=>setNeckType(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    >
+      <option>Round Neck</option>
+      <option>Polo</option>
+      <option>V-Neck</option>
+      <option>Shirt Collar</option>
+    </select>
+
+  </div>
+
+</div>
+
+)}
+{category === "Mobiles" && (
+
+<div className="space-y-4 border rounded-xl p-4 bg-blue-50">
+
+<h3 className="font-semibold text-lg">
+📱 Mobile Details
+</h3>
+
+<div className="grid grid-cols-2 gap-3">
+
+<input
+type="text"
+placeholder="Model Number"
+value={modelNumber}
+onChange={(e)=>setModelNumber(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<input
+type="text"
+placeholder="RAM (8 GB)"
+value={ram}
+onChange={(e)=>setRam(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<input
+type="text"
+placeholder="Storage (128 GB)"
+value={storageCapacity}
+onChange={(e)=>setStorageCapacity(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<input
+type="text"
+placeholder="Processor"
+value={processor}
+onChange={(e)=>setProcessor(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<input
+type="text"
+placeholder="Display Size"
+value={displaySize}
+onChange={(e)=>setDisplaySize(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<input
+type="text"
+placeholder="Battery"
+value={battery}
+onChange={(e)=>setBattery(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<input
+type="text"
+placeholder="Camera"
+value={camera}
+onChange={(e)=>setCamera(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<input
+type="text"
+placeholder="Operating System"
+value={operatingSystem}
+onChange={(e)=>setOperatingSystem(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<select
+value={warranty}
+onChange={(e)=>setWarranty(e.target.value)}
+className="w-full p-3 border rounded-xl"
+>
+<option>No Warranty</option>
+<option>6 Months</option>
+<option>1 Year</option>
+<option>2 Years</option>
+</select>
+
+</div>
+
+</div>
+
+)}
+{(
+  category === "Electronics" ||
+  category === "Appliances"
+) && (
+
+<div className="space-y-4 border rounded-xl p-4 bg-yellow-50">
+
+<h3 className="font-semibold text-lg">
+💻 Electronics/Appliances Details
+</h3>
+
+<div className="grid grid-cols-2 gap-3">
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Model Number
+  </label>
+
+  <input
+    type="text"
+    placeholder="e.g. SM-A546E"
+    value={modelNumber}
+    onChange={(e) => setModelNumber(e.target.value)}
+    className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+  />
+</div>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Warranty
+  </label>
+
+  <select
+    value={warranty}
+    onChange={(e) => setWarranty(e.target.value)}
+    className="w-full p-3 border rounded-xl"
+  >
+    <option>No Warranty</option>
+    <option>6 Months</option>
+    <option>1 Year</option>
+    <option>2 Years</option>
+  </select>
+</div>
+
+<div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Power Source
+  </label>
+
+  <input
+    type="text"
+    placeholder="Electric / Battery"
+    value={powerSource}
+    onChange={(e) => setPowerSource(e.target.value)}
+    className="w-full p-3 border rounded-xl"
+  />
+</div>
+
+<input
+type="text"
+placeholder="Voltage"
+value={voltage}
+onChange={(e)=>setVoltage(e.target.value)}
+className="w-full p-3 border rounded-xl"
+/>
+
+<input
+type="text"
+placeholder="Included Accessories"
+value={accessories}
+onChange={(e)=>setAccessories(e.target.value)}
+className="col-span-2 w-full p-3 border rounded-xl"
+/>
+
+</div>
+
+</div>
+
+)}
+{category === "Grocery" && (
+
+<div className="space-y-4 border rounded-xl p-4 bg-green-50">
+
+  <h3 className="text-lg font-semibold">
+    🛒 Grocery Details
+  </h3>
+
+  <div className="grid grid-cols-2 gap-3">
+
+    <input
+      type="number"
+      placeholder="Weight"
+      value={weight}
+      onChange={(e)=>setWeight(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <select
+      value={unit}
+      onChange={(e)=>setUnit(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    >
+      <option>g</option>
+      <option>kg</option>
+      <option>ml</option>
+      <option>L</option>
+    </select>
+
+    <input
+      type="date"
+      value={expiryDate}
+      onChange={(e)=>setExpiryDate(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <input
+      type="text"
+      placeholder="FSSAI Number"
+      value={fssaiNumber}
+      onChange={(e)=>setFssaiNumber(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <label className="flex items-center gap-2 col-span-2">
+
+      <input
+        type="checkbox"
+        checked={organic}
+        onChange={(e)=>setOrganic(e.target.checked)}
+      />
+
+      Organic Product
+
+    </label>
+
+  </div>
+
+</div>
+
+)}
+{category === "Beauty" && (
+
+<div className="space-y-4 border rounded-xl p-4 bg-pink-50">
+
+  <h3 className="text-lg font-semibold">
+    💄 Beauty Details
+  </h3>
+
+  <div>
+  <label className="block text-sm font-medium mb-1">
+    Skin Type
+  </label>
+
+  <select
+    value={skinType}
+    onChange={(e) => setSkinType(e.target.value)}
+    className="w-full p-3 border rounded-xl"
+  >
+    <option>Normal</option>
+    <option>Dry</option>
+    <option>Oily</option>
+    <option>Combination</option>
+    <option>Sensitive</option>
+  </select>
+</div>
+
+<div>
+  <label className="block text-sm font-medium mb-1">
+    Hair Type
+  </label>
+
+  <select
+    value={hairType}
+    onChange={(e) => setHairType(e.target.value)}
+    className="w-full p-3 border rounded-xl"
+  >
+    <option>Normal</option>
+    <option>Dry</option>
+    <option>Oily</option>
+    <option>Damaged</option>
+    <option>Curly</option>
+  </select>
+</div>
+    <input
+      type="text"
+      placeholder="Net Quantity"
+      value={netQuantity}
+      onChange={(e)=>setNetQuantity(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <input
+      type="date"
+      value={expiryDate}
+      onChange={(e)=>setExpiryDate(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <textarea
+      placeholder="Ingredients"
+      value={ingredients}
+      onChange={(e)=>setIngredients(e.target.value)}
+      className="col-span-2 w-full p-3 border rounded-xl"
+    />
+
+  </div>
+)}
+
+{category === "Furniture" && (
+
+<div className="space-y-4 border rounded-xl p-4 bg-orange-50">
+
+  <h3 className="text-lg font-semibold">
+    🪑 Furniture Details
+  </h3>
+
+  <div className="grid grid-cols-2 gap-3">
+
+    <div>
+      <label className="block text-sm mb-1">Dimensions</label>
+      <input
+        type="text"
+        placeholder="L × W × H"
+        value={dimensions}
+        onChange={(e)=>setDimensions(e.target.value)}
+        className="w-full p-3 border rounded-xl"
+      />
+    </div>
+
+    <div>
+      <label className="block text-sm mb-1">Weight Capacity</label>
+      <input
+        type="text"
+        placeholder="100 kg"
+        value={weightCapacity}
+        onChange={(e)=>setWeightCapacity(e.target.value)}
+        className="w-full p-3 border rounded-xl"
+      />
+    </div>
+
+    <label className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        checked={assemblyRequired}
+        onChange={(e)=>setAssemblyRequired(e.target.checked)}
+      />
+      Assembly Required
+    </label>
+
+    <div>
+      <label className="block text-sm mb-1">Warranty</label>
+      <select
+        value={furnitureWarranty}
+        onChange={(e)=>setFurnitureWarranty(e.target.value)}
+        className="w-full p-3 border rounded-xl"
+      >
+        <option>No Warranty</option>
+        <option>6 Months</option>
+        <option>1 Year</option>
+        <option>2 Years</option>
+        <option>5 Years</option>
+      </select>
+    </div>
+
+  </div>
+
+</div>
+
+)}
+{category === "Books" && (
+
+<div className="space-y-4 border rounded-xl p-4 bg-indigo-50">
+
+  <h3 className="text-lg font-semibold">
+    📚 Book Details
+  </h3>
+
+  <div className="grid grid-cols-2 gap-3">
+
+    <input
+      type="text"
+      placeholder="Author"
+      value={author}
+      onChange={(e)=>setAuthor(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <input
+      type="text"
+      placeholder="Publisher"
+      value={publisher}
+      onChange={(e)=>setPublisher(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <select
+      value={language}
+      onChange={(e)=>setLanguage(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    >
+      <option>English</option>
+      <option>Hindi</option>
+      <option>Tamil</option>
+      <option>Telugu</option>
+      <option>Kannada</option>
+      <option>Malayalam</option>
+    </select>
+
+    <input
+      type="text"
+      placeholder="ISBN"
+      value={isbn}
+      onChange={(e)=>setIsbn(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <input
+      type="text"
+      placeholder="Edition"
+      value={edition}
+      onChange={(e)=>setEdition(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+    <input
+      type="number"
+      placeholder="Pages"
+      value={pages}
+      onChange={(e)=>setPages(e.target.value)}
+      className="w-full p-3 border rounded-xl"
+    />
+
+  </div>
+
+</div>
+
+)}
+</div>
 
               <textarea
                 placeholder="Product Description"
@@ -768,13 +1401,18 @@ return ( (product.name || "").toLowerCase().includes(q) ||
                 </tr>
               </thead>
               <tbody>
-                {orders.length === 0 && (
-  <tr> <td
-      colSpan={5}  className="text-center py-12 text-gray-500">
+            {orders.length === 0 && (
+  <tr>
+    <td
+      colSpan={5}
+      className="text-center py-12 text-gray-500"
+    >
       🛒 No Orders Yet
       <br />
       Orders from customers will appear here.
-    </td> </tr> )}
+    </td>
+  </tr>
+)}
                 {orders.map((order) => (
                   <tr key={order.id} className="border-b">
                     <td className="py-4">{order.id?.slice(0, 8)}</td>
