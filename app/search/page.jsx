@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import ProductFilters from "@/components/ProductFilters";
 
 const CATEGORIES = [
   "Men Fashion",
@@ -29,6 +30,10 @@ function SearchContent() {
   const [sort, setSort] = useState("");
   const [stockOnly, setStockOnly] = useState(false);
   const [category, setCategory] = useState("");
+  const [minPrice, setMinPrice] = useState(0);
+const [maxPrice, setMaxPrice] = useState(1000000);
+const [inStockOnly, setInStockOnly] = useState(false);
+const [sortBy, setSortBy] = useState("default");
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -58,6 +63,17 @@ function SearchContent() {
 
   useEffect(() => {
     let items = [...products];
+    items = items.filter(
+  (item) =>
+    Number(item.price) >= minPrice &&
+    Number(item.price) <= maxPrice
+);
+
+if (inStockOnly) {
+  items = items.filter(
+    (item) => item.stock > 0
+  );
+}
 
     if (category) {
       items = items.filter((item) => item.category === category);
@@ -65,19 +81,19 @@ function SearchContent() {
     if (stockOnly) {
       items = items.filter((item) => item.stock > 0);
     }
-    if (sort === "low") items.sort((a, b) => a.price - b.price);
-    if (sort === "high") items.sort((a, b) => b.price - a.price);
+    if (sortBy === "priceLow") items.sort((a, b) => a.price - b.price);
+    if (sortBy === "priceHigh") items.sort((a, b) => b.price - a.price);
+    if (sortBy === "name") { items.sort((a, b) => a.name.localeCompare(b.name));}
     if (sort === "stock") items.sort((a, b) => b.stock - a.stock);
 
     setFiltered(items);
-  }, [products, sort, stockOnly, category]);
+  }, [products, category, stockOnly, sort, minPrice, maxPrice, inStockOnly, sortBy,]);
 
   const clearFilters = () => {
     setSort("");
     setStockOnly(false);
     setCategory("");
   };
-
   const quickChips = ["Shoes", "Mobiles", "Beauty", "Grocery", "Fashion"];
 
   return (
@@ -96,19 +112,16 @@ function SearchContent() {
 </div>
         </div>
 
-        {/* FILTER BAR */}
-        <div className="bg-white rounded-3xl shadow-lg p-4 mb-8 flex flex-wrap gap-3 items-center">
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-            className="border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="">Sort By</option>
-            <option value="low">Price: Low to High</option>
-            <option value="high">Price: High to Low</option>
-            <option value="stock">Stock Available</option>
-          </select>
-
+     <ProductFilters
+  minPrice={minPrice}
+  maxPrice={maxPrice}
+  inStockOnly={inStockOnly}
+  sortBy={sortBy}
+  setMinPrice={setMinPrice}
+  setMaxPrice={setMaxPrice}
+  setInStockOnly={setInStockOnly}
+  setSortBy={setSortBy}
+/>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -140,7 +153,7 @@ function SearchContent() {
               Clear Filters
             </button>
           )}
-        </div>
+    
 
         {/* RESULTS */}
         {loading ? (
@@ -153,29 +166,81 @@ function SearchContent() {
             <h2 className="text-2xl font-bold mb-2">🔍 No products found</h2>
             <p className="text-gray-500 mb-6">Try another keyword or filter.</p>
             <Link href="/">
-              <button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold transition">
-                Continue Shopping
-              </button>
-              <div className="mt-8">
-<p className="font-bold mb-4">
-Popular Searches
-</p>
-<div className="flex justify-center gap-3 flex-wrap">
-<span className="bg-white shadow rounded-full px-4 py-2">
-📱 Mobiles
-</span>
-<span className="bg-white shadow rounded-full px-4 py-2">
-👗 Fashion
-</span>
-<span className="bg-white shadow rounded-full px-4 py-2">
-💄 Beauty
-</span>
-<span className="bg-white shadow rounded-full px-4 py-2">
-🛒 Grocery
-</span>
+  <button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold transition">
+    Continue Shopping
+  </button>
+</Link>
+
+<div className="mt-8">
+  <p className="font-bold mb-4">
+    Popular Searches
+  </p>
+
+  <div className="flex justify-center gap-3 flex-wrap">
+
+  <Link href="/search?q=Men Fashion">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-green-50 transition cursor-pointer">
+      👔 Men Fashion
+    </span>
+  </Link>
+
+  <Link href="/search?q=Women Fashion">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-pink-50 transition cursor-pointer">
+      👗 Women Fashion
+    </span>
+  </Link>
+
+  <Link href="/search?q=Kids Fashion">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-yellow-50 transition cursor-pointer">
+      🧒 Kids Fashion
+    </span>
+  </Link>
+
+  <Link href="/search?q=Mobiles">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-blue-50 transition cursor-pointer">
+      📱 Mobiles
+    </span>
+  </Link>
+
+  <Link href="/search?q=Electronics">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-indigo-50 transition cursor-pointer">
+      💻 Electronics
+    </span>
+  </Link>
+
+  <Link href="/search?q=Appliances">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-cyan-50 transition cursor-pointer">
+      🏠 Appliances
+    </span>
+  </Link>
+
+  <Link href="/search?q=Furniture">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-orange-50 transition cursor-pointer">
+      🛋️ Furniture
+    </span>
+  </Link>
+
+  <Link href="/search?q=Beauty">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-rose-50 transition cursor-pointer">
+      💄 Beauty
+    </span>
+  </Link>
+
+  <Link href="/search?q=Grocery">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-lime-50 transition cursor-pointer">
+      🛒 Grocery
+    </span>
+  </Link>
+
+  <Link href="/search?q=Books">
+    <span className="bg-white shadow rounded-full px-4 py-2 hover:bg-purple-50 transition cursor-pointer">
+      📚 Books
+    </span>
+  </Link>
+
 </div>
 </div>
-            </Link>
+
           </div>
           ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
@@ -209,7 +274,7 @@ Popular Searches
                         {product.name}
                       </h3>
                       <div className="flex items-center gap-1 mt-2 text-yellow-500">
-                       ★★★★★ <span className="text-xs text-gray-500">(4.9)</span></div>
+                       ★★★★★ <span className="text-xs text-gray-500">({Number(product.rating || 0).toFixed(1)})</span></div>
 
                     <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-3 mt-6">
                         <span className="text-green-600 font-bold">

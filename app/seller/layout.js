@@ -17,6 +17,7 @@ const navItems = [
   { href: "/seller/reports", label: "Reports", icon: "📄" },
   { href: "/seller/assistant", label: "AI Assistant", icon: "🤖" },
   { href: "/seller/chat", label: "Customer Chats", icon: "💬" },
+  { href: "/seller/stock-notifications", label: "Stock Notifications", icon: "🔔" },
 ];
 
 export default function SellerLayout({ children }) {

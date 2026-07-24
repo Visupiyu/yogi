@@ -223,6 +223,37 @@ export default function OrderDetailsPage() {
             </div>
           </div>
         )}
+        {/* DELIVERY PROGRESS */}
+
+<div className="mt-8 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-8">
+
+  <h2 className="text-2xl font-bold">
+    📦 Delivery Progress
+  </h2>
+
+  <p className="mt-4 text-lg">
+    Current Status:
+    <span className="font-bold ml-2">
+      {order.status}
+    </span>
+  </p>
+
+  <div className="mt-6 w-full bg-white/20 rounded-full h-4">
+
+    <div
+      className="bg-white h-4 rounded-full transition-all duration-500"
+      style={{
+        width: `${(getStep(order.status) / 6) * 100}%`,
+      }}
+    />
+
+  </div>
+
+  <p className="mt-4 text-sm opacity-90">
+    Your order is moving through our delivery process.
+  </p>
+
+</div>
 
         {/* DELIVERY DETAILS */}
         <div className="mt-8 bg-white rounded-3xl shadow border p-8">
@@ -344,6 +375,36 @@ export default function OrderDetailsPage() {
             ))}
           </div>
         </div>
+        {/* ORDER SUMMARY */}
+
+<div className="mt-8 bg-white rounded-3xl shadow border p-8">
+
+  <h2 className="text-2xl font-bold mb-6">
+    💰 Order Summary
+  </h2>
+
+  <div className="space-y-4">
+
+    <div className="flex justify-between">
+      <span>Subtotal</span>
+      <span>₹{order.total?.toLocaleString("en-IN")}</span>
+    </div>
+
+    <div className="flex justify-between">
+      <span>Shipping</span>
+      <span>₹{order.shippingCharge || 0}</span>
+    </div>
+
+    <div className="flex justify-between font-bold text-xl border-t pt-4">
+      <span>Total Paid</span>
+      <span>
+        ₹{(order.finalTotal || order.total)?.toLocaleString("en-IN")}
+      </span>
+    </div>
+
+  </div>
+
+</div>
 
         {/* DELIVERY SUCCESS */}
         {order.status === "Delivered" && (

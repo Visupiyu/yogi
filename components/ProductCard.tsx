@@ -136,6 +136,41 @@ export default function ProductCard({ id, name, price, image, stock
 );
 
   };
+  const addToCompare = () => {
+
+  const compare = JSON.parse(
+    localStorage.getItem("compareProducts") || "[]"
+  );
+
+  const exists = compare.find(
+    (item: any) => item.id === id
+  );
+
+  if (exists) {
+    alert("Product already added for comparison");
+    return;
+  }
+
+  if (compare.length >= 4) {
+    alert("You can compare up to 4 products only");
+    return;
+  }
+
+  compare.push({
+    id,
+    name,
+    price,
+    image,
+    stock,
+  });
+
+  localStorage.setItem(
+    "compareProducts",
+    JSON.stringify(compare)
+  );
+
+  alert("Added to Compare");
+};
 
   return(
 
@@ -363,10 +398,43 @@ to-gray-50
  : "🟢 In Stock"
 }
 </p>
+<div className="flex gap-2 mt-3">
 
-        {/* BUTTON */}
+  <button
+    onClick={addToCompare}
+    className="
+      flex-1
+      bg-blue-600
+      hover:bg-blue-700
+      text-white
+      py-2
+      rounded-xl
+      text-sm
+      font-semibold
+      transition
+    "
+  >
+    Compare
+  </button>
 
+  <Link
+    href="/compare"
+    className="
+      flex-1
+      bg-gray-100
+      hover:bg-gray-200
+      text-center
+      py-2
+      rounded-xl
+      text-sm
+      font-semibold
+      transition
+    "
+  >
+    View
+  </Link>
 
+</div>
      </motion.div>
 
    </motion.div>

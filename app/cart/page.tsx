@@ -8,13 +8,21 @@ const SHIPPING_FEE = 99;
 
 export default function CartPage() {
   const [cart, setCart] = useState<any[]>([]);
+  const [savedItems, setSavedItems] = useState<any[]>([]);
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
 
-  useEffect(() => {
-    const storedCart = JSON.parse(localStorage.getItem("cart") || "[]");
-    setCart(storedCart);
-  }, []);
+ useEffect(() => {
+  setCart(
+    JSON.parse(localStorage.getItem("cart") || "[]")
+  );
+
+  setSavedItems(
+    JSON.parse(
+      localStorage.getItem("savedItems") || "[]"
+    )
+  );
+}, []);
 
   const persist = (updated: any[]) => {
     setCart(updated);
@@ -52,6 +60,51 @@ export default function CartPage() {
       alert("Invalid coupon");
     }
   };
+  const saveForLater = (index: number) => {
+
+  const item = cart[index];
+
+  const updatedCart =
+    cart.filter((_, i) => i !== index);
+
+  const updatedSaved = [
+    ...savedItems,
+    item,
+  ];
+
+  persist(updatedCart);
+
+  setSavedItems(updatedSaved);
+
+  localStorage.setItem(
+    "savedItems",
+    JSON.stringify(updatedSaved)
+  );
+
+};
+
+const moveToCart = (index: number) => {
+
+  const item = savedItems[index];
+
+  const updatedSaved =
+    savedItems.filter((_, i) => i !== index);
+
+  const updatedCart = [
+    ...cart,
+    item,
+  ];
+
+  setSavedItems(updatedSaved);
+
+  localStorage.setItem(
+    "savedItems",
+    JSON.stringify(updatedSaved)
+  );
+
+  persist(updatedCart);
+
+};
 
   const total = cart.reduce(
     (sum, item) => sum + (Number(item.price) || 0) * (Number(item.qty) || 1),
@@ -255,22 +308,43 @@ console.log("hasMrp:", hasMrp);
                         </p>
 
                         </div>
-                        <button
-  onClick={() => removeItem(index)}
-  className="
-    border
-    border-red-500
-    text-red-600
-    px-3
-    py-2
-    rounded-xl
-    hover:bg-red-500
-    hover:text-white
-    transition
-  "
->
-  🗑 Remove Item
-</button>
+   <div className="flex flex-col gap-2">
+
+  <button
+    onClick={() => saveForLater(index)}
+    className="
+      border
+      border-blue-500
+      text-blue-600
+      px-3
+      py-2
+      rounded-xl
+      hover:bg-blue-500
+      hover:text-white
+      transition
+    "
+  >
+    ⭐ Save for Later
+  </button>
+
+  <button
+    onClick={() => removeItem(index)}
+    className="
+      border
+      border-red-500
+      text-red-600
+      px-3
+      py-2
+      rounded-xl
+      hover:bg-red-500
+      hover:text-white
+      transition
+    "
+  >
+    🗑 Remove Item
+  </button>
+
+</div>
       </div>
       
 
@@ -326,7 +400,66 @@ console.log("hasMrp:", hasMrp);
                   </div>
                 );
               })}
+{savedItems.length > 0 && (
 
+  <div className="mt-10">
+
+    <h2 className="text-2xl font-bold mb-5">
+      ⭐ Saved for Later
+    </h2>
+
+    <div className="space-y-4">
+
+      {savedItems.map((item: any, index: number) => (
+
+        <div
+          key={`${item.id}-${index}`}
+          className="bg-white rounded-2xl shadow-sm p-5 flex flex-col sm:flex-row gap-5"
+        >
+
+          <img
+            src={item.image || "/no-image.png"}
+            alt={item.name}
+            className="w-28 h-28 object-cover rounded-xl"
+          />
+
+          <div className="flex-1">
+
+            <h3 className="font-bold">
+              {item.name}
+            </h3>
+
+            <p className="text-green-700 font-bold mt-2">
+              ₹{Number(item.price).toLocaleString("en-IN")}
+            </p>
+
+            <button
+              onClick={() => moveToCart(index)}
+              className="
+                mt-4
+                bg-green-600
+                hover:bg-green-700
+                text-white
+                px-5
+                py-2
+                rounded-xl
+                transition
+              "
+            >
+              🛒 Move to Cart
+            </button>
+
+          </div>
+
+        </div>
+
+      ))}
+
+    </div>
+
+  </div>
+
+)}
               <div className="flex flex-wrap gap-4 pt-2">
 
   <button

@@ -13,9 +13,9 @@ export default function RecommendedProducts() {
     const loadRecommendations = async () => {
       try {
         const wishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
-        const recent = JSON.parse(
-          localStorage.getItem("recentProducts") || "[]"
-        );
+       const recent = JSON.parse(
+  localStorage.getItem("recentlyViewed") || "[]"
+);
         const preferredIds = [...wishlist, ...recent].map((item) => item.id);
 
         const snapshot = await getDocs(collection(db, "products"));

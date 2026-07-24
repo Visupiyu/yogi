@@ -2,85 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  doc,
-  getDoc,
-  collection,
-  getDocs,
-  query,
-  where,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, where, addDoc, serverTimestamp,limit,} from "firebase/firestore";
+import RecentlyViewed from "@/components/RecentlyViewed";
+import FrequentlyBoughtTogether from "@/components/FrequentlyBoughtTogether";
+import CustomersAlsoBought from "@/components/CustomersAlsoBought";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 
-type Product = {
-  id: string;
-  name: string;
-  image?: string;
-  images?: string[];
-  price: number;
-  mrp?: number;
-  discountPercent?: number;
-  stock: number;
-  category?: string;
-  description?: string;
-  vendorId: string;
-  vendorName: string;
-  color?: string;
-  sizes?: string[];
-  material?: string;
-  brand?: string;
-  countryOfOrigin?: string;
+type Product = { id: string; name: string; image?: string;  images?: string[];  price: number;  mrp?: number;
+  discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
+  color?: string;  sizes?: string[];  material?: string;  brand?: string;  countryOfOrigin?: string;
   // Fashion
-pattern?: string;
-fitType?: string;
-sleeveType?: string;
-neckType?: string;
+pattern?: string;fitType?: string;sleeveType?: string;neckType?: string;
 
 // Mobiles
-modelNumber?: string;
-ram?: string;
-storageCapacity?: string;
-processor?: string;
-displaySize?: string;
-battery?: string;
-camera?: string;
-operatingSystem?: string;
-warranty?: string;
+modelNumber?: string;ram?: string;storageCapacity?: string;processor?: string;displaySize?: string;battery?: string;camera?: string;
+operatingSystem?: string;warranty?: string;
 
 // Electronics / Appliances
-powerSource?: string;
-voltage?: string;
-accessories?: string;
+powerSource?: string;voltage?: string;accessories?: string;
 
 // Grocery
-weight?: string;
-unit?: string;
-expiryDate?: string;
-fssaiNumber?: string;
-organic?: string;
+weight?: string;unit?: string;expiryDate?: string;fssaiNumber?: string;organic?: string;
 
 // Beauty
-skinType?: string;
-hairType?: string;
-ingredients?: string;
-netQuantity?: string;
+skinType?: string;hairType?: string;ingredients?: string;netQuantity?: string;
 
 // Furniture
-dimensions?: string;
-weightCapacity?: string;
-assemblyRequired?: string;
-furnitureWarranty?: string;
-
+dimensions?: string;weightCapacity?: string;assemblyRequired?: string;furnitureWarranty?: string;
 // Books
-author?: string;
-publisher?: string;
-language?: string;
-isbn?: string;
-edition?: string;
-pages?: string;
+author?: string;publisher?: string;language?: string;isbn?: string; edition?: string; pages?: string;
 };
 type ProductQuestion = {
   id: string;
@@ -91,6 +42,7 @@ type ProductQuestion = {
 type ProductReview = {
   id: string;
   customerName: string;
+  userEmail?: string;
   review: string;
   rating: number;
 };
@@ -125,6 +77,7 @@ export default function ProductPage() {
   const [reviewText, setReviewText] = useState("");
   const [pinCode, setPinCode] = useState("");
 const [deliveryMessage, setDeliveryMessage] = useState("");
+const [notifySuccess, setNotifySuccess] = useState(false);
 
   useEffect(() => {
     async function loadProduct() {
@@ -135,17 +88,39 @@ const [deliveryMessage, setDeliveryMessage] = useState("");
 
         if (snap.exists()) {
           const productData = snap.data();
-          const fullProduct: Product = {
+         const fullProduct: Product = {
   id: snap.id,
   ...(productData as Omit<Product, "id">),
 };
-          setProduct(fullProduct);
-          setSelectedImage(
-            fullProduct.images?.[0] ||
-              fullProduct.image ||
-              "/no-image.png"
-          );
 
+setProduct(fullProduct);
+
+// ⭐ Save Recently Viewed Product
+const viewed = JSON.parse(
+  localStorage.getItem("recentlyViewed") || "[]"
+);
+
+const filtered = viewed.filter(
+  (item: any) => item.id !== fullProduct.id
+);
+
+filtered.unshift({
+  id: fullProduct.id,
+  name: fullProduct.name,
+  image: fullProduct.image,
+  price: fullProduct.price,
+});
+
+localStorage.setItem(
+  "recentlyViewed",
+  JSON.stringify(filtered.slice(0, 10))
+);
+
+setSelectedImage(
+  fullProduct.images?.[0] ||
+    fullProduct.image ||
+    "/no-image.png"
+);
           const relatedSnap = await getDocs(
             query(
               collection(db, "products"),
@@ -201,7 +176,7 @@ reviewSnap.forEach((d) => {
   });
 });
           setReviews(reviewData);
-        }
+         }
       } catch (error) {
         console.error(error);
       } finally {
@@ -337,6 +312,50 @@ reviewSnap.forEach((d) => {
     }
   };
 
+  const notifyWhenAvailable = async () => {
+
+  if (!product) return;
+
+  const user = JSON.parse(
+    localStorage.getItem("user") || "{}"
+  );
+
+  if (!user.email) {
+    alert("Please login first.");
+    router.push("/login");
+    return;
+  }
+
+  const existing = await getDocs(
+    query(
+      collection(db, "stockNotifications"),
+      where("productId", "==", product.id),
+      where("userEmail", "==", user.email),
+      limit(1)
+    )
+  );
+
+  if (!existing.empty) {
+    alert("You are already subscribed.");
+    return;
+  }
+
+  await addDoc(
+    collection(db, "stockNotifications"),
+    {
+      productId: product.id,
+      productName: product.name,
+      userEmail: user.email,
+      userName: user.name || "Customer",
+      vendorId: product.vendorId,
+      createdAt: serverTimestamp(),
+    }
+  );
+
+  setNotifySuccess(true);
+
+};
+
   const startChat = async () => { if (!product) return;
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     if (!user.email) {
@@ -413,6 +432,9 @@ const savings = hasDiscount ? mrp - price : 0;
       ).toFixed(1)
     : null;
   const starCount = avgRating ? Math.round(Number(avgRating)) : 0;
+  const ratingCounts = [5, 4, 3, 2, 1].map(
+  (star) => reviews.filter((r) => r.rating === star).length
+);
   const specifications: [string, string | undefined][] = [
   ["Brand", product.brand],
   ["Category", product.category],
@@ -695,16 +717,46 @@ Easy Returns
                     product.stock > 0 ? "bg-green-50" : "bg-red-50"
                   }`}
                 >
-                  {product.stock > 0 ? (
-                    <p className="text-green-700 font-semibold text-sm">
-                      ✓ In stock
-                      {product.stock <= 5 ? ` — only ${product.stock} left` : ""}
-                    </p>
-                  ) : (
-                    <p className="text-red-600 font-semibold text-sm">
-                      Out of stock
-                    </p>
-                  )}
+                 {product.stock > 0 ? (
+  <p className="text-green-700 font-semibold text-sm">
+    ✓ In stock
+    {product.stock <= 5 ? ` — only ${product.stock} left` : ""}
+  </p>
+) : (
+  <div className="space-y-3">
+
+    <p className="text-red-600 font-semibold text-sm">
+      ❌ Out of Stock
+    </p>
+
+    {notifySuccess ? (
+
+      <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl text-sm font-medium">
+        ✅ We'll notify you when this product is back in stock.
+      </div>
+
+    ) : (
+
+      <button
+        onClick={notifyWhenAvailable}
+        className="
+          bg-orange-500
+          hover:bg-orange-600
+          text-white
+          px-5
+          py-3
+          rounded-2xl
+          font-semibold
+          transition
+        "
+      >
+        📧 Notify Me When Available
+      </button>
+
+    )}
+
+  </div>
+)}
                 </div>
 
                 {/* SIZE SELECTOR */}
@@ -1091,6 +1143,21 @@ className="border rounded-2xl px-4 py-2"
               </div>
             </div>
           )}
+         
+<FrequentlyBoughtTogether
+  currentProductId={product.id}
+  category={product.category}
+/>
+
+<CustomersAlsoBought
+  currentProductId={product.id}
+  category={product.category}
+/>
+
+<RecentlyViewed
+  currentProductId={product.id}
+/>
+      
 
           {/* QUESTIONS */}
           <div className="mt-10 bg-white rounded-3xl shadow-sm p-6">
@@ -1189,6 +1256,43 @@ className="border rounded-2xl px-4 py-2"
                 </div>
               </div>
             )}
+            <div className="mb-8 space-y-3">
+
+  {[5, 4, 3, 2, 1].map((star, index) => (
+
+    <div
+      key={star}
+      className="flex items-center gap-3"
+    >
+
+      <span className="w-8 font-medium">
+        {star}★
+      </span>
+
+      <div className="flex-1 bg-gray-200 rounded-full h-3">
+
+        <div
+          className="bg-yellow-500 h-3 rounded-full"
+          style={{
+            width: `${
+              reviews.length
+                ? (ratingCounts[index] / reviews.length) * 100
+                : 0
+            }%`,
+          }}
+        />
+
+      </div>
+
+      <span className="w-8 text-right text-sm">
+        {ratingCounts[index]}
+      </span>
+
+    </div>
+
+  ))}
+
+</div>
 
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <select
@@ -1256,11 +1360,13 @@ className="border rounded-2xl px-4 py-2"
   </p>
 
 </div>
+            
                ))}
             </div>
           </div>
         </div>
       </div>
+          
       
 
       {/* SIZE CHART MODAL */}

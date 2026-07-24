@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, serverTimestamp,} from "firebase/firestore";
+import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch,} from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -247,6 +247,42 @@ setPages("");
       });
     }
   };
+  const notifyWaitingCustomers = async (
+  productId: string,
+  productName: string,
+  stock: number
+) => {
+  if (stock <= 0) return;
+
+  const waitingSnap = await getDocs(
+    query(
+      collection(db, "stockNotifications"),
+      where("productId", "==", productId)
+    )
+  );
+
+  if (waitingSnap.empty) return;
+
+  const batch = writeBatch(db);
+
+  waitingSnap.forEach((docSnap) => {
+    const data = docSnap.data();
+
+    batch.set(doc(collection(db, "notifications")), {
+      title: "🎉 Product Back In Stock",
+      message: `${productName} is back in stock. Order now before it sells out.`,
+      userId: data.userId,
+      role: "customer",
+      type: "stock",
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+
+    batch.delete(doc(db, "stockNotifications", docSnap.id));
+  });
+
+  await batch.commit();
+};
 
   const addOrUpdateProduct = async () => {
     if (!name || !price || !stock) {
@@ -330,13 +366,21 @@ pages,
 };
 
       if (editingId) {
-        await updateDoc(doc(db, "products", editingId), {
-          ...baseData,
-          image: uploadedImages[0] || image,
-          images: uploadedImages.length > 0 ? uploadedImages : images,
-        });
-        await lowStockNotify(name, Number(stock));
-        alert("Product Updated");
+     await updateDoc(doc(db, "products", editingId), {
+  ...baseData,
+  image: uploadedImages[0] || image,
+  images: uploadedImages.length > 0 ? uploadedImages : images,
+});
+
+await lowStockNotify(name, Number(stock));
+
+await notifyWaitingCustomers(
+  editingId,
+  name,
+  Number(stock)
+);
+
+alert("Product Updated");
       } else {
         await addDoc(collection(db, "products"), {
           ...baseData,
