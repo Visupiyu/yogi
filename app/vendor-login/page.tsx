@@ -5,6 +5,7 @@ import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function VendorLoginPage() {
   const router = useRouter();
@@ -156,22 +157,24 @@ console.error(err);
           />
 
           <div className="flex items-center justify-between mt-2">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showPassword}
-                onChange={() => setShowPassword(!showPassword)}
-              />
-              <span className="text-sm text-gray-600">Show Password</span>
-            </label>
+  <label className="flex items-center gap-2">
+    <input
+      type="checkbox"
+      checked={showPassword}
+      onChange={() => setShowPassword(!showPassword)}
+    />
+    <span className="text-sm text-gray-600">
+      Show Password
+    </span>
+  </label>
 
-            <a
-              href="/vendor-forgot-password"
-              className="text-blue-600 font-semibold text-sm"
-            >
-              Forgot Password?
-            </a>
-          </div>
+  <Link
+    href="/vendor-forgot-password"
+    className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+  >
+    Forgot Password?
+  </Link>
+</div>
         </div>
 
         <button
@@ -188,12 +191,12 @@ console.error(err);
 
         <p className="text-center mt-5">
           New Vendor?
-          <a
-            href="/vendor-register"
-            className="text-blue-600 font-bold ml-2"
-          >
-            Register Here
-          </a>
+          <Link
+  href="/vendor-register"
+  className="text-blue-600 font-bold ml-2 hover:underline"
+>
+  Register Here
+</Link>
         </p>
       </div>
     </div>

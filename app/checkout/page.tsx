@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   collection,
   addDoc,
@@ -11,6 +12,7 @@ import {
   getDocs,
   query,
   where,
+  limit,
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
@@ -47,6 +49,7 @@ export default function CheckoutPage() {
 setPhone(userData.phone || "");
 setAddress(userData.address || "");
     setAvailablePoints(Number(userData.rewardPoints || 0));
+    loadDefaultAddress();
   }, []);
 
   const total = items.reduce(
@@ -111,6 +114,54 @@ setAddress(userData.address || "");
       alert("Coupon check failed");
     }
   };
+  async function loadDefaultAddress() {
+
+  try {
+
+    const user = JSON.parse(
+      localStorage.getItem("user") || "{}"
+    );
+
+    if (!user.email) return;
+
+    const q = query(
+      collection(db, "addresses"),
+      where("userEmail", "==", user.email),
+      where("isDefault", "==", true),
+      limit(1)
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+
+      const data = snapshot.docs[0].data();
+
+      setName(data.fullName || "");
+      setPhone(data.phone || "");
+
+      const fullAddress = [
+        data.addressLine1,
+        data.addressLine2,
+        data.landmark,
+        data.city,
+        data.state,
+        data.pincode,
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      setAddress(fullAddress);
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+  }
+
+}
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -447,9 +498,20 @@ localStorage.setItem( "user", JSON.stringify(user));
           <div className="lg:col-span-2 space-y-6">
             {/* DELIVERY ADDRESS */}
             <div className="bg-white rounded-2xl shadow-sm p-6">
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-📍 Delivery Address
-</h2>
+              <div className="flex justify-between items-center mb-6">
+
+  <h2 className="text-2xl font-bold flex items-center gap-3">
+    📍 Delivery Address
+  </h2>
+
+  <Link
+    href="/addresses"
+    className="text-green-600 font-semibold hover:underline"
+  >
+    Change Address
+  </Link>
+
+</div>
 <p className="text-gray-500 mb-6">
 Please enter your shipping details.
 </p>

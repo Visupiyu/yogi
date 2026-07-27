@@ -38,16 +38,11 @@ export default function ShippingPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              1. Order Processing
+              1. 📦 Order Processing
             </h2>
 
             <p>
-
-              Orders are processed after successful payment confirmation or
-              order verification for Cash on Delivery (COD). Sellers are
-              responsible for preparing orders for dispatch within the
-              promised handling time.
-
+              Orders are processed after successful payment confirmation or order verification for Pay on Delivery (UPI Only). Sellers are responsible for preparing orders for dispatch within the promised handling time.
             </p>
 
           </div>
@@ -55,7 +50,7 @@ export default function ShippingPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              2. Delivery Partners
+              2. 🚚 Delivery Partners
             </h2>
 
             <p>
@@ -71,7 +66,7 @@ export default function ShippingPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              3. Estimated Delivery Time
+              3. ⏳ Delivery Time
             </h2>
 
             <p>
@@ -84,11 +79,74 @@ export default function ShippingPolicyPage() {
             </p>
 
           </div>
+          <div className="overflow-x-auto mt-5">
+
+  <table className="w-full border rounded-xl overflow-hidden">
+
+    <thead className="bg-green-600 text-white">
+
+      <tr>
+
+        <th className="p-3 text-left">
+          Delivery Type
+        </th>
+
+        <th className="p-3 text-left">
+          Estimated Time
+        </th>
+
+      </tr>
+
+    </thead>
+
+    <tbody>
+
+      <tr className="border-b">
+
+        <td className="p-3">
+          Standard Delivery
+        </td>
+
+        <td className="p-3">
+          3–7 Business Days
+        </td>
+
+      </tr>
+
+      <tr className="border-b">
+
+        <td className="p-3">
+          Remote Areas
+        </td>
+
+        <td className="p-3">
+          5–10 Business Days
+        </td>
+
+      </tr>
+
+      <tr>
+
+        <td className="p-3">
+          Pre-Order Products
+        </td>
+
+        <td className="p-3">
+          Mentioned on Product Page
+        </td>
+
+      </tr>
+
+    </tbody>
+
+  </table>
+
+</div>
 
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              4. Shipping Charges
+              4. 💰 Shipping Charges
             </h2>
 
             <p>
@@ -120,7 +178,7 @@ export default function ShippingPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              6. Order Tracking
+              6. 📍 Tracking
             </h2>
 
             <p>
@@ -133,7 +191,7 @@ export default function ShippingPolicyPage() {
           <div>
 
             <h2 className="text-2xl font-bold mb-2">
-              7. Delays
+              7. ⚠️ Delays
             </h2>
 
             <p>
@@ -191,6 +249,23 @@ export default function ShippingPolicyPage() {
   </p>
 
 </div>
+<div className="bg-yellow-50 border border-yellow-300 rounded-xl p-5">
+
+  <h3 className="font-bold text-lg mb-2">
+
+    ⚠ Important Notice
+
+  </h3>
+
+  <p>
+
+    Delivery timelines are estimates only. Actual delivery may vary
+    depending on seller location, courier availability, weather
+    conditions, public holidays, or other unforeseen circumstances.
+
+  </p>
+
+</div>
 
           <div>
 
@@ -207,6 +282,47 @@ export default function ShippingPolicyPage() {
             </p>
 
           </div>
+          <div className="border-t pt-8">
+
+<h2 className="text-2xl font-bold mb-5">
+
+Related Policies
+
+</h2>
+
+<div className="flex flex-wrap gap-4">
+
+<Link
+href="/returns-refunds"
+className="text-green-600 hover:underline"
+>
+Return & Refund Policy
+</Link>
+
+<Link
+href="/privacy-policy"
+className="text-green-600 hover:underline"
+>
+Privacy Policy
+</Link>
+
+<Link
+href="/terms"
+className="text-green-600 hover:underline"
+>
+Terms & Conditions
+</Link>
+
+<Link
+href="/contact"
+className="text-green-600 hover:underline"
+>
+Contact Us
+</Link>
+
+</div>
+
+</div>
           <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
 
   <h3 className="text-2xl font-bold mb-2">
@@ -222,7 +338,7 @@ export default function ShippingPolicyPage() {
     href="/contact"
     className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
   >
-    Contact Support
+    📞 Contact Support
   </Link>
 
 </div>

@@ -28,10 +28,7 @@ export default function Footer() {
           <h3 className="text-lg font-bold mb-3">Company</h3>
           <ul className="space-y-3 text-gray-600">
             <li><Link href="/about" className="hover:text-green-600 transition">About Us</Link></li>
-            <li><Link href="/" className="hover:text-green-600 transition">Careers</Link></li>
-            <li><Link href="/" className="hover:text-green-600 transition">Press</Link></li>
-            <li><Link href="/" className="hover:text-green-600 transition">Blog</Link></li>
-          </ul>
+            </ul>
         </div>
 
         {/* HELP */}
@@ -39,8 +36,17 @@ export default function Footer() {
           <h3 className="text-lg font-bold mb-3">Help</h3>
           <ul className="space-y-3 text-gray-600">
             <li><Link href="/contact" className="hover:text-green-600 transition">Contact Us</Link></li>
-            <li><Link href="/returns" className="hover:text-green-600 transition">Returns</Link></li>
-            <li><Link href="/shipping" className="hover:text-green-600 transition">Shipping</Link></li>
+            <li>
+  <Link href="/returns-refunds" className="hover:text-green-600 transition">
+    Returns & Refunds
+  </Link>
+</li>
+
+<li>
+  <Link href="/shipping-policy" className="hover:text-green-600 transition">
+    Shipping Policy
+  </Link>
+</li>
             <li><Link href="/privacy-policy" className="hover:text-green-600 transition">Privacy Policy</Link></li>
             <li><Link href="/terms" className="hover:text-green-600 transition">Terms &amp; Conditions</Link></li>
           </ul>

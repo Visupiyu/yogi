@@ -61,25 +61,32 @@ export default function ChatRoomPage() {
     where("chatId", "==", id),
     orderBy("createdAt")
   );
+const unsubscribe = onSnapshot(q, (snapshot) => {
 
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const list: any[] = [];
+  console.log("Message count:", snapshot.size);
 
-    snapshot.forEach((docSnap) => {
-      list.push({
-        id: docSnap.id,
-        ...docSnap.data(),
-      });
+  const list: any[] = [];
+
+  snapshot.forEach((docSnap) => {
+
+    console.log("Message:", docSnap.data());
+
+    list.push({
+      id: docSnap.id,
+      ...docSnap.data(),
     });
 
-    setMessages(list);
+  });
 
-    requestAnimationFrame(() => {
-      bottomRef.current?.scrollIntoView({
-        behavior: "smooth",
-      });
+  setMessages(list);
+
+  requestAnimationFrame(() => {
+    bottomRef.current?.scrollIntoView({
+      behavior: "smooth",
     });
   });
+
+});
 
   return () => unsubscribe();
 

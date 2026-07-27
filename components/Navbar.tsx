@@ -76,16 +76,31 @@ const totalQty = cart.reduce(
   }, []);
 
   /* LOAD USER */
-  useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    const savedVendor = localStorage.getItem("vendor");
-    const savedAdmin = localStorage.getItem("admin");
+ const loadUser = () => {
+  const savedUser = localStorage.getItem("user");
+  const savedVendor = localStorage.getItem("vendor");
+  const savedAdmin = localStorage.getItem("admin");
 
-    if (savedAdmin) setUser(JSON.parse(savedAdmin));
-    else if (savedVendor) setUser(JSON.parse(savedVendor));
-    else if (savedUser) setUser(JSON.parse(savedUser));
-    else setUser(null);
-  }, []);
+  if (savedAdmin) {
+    setUser(JSON.parse(savedAdmin));
+  } else if (savedVendor) {
+    setUser(JSON.parse(savedVendor));
+  } else if (savedUser) {
+    setUser(JSON.parse(savedUser));
+  } else {
+    setUser(null);
+  }
+};
+
+useEffect(() => {
+  loadUser();
+
+  window.addEventListener("storage", loadUser);
+
+  return () => {
+    window.removeEventListener("storage", loadUser);
+  };
+}, []);
 
   /* SEARCH SUGGESTIONS (debounced) */
   useEffect(() => {

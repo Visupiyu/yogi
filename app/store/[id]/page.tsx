@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductCard from "@/components/ProductCard";
 
-export default function StorePage() {const params = useParams();
+export default function StorePage() {const params = useParams(); const router = useRouter();
 
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -153,12 +153,35 @@ export default function StorePage() {const params = useParams();
    return (
     <section className="py-10 px-4">
       <div className="max-w-7xl mx-auto">
-        <Link
-          href="/stores"
-          className="inline-block mb-6 bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-xl"
-        >
-          ← Back to Stores
-        </Link>
+        <button
+  onClick={() => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/stores");
+    }
+  }}
+  className="
+    inline-flex
+    items-center
+    gap-2
+    mb-6
+    bg-white
+    border
+    border-gray-300
+    hover:bg-green-50
+    hover:border-green-500
+    text-gray-700
+    hover:text-green-700
+    px-5
+    py-3
+    rounded-xl
+    shadow-sm
+    transition
+  "
+>
+  ← Back
+</button>
 
         {/* STORE HEADER */}
         <div className="bg-gradient-to-r from-green-600 via-green-500 to-blue-600 rounded-[32px] p-8 md:p-14 text-white mb-10 shadow-xl">

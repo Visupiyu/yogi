@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
@@ -50,6 +59,67 @@ export default function OrderDetailsPage() {
 
     return () => unsub();
   }, [orderId, router]);
+  const openSellerChat = async () => {
+     console.log("Firebase User:", auth.currentUser);
+  console.log("Order:", order);
+  console.log("First Item:", order?.items?.[0]);
+
+  if (!order?.items?.length) return;
+
+  try {
+
+    const item = order.items[0];
+
+    const q = query(
+      collection(db, "chats"),
+      where("orderId", "==", order.id),
+      where("sellerId", "==", item.vendorId)
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      router.push(`/chat/${snapshot.docs[0].id}`);
+      return;
+    }
+
+    const chatRef = await addDoc(
+  collection(db, "chats"),
+  {
+    orderId: order.id,
+
+    sellerId: item.vendorId,
+    sellerName: item.vendorName || "",
+
+    customerId: order.userId,
+    customerName: order.customerName,
+    customerEmail: order.userEmail,
+
+    productId: item.id,
+    productName: item.name,
+    productImage: item.image || "",
+
+    lastMessage: "Conversation started",
+    lastSender: "system",
+
+    sellerUnread: 0,
+    customerUnread: 0,
+
+    createdAt: serverTimestamp(),
+    lastMessageAt: serverTimestamp(),
+  }
+);
+
+    router.push(`/chat/${chatRef.id}`);
+
+  } catch (error: any) {
+
+  console.error("Chat Error:", error);
+
+  alert(error.message);
+
+}
+};
 
   const getStep = (status: string = "") => {
     switch (status) {
@@ -307,21 +377,23 @@ export default function OrderDetailsPage() {
             📄 Download Invoice
           </a>
 
-          {order.chatId ? (
-            <a
-              href={`/chat/${order.chatId}`}
-              className="h-12 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold flex items-center justify-center"
-            >
-              💬 Contact Seller
-            </a>
-          ) : (
-            <button
-              disabled
-              className="h-12 rounded-xl bg-gray-300 text-gray-600 cursor-not-allowed font-semibold"
-            >
-              💬 Chat Unavailable
-            </button>
-          )}
+          <button
+  onClick={openSellerChat}
+  className="
+    h-12
+    rounded-xl
+    bg-green-600
+    hover:bg-green-700
+    text-white
+    font-semibold
+    flex
+    items-center
+    justify-center
+    w-full
+  "
+>
+  💬 Contact Seller
+</button>
 
           <Link
             href="/orders"

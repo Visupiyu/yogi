@@ -116,12 +116,14 @@ export default function LoginPage() {
               <span className="text-sm text-gray-600">Show Password</span>
             </label>
 
-            <Link
-  href="/forgot-password"
-  className="text-blue-600 font-semibold text-sm"
->
-  Forgot Password?
-</Link>
+           <div className="flex justify-end mt-2">
+  <Link
+    href="/forgot-password"
+    className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+  >
+    Forgot Password?
+  </Link>
+</div>
           </div>
         </div>
 

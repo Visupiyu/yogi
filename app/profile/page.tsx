@@ -12,8 +12,11 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { onAuthStateChanged,} from "firebase/auth";
-import { signOut } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signOut,
+  updateProfile,
+} from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 
 export default function ProfilePage() {
@@ -104,6 +107,11 @@ export default function ProfilePage() {
         },
         { merge: true }
       );
+      if (auth.currentUser) {
+  await updateProfile(auth.currentUser, {
+    displayName: fullName,
+  });
+}
 
       const updated = { ...user, name: fullName, phone, address };
       localStorage.setItem("user", JSON.stringify(updated));

@@ -48,3 +48,4 @@ export const db = getFirestore(app);
 
 export const storage =
   getStorage(app);
+  export { app };

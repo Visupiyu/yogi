@@ -7,20 +7,28 @@ export default function TopStrip() {
   return (
     <div className="hidden md:block bg-green-600 text-white text-sm">
       <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-4 overflow-x-auto whitespace-nowrap">
+
         {/* LEFT */}
         <div className="flex items-center gap-6">
+
           <div className="flex items-center gap-2">
             <Truck size={16} />
             <span>Free Delivery Above ₹999</span>
           </div>
-          <div className="flex items-center gap-2">
+
+          <Link
+            href="/support"
+            className="flex items-center gap-2 hover:text-yellow-200 transition"
+          >
             <Headphones size={16} />
             <span>24/7 Support</span>
-          </div>
+          </Link>
+
         </div>
 
         {/* RIGHT */}
         <div className="flex items-center gap-6">
+
           <Link
             href="/track-order"
             className="flex items-center gap-2 hover:text-yellow-200 transition"
@@ -36,7 +44,9 @@ export default function TopStrip() {
             <Smartphone size={16} />
             Download App
           </Link>
+
         </div>
+
       </div>
     </div>
   );
