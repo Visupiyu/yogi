@@ -9,6 +9,7 @@ import QueryProvider from "@/components/providers/QueryProvider";
 const HIDE_CHROME_PREFIXES = [
   "/seller",
   "/admin",
+  "/invoice",
 ];
 
 export default function ClientLayout({

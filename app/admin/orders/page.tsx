@@ -10,6 +10,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import Link from "next/link";
 
 type Order = {
   id: string;
@@ -311,17 +312,21 @@ const filtered = orders.filter(
                         />
                       </td>
                       <td>
-                        {order.paymentStatus === "Paid" ? (
-                        <a
-                          href={`/invoice/${order.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 transition text-white px-3 py-2 rounded-lg inline-block"
-                        >
-                          Invoice
-                        </a>
-                        ) : (<span className="bg-gray-300 text-gray-600 px-3 py-2 rounded-lg inline-block">Unpaid</span>)}
-                      </td>
+  {order.paymentStatus === "Paid" ? (
+    <a
+      href={`/admin/orders/${order.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 transition text-white px-3 py-2 rounded-lg inline-block"
+    >
+      Invoice
+    </a>
+  ) : (
+    <span className="bg-gray-300 text-gray-600 px-3 py-2 rounded-lg inline-block">
+      Unpaid
+    </span>
+  )}
+</td>
                     </tr>
                   ))
                 )}

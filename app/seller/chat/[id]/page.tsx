@@ -14,12 +14,14 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   increment,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
-  updateDoc,where
+  updateDoc,
+  where
 } from "firebase/firestore";
 import Image from "next/image";
 
@@ -41,6 +43,8 @@ const id = params.id as string;
 
   const [messages,setMessages]=
     useState<any[]>([]);
+    const [chat,setChat] =
+useState<any>(null);
     const [sending,setSending]=
 useState(false);
 
@@ -67,6 +71,24 @@ useState(false);
   where("chatId", "==", id),
   orderBy("createdAt")
 );
+const loadChat = async () => {
+
+  const snap = await getDoc(
+    doc(db, "chats", id)
+  );
+
+  if (snap.exists()) {
+
+    setChat({
+      id: snap.id,
+      ...snap.data(),
+    });
+
+  }
+
+};
+
+loadChat();
 
     const unsubscribe=
 
@@ -201,14 +223,17 @@ setImageFile(null);
         p-6
       ">
 
-        <h1 className="
-          text-3xl
-          font-bold
-        ">
+        <h1 className="text-3xl font-bold">
 
-          💬 Customer Chat
+💬 {chat?.customerName || "Customer"}
 
-        </h1>
+</h1>
+
+<p className="mt-2 opacity-90">
+
+📦 {chat?.productName}
+
+</p>
 
       </div>
 

@@ -6,14 +6,15 @@ import Image from "next/image";
 import {
   addDoc,
   collection,
+  doc,
+  getDoc,
+  increment,
   onSnapshot,
   orderBy,
   query,
-  where,
   serverTimestamp,
   updateDoc,
-  doc,
-  increment,
+  where
 } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -26,6 +27,7 @@ export default function ChatRoomPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const [message, setMessage] = useState("");
+  const [chat,setChat] =useState<any>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [preview,setPreview] = useState("");
   useEffect(() => { return () => { if (preview) { URL.revokeObjectURL(preview); } };
@@ -61,6 +63,24 @@ export default function ChatRoomPage() {
     where("chatId", "==", id),
     orderBy("createdAt")
   );
+  const loadChat = async () => {
+
+  const snap = await getDoc(
+    doc(db, "chats", id)
+  );
+
+  if (snap.exists()) {
+
+    setChat({
+      id: snap.id,
+      ...snap.data(),
+    });
+
+  }
+
+};
+
+loadChat();
 const unsubscribe = onSnapshot(q, (snapshot) => {
 
   console.log("Message count:", snapshot.size);
@@ -150,23 +170,34 @@ const sendMessage = async () => {
  return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* HEADER */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-         <Image
-            src="/avatar.png"
-            alt="Seller"
-             width={56} height={56}
-            className="rounded-full border-2 border-white"
-          />
-          <div>
-            <h1 className="text-2xl font-bold">Seller Chat</h1>
-            <p className="text-sm flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-green-400" />
-              Online
-            </p>
-          </div>
-        </div>
-      </div>
+     <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-5 flex items-center justify-between">
+  <div className="flex items-center gap-4">
+
+    <Image
+      src={chat?.sellerImage || "/avatar.png"}
+      alt={chat?.sellerName || "Seller"}
+      width={56}
+      height={56}
+      className="rounded-full border-2 border-white object-cover"
+    />
+
+    <div>
+      <h1 className="text-2xl font-bold">
+        {chat?.sellerName || "Seller"}
+      </h1>
+
+      <p className="text-sm">
+        📦 {chat?.productName || "Product"}
+      </p>
+
+      <p className="text-sm flex items-center gap-2 mt-1">
+        <span className="w-3 h-3 rounded-full bg-green-400" />
+        Seller
+      </p>
+    </div>
+
+  </div>
+</div>
 
       {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">

@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 
+
 export default function OrderDetailsPage() {
   const router = useRouter();
   const params = useParams();
@@ -367,15 +368,13 @@ export default function OrderDetailsPage() {
         </div>
 
         {/* ACTION BUTTONS */}
-        <div className="mt-8 grid md:grid-cols-3 gap-4">
-          <a
-            href={`/invoice/${order.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
-          >
-            📄 Download Invoice
-          </a>
+        <Link
+  href={`/admin/invoice/${order.id}`}
+  target="_blank"
+  className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
+>
+  🖨 Print Invoice
+</Link>
 
           <button
   onClick={openSellerChat}
@@ -495,7 +494,6 @@ export default function OrderDetailsPage() {
             </Link>
           </div>
         )}
-      </div>
-    </section>
+      </section>
   );
 }

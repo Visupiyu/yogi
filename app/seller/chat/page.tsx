@@ -40,21 +40,31 @@ export default function SellerChatPage(){
 
     try{
 
-      const vendor = JSON.parse(
+    const vendor = JSON.parse(
+  localStorage.getItem("vendor") || "{}"
+);
 
-        localStorage.getItem(
-          "vendor"
-        ) || "{}"
+console.log("Vendor Object:", vendor);
+console.log("Vendor UID:", vendor.uid);
 
-      );
+ if (!vendor?.uid) {
 
-     const snapshot = await getDocs(
+  console.error("Vendor UID not found");
+
+  setLoading(false);
+
+  return;
+
+}
+
+const snapshot = await getDocs(
   query(
     collection(db, "chats"),
-    where("sellerId", "==", vendor.uid),
-    orderBy("lastMessageAt", "desc")
+    where("sellerId", "==", vendor.uid)
   )
 );
+
+console.log("Chats Found:", snapshot.size);
 
       const list:any[]=[];
 

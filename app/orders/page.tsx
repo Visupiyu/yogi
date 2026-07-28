@@ -457,49 +457,20 @@ export default function OrdersPage() {
 
 </div>
 </div>
-                  {/* RIGHT */}
+{/* RIGHT */}
 
-                  <div className="space-y-3">
-                    {/* ACTION BUTTONS */}
-{order.paymentStatus === "Paid" ? (
-<a
-  href={`/invoice/${order.id}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="
-    w-full
-    h-12
-    rounded-xl
-    bg-blue-600
-    hover:bg-blue-700
-    text-white
-    font-semibold
-    flex
-    items-center
-    justify-center
-  "
->
-  📄 Download Invoice
-</a>
-) : (
-  <button
-    disabled
-    className="w-full h-12 rounded-xl bg-gray-300 text-gray-600 cursor-not-allowed font-semibold"
-  >
-    📄 Invoice Unavailable
-  </button>
-)}
+<div className="space-y-3">
 
-{order.chatId ? (
+  {/* View Details */}
 
   <a
-    href={`/chat/${order.chatId}`}
+    href={`/orders/${order.id}`}
     className="
       w-full
       h-12
       rounded-xl
-      bg-green-600
-      hover:bg-green-700
+      bg-indigo-600
+      hover:bg-indigo-700
       text-white
       font-semibold
       flex
@@ -507,64 +478,97 @@ export default function OrdersPage() {
       justify-center
     "
   >
-    💬 Contact Seller
+    👁️ View Details
   </a>
 
-) : (
+  {/* Download Invoice */}
 
-  <button
-    disabled
+ {["Confirmed", "Shipped", "Delivered"].includes(order.status) && (
+
+    <a
+      href={`/invoice/${order.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="
+        w-full
+        h-12
+        rounded-xl
+        bg-blue-600
+        hover:bg-blue-700
+        text-white
+        font-semibold
+        flex
+        items-center
+        justify-center
+      "
+    >
+      📄 Download Invoice
+    </a>
+
+  )}
+
+  {/* Contact Seller */}
+
+  {order.chatId && (
+
+    <a
+      href={`/chat/${order.chatId}`}
+      className="
+        w-full
+        h-12
+        rounded-xl
+        bg-green-600
+        hover:bg-green-700
+        text-white
+        font-semibold
+        flex
+        items-center
+        justify-center
+      "
+    >
+      💬 Contact Seller
+    </a>
+
+  )}
+
+  {/* Track Order */}
+
+  <a
+    href={`/orders/${order.id}`}
     className="
       w-full
       h-12
       rounded-xl
-      bg-gray-300
-      text-gray-600
-      cursor-not-allowed
-      font-semibold
-    "
-  >
-    💬 Chat Unavailable
-  </button>
-
-)}
-
-<a
-  href={`/orders/${order.id}`}
-  className="
-    w-full
-    h-12
-    rounded-xl
-    bg-purple-600
-    hover:bg-purple-700
-    text-white
-    font-semibold
-    flex
-    items-center
-    justify-center
-  "
->
-  📍 Track Order
-</a>
-
-{order.status === "Pending" && (
-
-  <button
-    onClick={() =>
-      cancelOrder(order.id)
-    }
-    className="
-      w-full
-      h-12
-      rounded-xl
-      bg-red-600
-      hover:bg-red-700
+      bg-purple-600
+      hover:bg-purple-700
       text-white
       font-semibold
+      flex
+      items-center
+      justify-center
     "
   >
-    ❌ Cancel Order
-  </button>
+    📍 Track Order
+  </a>
+
+  {/* Cancel Order */}
+
+  {order.status === "Pending" && (
+
+    <button
+      onClick={() => cancelOrder(order.id)}
+      className="
+        w-full
+        h-12
+        rounded-xl
+        bg-red-600
+        hover:bg-red-700
+        text-white
+        font-semibold
+      "
+    >
+      ❌ Cancel Order
+    </button>
 
 )}
 

@@ -6,6 +6,11 @@ import { toast } from "sonner";
 import { useParams } from "next/navigation";
 import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp} from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import ShippingLabel from "@/components/ShippingLabel";
+import generateInvoicePDF from "@/components/InvoicePDF";
+import Invoice from "@/components/invoice/Invoice";
+
+import { useRef } from "react";
 
 export default function SellerOrderDetailsPage(){
 
@@ -20,6 +25,8 @@ export default function SellerOrderDetailsPage(){
   const [dispatchDate,setDispatchDate] =useState("");
   const [expectedDelivery,setExpectedDelivery] =useState("");
   const [sellerNotes,setSellerNotes] = useState("");
+  const invoiceRef = useRef<HTMLDivElement>(null);
+const shippingLabelRef = useRef<HTMLDivElement>(null);
    
   useEffect(()=>{loadOrder();},[]);
 
@@ -1267,28 +1274,47 @@ finally{ setSaving(false);} };
           ">
 
             <button
-              className="
-                bg-blue-600
-                text-white
-                py-3
-                rounded-xl
-                font-semibold
-              "
-              onClick={()=>
-                window.print()
-              }
-            >
-
-              🖨 Print Invoice
-
-            </button>
+  onClick={() =>
+    window.open(
+      `/seller/invoice/${order.id}`,
+      "_blank"
+    )
+  }
+  className="
+    bg-blue-600
+    text-white
+    py-3
+    rounded-xl
+    font-semibold
+  "
+>
+  🖨 Print Invoice
+</button>
             <button
 
-  onClick={()=>
+ onClick={() => {
 
-    window.print()
+  const printWindow = window.open("", "_blank");
 
-  }
+  if (!printWindow) return;
+
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Shipping Label</title>
+      </head>
+      <body>
+        ${shippingLabelRef.current?.innerHTML}
+      </body>
+    </html>
+  `);
+
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+  printWindow.close();
+
+}}
 
   className="
     bg-indigo-600
@@ -1304,25 +1330,7 @@ finally{ setSaving(false);} };
 
 </button>
 
-            <button
-              className="
-                bg-purple-600
-                text-white
-                py-3
-                rounded-xl
-                font-semibold
-              "
-              onClick={()=>
-               toast.success(
-                  "Invoice download coming soon."
-                )
-              }
-            >
-
-              📄 Download Invoice
-
-            </button>
-
+            
             <Link
 
               href={`/seller/chat`}
@@ -1404,6 +1412,20 @@ finally{ setSaving(false);} };
         </div>
 
       </div>
+      <div className="hidden">
+
+  <div ref={invoiceRef}>
+    <Invoice
+  order={order}
+  type="seller"
+/>
+  </div>
+
+  <div ref={shippingLabelRef}>
+    <ShippingLabel order={order} />
+  </div>
+
+</div>
 
     </div>
 
