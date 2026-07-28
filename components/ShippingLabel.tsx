@@ -1,223 +1,157 @@
 "use client";
 
+import QRCode from "react-qr-code";
+import Barcode from "react-barcode";
+
 interface ShippingLabelProps {
   order: any;
 }
 
-export default function ShippingLabel({
-  order,
-}: ShippingLabelProps) {
+export default function ShippingLabel({ order }: ShippingLabelProps) {
   if (!order) return null;
+
+  const date = order.createdAt?.toDate
+    ? order.createdAt.toDate().toLocaleDateString()
+    : new Date().toLocaleDateString();
 
   return (
     <div
       id="shipping-label"
-      className="max-w-2xl mx-auto bg-white text-black border-4 border-black p-8"
+      style={{
+        width: "120mm",
+        height: "150mm",
+        padding: "4mm",
+        boxSizing: "border-box",
+        fontSize: "9px",
+        lineHeight: 1.25,
+        color: "#000",
+      }}
+      className="mx-auto bg-white border border-black flex flex-col"
     >
-      {/* Header */}
-
-      <div className="text-center border-b-2 border-black pb-4">
-        <h1 className="text-4xl font-bold">
+      {/* HEADER */}
+      <div className="text-center border-b border-black pb-1 mb-1">
+        <h1 className="font-bold" style={{ fontSize: "18px", lineHeight: 1 }}>
           YOMICO
         </h1>
-
-        <p className="text-lg font-semibold">
+        <p className="font-semibold tracking-widest" style={{ fontSize: "9px" }}>
           SHIPPING LABEL
         </p>
       </div>
 
-      {/* Order */}
-
-      <div className="mt-6 grid grid-cols-2 gap-6">
-
+      {/* ORDER + DATE */}
+      <div className="grid grid-cols-2 gap-2 mb-1">
         <div>
-
-          <p>
-            <strong>Order ID</strong>
-          </p>
-
-          <p>{order.id}</p>
-
+          <p className="font-bold">Order ID</p>
+          <p className="break-all">{order.id}</p>
         </div>
-
-        <div>
-
-          <p>
-            <strong>Date</strong>
-          </p>
-
-          <p>
-            {order.createdAt?.toDate
-              ? order.createdAt
-                  .toDate()
-                  .toLocaleDateString()
-              : new Date().toLocaleDateString()}
-          </p>
-
+        <div className="text-right">
+          <p className="font-bold">Date</p>
+          <p>{date}</p>
         </div>
-
       </div>
 
-      {/* Customer */}
+      {/* SHIP FROM */}
+      <div className="border border-black p-1 mb-1">
+        <h2 className="font-bold uppercase" style={{ fontSize: "8px" }}>
+          Ship From
+        </h2>
+        <p className="font-bold">{order.vendorName || "YOMICO Seller"}</p>
+        <p>{order.vendorPhone || "-"}</p>
+        <div className="whitespace-pre-wrap">{order.vendorAddress || "-"}</div>
+      </div>
 
-      <div className="mt-8 border rounded-xl p-5">
-
-        <h2 className="text-xl font-bold mb-4">
+      {/* SHIP TO */}
+      <div className="border border-black p-1 mb-1">
+        <h2 className="font-bold uppercase" style={{ fontSize: "8px" }}>
           Ship To
         </h2>
-
-        <p className="font-bold text-lg">
+        <p className="font-bold" style={{ fontSize: "12px" }}>
           {order.customerName}
         </p>
-
         <p>{order.phone}</p>
-
-        <p>{order.userEmail}</p>
-
-        <div className="mt-3 whitespace-pre-wrap">
-          {order.address}
-        </div>
-
+        <p className="break-all">{order.userEmail}</p>
+        <div className="whitespace-pre-wrap">{order.address}</div>
       </div>
 
-      {/* Courier */}
-
-      <div className="mt-8 grid grid-cols-2 gap-6">
-
+      {/* COURIER */}
+      <div className="grid grid-cols-2 gap-2 border border-black p-1 mb-1">
         <div>
-
-          <p className="font-semibold">
-            Courier Partner
-          </p>
-
-          <p>
-            {order.courierPartner || "-"}
-          </p>
-
+          <p className="font-bold">Courier</p>
+          <p>{order.courierPartner || order.courierName || "-"}</p>
         </div>
-
-        <div>
-
-          <p className="font-semibold">
-            Tracking Number
-          </p>
-
-          <p className="font-mono text-lg">
+        <div className="text-right">
+          <p className="font-bold">Tracking No.</p>
+          <p className="font-mono font-bold tracking-wider">
             {order.trackingNumber || "-"}
           </p>
-
         </div>
-
       </div>
 
-      {/* Payment */}
-
-      <div className="mt-8 border rounded-xl p-5">
-
+      {/* PAYMENT */}
+      <div className="border border-black p-1 mb-1">
         <div className="flex justify-between">
-
-          <span>
-            Payment Method
-          </span>
-
-          <strong>
-            {order.paymentMethod}
-          </strong>
-
+          <span>Payment Method</span>
+          <strong>{order.paymentMethod || "COD"}</strong>
         </div>
-
-        <div className="flex justify-between mt-3">
-
-          <span>
-            Payment Status
-          </span>
-
-          <strong>
-            {order.paymentStatus}
-          </strong>
-
+        <div className="flex justify-between">
+          <span>Payment Status</span>
+          <strong>{order.paymentStatus || "Pending"}</strong>
         </div>
-
-        <div className="flex justify-between mt-3">
-
-          <span>
-            Order Status
-          </span>
-
-          <strong>
-            {order.status}
-          </strong>
-
+        <div className="flex justify-between">
+          <span>Total Items</span>
+          <strong>{order.items?.length || 0}</strong>
         </div>
-
       </div>
 
-      {/* Products */}
-
-      <div className="mt-8">
-
-        <h2 className="font-bold text-xl mb-4">
+      {/* CONTENTS */}
+      <div className="mb-1 flex-1 overflow-hidden">
+        <h2 className="font-bold mb-0.5" style={{ fontSize: "9px" }}>
           Package Contents
         </h2>
-
-        <table className="w-full border">
-
+        <table className="w-full border border-black border-collapse">
           <thead>
-
             <tr className="bg-gray-100">
-
-              <th className="border p-2 text-left">
-                Product
-              </th>
-
-              <th className="border p-2">
-                Qty
-              </th>
-
+              <th className="border border-black px-1 text-left">Product</th>
+              <th className="border border-black px-1 w-10 text-center">Qty</th>
             </tr>
-
           </thead>
-
           <tbody>
-
-            {order.items?.map(
-              (item: any, index: number) => (
-
-                <tr key={index}>
-
-                  <td className="border p-2">
-                    {item.name}
-                  </td>
-
-                  <td className="border p-2 text-center">
-                    {item.qty}
-                  </td>
-
-                </tr>
-
-              )
-            )}
-
+            {order.items?.map((item: any, index: number) => (
+              <tr key={index}>
+                <td className="border border-black px-1">{item.name}</td>
+                <td className="border border-black px-1 text-center">
+                  {item.qty}
+                </td>
+              </tr>
+            ))}
           </tbody>
-
         </table>
-
       </div>
 
-      {/* Footer */}
+      {/* QR + BARCODE */}
+      <div className="grid grid-cols-2 gap-2 items-center border-t border-black pt-1">
+        <div className="flex flex-col items-center">
+          <QRCode value={order.trackingNumber || order.id} size={54} />
+        </div>
+        <div className="flex flex-col items-center overflow-hidden">
+          <Barcode
+            value={order.trackingNumber || order.id}
+            width={1}
+            height={30}
+            fontSize={9}
+            margin={0}
+            displayValue={true}
+          />
+        </div>
+      </div>
 
-      <div className="mt-10 border-t pt-6 text-center">
-
-        <p className="text-lg font-bold">
-          Handle With Care
-        </p>
-
-        <p className="text-gray-600">
+      {/* FOOTER */}
+      <div className="text-center border-t border-black pt-0.5 mt-1">
+        <p className="font-bold">Handle With Care</p>
+        <p className="text-gray-600" style={{ fontSize: "8px" }}>
           Thank you for selling with YOMICO
         </p>
-
       </div>
-
     </div>
   );
 }

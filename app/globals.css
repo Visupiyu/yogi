@@ -379,3 +379,25 @@ body{
   }
 
 }
+@media print {
+  @page {
+    size: 120mm 150mm;
+    margin: 0;
+  }
+
+  /* Hide everything except the label */
+  body * {
+    visibility: hidden;
+  }
+  #shipping-label,
+  #shipping-label * {
+    visibility: visible;
+  }
+  #shipping-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 0 !important;
+    border: none !important; /* label stock already has edges; remove if you want the frame */
+  }
+}
