@@ -43,36 +43,57 @@ export default function FlashSale() {
         viewport={{ once: true }}
         className="max-w-7xl mx-auto"
       >
-        <div className="rounded-2xl overflow-hidden bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 text-white p-6 md:p-8 shadow-xl">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+      <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-red-600 via-orange-500 to-yellow-500 text-white p-6 md:p-8 shadow-xl">
+
+  <div className="absolute inset-0 opacity-10">
+    <div className="w-full h-full bg-[radial-gradient(circle_at_top_right,white_2px,transparent_2px)] bg-[length:30px_30px]" />
+  </div>
+
+  <div className="relative flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="absolute top-5 right-5 bg-yellow-400 text-black px-4 py-2 rounded-full font-bold shadow-xl rotate-6">
+  SAVE 70%
+</div>
             {/* LEFT */}
             <div className="text-center lg:text-left">
-              <p className="uppercase tracking-widest text-sm mb-2">
-                🔥 Limited Time Offer
-              </p>
-              <h2 className="text-3xl md:text-4xl font-extrabold leading-tight">
+              <span className="inline-block bg-white text-red-600 px-4 py-1 rounded-full text-sm font-bold shadow-lg mb-4">
+  🔥 BIGGEST SALE OF THE SEASON
+</span>
+             <h2 className="text-4xl md:text-5xl font-black leading-tight">
                 ⚡ Flash Sale
                 <br />
-                Up To 70% OFF
+                MEGA SALE
               </h2>
-              <p className="mt-3 text-base text-white/90">
+              <p className="mt-4 text-lg text-white/95 max-w-md">
                 Grab your favourite products before the offer ends.
               </p>
-              <Link href="/search">
-                <button className="mt-5 bg-white text-red-500 px-8 py-3 rounded-xl font-bold hover:scale-105 transition">
+              <div className="flex flex-wrap gap-4 mt-6">
+
+                <Link href="/search">
+                <button className="bg-white text-red-600 hover:bg-gray-100 px-8 py-4 rounded-2xl font-bold shadow-xl transition-all hover:scale-105">
                   Shop Now
                 </button>
-              </Link>
+                </Link>
+                <Link
+  href="/search"
+  className="bg-transparent border-2 border-white px-8 py-4 rounded-2xl font-bold hover:bg-white hover:text-red-600 transition"
+>
+  View All Deals
+</Link>
+                <p className="mt-4 text-sm font-semibold text-white">
+  🚚 Free Shipping • Secure Payment • Easy Returns
+</p>
             </div>
+             </div>
+
 
             {/* TIMER */}
             <div className="flex gap-3">
               {units.map((u) => (
                 <div
                   key={u.label}
-                  className="bg-white/20 backdrop-blur-md rounded-2xl p-2 min-w-[90px] h-[100px] flex flex-col justify-center text-center border border-white/20"
+                  className="bg-white/15 backdrop-blur-md rounded-2xl p-2 min-w-[100px] h-[110px] flex flex-col justify-center text-center border border-white/20"
                 >
-                  <h3 className="text-3xl font-bold">
+                  <h3 className="text-4xl font-bold">
                     {String(u.value).padStart(2, "0")}
                   </h3>
                   <p className="mt-2 text-sm">{u.label}</p>

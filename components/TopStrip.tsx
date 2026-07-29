@@ -5,20 +5,21 @@ import { MapPin, Truck, Headphones, Smartphone } from "lucide-react";
 
 export default function TopStrip() {
   return (
-    <div className="hidden md:block bg-green-600 text-white text-sm">
-      <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-4 overflow-x-auto whitespace-nowrap">
+    <div className="hidden md:block bg-gradient-to-r from-green-600 via-green-700 to-emerald-700 text-white text-sm">
+      <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4 overflow-x-auto whitespace-nowrap">
 
         {/* LEFT */}
         <div className="flex items-center gap-6">
 
-          <div className="flex items-center gap-2">
-            <Truck size={16} />
-            <span>Free Delivery Above ₹999</span>
+          <div className="flex items-center gap-2 font-medium">
+            <Truck size={18} />
+            <span>🚚 Free Delivery on Orders Above ₹999</span>
           </div>
-
+{/* Divider */}
+  <div className="hidden lg:block h-5 w-px bg-white/30" />
           <Link
             href="/support"
-            className="flex items-center gap-2 hover:text-yellow-200 transition"
+            className="flex items-center gap-2 hover:text-yellow-200 hover:scale-105 transition-all duration-300"
           >
             <Headphones size={16} />
             <span>24/7 Support</span>
@@ -42,7 +43,7 @@ export default function TopStrip() {
             className="flex items-center gap-2 hover:text-yellow-200 transition"
           >
             <Smartphone size={16} />
-            Download App
+            Get Our App
           </Link>
 
         </div>

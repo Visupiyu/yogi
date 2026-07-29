@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductCard from "./ProductCard";
+import { motion } from "framer-motion";
 
 async function fetchBestSellers() {
   const q = query(
@@ -17,8 +18,8 @@ async function fetchBestSellers() {
 
 function ProductSkeleton() {
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-4 animate-pulse">
-      <div className="h-40 bg-gray-200 rounded-xl mb-3" />
+    <div className="bg-white rounded-3xl shadow-lg p-4 animate-pulse">
+      <div className="h-56 bg-gray-200 rounded-xl mb-3" />
       <div className="h-4 bg-gray-200 rounded mb-2" />
       <div className="h-4 bg-gray-200 rounded w-2/3 mb-2" />
       <div className="h-6 bg-gray-200 rounded w-1/3" />
@@ -34,21 +35,56 @@ export default function BestSellers() {
   });
 
   return (
-    <section className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-2xl md:text-3xl font-bold">🏆 Best Sellers</h2>
-      </div>
+    <section className="max-w-7xl mx-auto px-4 py-12">
+      <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
 
-      {error && <p className="text-red-500">Failed to load products</p>}
+  <div>
+
+    <span className="inline-block bg-yellow-100 text-yellow-700 px-4 py-1 rounded-full text-sm font-semibold mb-3">
+      🏆 TOP SELLING
+    </span>
+
+    <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+      Best Sellers
+    </h2>
+
+    <p className="text-gray-600 mt-2">
+      Discover the products our customers love the most.
+    </p>
+
+  </div>
+
+  <a
+    href="/search"
+    className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-xl font-semibold transition"
+  >
+    View All →
+  </a>
+
+</div>
+
+      {error && <div className="text-center py-10 bg-red-50 rounded-2xl border border-red-200">
+
+  <p className="text-red-600 font-semibold">
+    Failed to load best sellers.
+  </p>
+
+</div>}
 
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
           {[...Array(8)].map((_, index) => (
             <ProductSkeleton key={index} />
           ))}
         </div>
       ) : products && products.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        <motion.div
+  initial={{ opacity: 0, y: 30 }}
+  whileInView={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.6 }}
+  viewport={{ once: true }}
+  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6"
+>
           {products.map((product) => (
             <ProductCard
               key={product.id}
@@ -59,12 +95,25 @@ export default function BestSellers() {
               stock={product.stock}
             />
           ))}
-        </div>
+    
+        </motion.div>
       ) : (
         !error && (
-          <div className="text-center py-10 text-gray-500">
-            No Best Sellers Found
-          </div>
+          <div className="text-center py-16">
+
+  <div className="text-6xl mb-4">
+    🏆
+  </div>
+
+  <h3 className="text-2xl font-bold text-gray-800">
+    No Best Sellers Yet
+  </h3>
+
+  <p className="text-gray-500 mt-2">
+    Best-selling products will appear here once orders start coming in.
+  </p>
+
+</div>
         )
       )}
     </section>

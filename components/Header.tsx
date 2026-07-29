@@ -7,6 +7,7 @@ import { ShoppingCart, Heart, User, Search } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import NotificationBell from "@/components/NotificationBell";
 import { db } from "@/lib/firebase";
+import Image from "next/image";
 
 interface Product {
   id: string;
@@ -65,12 +66,12 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white shadow-md">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-md">
       <div className="max-w-7xl mx-auto px-4">
         <div className="h-20 flex items-center justify-between gap-4">
           {/* LOGO */}
           <Link href="/">
-            <h1 className="text-2xl font-extrabold text-green-600 whitespace-nowrap">
+           <h1 className="text-2xl font-extrabold text-green-600 whitespace-nowrap transition-transform duration-300 hover:scale-105">
               YOMICO
             </h1>
           </Link>
@@ -80,17 +81,17 @@ export default function Header() {
             <div className="w-full relative">
               <input
                 type="text"
-                placeholder="Search on YOMICO..."
+                placeholder="Search for products, brands and categories..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") runSearch();
                 }}
-                className="w-full border border-gray-300 rounded-full py-3 pl-5 pr-12 outline-none focus:border-green-500"
+                className="w-full border border-gray-200 rounded-full py-3 pl-5 pr-12 shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
               />
               <button
                 onClick={runSearch}
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-600 hover:bg-green-700 text-white p-2 rounded-full"
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white p-2 rounded-full"
               >
                 <Search size={18} />
               </button>
@@ -105,11 +106,13 @@ export default function Header() {
           onClick={() => setSuggestions([])}
           className="flex items-center gap-4 p-3 hover:bg-gray-100"
         >
-          <img
-            src={product.image || "/no-image.png"}
-            alt=""
-            className="w-12 h-12 rounded-lg object-cover"
-          />
+          <Image
+  src={product.image || "/no-image.png"}
+  alt={product.name}
+  width={48}
+  height={48}
+  className="w-12 h-12 rounded-lg object-cover"
+/>
 
           <div>
             <p className="font-medium">{product.name}</p>
@@ -121,26 +124,55 @@ export default function Header() {
         </Link>
       ))
     ) : (
-      <div className="p-4 text-center text-gray-500">
-        No matching products found.
-      </div>
+     <div className="p-6 text-center text-gray-500">
+  <Search className="mx-auto mb-2 text-gray-400" size={28} />
+  <p>No matching products found.</p>
+</div>
     )}
   </div>
 )}
 </div>
+</div>
+{/* Mobile Search */}
+<div className="md:hidden px-4 pb-4">
+  <div className="relative">
+    <input
+      type="text"
+      placeholder="Search for products..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") runSearch();
+      }}
+      className="w-full border border-gray-200 rounded-full py-3 pl-5 pr-12 shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+    />
+
+    <button
+      onClick={runSearch}
+      className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-600 text-white p-2 rounded-full"
+    >
+      <Search size={18} />
+    </button>
+  </div>
 </div>
 
           {/* RIGHT SIDE */}
           <div className="flex items-center gap-5">
             <NotificationBell />
 
-            <Link href="/wishlist" className="relative">
-              <Heart className="w-6 h-6 text-gray-700" />
-            </Link>
+            <Link
+  href="/wishlist"
+  className="relative transition-transform duration-300 hover:scale-110"
+>
+  <Heart className="w-6 h-6 text-gray-700" />
+</Link>
 
-            <Link href="/cart" className="relative">
-              <ShoppingCart className="w-6 h-6 text-gray-700" />
-            </Link>
+<Link
+  href="/cart"
+  className="relative transition-transform duration-300 hover:scale-110"
+>
+  <ShoppingCart className="w-6 h-6 text-gray-700" />
+</Link>
 
             <Link href="/login">
               <div className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-full transition">

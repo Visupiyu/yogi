@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 // Names must match the exact category strings stored on products,
 // so the /category/[name] pages resolve correctly.
@@ -49,20 +50,38 @@ const categories = [
 
 export default function CategoriesGrid() {
   return (
-    <section className="py-8 px-4 bg-white">
+    <section className="py-12 px-4 bg-white">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl md:text-3xl font-bold">Shop by Category</h2>
-        </div>
+        <div className="text-center mb-10">
 
-        <div className="flex flex-nowrap overflow-x-auto w-full gap-4 pb-2 scrollbar-hide">
+  <span className="inline-block bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-semibold mb-3">
+    🛍️ SHOP BY CATEGORY
+  </span>
+
+  <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+    Explore Our Categories
+  </h2>
+
+  <p className="text-gray-600 mt-3 max-w-2xl mx-auto">
+    Discover thousands of products across every category—from fashion and electronics to groceries and home essentials.
+  </p>
+
+</div>
+
+       <motion.div
+  initial={{ opacity: 0, y: 30 }}
+  whileInView={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.6 }}
+  viewport={{ once: true }}
+  className="flex flex-nowrap overflow-x-auto w-full gap-5 pb-3 scrollbar-hide"
+>
           {categories.map((category) => (
             <Link
               key={category.name}
               href={`/category/${encodeURIComponent(category.name)}`}
               className="flex-shrink-0 block"
             >
-              <div className="group relative min-w-[150px] md:min-w-[190px] h-32 md:h-40 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition duration-300">
+              <div className="group relative min-w-[170px] md:min-w-[220px] h-40 md:h-52 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-2 transition duration-300">
                 <img
                   src={category.image}
                   alt={category.name}
@@ -71,14 +90,17 @@ export default function CategoriesGrid() {
                   }}
                   className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
-                <h3 className="absolute bottom-3 left-3 right-3 text-white font-bold text-base md:text-lg drop-shadow">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                <h3 className="absolute bottom-3 left-3 right-3 text-white font-bold text-lg md:text-xl drop-shadow">
                   {category.name}
                 </h3>
               </div>
+              <p className="absolute bottom-2 left-3 text-white/90 text-sm font-medium">
+  Explore →
+</p>
             </Link>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );

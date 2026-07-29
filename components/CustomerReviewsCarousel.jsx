@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 const reviews = [
   {
@@ -43,39 +44,54 @@ export default function CustomerReviewsCarousel() {
 
   return (
     <section className="py-8 px-4 bg-gradient-to-b from-white to-gray-50">
-      <div className="max-w-5xl mx-auto">
-        <h2 className="text-2xl md:text-3xl font-bold text-center mb-8">
-          ❤️ What Our Customers Say
-        </h2>
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-10">
 
-        <div
-          className={`${review.bg} rounded-3xl shadow-xl p-6 md:p-10 text-center transition-all duration-500`}
+  <span className="inline-block bg-pink-100 text-pink-600 px-4 py-1 rounded-full text-sm font-semibold mb-3">
+    ❤️ CUSTOMER LOVE
+  </span>
+
+  <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+    What Our Customers Say
+  </h2>
+
+  <p className="text-gray-600 mt-3 max-w-2xl mx-auto">
+    Trusted by happy shoppers across India for quality products and reliable service.
+  </p>
+
+</div>
+<motion.div
+      key={current}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className={`${review.bg} rounded-3xl shadow-xl p-6 md:p-10 text-center transition-all duration-500`}
         >
-          <div className="text-yellow-500 text-2xl mb-3">
+          <div className="text-yellow-500 text-3xl mb-4 tracking-wide">
             {"⭐".repeat(review.rating)}
           </div>
 
-          <div className="text-5xl text-black/10 mb-2">❝</div>
+          <div className="text-6xl text-black/10 mb-2">❝</div>
 
-          <p className="text-lg text-gray-700 leading-8 mb-3">
+          <p className="text-xl text-gray-700 leading-9 max-w-3xl mx-auto mb-5">
             &quot;{review.text}&quot;
           </p>
 
-          <div className="w-20 h-20 rounded-full bg-white shadow-lg mx-auto mb-4 flex items-center justify-center text-3xl">
+          <div className="w-24 h-24 rounded-full bg-white shadow-lg mx-auto mb-4 flex items-center justify-center text-3xl">
             👤
           </div>
 
           <h3 className="font-bold text-xl">{review.name}</h3>
 
-          <p className="text-green-600 text-sm mt-1">✅ Verified Purchase</p>
-        </div>
+          <p className="inline-block mt-3 bg-green-100 text-green-700 px-4 py-1 rounded-full text-sm font-semibold">✅ Verified Purchase</p>
+          </motion.div>
 
         <div className="flex justify-center gap-2 mt-4">
           {reviews.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrent(index)}
-              className={`w-3 h-3 rounded-full transition ${
+              className={`w-4 h-4 rounded-full transition ${
                 current === index ? "bg-green-600" : "bg-gray-300"
               }`}
             />

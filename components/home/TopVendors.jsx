@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { motion } from "framer-motion";
 
 export default function TopVendors() {
   const [vendors, setVendors] = useState([]);
@@ -28,32 +29,60 @@ export default function TopVendors() {
     fetchVendors();
   }, []);
 
-  if (vendors.length === 0) return null;
-
+  if (vendors.length === 0) {
   return (
-    <section className="py-8 px-4 bg-gray-50">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-5">
-          <h2 className="text-2xl md:text-3xl font-bold">Top Vendors</h2>
-          <Link
-            href="/stores"
-            className="text-green-600 font-semibold text-sm hover:underline"
-          >
-            View All →
-          </Link>
-        </div>
+    <section className="py-12 text-center">
+      <h2 className="text-2xl font-bold">No Vendors Found</h2>
+    </section>
+  );
+}
+  return (
+    <section className="py-12 px-4 bg-gray-50">
+        <div className="max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+  <div>
+
+    <span className="inline-block bg-green-100 text-green-700 px-4 py-1 rounded-full text-sm font-semibold mb-3">
+      🏪 TRUSTED SELLERS
+    </span>
+
+    <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+      Top Vendors
+    </h2>
+
+    <p className="text-gray-600 mt-2">
+      Shop from trusted sellers delivering quality products across India.
+    </p>
+
+  </div>
+
+  <Link
+    href="/stores"
+    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-2xl shadow-lg font-semibold transition"
+  >
+    View All Sellers →
+  </Link>
+
+</div>
+
+        <motion.div
+  initial={{ opacity: 0, y: 30 }}
+  whileInView={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.6 }}
+  viewport={{ once: true }}
+ className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6"
+>
           {vendors.map((vendor) => (
             <Link key={vendor.id} href={`/store/${vendor.id}`}>
-              <div className="bg-gradient-to-br from-white to-green-50 rounded-3xl shadow-md hover:shadow-2xl overflow-hidden transition duration-300 h-full">
+              <div className="bg-gradient-to-br from-white to-green-50 rounded-3xl shadow-lg hover:shadow-2xl hover:-translate-y-2 overflow-hidden transition duration-300 h-full">
                 <div className="h-24 bg-gradient-to-r from-green-500 via-blue-500 to-purple-600" />
 
                 <div className="p-4 text-center">
-                  <div className="w-20 h-20 rounded-full bg-gray-200 mx-auto -mt-14 border-4 border-white overflow-hidden shadow-lg">
+                  <div className="w-24 h-24 rounded-full bg-gray-200 mx-auto -mt-14 border-4 border-white overflow-hidden shadow-lg">
                     <img
                       src={vendor.storeLogo || "/user.png"}
-                      alt=""
+                    alt={vendor.storeName || vendor.businessName || "Vendor Store"}
                       onError={(e) => {
                         e.currentTarget.src = "/user.png";
                       }}
@@ -72,16 +101,20 @@ export default function TopVendors() {
                   <p className="text-yellow-500 font-semibold text-sm mt-1">
                     {vendor.rating ? `⭐ ${vendor.rating}` : "✨ New Seller"}
                   </p>
+                  <div className="inline-block mt-3 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+  ✔ Trusted Seller
+</div>
 
-                  <button className="mt-4 w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 rounded-xl font-semibold hover:from-green-500 hover:to-blue-500 transition">
-                    Visit Store
-                  </button>
+  <div className="mt-4 w-full bg-gradient-to-r from-green-600 to-blue-600 text-white py-3 rounded-2xl shadow-lg font-semibold text-center hover:from-green-500 hover:to-blue-500 transition">
+  Visit Store
+</div>
                 </div>
               </div>
             </Link>
           ))}
-        </div>
-      </div>
+  
+     </motion.div>
+       </div>
     </section>
   );
 }
