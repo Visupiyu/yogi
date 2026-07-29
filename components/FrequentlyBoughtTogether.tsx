@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import Image from "next/image";
 
 type Product = {
   id: string;
@@ -116,11 +117,12 @@ export default function FrequentlyBoughtTogether({
           >
             <div className="border rounded-2xl p-4 hover:shadow-lg transition">
 
-              <img
-                src={product.image}
-                alt={product.name}
-                className="w-full h-44 object-cover rounded-xl"
-              />
+             <Image
+  src={product.image}
+  alt={product.name}
+  width={300}
+  height={300}
+/>
 
               <h3 className="font-semibold mt-3 line-clamp-2">
                 {product.name}

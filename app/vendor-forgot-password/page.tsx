@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import Image from "next/image";
 
 export default function VendorForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -55,11 +56,13 @@ export default function VendorForgotPasswordPage() {
       <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8 border">
 
         <div className="text-center mb-8">
-          <img
-            src="/logo.png"
-            alt="YOMICO"
-            className="w-40 mx-auto mb-4"
-          />
+          <Image
+  src="/logo.png"
+  alt="YOMICO"
+  width={180}
+  height={180}
+  className="h-36 md:h-40 w-auto object-contain"
+/>
 
           <h1 className="text-3xl font-bold">
             Vendor Forgot Password

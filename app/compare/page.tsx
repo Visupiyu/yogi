@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function ComparePage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -84,12 +85,13 @@ export default function ComparePage() {
                   key={product.id}
                   className="p-4 text-center min-w-[220px]"
                 >
-                  <img
-                    src={product.image || "/no-image.png"}
-                    alt={product.name}
-                    className="w-28 h-28 object-cover mx-auto rounded-lg"
-                  />
-
+              <Image
+  src={product.image || "/no-image.png"}
+  alt={product.name}
+  width={112}
+  height={112}
+  className="w-28 h-28 object-cover mx-auto rounded-lg"
+/>
                   <p className="font-semibold mt-3">
                     {product.name}
                   </p>

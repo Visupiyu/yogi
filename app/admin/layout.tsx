@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 
 // Stopgap admin check. Replace with a custom claim (token.admin === true)
 // when you set up admin claims — then this constant can go away.
@@ -69,7 +70,8 @@ export default function AdminLayout({
       {/* SIDEBAR */}
       <aside className="w-64 shrink-0 bg-black text-white flex flex-col sticky top-0 h-screen">
         <div className="p-5 text-center border-b border-white/10">
-          <img src="/logo.png" alt="YOMICO" className="w-32 mx-auto mb-3" />
+        <Image   src="/logo.png"  alt="YOMICO" width={180} height={180}
+  className="h-36 md:h-40 w-auto object-contain"/>
           <h1 className="text-2xl font-bold">👑 Admin Panel</h1>
           <p className="text-gray-400 mt-1 text-sm">Marketplace Control Center</p>
           <div className="mt-3 bg-green-600 rounded-full px-4 py-1.5 inline-block text-sm">

@@ -5,6 +5,7 @@ import { createUserWithEmailAndPassword,  signOut, } from "firebase/auth";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
+import Image from "next/image";
 
 const citiesByState = {
   Gujarat: ["Ahmedabad", "Surat", "Vadodara", "Rajkot"],
@@ -223,11 +224,13 @@ if (!aadhaarDoc || !chequeDoc) {
       <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-xl p-10">
         {/* LOGO + HEADING */}
         <div className="text-center mb-6">
-          <img
-            src="/logo.png"
-           alt="YOMICO"
-            className="w-60 mx-auto mb-3"
-          />
+          <Image
+  src="/logo.png"
+  alt="YOMICO"
+  width={180}
+  height={180}
+  className="h-36 md:h-40 w-auto object-contain"
+/>
           <p className="text-green-600 font-semibold">
             YOMICO Seller Portal
           </p>

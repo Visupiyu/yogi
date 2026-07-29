@@ -7,6 +7,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import Image from "next/image";
 
 type ProductSuggestion = {
   id: string;
@@ -166,11 +167,13 @@ useEffect(() => {
   href="/"
   className="shrink-0 flex items-center gap-3"
 >
-  <img
-    src="/logo.png"
-    alt="YOMICO"
-    className="h-11 md:h-12 w-auto object-contain"
-  />
+  <Image
+  src="/logo.png"
+  alt="YOMICO"
+  width={180}
+  height={180}
+  className="h-36 md:h-40 w-auto object-contain"
+/>
 
   <div className="hidden md:block">
     <h1 className="text-2xl font-extrabold tracking-wide text-green-700">

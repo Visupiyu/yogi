@@ -23,12 +23,12 @@ export const metadata: Metadata = {
   },
 
   title: {
-    default: "YOMICO",
+  default:
+  "YOMICO – India's Modern Multi-Vendor Marketplace",
     template: "%s | YOMICO",
   },
   description:
-    "YOMICO is India's modern multi-vendor marketplace for groceries, electronics, fashion, furniture, beauty, home essentials and more.",
-
+"Shop groceries, electronics, fashion, beauty, furniture, home essentials and more from trusted sellers across India with fast delivery and secure payments.",
   keywords: [
     "YOMICO",
     "Yomico",
@@ -43,8 +43,32 @@ export const metadata: Metadata = {
     "Beauty",
     "Shopping",
   ],
+  category: "E-commerce",
+  authors: [
+  {
+    name: "YOMICO",
+    url: "https://yomico.in",
+  },
+],
+creator: "YOMICO",
+
+publisher: "YOMICO",
+
+  robots: {
+  index: true,
+  follow: true,
+  googleBot: {
+    index: true,
+    follow: true,
+    "max-image-preview": "large",
+    "max-snippet": -1,
+    "max-video-preview": -1,
+  },
+},
 
   manifest: "/manifest.json",
+
+themeColor: "#16a34a",
 
   openGraph: {
   title: "YOMICO",

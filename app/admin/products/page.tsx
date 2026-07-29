@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
+import Image from "next/image";
 
 type Product = {
   id: string;
@@ -31,6 +32,7 @@ export default function AdminProductsPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [vendorFilter, setVendorFilter] = useState("All");
+  
 
   useEffect(() => {
     loadProducts();
@@ -217,7 +219,7 @@ export default function AdminProductsPage() {
                 className="bg-white rounded-2xl shadow-sm hover:shadow-md transition p-3"
               >
                 <div className="relative h-32">
-                  <img
+                  <Image
                     src={product.image || "/no-image.png"}
                     alt={product.name}
                     onError={(e) => {

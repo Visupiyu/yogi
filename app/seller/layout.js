@@ -5,6 +5,7 @@ import {usePathname, useRouter, } from "next/navigation";
 import { useEffect } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import Image from "next/image";
 
 const navItems = [
   { href: "/seller", label: "Dashboard", icon: "📊" },
@@ -43,10 +44,12 @@ useEffect(() => {
       {/* SIDEBAR */}
       <aside className="w-64 shrink-0 bg-gradient-to-b from-green-700 to-blue-700 text-white flex flex-col sticky top-0 h-screen">
         <div className="p-5 text-center border-b border-white/10">
-          <img
+         <Image
   src="/logo.png"
   alt="YOMICO"
-  className="w-32 mx-auto mb-2"
+  width={180}
+  height={180}
+  className="h-36 md:h-40 w-auto object-contain"
 />
           <h1 className="text-xl font-bold">Seller Panel</h1>
           <p className="text-sm opacity-80 mt-2">🟢 Online</p>

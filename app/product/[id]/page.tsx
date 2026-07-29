@@ -8,6 +8,7 @@ import FrequentlyBoughtTogether from "@/components/FrequentlyBoughtTogether";
 import CustomersAlsoBought from "@/components/CustomersAlsoBought";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
+import Image from "next/image";
 
 type Product = { id: string; name: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
@@ -569,37 +570,39 @@ if (product.stock > 20) {
 
   {/* Thumbnails */}
 
-  <div className="order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-visible">
+ <div className="order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-visible">
 
-    {(product.images ?? [product.image])
-      .filter((img): img is string => Boolean(img))
-      .map((img, index) => (
-        <img
-          key={index}
-          src={img}
-          alt={product.name}
-          onClick={() => setSelectedImage(img)}
-          className={`w-16 h-16 md:w-20 md:h-20 object-cover rounded-2xl border-2 cursor-pointer transition flex-shrink-0 ${
-            selectedImage === img
-              ? "border-green-600"
-              : "border-gray-200 hover:border-green-400"
-          }`}
-        />
-      ))}
+  {(product.images ?? [product.image])
+    .filter((img): img is string => Boolean(img))
+    .map((img, index) => (
+      <Image
+        key={index}
+        src={img}
+        alt={product.name}
+        width={80}
+        height={80}
+        onClick={() => setSelectedImage(img)}
+        className={`w-16 h-16 md:w-20 md:h-20 object-cover rounded-2xl border-2 cursor-pointer transition flex-shrink-0 ${
+          selectedImage === img
+            ? "border-green-600"
+            : "border-gray-200 hover:border-green-400"
+        }`}
+      />
+    ))}
 
-  </div>
+</div>
 
   {/* Main Image */}
 
-  <div className="order-1 md:order-2 flex-1 bg-gray-50 rounded-3xl p-4 overflow-hidden">
-
-    <img
-      src={selectedImage}
-      alt={product.name}
-      className="w-full h-[320px] sm:h-[420px] md:h-[520px] object-contain rounded-2xl transition-transform duration-300 hover:scale-110 cursor-zoom-in"
-    />
-
-  </div>
+  <div className="relative w-full h-[320px] sm:h-[420px] md:h-[520px]">
+  <Image
+    src={selectedImage}
+    alt={product.name}
+    fill
+    className="object-contain rounded-2xl transition-transform duration-300 hover:scale-110 cursor-zoom-in"
+    sizes="(max-width: 768px) 100vw, 50vw"
+  />
+</div>
 
 </div>
  </div>
@@ -1124,11 +1127,13 @@ className="border rounded-2xl px-4 py-2"
                 {relatedProducts.map((item) => (
                   <Link key={item.id} href={`/product/${item.id}`}>
                     <div className="bg-white rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all overflow-hidden">
-                      <img
-                        src={item.image || "/no-image.png"}
-                        alt={item.name}
-                        className="w-full h-40 object-contain p-2"
-                      />
+                    <Image
+  src={item.image || "/no-image.png"}
+  alt={item.name}
+  width={300}
+  height={300}
+  className="w-full h-40 object-contain p-2"
+/>
                       <div className="p-3">
                         <h3 className="font-semibold text-sm line-clamp-2 min-h-[40px]">
                           {item.name}

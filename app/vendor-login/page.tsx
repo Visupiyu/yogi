@@ -6,6 +6,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function VendorLoginPage() {
   const router = useRouter();
@@ -121,11 +122,13 @@ console.error(err);
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-6">
       <div className="bg-white backdrop-blur-sm border border-gray-100 p-10 rounded-3xl shadow-xl w-full max-w-md">
         <div className="text-center mb-5">
-          <img
-            src="/logo.png"
-            alt="YOMICO"
-            className="w-40 mx-auto mb-3"
-          />
+          <Image
+  src="/logo.png"
+  alt="YOMICO"
+  width={180}
+  height={180}
+  className="h-36 md:h-40 w-auto object-contain"
+/>
         </div>
 
         <p className="text-center text-green-600 font-semibold text-sm mb-2">

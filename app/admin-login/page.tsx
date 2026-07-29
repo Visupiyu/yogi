@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
+import Image from "next/image";
 
 const adminEmails = ["adminyogimart@gmail.com"];
 
@@ -65,7 +66,7 @@ router.push("/admin");
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 p-6">
       <div className="bg-white w-full max-w-md rounded-3xl shadow-xl p-10">
         <div className="flex justify-center mb-6">
-       <img src="/logo.png" alt="YOMICO" className="h-20 w-auto" /></div>
+      <Image  src="/logo.png" alt="YOMICO" width={180} height={180}className="h-36 md:h-40 w-auto object-contain"/></div>
         <h1 className="text-4xl font-bold mb-3 text-center">👑 YOMICO Admin</h1>
         <p className="text-gray-500 text-center mb-10">
         YOMICO Administration Portal

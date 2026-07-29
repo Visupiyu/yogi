@@ -24,6 +24,7 @@ import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 
 type Vendor = {
@@ -334,11 +335,13 @@ export default function AdminPage() {
       {/* HEADER */}
       <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-5 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <img
-            src="/logo.png"
-            alt="YOMICO"
-            className="w-24 h-24 rounded-full bg-white p-3"
-          />
+          <Image
+  src="/logo.png"
+  alt="YOMICO"
+  width={180}
+  height={180}
+  className="h-36 md:h-40 w-auto object-contain"
+/>
           <div>
             <h1 className="text-5xl font-bold"> YOMICO</h1>
             <p className="mt-3 text-lg opacity-90">Manage your complete marketplace from one dashboard.</p>

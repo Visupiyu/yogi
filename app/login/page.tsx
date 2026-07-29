@@ -5,6 +5,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import Link from "next/link";
+import Image from "next/image";
 export default function LoginPage() {
   const router = useRouter();
 
@@ -63,11 +64,13 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-6">
       <div className="bg-white backdrop-blur-sm border border-gray-100 p-10 rounded-3xl shadow-xl w-full max-w-md">
         <div className="text-center mb-5">
-  <img
-    src="/logo.png"
-    alt="YOMICO"
-    className="w-28 mx-auto mb-3"
-  />
+ <Image
+  src="/logo.png"
+  alt="YOMICO"
+  width={180}
+  height={180}
+  className="h-36 md:h-40 w-auto object-contain"
+/>
 
   <h2 className="text-3xl font-extrabold text-green-700 tracking-wide">
     YOMICO

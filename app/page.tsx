@@ -20,6 +20,8 @@ import CouponPopup from "@/components/CouponPopup";
 import RecommendedProducts from "@/components/RecommendedProducts";
 import CategoryRow from "@/components/CategoryRow";
 import FeaturedCategories from "@/components/FeaturedCategories";
+import NewsletterCTA from "@/components/NewsletterCTA";
+
 
 type Product = {
   id: string;
@@ -110,6 +112,7 @@ if (filteredData.length === 0) {
       <section className="max-w-7xl mx-auto px-2 py-1 grid grid-cols-1 lg:grid-cols-4 gap-3">
         <div className="lg:col-span-3">
           <HeroSlider />
+     
         </div>
         <OfferCards />
       </section>
@@ -131,6 +134,7 @@ if (filteredData.length === 0) {
       <CustomerReviewsCarousel />
       <FeaturedProducts />
       <TopVendors />
+      <NewsletterCTA />
       <Footer />
     </main>
   );
