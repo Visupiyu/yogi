@@ -26,15 +26,22 @@ function SearchContent() {
 
   const [products, setProducts] = useState([]);
   const [filtered, setFiltered] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState("");
   const [stockOnly, setStockOnly] = useState(false);
   const [category, setCategory] = useState("");
   const [minPrice, setMinPrice] = useState(0);
 const [maxPrice, setMaxPrice] = useState(1000000);
+const [minimumRating, setMinimumRating] = useState(0);
+const [minimumDiscount, setMinimumDiscount] = useState(0);
 const [inStockOnly, setInStockOnly] = useState(false);
 const [sortBy, setSortBy] = useState("default");
-
+const [quickViewProduct, setQuickViewProduct] = useState(null);
+const [showQuickView, setShowQuickView] = useState(false);
+const [quickQty, setQuickQty] = useState(1);
+const [quickSize, setQuickSize] = useState("");
+const [quickColor, setQuickColor] = useState("");
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -62,6 +69,27 @@ const [sortBy, setSortBy] = useState("default");
   }, [query]);
 
   useEffect(() => {
+
+  if (!query.trim()) {
+    setSuggestions([]);
+    return;
+  }
+
+  const q = query.toLowerCase();
+
+  const list = products
+    .filter(
+      (item) =>
+        item.name?.toLowerCase().includes(q) ||
+        item.category?.toLowerCase().includes(q)
+    )
+    .slice(0, 6);
+
+  setSuggestions(list);
+
+}, [query, products]);
+
+  useEffect(() => {
     let items = [...products];
     items = items.filter(
   (item) =>
@@ -78,6 +106,26 @@ if (inStockOnly) {
     if (category) {
       items = items.filter((item) => item.category === category);
     }
+    if (minimumRating > 0) {
+  items = items.filter(
+    (item) => Number(item.rating || 0) >= minimumRating
+  );
+}
+if (minimumDiscount > 0) {
+  items = items.filter((item) => {
+
+    const mrp = Number(item.mrp || 0);
+    const price = Number(item.price || 0);
+
+    if (mrp <= 0) return false;
+
+    const discount =
+      ((mrp - price) / mrp) * 100;
+
+    return discount >= minimumDiscount;
+
+  });
+}
     if (stockOnly) {
       items = items.filter((item) => item.stock > 0);
     }
@@ -87,12 +135,15 @@ if (inStockOnly) {
     if (sort === "stock") items.sort((a, b) => b.stock - a.stock);
 
     setFiltered(items);
-  }, [products, category, stockOnly, sort, minPrice, maxPrice, inStockOnly, sortBy,]);
+  }, [products, category, stockOnly, sort, minPrice, maxPrice, inStockOnly, sortBy, minimumRating,minimumDiscount,]);
+  
 
   const clearFilters = () => {
     setSort("");
     setStockOnly(false);
     setCategory("");
+     setMinimumRating(0);
+      setMinimumDiscount(0);
   };
   const quickChips = ["Shoes", "Mobiles", "Beauty", "Grocery", "Fashion"];
 
@@ -134,6 +185,32 @@ if (inStockOnly) {
               </option>
             ))}
           </select>
+          <select
+  value={minimumRating}
+  onChange={(e) =>
+    setMinimumRating(Number(e.target.value))
+  }
+  className="border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
+>
+  <option value={0}>All Ratings</option>
+  <option value={4}>⭐⭐⭐⭐ & Above</option>
+  <option value={3}>⭐⭐⭐ & Above</option>
+  <option value={2}>⭐⭐ & Above</option>
+  <option value={1}>⭐ & Above</option>
+</select>
+<select
+  value={minimumDiscount}
+  onChange={(e) =>
+    setMinimumDiscount(Number(e.target.value))
+  }
+  className="border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
+>
+  <option value={0}>All Discounts</option>
+  <option value={10}>🏷️ 10% & Above</option>
+  <option value={25}>🏷️ 25% & Above</option>
+  <option value={50}>🏷️ 50% & Above</option>
+  <option value={70}>🏷️ 70% & Above</option>
+</select>
 
           <label className="flex items-center gap-2 border rounded-xl px-4 py-2.5 bg-white cursor-pointer">
             <input
@@ -294,6 +371,16 @@ if (inStockOnly) {
                       >
                         {product.stock > 0 ? "In Stock" : "Out of Stock"}</p>
                       <p className="text-xs text-green-600 mt-1">🚚 Free Delivery </p>
+                      <button
+  onClick={(e) => {
+    e.preventDefault();
+    setQuickViewProduct(product);
+    setShowQuickView(true);
+  }}
+  className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl font-medium transition"
+>
+  👁 Quick View
+</button>
                     </div>
                   </div>
                 </Link>
@@ -310,6 +397,229 @@ className="text-green-600 ml-2 hover:underline"
 Contact Support
 </Link>
 </div>
+{showQuickView && quickViewProduct && (
+  <div
+    className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+    onClick={() => setShowQuickView(false)}
+  >
+    <div
+      className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="grid md:grid-cols-2">
+
+        <div className="bg-gray-100">
+          <img
+            src={quickViewProduct.image || "/no-image.png"}
+            alt={quickViewProduct.name}
+            className="w-full h-80 object-cover"
+          />
+        </div>
+
+        <div className="p-6">
+
+          <h2 className="text-2xl font-bold">
+            {quickViewProduct.name}
+          </h2>
+
+          <p className="text-yellow-500 mt-2">
+            ⭐ {Number(quickViewProduct.rating || 0).toFixed(1)}
+          </p>
+
+         <div className="mt-4">
+
+  <div className="flex items-center gap-3 flex-wrap">
+
+    <span className="text-3xl font-bold text-green-600">
+      ₹{Number(quickViewProduct.price).toLocaleString("en-IN")}
+    </span>
+
+    {Number(quickViewProduct.mrp) > Number(quickViewProduct.price) && (
+      <>
+        <span className="text-gray-400 line-through text-lg">
+          ₹{Number(quickViewProduct.mrp).toLocaleString("en-IN")}
+        </span>
+
+        <span className="bg-red-500 text-white px-2 py-1 rounded-full text-sm font-bold">
+          {Math.round(
+            ((quickViewProduct.mrp - quickViewProduct.price) /
+              quickViewProduct.mrp) *
+              100
+          )}
+          % OFF
+        </span>
+      </>
+    )}
+
+  </div>
+
+</div>
+
+          <p className="mt-4 text-gray-600 line-clamp-4">
+            {quickViewProduct.description}
+          </p>
+          <div className="mt-4 space-y-2">
+
+  <p
+    className={`font-semibold ${
+      quickViewProduct.stock > 0
+        ? "text-green-600"
+        : "text-red-600"
+    }`}
+  >
+    {quickViewProduct.stock > 0
+      ? `✅ In Stock (${quickViewProduct.stock} available)`
+      : "❌ Out of Stock"}
+  </p>
+
+  <p className="text-gray-700">
+    🏪 Seller:{" "}
+    <span className="font-semibold">
+      {quickViewProduct.vendorName || "YOMICO Seller"}
+    </span>
+  </p>
+
+  <p className="text-green-600 font-medium">
+    🚚 Free Delivery
+  </p>
+
+  <p className="text-blue-600">
+    🔄 7 Days Easy Return
+  </p>
+
+</div>
+<div className="mt-6">
+
+  <p className="font-semibold mb-2">
+    Quantity
+  </p>
+
+  <div className="flex items-center gap-3">
+
+    <button
+      onClick={() =>
+        setQuickQty((q) => Math.max(1, q - 1))
+      }
+      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-xl"
+    >
+      −
+    </button>
+
+    <span className="text-xl font-bold w-10 text-center">
+      {quickQty}
+    </span>
+
+    <button
+      onClick={() =>
+        setQuickQty((q) =>
+          Math.min(
+            quickViewProduct.stock || 1,
+            q + 1
+          )
+        )
+      }
+      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-xl"
+    >
+      +
+    </button>
+
+  </div>
+
+</div>
+{quickViewProduct.sizes &&
+  quickViewProduct.sizes.filter((s) => s?.trim()).length > 0 && (
+    <div className="mt-6">
+
+      <p className="font-semibold mb-2">
+        Select Size
+      </p>
+
+      <div className="flex flex-wrap gap-2">
+
+        {quickViewProduct.sizes
+          .filter((s) => s?.trim())
+          .map((size) => (
+
+            <button
+              key={size}
+              onClick={() => setQuickSize(size)}
+              className={`px-4 py-2 rounded-lg border transition ${
+                quickSize === size
+                  ? "bg-green-600 text-white border-green-600"
+                  : "bg-white hover:bg-gray-100"
+              }`}
+            >
+              {size}
+            </button>
+
+          ))}
+
+      </div>
+
+    </div>
+)}
+{quickViewProduct.colors &&
+  quickViewProduct.colors.filter((c) => c?.trim()).length > 0 && (
+    <div className="mt-6">
+
+      <p className="font-semibold mb-2">
+        Select Color
+      </p>
+
+      <div className="flex flex-wrap gap-2">
+
+        {quickViewProduct.colors
+          .filter((c) => c?.trim())
+          .map((color) => (
+
+            <button
+              key={color}
+              onClick={() => setQuickColor(color)}
+              className={`px-4 py-2 rounded-lg border transition ${
+                quickColor === color
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white hover:bg-gray-100"
+              }`}
+            >
+              {color}
+            </button>
+
+          ))}
+
+      </div>
+
+    </div>
+)}
+
+          <div className="flex gap-3 mt-6">
+
+            <button
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold"
+            >
+              🛒 Add to Cart
+            </button>
+
+            <button
+              className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-semibold"
+            >
+              ❤️ Wishlist
+            </button>
+
+          </div>
+
+          <button
+            onClick={() => setShowQuickView(false)}
+            className="mt-4 w-full border border-gray-300 py-3 rounded-xl hover:bg-gray-100"
+          >
+            Close
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+)}
     </section>
   );
 }

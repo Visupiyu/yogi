@@ -10,6 +10,7 @@ import { db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
 
+
 type Product = { id: string; name: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
   color?: string;  sizes?: string[];  material?: string;  brand?: string;  countryOfOrigin?: string;
@@ -79,9 +80,12 @@ export default function ProductPage() {
   const [pinCode, setPinCode] = useState("");
 const [deliveryMessage, setDeliveryMessage] = useState("");
 const [notifySuccess, setNotifySuccess] = useState(false);
+const [showGallery, setShowGallery] = useState(false);
+const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     async function loadProduct() {
+      
       try {
         const snap = await getDoc(
           doc(db, "products", params.id as string)
@@ -160,26 +164,34 @@ questionSnap.forEach((d) => {
 });
           setQuestions(questionData);
 
-          const reviewSnap = await getDocs(
-            query(
-              collection(db, "productReviews"),
-              where("productId", "==", snap.id)
-            )
-          );
-         const reviewData: ProductReview[] = [];
+          try {
+  const reviewSnap = await getDocs(
+    query(
+      collection(db, "productReviews"),
+      where("productId", "==", snap.id)
+    )
+  );
 
-reviewSnap.forEach((d) => {
-  const data = d.data() as Omit<ProductReview, "id">;
+  const reviewData: ProductReview[] = [];
 
-  reviewData.push({
-    id: d.id,
-    ...data,
+  reviewSnap.forEach((d) => {
+    const data = d.data() as Omit<ProductReview, "id">;
+
+    reviewData.push({
+      id: d.id,
+      ...data,
+    });
   });
-});
-          setReviews(reviewData);
+
+  setReviews(reviewData);
+
+} catch (e) {
+  console.error("Product Reviews Error:", e);
+}
+    
          }
       } catch (error) {
-        console.error(error);
+  console.error("loadProduct error:", error);
       } finally {
         setLoading(false);
       }
@@ -187,6 +199,47 @@ reviewSnap.forEach((d) => {
 
     if (params?.id) loadProduct();
   }, [params]);
+  useEffect(() => {
+
+  if (!showGallery) return;
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+
+    const images =
+      (product?.images?.length
+        ? product.images
+        : [product?.image]
+      ).filter(Boolean) as string[];
+
+    const index = images.indexOf(selectedImage);
+
+    if (e.key === "Escape") {
+      setShowGallery(false);
+    }
+
+    if (e.key === "ArrowLeft") {
+      setSelectedImage(
+        images[(index - 1 + images.length) % images.length]
+      );
+    }
+
+    if (e.key === "ArrowRight") {
+      setSelectedImage(
+        images[(index + 1) % images.length]
+      );
+    }
+
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+
+  return () =>
+    window.removeEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
+}, [showGallery, selectedImage, product]);
 
   const colors = product?.color
     ? product.color.split(",").map((c: string) => c.trim()).filter(Boolean)
@@ -197,8 +250,7 @@ reviewSnap.forEach((d) => {
     (s: string) => s && s.trim()
   );
 
-  // Shared cart logic. Returns false if a required option is missing.
-  const addItemToCart = (): boolean => { if (!product) return false;
+    const addItemToCart = (): boolean => { if (!product) return false;
     if (sizes.length > 0 && !selectedSize) {
       alert("Please select a size");
       return false;
@@ -219,7 +271,7 @@ reviewSnap.forEach((d) => {
     );
 
     if (index > -1) {
-      cart[index].qty = Math.min(cart[index].qty + 1, product.stock);
+      cart[index].qty = Math.min(cart[index].qty + quantity,product.stock);
     } else {
       cart.push({
   id: product.id,
@@ -227,7 +279,7 @@ reviewSnap.forEach((d) => {
   price: product.price ?? 0,
   image: product.image,
   stock: product.stock ?? 0,
-  qty: 1,
+  qty: quantity,
   size: selectedSize,
   color: selectedColor,
   vendorId: product.vendorId ?? "",
@@ -596,12 +648,13 @@ if (product.stock > 20) {
 
   <div className="relative w-full h-[320px] sm:h-[420px] md:h-[520px]">
   <Image
-    src={selectedImage}
-    alt={product.name}
-    fill
-    className="object-contain rounded-2xl transition-transform duration-300 hover:scale-110 cursor-zoom-in"
-    sizes="(max-width: 768px) 100vw, 50vw"
-  />
+  src={selectedImage}
+  alt={product.name}
+  fill
+  onClick={() => setShowGallery(true)}
+  className="object-contain rounded-2xl transition-transform duration-300 hover:scale-110 cursor-zoom-in"
+  sizes="(max-width: 768px) 100vw, 50vw"
+/>
 </div>
 
 </div>
@@ -656,6 +709,47 @@ if (product.stock > 20) {
                     Inclusive of all taxes
                   </p>
                 </div>
+                <div className="mt-4 rounded-2xl bg-gray-50 border p-4">
+
+  <div className="flex justify-between items-center">
+
+    <span className="text-gray-600">
+      Unit Price
+    </span>
+
+    <span className="font-semibold">
+      ₹{Number(product.price).toLocaleString("en-IN")}
+    </span>
+
+  </div>
+
+  <div className="flex justify-between items-center mt-2">
+
+    <span className="text-gray-600">
+      Quantity
+    </span>
+
+    <span className="font-semibold">
+      {quantity}
+    </span>
+
+  </div>
+
+  <div className="border-t my-3"></div>
+
+  <div className="flex justify-between items-center">
+
+    <span className="text-lg font-bold">
+      Total
+    </span>
+
+    <span className="text-2xl font-bold text-green-600">
+      ₹{(Number(product.price) * quantity).toLocaleString("en-IN")}
+    </span>
+
+  </div>
+
+</div>
                 {badges.length > 0 && (
 
   <div className="flex flex-wrap gap-2 mb-5">
@@ -921,17 +1015,43 @@ Easy Returns
 
 </div>
 <div className="mb-6">
-<p className="font-semibold mb-2">
-Quantity
-</p>
-<select
-className="border rounded-2xl px-4 py-2"
->
-<option>1</option>
-<option>2</option>
-<option>3</option>
-<option>4</option>
-</select>
+
+  <p className="font-semibold mb-3">
+    Quantity
+  </p>
+
+  <div className="flex items-center gap-3">
+
+    <button
+      onClick={() =>
+        setQuantity((prev) => Math.max(1, prev - 1))
+      }
+      className="w-10 h-10 rounded-xl border border-gray-300 hover:bg-gray-100 text-xl font-bold transition"
+    >
+      −
+    </button>
+
+    <span className="w-12 text-center text-lg font-semibold">
+      {quantity}
+    </span>
+
+    <button
+      onClick={() =>
+        setQuantity((prev) =>
+          Math.min(product.stock || 1, prev + 1)
+        )
+      }
+      className="w-10 h-10 rounded-xl border border-gray-300 hover:bg-gray-100 text-xl font-bold transition"
+    >
+      +
+    </button>
+
+    <span className="text-sm text-gray-500 ml-2">
+      Max: {product.stock}
+    </span>
+
+  </div>
+
 </div>
                 {/* ACTION BUTTONS */}
                 <div className="flex gap-3 mb-3">
@@ -1413,6 +1533,103 @@ className="border rounded-2xl px-4 py-2"
          ⚡ Buy Now
         </button>
       </div>
+      {showGallery && (
+ <div
+  className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4"
+  onClick={() => setShowGallery(false)}
+>
+
+    <button
+      onClick={() => setShowGallery(false)}
+      className="absolute top-5 right-5 text-white text-4xl font-bold hover:text-red-400"
+    >
+      ✕
+    </button>
+
+    <button
+      onClick={() => {
+        const images = (product.images?.length
+          ? product.images
+          : [product.image]
+        ).filter(Boolean) as string[];
+
+        const index = images.indexOf(selectedImage);
+
+        setSelectedImage(
+          images[(index - 1 + images.length) % images.length]
+        );
+      }}
+      className="absolute left-5 text-white text-5xl font-bold"
+    >
+      ‹
+    </button>
+
+   <div
+  className="flex flex-col items-center w-full"
+  onClick={(e) => e.stopPropagation()}
+>
+
+  <div className="relative w-full max-w-5xl h-[70vh]">
+
+    <Image
+      src={selectedImage}
+      alt={product.name}
+      fill
+      className="object-contain"
+      sizes="100vw"
+    />
+
+  </div>
+
+  <div className="flex gap-3 mt-6 overflow-x-auto max-w-full">
+
+    {(product.images?.length
+      ? product.images
+      : [product.image]
+    )
+      .filter(Boolean)
+      .map((img, index) => (
+
+        <Image
+          key={index}
+          src={img as string}
+          alt={`${product.name}-${index}`}
+          width={70}
+          height={70}
+          onClick={() => setSelectedImage(img as string)}
+          className={`w-16 h-16 rounded-xl object-cover cursor-pointer border-2 transition ${
+            selectedImage === img
+              ? "border-green-500"
+              : "border-gray-400"
+          }`}
+        />
+
+      ))}
+
+  </div>
+
+</div>
+
+    <button
+      onClick={() => {
+        const images = (product.images?.length
+          ? product.images
+          : [product.image]
+        ).filter(Boolean) as string[];
+
+        const index = images.indexOf(selectedImage);
+
+        setSelectedImage(
+          images[(index + 1) % images.length]
+        );
+      }}
+      className="absolute right-5 text-white text-5xl font-bold"
+    >
+      ›
+    </button>
+
+  </div>
+)}
     </>
   );
 }
