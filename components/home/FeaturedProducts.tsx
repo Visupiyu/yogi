@@ -78,7 +78,7 @@ export default function FeaturedProducts() {
             ))}
           </div>
         ) : products.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-8 md:py-12 text-gray-500">
             No Featured Products Found
           </div>
         ) : (

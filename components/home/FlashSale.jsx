@@ -29,12 +29,15 @@ export default function FlashSale() {
   }, []);
 
   const units = [
-    { label: "Hours", value: timeLeft.hours },
-    { label: "Minutes", value: timeLeft.minutes },
-    { label: "Seconds", value: timeLeft.seconds },
-  ];
+  { label: "Hours", value: timeLeft.hours },
+  { label: "Minutes", value: timeLeft.minutes },
+  { label: "Seconds", value: timeLeft.seconds },
+];
 
-  return (
+const primaryButton =
+  "inline-flex items-center justify-center px-5 py-2 sm:px-8 sm:py-4 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition-all hover:scale-105";
+
+return (
     <section className="py-6 px-2">
       <motion.div
         initial={{ opacity: 0, y: 50 }}
@@ -50,7 +53,7 @@ export default function FlashSale() {
   </div>
 
   <div className="relative flex flex-col lg:flex-row items-center justify-between gap-6">
-            <div className="absolute top-5 right-5 bg-yellow-400 text-black px-4 py-2 rounded-full font-bold shadow-xl rotate-6">
+            <div className="absolute top-3 right-3 bg-yellow-400 text-black px-2 py-1 rounded-full text-xs font-bold shadow-lg rotate-6">
   SAVE 70%
 </div>
             {/* LEFT */}
@@ -58,7 +61,7 @@ export default function FlashSale() {
               <span className="inline-block bg-white text-red-600 px-4 py-1 rounded-full text-sm font-bold shadow-lg mb-4">
   🔥 BIGGEST SALE OF THE SEASON
 </span>
-             <h2 className="text-4xl md:text-5xl font-black leading-tight">
+             <h2 className="text-3xl sm:text-4xl md:text-6xl font-extrabold leading-tight">
                 ⚡ Flash Sale
                 <br />
                 MEGA SALE
@@ -66,20 +69,21 @@ export default function FlashSale() {
               <p className="mt-4 text-lg text-white/95 max-w-md">
                 Grab your favourite products before the offer ends.
               </p>
-              <div className="flex flex-wrap gap-4 mt-6">
+              <div className="mt-3 text-sm sm:text-base">
 
-                <Link href="/search">
-                <button className="bg-white text-red-600 hover:bg-gray-100 px-8 py-4 rounded-2xl font-bold shadow-xl transition-all hover:scale-105">
-                  Shop Now
-                </button>
-                </Link>
+                <Link
+  href="/search"
+  className={`inline-flex items-center justify-center bg-white text-red-600 hover:bg-gray-100 ${primaryButton}`}
+>
+  Shop Now →
+</Link>
                 <Link
   href="/search"
   className="bg-transparent border-2 border-white px-8 py-4 rounded-2xl font-bold hover:bg-white hover:text-red-600 transition"
 >
   View All Deals
 </Link>
-                <p className="mt-4 text-sm font-semibold text-white">
+                <p className="hidden sm:block mt-4 text-sm font-semibold text-white">
   🚚 Free Shipping • Secure Payment • Easy Returns
 </p>
             </div>
@@ -91,12 +95,12 @@ export default function FlashSale() {
               {units.map((u) => (
                 <div
                   key={u.label}
-                  className="bg-white/15 backdrop-blur-md rounded-2xl p-2 min-w-[100px] h-[110px] flex flex-col justify-center text-center border border-white/20"
+                  className="bg-white/15 backdrop-blur-md rounded-2xl p-2 min-w-[70px] sm:min-w-[100px] h-[80px] sm:h-[110px] flex flex-col justify-center text-center border border-white/20"
                 >
-                  <h3 className="text-4xl font-bold">
+                  <h3 className="text-2xl sm:text-4xl font-bold">
                     {String(u.value).padStart(2, "0")}
                   </h3>
-                  <p className="mt-2 text-sm">{u.label}</p>
+                  <p className="mt-1 text-xs sm:text-sm">{u.label}</p>
                 </div>
               ))}
             </div>

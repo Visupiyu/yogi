@@ -35,7 +35,7 @@ export default function TrendingProducts() {
   });
 
   return (
-    <section className="max-w-7xl mx-auto px-4 py-12">
+    <section className="max-w-7xl mx-auto px-4 py-8 md:py-12">
       <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
 
   <div>
@@ -98,7 +98,7 @@ export default function TrendingProducts() {
 </motion.div>
       ) : (
         !error && (
-         <div className="text-center py-16">
+         <div className="text-center py-10 md:py-16">
 
   <div className="text-6xl mb-4">
     📦

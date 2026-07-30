@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
 
@@ -68,8 +68,6 @@ publisher: "YOMICO",
 
   manifest: "/manifest.json",
 
-themeColor: "#16a34a",
-
   openGraph: {
   title: "YOMICO",
   description: "India's Modern Multi-Vendor Marketplace",
@@ -97,12 +95,16 @@ icons: {
   apple: "/apple-touch-icon.png",
 },
 };
+export const viewport: Viewport = {
+  themeColor: "#16a34a",
+};
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  
   return (
     <html
       lang="en"

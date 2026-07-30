@@ -50,9 +50,9 @@ const categories = [
 
 export default function CategoriesGrid() {
   return (
-    <section className="py-12 px-4 bg-white">
+    <section className="py-8 md:py-12 px-4 bg-white">
       <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-10">
+        <div className="text-center mb-6 md:mb-10">
 
   <span className="inline-block bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-semibold mb-3">
     🛍️ SHOP BY CATEGORY

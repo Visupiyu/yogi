@@ -58,7 +58,7 @@ const nextSlide = () => {
 };
 
   return (
-    <div className="relative w-full h-[220px] md:h-[420px] overflow-hidden rounded-2xl mb-6">
+    <div className="relative w-full h-[260px] sm:h-[300px] md:h-[420px] overflow-hidden rounded-2xl mb-6">
       {slides.map((slide, index) => {
         const active = current === index;
         return (
@@ -98,19 +98,15 @@ const nextSlide = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.7 }}
-              className="absolute inset-0 flex flex-col justify-center px-10 md:px-20 text-white max-w-xl z-10"
+              className="absolute inset-0 flex flex-col justify-center px-5 sm:px-8 md:px-20 text-white max-w-xl z-10"
             >
               <span className="inline-block bg-yellow-400 text-black px-4 py-1 rounded-full text-xs md:text-sm font-bold mb-4 shadow-lg">
   {slide.offer}
 </span>
-              <h1 className="text-3xl md:text-5xl font-extrabold leading-tight mb-4">
+              <h1 className="text-2xl sm:text-4xl md:text-6xl font-extrabold leading-tight mb-3">
                 {slide.title}
               </h1>
-              <span className="inline-block bg-yellow-400 text-black px-4 py-1 rounded-full text-sm font-bold mb-4">
-  {slide.offer}
-</span>
-
-              <p className="text-lg md:text-xl text-gray-100 mb-8 max-w-lg">
+              <p className="text-xs sm:text-sm md:text-2xl text-gray-100 mb-5 max-w-lg">
                 {slide.subtitle}
               </p>
 
@@ -122,7 +118,7 @@ const nextSlide = () => {
   >
     <Link
       href={`/category/${encodeURIComponent(slide.category)}`}
-      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 px-8 py-4 rounded-2xl text-lg font-semibold shadow-xl hover:shadow-2xl transition"
+      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 px-5 py-2 sm:px-8 sm:py-4 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition"
     >
       {slide.button}
     </Link>
@@ -132,7 +128,7 @@ const nextSlide = () => {
 
   <Link
     href="/vendor-register"
-    className="bg-white text-gray-900 hover:bg-gray-100 px-8 py-4 rounded-2xl text-lg font-semibold shadow-xl transition"
+   className="bg-white text-gray-900 hover:bg-gray-100 px-5 py-2 sm:px-8 sm:py-4 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition"
   >
     Become a Seller
   </Link>
@@ -144,7 +140,7 @@ const nextSlide = () => {
         );
       })}
 
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-4 z-20">
+      <div className="absolute bottom-3 sm:bottom-5 left-1/2 -translate-x-1/2 flex gap-4 z-20">
      {slides.map((_, index) => (
           <button
             key={index}

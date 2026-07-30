@@ -44,7 +44,7 @@ const features = [
 
 export default function FeatureStrip() {
   return (
-    <section className="bg-white py-12 border-b">
+    <section className="bg-white py-8 md:py-12 border-b">
       <div className="text-center mb-8">
 
   <span className="inline-block bg-green-100 text-green-700 px-4 py-1 rounded-full text-sm font-semibold mb-3">

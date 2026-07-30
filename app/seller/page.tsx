@@ -1343,7 +1343,7 @@ className="h-16 w-full object-cover rounded-xl"
 
             <div className="space-y-4">
               {products.length === 0 && (
-                <div className="text-center py-12">
+                <div className="text-center py-8 md:py-12">
                   <div className="text-4xl mb-2">📦</div>
                   <p className="text-gray-500">📦 No Products Yet<br/>Start adding products to grow your business.</p>
                 </div>
@@ -1449,7 +1449,7 @@ return ( (product.name || "").toLowerCase().includes(q) ||
   <tr>
     <td
       colSpan={5}
-      className="text-center py-12 text-gray-500"
+      className="text-center py-8 md:py-12 text-gray-500"
     >
       🛒 No Orders Yet
       <br />

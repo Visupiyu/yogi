@@ -78,7 +78,7 @@ export default function RecommendedProducts() {
 
  if (products.length === 0) {
   return (
-    <section className="max-w-7xl mx-auto px-4 py-16 text-center">
+    <section className="max-w-7xl mx-auto px-4 py-10 md:py-16 text-center">
 
       <div className="text-6xl mb-4">
         🎯

@@ -19,16 +19,16 @@ export default function Footer() {
   return (
     <footer className="bg-gradient-to-br from-slate-50 via-white to-green-50 border-t mt-10">
       {/* TOP */}
-      <div className="max-w-7xl mx-auto px-4 py-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+      <div className="max-w-7xl mx-auto px-2 py-4 md:py-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         {/* BRAND */}
         <div>
-          <h2 className="text-3xl font-extrabold text-green-700 mb-2 tracking-wide">YOMICO</h2>
+          <h2 className="text-2xl font-extrabold text-green-700 mb-1 tracking-wide">YOMICO</h2>
           <Image
   src="/logo.png"
   alt="YOMICO Logo"
-  width={180}
-  height={180}
-  className="h-36 md:h-40 w-auto object-contain"
+  width={160}
+  height={100}
+  className="h-24 sm:h-28 md:h-40 w-auto object-contain"
 />
           <p className="text-gray-600 leading-7">
   <span className="font-bold text-green-700">YOMICO</span> is India's
@@ -40,8 +40,8 @@ export default function Footer() {
 
         {/* COMPANY */}
         <div>
-          <h3 className="text-lg font-bold mb-3">Company</h3>
-          <ul className="space-y-3 text-gray-600">
+          <h3 className="text-base md:text-lg font-bold mb-3">Company</h3>
+          <ul className="space-y-2 text-gray-600">
             <li><Link href="/about" className="hover:text-green-600 transition">About Us</Link></li>
             </ul>
         </div>
@@ -70,7 +70,7 @@ export default function Footer() {
         {/* SELLER */}
         <div>
           <h3 className="text-lg font-bold mb-3">Seller</h3>
-          <ul className="space-y-3 text-gray-600">
+          <ul className="space-y-2 text-gray-600">
             <li><Link href="/vendor-login" className="hover:text-green-600 transition">Sell on YOMICO</Link></li>
             <li><Link href="/vendor-register" className="hover:text-green-600 transition">Become a Seller</Link></li>
             <li><Link href="/vendor-login" className="hover:text-green-600 transition">Seller Login</Link></li>
@@ -79,16 +79,16 @@ export default function Footer() {
 
         {/* DOWNLOAD */}
         <div>
-          <h3 className="text-lg font-bold mb-3">Download App</h3>
-          <div className="flex flex-col gap-3">
-            <button className="bg-black text-white py-3 rounded-xl font-semibold hover:bg-gray-800 transition">
+          <h3 className="text-lg font-bold mb-2">Download App</h3>
+          <div className="flex flex-col gap-2">
+            <button className="bg-black text-white py-2 rounded-2xl shadow-lg font-semibold hover:bg-gray-800 transition">
   Google Play
   <div className="text-xs opacity-80">
     Coming Soon
   </div>
   </button>
 
-   <button className="bg-black text-white py-3 rounded-xl font-semibold hover:bg-gray-800 transition">
+   <button className="bg-black text-white py-2 rounded-2xl shadow-lg font-semibold hover:bg-gray-800 transition">
          
  App Store
   <div className="text-xs opacity-80">
@@ -100,7 +100,7 @@ export default function Footer() {
       </div>
 
       {/* TRUST ROW */}
-      <div className="border-t border-b py-4 px-4">
+      <div className="border-t border-b py-2 px-4">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-gray-700">
           <div className="flex items-center justify-center gap-2">
   <Truck size={18} className="text-green-600" />
@@ -125,7 +125,7 @@ export default function Footer() {
       </div>
 
       {/* SOCIAL */}
- <div className="flex justify-center gap-6 py-4">
+ <div className="flex justify-center gap-6 py-3">
   <Link href="#">
     <FaFacebook className="text-2xl hover:text-blue-600 transition" />
   </Link>
@@ -144,7 +144,7 @@ export default function Footer() {
 </div>
 
       {/* BOTTOM */}
-      <div className="border-t py-4 text-center text-gray-500 text-sm">
+     <div className="border-t py-3 text-center text-xs sm:text-sm text-gray-500 leading-6">
       © 2026 YOMICO. All Rights Reserved.
 
 Designed & Developed with ❤️ in India 🇮🇳

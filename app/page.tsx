@@ -105,7 +105,7 @@ if (filteredData.length === 0) {
     filteredData.filter((p) => p.category === name);
 
   return (
-    <main className="min-h-screen bg-gray-100">
+    <main className="min-h-screen bg-gray-100 pb-24 md:pb-0">
       <CategoryStrip />
       <FeatureStrip />
 

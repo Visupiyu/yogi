@@ -45,7 +45,7 @@ export default function CustomerReviewsCarousel() {
   return (
     <section className="py-8 px-4 bg-gradient-to-b from-white to-gray-50">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-10">
+        <div className="text-center mb-6 md:mb-10">
 
   <span className="inline-block bg-pink-100 text-pink-600 px-4 py-1 rounded-full text-sm font-semibold mb-3">
     ❤️ CUSTOMER LOVE
