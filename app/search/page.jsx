@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductFilters from "@/components/ProductFilters";
+import { addToCart as addToCartHelper } from "@/lib/cart";
 
 const CATEGORIES = [
   "Men Fashion",
@@ -591,14 +592,43 @@ Contact Support
     </div>
 )}
 
-          <div className="flex gap-3 mt-6">
+          <button
+  onClick={() => {
 
-            <button
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold"
-            >
-              🛒 Add to Cart
-            </button>
+    if (!quickViewProduct) return;
 
+    if (
+      quickViewProduct.sizes?.filter((s) => s?.trim()).length > 0 &&
+      !quickSize
+    ) {
+      alert("Please select a size");
+      return;
+    }
+
+    if (
+      quickViewProduct.colors?.filter((c) => c?.trim()).length > 0 &&
+      !quickColor
+    ) {
+      alert("Please select a color");
+      return;
+    }
+
+    const success = addToCartHelper(quickViewProduct, {
+      qty: quickQty,
+      size: quickSize,
+      color: quickColor,
+    });
+
+    if (success) {
+      alert("Added To Cart");
+      setShowQuickView(false);
+    }
+
+  }}
+  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold"
+>
+  🛒 Add to Cart
+</button>
             <button
               className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-semibold"
             >
@@ -618,7 +648,7 @@ Contact Support
 
       </div>
     </div>
-  </div>
+
 )}
     </section>
   );

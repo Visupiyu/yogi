@@ -9,7 +9,7 @@ import {
   doc,
   updateDoc,
   increment,
-  getDocs,
+  getDocs, getDoc,
   query,
   where,
   limit,
@@ -329,6 +329,7 @@ localStorage.setItem( "user", JSON.stringify(user));
 
   const placeCODOrder = async () => {
     if (!validateForm()) return;
+     if (!(await validateStock())) return;
 
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
@@ -357,6 +358,8 @@ localStorage.setItem( "user", JSON.stringify(user));
 
   const payNow = async () => {
     if (!validateForm()) return;
+
+      if (!(await validateStock())) return;
 
     const res: any = await loadRazorpayScript();
     if (!res) {
@@ -439,6 +442,42 @@ localStorage.setItem( "user", JSON.stringify(user));
     if (paymentMethod === "ONLINE") payNow();
     else placeCODOrder();
   };
+  const validateStock = async () => {
+
+  for (const item of items) {
+
+    const snap = await getDoc(
+      doc(db, "products", item.id)
+    );
+
+    if (!snap.exists()) {
+      alert(`${item.name} is no longer available.`);
+      return false;
+    }
+
+    const product = snap.data();
+    if (product.status === "Inactive") {
+  alert(`${item.name} is currently unavailable.`);
+  return false;
+}
+
+if (product.approved === false) {
+  alert(`${item.name} is no longer available.`);
+  return false;
+}
+
+    if ((product.stock ?? 0) < item.qty) {
+      alert(
+        `${item.name} has only ${product.stock} item(s) left in stock.`
+      );
+      return false;
+    }
+
+  }
+
+  return true;
+
+};
 
   return (
     <section className="py-8 px-4 bg-gray-50 min-h-screen">

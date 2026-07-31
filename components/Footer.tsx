@@ -28,9 +28,9 @@ export default function Footer() {
   alt="YOMICO Logo"
   width={160}
   height={100}
-  className="h-24 sm:h-28 md:h-40 w-auto object-contain"
+  className="h-24 sm:h-28 md:h-28 w-auto object-contain"
 />
-          <p className="text-gray-600 leading-7">
+          <p className="text-gray-600 leading-6">
   <span className="font-bold text-green-700">YOMICO</span> is India's
   modern multi-vendor marketplace connecting customers with trusted
   sellers for groceries, fashion, electronics, beauty, home essentials

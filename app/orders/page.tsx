@@ -9,404 +9,225 @@ import {
   updateDoc,
   doc,
 } from "firebase/firestore";
-
 import { onAuthStateChanged } from "firebase/auth";
-
 import { useRouter } from "next/navigation";
-
 import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
-
+import { addToCart } from "@/lib/cart";
 export default function OrdersPage() {
-
   const router = useRouter();
-
   const [orders, setOrders] = useState<any[]>([]);
-
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
-
     const unsub = onAuthStateChanged(
-
       auth,
-
       (firebaseUser) => {
-
         if (!firebaseUser) {
-
           setLoading(false);
-
           alert("Please login first");
-
           router.push("/login");
-
           return;
-
         }
-
         const fetchOrders = async () => {
-
           try {
-
             const q = query(
-
               collection(db, "orders"),
-
               where(
                 "userEmail",
                 "==",
                 firebaseUser.email
               )
-
             );
-
             const snapshot =
               await getDocs(q);
-
             const items: any[] = [];
-
             snapshot.forEach((docSnap) => {
-
               items.push({
-
                 id: docSnap.id,
-
                 ...docSnap.data(),
-
               });
-
             });
-
             const unique = Array.from(
-
               new Map(
-
                 items.map((o) => [
-
                   o.id,
-
                   o,
-
                 ])
-
               ).values()
-
             );
-
             unique.sort(
-
               (a, b) =>
-
                 (b.createdAt?.seconds || 0) -
-
                 (a.createdAt?.seconds || 0)
-
             );
-
             setOrders(unique);
-
           } catch (error) {
-
             console.error(error);
-
           } finally {
-
             setLoading(false);
-
           }
-
         };
-
         fetchOrders();
-
       }
-
     );
-
     return () => unsub();
-
   }, [router]);
-
   const getStep = (
-
     status: string = ""
-
   ) => {
-
     switch (status) {
-
       case "Pending":
-        return 1;
-
+       return 1;
       case "Confirmed":
         return 2;
-
       case "Packed":
         return 3;
-
       case "Shipped":
         return 4;
-
       case "Out For Delivery":
-        return 5;
-
+       return 5;
       case "Delivered":
         return 6;
-
       default:
         return 1;
-
     }
-
   };
-
   const cancelOrder = async (
-
     id: string
-
   ) => {
-
     if (
-
       !confirm(
-
         "Cancel this order?"
-
       )
-
     )
-
       return;
-
     try {
-
       await updateDoc(
-
         doc(db, "orders", id),
-
         {
-
           status: "Cancelled",
-
         }
-
       );
-
       setOrders((prev) =>
-
         prev.map((o) =>
-
           o.id === id
-
             ? {
-
                 ...o,
-
                 status: "Cancelled",
-
               }
-
             : o
-
         )
-
       );
-
     } catch (error) {
-
       console.log(error);
-
     }
-
   };
-
+  const reorderItems = (items: any[]) => {
+  items.forEach((item) => {
+    addToCart(item, {
+      qty: item.qty,
+      size: item.size,
+      color: item.color,
+    });
+  });
+  toast.success(
+  `${items.length} item(s) added to your cart.`
+);
+  router.push("/cart");
+};
   const steps = [
-
     "📝 Placed",
-
     "✅ Confirmed",
-
     "📦 Packed",
-
     "🚚 Shipped",
-
     "🏍️ Out For Delivery",
-
     "🎉 Delivered",
-
   ];
-
   if (loading) {
-
     return (
-
       <div className="py-20 text-center">
-
       Loading your orders...
-
       </div>
-
     );
-
   }
-
   return (
-
   <section className="bg-gray-50 min-h-screen py-10">
-
       <div className="max-w-6xl mx-auto px-5">
-
         <h1 className="text-4xl font-bold mb-10">
-
           My Orders
-
         </h1>
-
         {orders.length === 0 ? (
-
           <div className="bg-white rounded-3xl shadow-md p-10 text-center">
-
             <p className="text-gray-500 text-lg">
-
               No Orders Found
-
             </p>
-
           </div>
-
         ) : (
-
           <div className="space-y-8">
-
             {orders.map((order: any) => (
-
               <div
-
                 key={order.id}
-
                 className="bg-white rounded-3xl shadow-md border overflow-hidden"
-
               >
-
                 {/* ORDER SUMMARY */}
-
                 <div className="grid lg:grid-cols-3 gap-8 p-8 border-b">
-
                   {/* LEFT */}
-
                   <div>
-
                     <h2 className="text-2xl font-bold">
-
                       Order #
-
                       {order.id.slice(0, 8)}
-
                     </h2>
-
                     <p className="mt-4">
-
                       👤 {order.customerName}
-
                     </p>
-
                     <p className="mt-2 text-gray-500">
-
                       📅
-
                       {" "}
-
                       {order.createdAt?.seconds
-
                         ? new Date(
-
                             order.createdAt.seconds *
-
                               1000
-
                           ).toLocaleString()
-
                         : "-"}
-
                     </p>
-
                     <p className="mt-2">
-
                       📧
-
                       {" "}
-
                       {order.userEmail}
-
                     </p>
-
                     <p className="mt-2">
-
                       📞
-
                       {" "}
-
                       {order.phone}
-
                     </p>
-
                     <p className="mt-2">
-
                       📍
-
                       {" "}
-
                       {order.address}
-
                     </p>
-
                   </div>
-
                   {/* CENTER */}
-
                   <div className="bg-gray-50 rounded-3xl border p-6">
-
                     <p className="text-4xl font-bold text-green-700">
-
                       ₹
-
                       {(
-
                         order.finalTotal ||
-
                         order.total
-
                       )?.toLocaleString(
-
                         "en-IN"
-
                       )}
-
                     </p>
-
                     <p className="text-gray-500 mt-2">
-
                       Total Amount
-
                     </p>
-
                     <hr className="my-5" />
-
 <div className="space-y-4">
-
   <div className="flex justify-between">
-
     <span>Items</span>
-
     <span>{order.items?.length}</span>
-
   </div>
-
   <div className="flex justify-between">
-
     <span>Payment</span>
-
     <span
       className={
         order.paymentStatus === "Paid"
@@ -416,53 +237,30 @@ export default function OrdersPage() {
     >
       {order.paymentStatus || "Pending"}
     </span>
-
   </div>
-
   <div className="flex justify-between">
-
     <span>Method</span>
-
     <span>
-
       {order.paymentMethod || "COD"}
-
     </span>
-
   </div>
-
   <div className="flex justify-between">
-
     <span>Status</span>
-
     <span className="text-blue-600 font-semibold">
-
       {order.status}
-
     </span>
-
   </div>
-
   <div className="flex justify-between">
-
     <span>Shipping</span>
-
     <span>
-
       Free
-
     </span>
-
   </div>
-
 </div>
 </div>
 {/* RIGHT */}
-
 <div className="space-y-3">
-
   {/* View Details */}
-
   <a
     href={`/orders/${order.id}`}
     className="
@@ -480,11 +278,8 @@ export default function OrdersPage() {
   >
     👁️ View Details
   </a>
-
   {/* Download Invoice */}
-
  {["Confirmed", "Shipped", "Delivered"].includes(order.status) && (
-
     <a
       href={`/invoice/${order.id}`}
       target="_blank"
@@ -550,6 +345,21 @@ export default function OrdersPage() {
   >
     📍 Track Order
   </a>
+
+  <button
+  onClick={() => reorderItems(order.items)}
+  className="
+    w-full
+    h-12
+    rounded-xl
+    bg-green-700
+    hover:bg-green-800
+    text-white
+    font-semibold
+  "
+>
+  🔄 Reorder
+</button>
 
   {/* Cancel Order */}
 
@@ -902,19 +712,21 @@ export default function OrdersPage() {
 
             </h3>
 
-            <div className="mt-3 space-y-2 text-gray-600">
+           <div className="mt-3 space-y-2 text-gray-600">
 
-              <p>
-
-                🏬 Sold By:
-                {" "}
-                <span className="font-semibold">
-
-                 {item.vendorName || "YOMICO"}
-
-                </span>
-
-              </p>
+  <p>
+    🏬 Sold By:{" "}
+    <a
+      href={`/seller/${item.vendorId}`}
+      className="
+        font-semibold
+        text-blue-600
+        hover:underline
+      "
+    >
+      {item.vendorName || "YOMICO"}
+    </a>
+  </p>
 
               <p>
 

@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  getCartItems,
+  updateCartQuantity,
+  removeFromCart,
+  getCartTotal,
+  clearCart,
+} from "@/lib/cart";
 
 const FREE_DELIVERY_THRESHOLD = 999; // keep in sync with TopStrip
 const SHIPPING_FEE = 99;
@@ -13,9 +20,7 @@ export default function CartPage() {
   const [discount, setDiscount] = useState(0);
 
  useEffect(() => {
-  setCart(
-    JSON.parse(localStorage.getItem("cart") || "[]")
-  );
+  setCart(getCartItems());
 
   setSavedItems(
     JSON.parse(
@@ -31,25 +36,49 @@ export default function CartPage() {
   };
 
   const updateQty = (index: number, type: string) => {
-    const updated = [...cart];
-    if (type === "inc" && updated[index].qty < updated[index].stock) {
-      updated[index].qty += 1;
-    }
-    if (type === "dec" && updated[index].qty > 1) {
-      updated[index].qty -= 1;
-    }
-    persist(updated);
-  };
 
-  const removeItem = (index: number) => {
-    persist(cart.filter((_, i) => i !== index));
-  };
+  const item = cart[index];
 
-  const clearCart = () => {
-    localStorage.removeItem("cart");
-    setCart([]);
-    window.dispatchEvent(new Event("cartUpdated"));
-  };
+  if (!item) return;
+
+  const newQty =
+    type === "inc"
+      ? item.qty + 1
+      : item.qty - 1;
+
+  updateCartQuantity(
+    item.id,
+    newQty,
+    item.size,
+    item.color
+  );
+
+  setCart(getCartItems());
+
+};
+const removeItem = (index: number) => {
+
+  const item = cart[index];
+
+  if (!item) return;
+
+  removeFromCart(
+    item.id,
+    item.size,
+    item.color
+  );
+
+  setCart(getCartItems());
+
+};
+
+ const clearCartHandler = () => {
+
+  clearCart();
+
+  setCart([]);
+
+};
 
   const applyCoupon = () => {
     if (coupon.trim().toUpperCase() === "TEST50") {
@@ -463,7 +492,7 @@ console.log("hasMrp:", hasMrp);
               <div className="flex flex-wrap gap-4 pt-2">
 
   <button
-    onClick={clearCart}
+    onClick={clearCartHandler}
     className="text-sm text-gray-500 hover:text-red-500 transition font-medium"
   >
     🗑 Clear Cart

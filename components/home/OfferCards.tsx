@@ -21,7 +21,7 @@ const offers = [
 
 export default function OfferCards() {
   return (
-    <div className="flex flex-col gap-5">
+   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {offers.map((offer) => (
         <Link
           key={offer.title}
@@ -30,7 +30,7 @@ export default function OfferCards() {
           )}`}
           className="block"
         >
-          <div className="relative overflow-hidden rounded-3xl h-[205px] shadow-xl hover:shadow-2xl group transition-all duration-300">
+          <div className="relative overflow-hidden rounded-3xl h-[170px] shadow-xl hover:shadow-2xl group transition-all duration-300">
             <img
               src={offer.image}
               alt={offer.title}
@@ -42,12 +42,12 @@ export default function OfferCards() {
             {/* darker gradient so white text is readable */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/45 to-transparent" />
 
-            <div className="relative z-10 h-full flex flex-col justify-center p-6 text-white">
+            <div className="relative z-10 h-full flex flex-col justify-center p-4 text-white">
              <span className="inline-block bg-yellow-400 text-black px-3 py-1 rounded-full text-xs font-bold mb-3 w-fit">
   {offer.badge}
 </span>
-              <h2 className="text-3xl font-bold mb-1">{offer.title}</h2>
-              <p className="text-lg font-semibold mb-3">{offer.subtitle}</p>
+              <h2 className="text-2xl font-bold mb-1">{offer.title}</h2>
+              <p className="text-sm font-semibold mb-3">{offer.subtitle}</p>
               <span className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white px-5 py-3 rounded-xl font-semibold w-fit shadow-lg transition">
   Shop Now →
 </span>

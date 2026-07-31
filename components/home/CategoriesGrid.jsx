@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-// Names must match the exact category strings stored on products,
-// so the /category/[name] pages resolve correctly.
 const categories = [
   {
     name: "Men Fashion",

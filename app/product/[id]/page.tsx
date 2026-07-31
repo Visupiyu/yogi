@@ -9,7 +9,7 @@ import CustomersAlsoBought from "@/components/CustomersAlsoBought";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
-
+import { addToCart as addToCartHelper } from "@/lib/cart";
 
 type Product = { id: string; name: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
@@ -250,48 +250,25 @@ questionSnap.forEach((d) => {
     (s: string) => s && s.trim()
   );
 
-    const addItemToCart = (): boolean => { if (!product) return false;
-    if (sizes.length > 0 && !selectedSize) {
-      alert("Please select a size");
-      return false;
-    }
-    if (colors.length > 0 && !selectedColor) {
-      alert("Please select a color");
-      return false;
-    }
+   const addItemToCart = (): boolean => {
+  if (!product) return false;
 
-    const cart: CartItem[] = JSON.parse(
-  localStorage.getItem("cart") || "[]"
-);
-    const index = cart.findIndex(
-      (item) =>
-        item.id === product.id &&
-        item.size === selectedSize &&
-        item.color === selectedColor
-    );
+  if (sizes.length > 0 && !selectedSize) {
+    alert("Please select a size");
+    return false;
+  }
 
-    if (index > -1) {
-      cart[index].qty = Math.min(cart[index].qty + quantity,product.stock);
-    } else {
-      cart.push({
-  id: product.id,
-  name: product.name ?? "",
-  price: product.price ?? 0,
-  image: product.image,
-  stock: product.stock ?? 0,
-  qty: quantity,
-  size: selectedSize,
-  color: selectedColor,
-  vendorId: product.vendorId ?? "",
-  vendorName: product.vendorName ?? "",
-});
-    }
+  if (colors.length > 0 && !selectedColor) {
+    alert("Please select a color");
+    return false;
+  }
 
-    localStorage.setItem("cart", JSON.stringify(cart));
-    window.dispatchEvent(new Event("cartUpdated"));
-    return true;
-  };
-
+  return addToCartHelper(product, {
+    qty: quantity,
+    size: selectedSize,
+    color: selectedColor,
+  });
+};
   const addToCart = () => {
     if (addItemToCart()) alert("Added To Cart");
   };
@@ -600,6 +577,12 @@ if (product.stock > 20) {
     <>
       <div className="min-h-screen bg-gray-50 p-3 pb-32">
         <div className="max-w-7xl mx-auto">
+          <Link
+  href="/"
+  className="inline-flex items-center text-green-600 hover:underline mb-4"
+>
+  ← Continue Shopping
+</Link>
           {/* BREADCRUMB */}
           <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 px-1">
             <Link href="/" className="hover:text-green-600">Home</Link>
@@ -615,6 +598,15 @@ if (product.stock > 20) {
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div className="mb-6">
+  <h1 className="text-4xl font-bold">
+    Product Details
+  </h1>
+
+  <p className="text-gray-500 mt-2">
+    Explore complete product information, seller details, delivery options and customer reviews.
+  </p>
+</div>
             <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
               {/* IMAGE GALLERY */}
               <div className="md:sticky md:top-24 self-start">
@@ -921,15 +913,19 @@ Easy Returns
       </p>
 
       <h3 className="text-xl font-bold text-gray-800 mt-1">
-        🏪 {product.vendorName}
-      </h3>
+  <Link
+    href={`/seller/${product.vendorId}`}
+    className="hover:text-green-600 hover:underline"
+  >
+    🏪 {product.vendorName}
+  </Link>
+</h3>
 
       <div className="flex items-center gap-2 mt-2">
 
         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
-          ⭐ Trusted Seller
-        </span>
-
+  ✔ Verified Seller
+</span>
         <span className="text-sm text-gray-500">
           Secure Marketplace
         </span>
@@ -942,12 +938,12 @@ Easy Returns
 
     </div>
 
-    <Link
-      href={`/store/${product.vendorId}`}
-      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-2xl font-semibold transition"
-    >
-      Visit Store
-    </Link>
+   <Link
+  href={`/seller/${product.vendorId}`}
+  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-2xl font-semibold transition"
+>
+  Visit Store
+</Link>
 
   </div>
 
@@ -1232,7 +1228,7 @@ Easy Returns
                 <div className="mt-8">
                   <h2 className="text-2xl font-bold mb-5">Product Description</h2>
                   <p className="text-gray-600 leading-7">
-                    {product.description || "No description available."}
+                    {product.description || "This product does not have a description yet. Please contact the seller for more details."}
                   </p>
                 </div>
               </div>
@@ -1258,9 +1254,17 @@ Easy Returns
                         <h3 className="font-semibold text-sm line-clamp-2 min-h-[40px]">
                           {item.name}
                         </h3>
+                        {item.brand && (
+  <p className="text-xs text-gray-500 mt-1">
+    {item.brand}
+  </p>
+)}
                         <p className="text-green-600 font-bold mt-1">
                           ₹{item.price?.toLocaleString("en-IN")}
                         </p>
+                        <p className="text-xs text-gray-500 mt-1">
+  {item.category}
+</p>
                       </div>
                     </div>
                   </Link>
@@ -1305,7 +1309,7 @@ Easy Returns
             <div className="space-y-4">
               {questions.length === 0 && (
                 <p className="text-gray-400 text-sm">
-                  No questions yet. Be the first to ask!
+                  No questions have been asked yet. Ask the seller anything about this product.
                 </p>
               )}
               {questions.map((q) => (
@@ -1448,7 +1452,7 @@ Easy Returns
             <div className="space-y-4">
               {reviews.length === 0 && (
                 <p className="text-gray-400 text-sm">
-                  No reviews yet. Share yours!
+                  Be the first customer to review this product.
                 </p>
               )}
               {reviews.map((review) => (

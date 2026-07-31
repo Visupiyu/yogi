@@ -35,28 +35,24 @@ export default function BestSellers() {
   });
 
   return (
-    <section className="max-w-7xl mx-auto px-4 py-8 md:py-12">
-      <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+    <section className="max-w-7xl mx-auto px-2 py-2">
+      <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-2">
 
   <div>
 
-    <span className="inline-block bg-yellow-100 text-yellow-700 px-4 py-1 rounded-full text-sm font-semibold mb-3">
+    <span className="inline-block bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-semibold mb-2">
       🏆 TOP SELLING
     </span>
 
-    <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+    <h2 className="text-2xl md:text-2xl font-bold text-gray-900">
       Best Sellers
     </h2>
 
-    <p className="text-gray-600 mt-2">
-      Discover the products our customers love the most.
-    </p>
-
-  </div>
+    </div>
 
   <a
     href="/search"
-    className="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-3 rounded-xl font-semibold transition"
+    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
   >
     View All →
   </a>
@@ -72,7 +68,7 @@ export default function BestSellers() {
 </div>}
 
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
           {[...Array(8)].map((_, index) => (
             <ProductSkeleton key={index} />
           ))}
@@ -83,7 +79,7 @@ export default function BestSellers() {
   whileInView={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.6 }}
   viewport={{ once: true }}
-  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6"
+  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
 >
           {products.map((product) => (
             <ProductCard

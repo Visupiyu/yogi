@@ -70,3 +70,113 @@ export function addToCart(
 
   return true;
 }
+export function getCartItems(): CartItem[] {
+
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  return JSON.parse(
+    localStorage.getItem("cart") || "[]"
+  );
+
+}
+export function getCartCount(): number {
+
+  const cart = getCartItems();
+
+  return cart.reduce(
+    (total, item) => total + item.qty,
+    0
+  );
+
+}
+export function removeFromCart(
+  id: string,
+  size?: string,
+  color?: string
+): void {
+
+  const cart = getCartItems();
+
+  const updatedCart = cart.filter(
+    (item) =>
+      !(
+        item.id === id &&
+        item.size === size &&
+        item.color === color
+      )
+  );
+
+  localStorage.setItem(
+    "cart",
+    JSON.stringify(updatedCart)
+  );
+
+  window.dispatchEvent(
+    new Event("cartUpdated")
+  );
+
+}
+export function updateCartQuantity(
+  id: string,
+  qty: number,
+  size?: string,
+  color?: string
+): void {
+
+  const cart = getCartItems();
+
+  const updatedCart = cart.map((item) => {
+
+    if (
+      item.id === id &&
+      item.size === size &&
+      item.color === color
+    ) {
+      return {
+        ...item,
+        qty: Math.max(
+          1,
+          Math.min(qty, item.stock)
+        ),
+      };
+    }
+
+    return item;
+
+  });
+
+  localStorage.setItem(
+    "cart",
+    JSON.stringify(updatedCart)
+  );
+
+  window.dispatchEvent(
+    new Event("cartUpdated")
+  );
+
+}
+export function getCartTotal(): number {
+
+  const cart = getCartItems();
+
+  return cart.reduce(
+    (total, item) => total + item.price * item.qty,
+    0
+  );
+
+}
+export function clearCart(): void {
+
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.removeItem("cart");
+
+  window.dispatchEvent(
+    new Event("cartUpdated")
+  );
+
+}

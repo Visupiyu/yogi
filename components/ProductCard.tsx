@@ -181,8 +181,8 @@ export default function ProductCard({ id, name, price, image, stock
   animate={{ opacity:1, y:0 }}
 
   whileHover={{
-    y:-10,
-    scale:1.03
+    y:-4,
+    scale:1.01
   }}
 
   transition={{
@@ -193,7 +193,7 @@ export default function ProductCard({ id, name, price, image, stock
   bg-gradient-to-b
   from-white
   to-gray-50
-  rounded-3xl
+  rounded-2xl
   overflow-hidden
  shadow-lg
     hover:shadow-2xl
@@ -220,8 +220,8 @@ export default function ProductCard({ id, name, price, image, stock
   alt={name}
   className="
     w-full
-    h-56
-    md:h-64
+    h-44
+    md:h-48
     object-cover
     group-hover:scale-105
     transition
@@ -236,16 +236,16 @@ export default function ProductCard({ id, name, price, image, stock
 
         <motion.div className="
           absolute
-          top-3
-          left-3
+          top-2
+          left-2
         bg-gradient-to-r
         from-orange-500
          to-red-500
           text-white
           text-xs
           font-bold
-          px-3
-          py-1
+          px-2
+          py-0.5
           rounded-full
         ">
             25% OFF
@@ -268,13 +268,13 @@ export default function ProductCard({ id, name, price, image, stock
 
           className="
             absolute
-            top-3
-            right-3
+            top-2
+            right-2
             bg-gradient-to-b
 from-white
 to-gray-50
-            w-8
-            h-8
+            w-6
+            h-6
             rounded-full
             flex
             items-center
@@ -287,7 +287,7 @@ to-gray-50
           "
         >
 
-          <Heart size={16} />
+          <Heart size={12} />
 
         </motion.button>
 
@@ -296,36 +296,8 @@ to-gray-50
       {/* CONTENT */}
 
       <motion.div className="
-  p-2
+  p-1.5
 ">
-
-        {/* RATING */}
-
-        <motion.div className="
-          flex
-          items-center
-          gap-1
-          text-yellow-500
-          mb-0
-        ">
-
-          <Star size={14} fill="currentColor" />
-          <Star size={14} fill="currentColor" />
-          <Star size={14} fill="currentColor" />
-          <Star size={14} fill="currentColor" />
-          <Star size={14} fill="currentColor" />
-
-          <span className="
-            text-gray-500
-            text-xs
-            ml-1
-          ">
-
-          (4.9)
-
-          </span>
-
-     </motion.div>
 
         {/* NAME */}
 
@@ -376,28 +348,7 @@ to-gray-50
            ₹{Math.round(price * 1.25)}
 
           </p>
-          <p className="
-  text-xs
-  text-green-600
-  font-medium
-  mt-1
-">
-  🚚 Free Delivery
-</p>
-
        </motion.div>
-
-       <p className="
-  text-xs
-  font-medium
-  mt-2
-  mb-2
-">
-  {stock <= 10
- ? "⚠️ Limited Stock"
- : "🟢 In Stock"
-}
-</p>
 <div className="flex gap-2 mt-3">
 
   <button
@@ -407,9 +358,9 @@ to-gray-50
       bg-blue-600
       hover:bg-blue-700
       text-white
-      py-2
-      rounded-xl
-      text-sm
+      py-1.5
+      rounded-lg
+      text-xs
       font-semibold
       transition
     "
@@ -424,9 +375,9 @@ to-gray-50
       bg-gray-100
       hover:bg-gray-200
       text-center
-      py-2
-      rounded-xl
-      text-sm
+      py-1.5
+      rounded-lg
+      text-xs
       font-semibold
       transition
     "

@@ -51,14 +51,6 @@ export default function FeatureStrip() {
     ⭐ WHY SHOP WITH US
   </span>
 
-  <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-    Shop with Confidence
-  </h2>
-
-  <p className="text-gray-600 mt-3 max-w-2xl mx-auto">
-    Enjoy secure shopping, fast delivery, hassle-free returns, and dedicated customer support with every order.
-  </p>
-
 </div>
       <motion.div
   initial={{ opacity: 0, y: 20 }}

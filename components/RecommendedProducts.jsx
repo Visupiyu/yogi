@@ -47,27 +47,23 @@ export default function RecommendedProducts() {
 
   if (loading) {
     return (
-      <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-2">
 
   <div>
 
-    <span className="inline-block bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-semibold mb-3">
+    <span className="inline-block bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-semibold mb-2">
       🎯 JUST FOR YOU
     </span>
 
-    <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+    <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
       Recommended For You
     </h2>
-
-    <p className="text-gray-600 mt-2">
-      Handpicked products based on your recent activity.
-    </p>
 
   </div>
 
   <a
     href="/search"
-    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-semibold transition"
+    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium font-semibold transition"
   >
     Discover More →
   </a>
@@ -97,8 +93,8 @@ export default function RecommendedProducts() {
 }
 
   return (
-    <section className="max-w-7xl mx-auto px-4 py-12">
-      <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4">
+    <section className="max-w-7xl mx-auto px-2 py-5">
+      <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-2">
 
   <div>
 
@@ -106,15 +102,11 @@ export default function RecommendedProducts() {
       🎯 JUST FOR YOU
     </span>
 
-    <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
+    <h2 className="text-2xl md:text-2xl font-bold text-gray-900">
       Recommended For You
     </h2>
 
-    <p className="text-gray-600 mt-2">
-      Handpicked products based on your recent activity.
-    </p>
-
-  </div>
+    </div>
 
   <a
     href="/search"
@@ -130,7 +122,7 @@ export default function RecommendedProducts() {
   whileInView={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.6 }}
   viewport={{ once: true }}
-  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6"
+  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
 >
         {products.map((product) => (
           <ProductCard

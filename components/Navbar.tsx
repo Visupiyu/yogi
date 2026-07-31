@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import { getCartCount } from "@/lib/cart";
 
 type ProductSuggestion = {
   id: string;
@@ -72,15 +73,7 @@ localStorage.setItem(
   /* CART + WISHLIST COUNTS */
   useEffect(() => {
     const updateCounts = () => {
-      const cart: CartItem[] = JSON.parse(
-  localStorage.getItem("cart") || "[]"
-);
-
-const totalQty = cart.reduce(
-  (sum, item) => sum + (item.qty ?? 0),
-  0
-);
-      setCartCount(totalQty);
+     setCartCount(getCartCount()); 
 
       const wishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
       setWishlistCount(wishlist.length);
@@ -195,25 +188,22 @@ useEffect(() => {
       <div className="max-w-screen-2xl mx-auto px-4">
         <div className="h-16 flex items-center justify-between gap-6">
           {/* LOGO */}
-          <Link
-  href="/"
-  className="shrink-0 flex items-center gap-3"
->
+  <Link href="/" className="shrink-0 flex items-center gap-2">
   <Image
-  src="/logo.png"
-  alt="YOMICO"
-  width={100}
-  height={80}
-  className="h-36 md:h-40 w-auto object-contain"
-/>
-
-  <div className="hidden md:block">
-    <h1 className="text-2xl font-extrabold tracking-wide text-green-700">
+    src="/logo.png"
+    alt="YOMICO"
+    width={96}
+    height={40}
+    priority
+    className="h-8 md:h-9 w-auto object-contain"
+    style={{ width: "auto", height: "auto" }}
+  />
+  <div className="hidden md:block leading-tight">
+    <h1 className="text-lg font-extrabold tracking-wide text-green-700">
       YOMICO
     </h1>
-
-    <p className="text-xs text-gray-600 -mt-1">
-      India's Multi-Vendor Marketplace
+    <p className="text-[10px] text-gray-600 -mt-0.5">
+      India&apos;s Multi-Vendor Marketplace
     </p>
   </div>
 </Link>

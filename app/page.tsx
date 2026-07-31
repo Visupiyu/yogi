@@ -3,25 +3,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-
 import CategoryStrip from "@/components/CategoryStrip";
 import Footer from "@/components/Footer";
 import HeroSlider from "@/components/heroSlider";
 import FeaturedProducts from "@/components/home/FeaturedProducts";
-import TopVendors from "@/components/home/TopVendors";
 import FlashSale from "@/components/home/FlashSale";
 import FeatureStrip from "@/components/home/FeatureStrip";
 import OfferCards from "@/components/home/OfferCards";
 import ProductSkeleton from "@/components/ProductSkeleton";
 import TrendingProducts from "@/components/TrendingProducts";
 import BestSellers from "@/components/BestSellers";
-import CustomerReviewsCarousel from "@/components/CustomerReviewsCarousel";
-import CouponPopup from "@/components/CouponPopup";
 import RecommendedProducts from "@/components/RecommendedProducts";
 import CategoryRow from "@/components/CategoryRow";
 import FeaturedCategories from "@/components/FeaturedCategories";
-import NewsletterCTA from "@/components/NewsletterCTA";
-
 
 type Product = {
   id: string;
@@ -32,7 +26,6 @@ type Product = {
   category: string;
 };
 
-// Category rows rendered on the home page (only shown if they have products).
 const CATEGORY_ROWS = [
   { title: "📱 Mobiles", name: "Mobiles" },
   { title: "👔 Men Fashion", name: "Men Fashion" },
@@ -105,20 +98,19 @@ if (filteredData.length === 0) {
     filteredData.filter((p) => p.category === name);
 
   return (
-    <main className="min-h-screen bg-gray-100 pb-24 md:pb-0">
+    <main className="min-h-screen bg-gray-100 pb-16 md:pb-0">
       <CategoryStrip />
       <FeatureStrip />
 
-      <section className="max-w-7xl mx-auto px-2 py-1 grid grid-cols-1 lg:grid-cols-4 gap-3">
-        <div className="lg:col-span-3">
-          <HeroSlider />
-     
-        </div>
-        <OfferCards />
-      </section>
+      <section className="max-w-7xl mx-auto px-2 py-2">
+  <HeroSlider />
+</section>
+
+<section className="max-w-7xl mx-auto px-2 pb-4">
+  <OfferCards />
+</section>
 
       <FeaturedCategories />
-      <CouponPopup />
       <FlashSale />
 
       {/* Category rows — only rendered when the category has products */}
@@ -131,10 +123,7 @@ if (filteredData.length === 0) {
       <TrendingProducts />
       <BestSellers />
       <RecommendedProducts />
-      <CustomerReviewsCarousel />
       <FeaturedProducts />
-      <TopVendors />
-      <NewsletterCTA />
       <Footer />
     </main>
   );

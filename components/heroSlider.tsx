@@ -58,7 +58,7 @@ const nextSlide = () => {
 };
 
   return (
-    <div className="relative w-full h-[260px] sm:h-[300px] md:h-[420px] overflow-hidden rounded-2xl mb-6">
+    <div className="relative w-full h-[220px] sm:h-[260px] md:h-[340px] overflow-hidden rounded-2xl mb-6">
       {slides.map((slide, index) => {
         const active = current === index;
         return (
@@ -72,14 +72,14 @@ const nextSlide = () => {
           >
              <button
       onClick={previousSlide}
-      className="hidden md:flex absolute left-5 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 items-center justify-center transition"
+      className="hidden md:flex absolute left-5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 items-center justify-center transition"
     >
       <ChevronLeft className="w-7 h-7 text-white" />
     </button>
 
     <button
       onClick={nextSlide}
-      className="hidden md:flex absolute right-5 top-1/2 -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 items-center justify-center transition"
+      className="hidden md:flex absolute right-5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 items-center justify-center transition"
     >
       <ChevronRight className="w-7 h-7 text-white" />
     </button>
@@ -103,10 +103,10 @@ const nextSlide = () => {
               <span className="inline-block bg-yellow-400 text-black px-4 py-1 rounded-full text-xs md:text-sm font-bold mb-4 shadow-lg">
   {slide.offer}
 </span>
-              <h1 className="text-2xl sm:text-4xl md:text-6xl font-extrabold leading-tight mb-3">
+              <h1 className="text-xl sm:text-3xl md:text-5xl font-extrabold leading-tight mb-3">
                 {slide.title}
               </h1>
-              <p className="text-xs sm:text-sm md:text-2xl text-gray-100 mb-5 max-w-lg">
+              <p className="text-xs sm:text-sm md:text-lg text-gray-100 mb-5 max-w-lg">
                 {slide.subtitle}
               </p>
 
@@ -118,7 +118,7 @@ const nextSlide = () => {
   >
     <Link
       href={`/category/${encodeURIComponent(slide.category)}`}
-      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 px-5 py-2 sm:px-8 sm:py-4 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition"
+      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 px-4 py-2 sm:px-6 sm:py-3 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition"
     >
       {slide.button}
     </Link>

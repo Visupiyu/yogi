@@ -340,13 +340,13 @@ body{
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
+
+/* ============================================================
+   PRINT STYLES
+   ============================================================ */
+
+/* Generic document printing (invoices, reports) — A4 */
 @media print {
-
-  @page {
-    size: A4 portrait;
-    margin: 8mm;
-  }
-
   html,
   body {
     background: white !important;
@@ -354,50 +354,44 @@ body{
     padding: 0;
   }
 
-  table,
-  thead,
-  tbody,
-  tr,
-  td,
-  th {
+  table, thead, tbody, tr, td, th,
+  h1, h2, h3, h4, div, section {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  div,
-  section {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  .print\\:hidden {
+  /* Utility: add class="print-hidden" to anything you don't want printed */
+  .print-hidden {
     display: none !important;
   }
-
 }
+
+/* Invoice / report pages use A4 unless a label is being printed */
 @media print {
   @page {
-    size: 120mm 150mm;
-    margin: 0;
+    size: A4 portrait;
+    margin: 8mm;
   }
+}
 
-  /* Hide everything except the label */
-  body * {
+/* ------------------------------------------------------------
+   Shipping label — scoped so it ONLY affects the 120x150 label.
+   Wrap the label page in <body class="printing-label"> (or add the
+   class to a parent) so these rules don't hijack invoice printing.
+   ------------------------------------------------------------ */
+@media print {
+  body.printing-label * {
     visibility: hidden;
   }
-  #shipping-label,
-  #shipping-label * {
+  body.printing-label #shipping-label,
+  body.printing-label #shipping-label * {
     visibility: visible;
   }
-  #shipping-label {
+  body.printing-label #shipping-label {
     position: absolute;
     top: 0;
     left: 0;
     margin: 0 !important;
-    border: none !important; /* label stock already has edges; remove if you want the frame */
+    border: none !important;
   }
 }
