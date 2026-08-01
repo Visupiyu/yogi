@@ -2,18 +2,13 @@ import type { Metadata, Viewport } from "next";
 
 import "./globals.css";
 
-import { Geist } from "next/font/google";
+
 
 import { cn } from "@/lib/utils";
 
 import { Toaster } from "sonner";
 
 import ClientLayout from "@/components/ClientLayout";
-
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://yomico.in"),
@@ -106,10 +101,7 @@ export default function RootLayout({
 }) {
   
   return (
-    <html
-      lang="en"
-      className={cn("font-sans", geist.variable)}
-    >
+    <html lang="en">
       <body
         className="
           bg-gradient-to-br
