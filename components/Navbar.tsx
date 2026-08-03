@@ -190,13 +190,13 @@ useEffect(() => {
           {/* LOGO */}
   <Link href="/" className="shrink-0 flex items-center gap-2">
   <Image
-  src="/logo.png"
-  alt="YOMICO"
-  width={100}
-  height={40}
-  priority
-  className="object-contain"
-/>
+    src="/logo.png"
+    alt="YOMICO"
+    width={160}
+    height={64}
+    priority
+    className="h-18 md:h-20 w-auto object-contain"
+  />
   <div className="hidden md:block leading-tight">
     <h1 className="text-lg font-extrabold tracking-wide text-green-700">
       YOMICO

@@ -2,11 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { catalogTree } from "@/lib/catalog/catalogTree";
+import {findNodeById, getChildren, } from "@/lib/catalog/categoryUtils";
+import { categoryFields } from "@/lib/catalog/categoryFields";
 import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch,} from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import SellerDashboardCards from "@/components/seller/SellerDashboardCards";
+import SellerNotifications from "@/components/seller/SellerNotifications";
+import SellerImageUpload from "@/components/seller/SellerImageUpload";
+import SellerProductSpecifications from "@/components/seller/SellerProductSpecifications";
+import SellerProductsTable from "@/components/seller/SellerProductsTable";
+import SellerOrdersTable from "@/components/seller/SellerOrdersTable";
+import SellerDashboard from "@/components/seller/SellerDashboard";
 
 type Product = { id: string; name: string; price: number; image: string; images?: string[]; stock: number; category: string;};
 type Notification = {id: string; title: string; message: string; read: boolean;};
@@ -31,16 +40,12 @@ export default function SellerPage() {
   const [stock, setStock] = useState("");
   const [category, setCategory] = useState("Grocery");
 const [mainCategory, setMainCategory] = useState("");
-
 const [subCategory, setSubCategory] = useState("");
-
 const [department, setDepartment] = useState("");
-
 const [section, setSection] = useState("");
-
 const [productType, setProductType] = useState("");
-
 const [productVariant, setProductVariant] = useState("");
+const [attributes, setAttributes] = useState<Record<string, string>>({});
   const [vendorName, setVendorName] = useState("");
   const [image, setImage] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -84,49 +89,44 @@ const [dimensions, setDimensions] = useState("");
 const [weightCapacity, setWeightCapacity] = useState("");
 const [assemblyRequired, setAssemblyRequired] = useState(false);
 const [furnitureWarranty, setFurnitureWarranty] = useState("No Warranty");
-
 const [author, setAuthor] = useState("");
 const [publisher, setPublisher] = useState("");
 const [language, setLanguage] = useState("English");
 const [isbn, setIsbn] = useState("");
 const [edition, setEdition] = useState("");
 const [pages, setPages] = useState("");
-  const [bestSeller, setBestSeller] = useState("None");
-  const SIZE_OPTIONS = ["XS","S","M","L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL",];
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+const [bestSeller, setBestSeller] = useState("None");
+const SIZE_OPTIONS = ["XS","S","M","L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL",];
+const [notifications, setNotifications] = useState<Notification[]>([]);
 const mainCategories = catalogTree;
+const selectedMain = findNodeById(mainCategory);
+const subCategories = getChildren(mainCategory);
+const selectedSub = subCategories.find(item => item.id === subCategory);
+const departments = getChildren(subCategory);
+const selectedDepartment = departments.find(item => item.id === department);
+const sections = getChildren(department);
+const selectedSection = sections.find(item => item.id === section);
+const productTypes = getChildren(section);
+const selectedType = productTypes.find(item => item.id === productType);
+const productVariants = getChildren(productType);
+const selectedCategoryFields = categoryFields[ productVariant || productType || section || department] || [];
+const groupedFields =
+  selectedCategoryFields.reduce(
+    (groups, field) => {
+      const group = field.group || "General";
 
-const selectedMain = catalogTree.find(
-  item => item.id === mainCategory
-);
+      if (!groups[group]) {
+        groups[group] = [];
+      }
 
-const subCategories = selectedMain?.children || [];
+      groups[group].push(field);
 
-const selectedSub = subCategories.find(
-  item => item.id === subCategory
-);
-
-const departments = selectedSub?.children || [];
-
-const selectedDepartment = departments.find(
-  item => item.id === department
-);
-
-const sections = selectedDepartment?.children || [];
-
-const selectedSection = sections.find(
-  item => item.id === section
-);
-
-const productTypes = selectedSection?.children || [];
-
-const selectedType = productTypes.find(
-  item => item.id === productType
-);
-
-const productVariants = selectedType?.children || [];
-  const buildNotifications = (items: Product[]) => {
-    const alerts: Notification[] = [];
+      return groups;
+    },
+    {} as Record<string, typeof selectedCategoryFields>
+  );
+const buildNotifications = (items: Product[]) => {
+const alerts: Notification[] = [];
     items.forEach((product: any) => {
       if (product.stock === 0) {
         alerts.push({
@@ -372,6 +372,27 @@ setPages("");
   price: Number(price),
   stock: Number(stock),
   category,
+  mainCategory,
+subCategory,
+department,
+section,
+productType,
+productVariant,
+categoryId:
+  productVariant ||
+  productType ||
+  section ||
+  department ||
+  subCategory ||
+  mainCategory,
+categoryPath: {
+  main: mainCategory,
+  sub: subCategory,
+  department,
+  section,
+  productType,
+  variant: productVariant,
+},
   description,
   modelNumber,
 ram,
@@ -398,13 +419,13 @@ dimensions,
 weightCapacity,
 assemblyRequired,
 furnitureWarranty,
-
 author,
 publisher,
 language,
 isbn,
 edition,
 pages,
+attributes,
 };
 
       if (editingId) {
@@ -600,30 +621,16 @@ setPages((product as any).pages || "");
 <p className="mt-3 opacity-90">
 Manage your products, inventory, orders and business growth from one dashboard.</p>
       </div>
-      <div className="max-w-7xl mx-auto p-6 md:p-8">
+      <SellerDashboard>
         {/* STATS */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          {[
-            { label:"Products", value: totalProducts, subtitle:"Live Products", color: "text-blue-600", icon: "📦" },
-            { label: "Total Orders", value: totalOrders, color: "text-green-600", icon: "🛒" },
-            { label: "Pending Orders", value: pendingOrders, color: "text-yellow-500", icon: "⏳" },
-            { label: "Earnings", value: `₹${earnings.toLocaleString("en-IN")}`, color: "text-pink-600", icon: "💰" },
-            { label: "Commission", value: `₹${commissionPaid.toLocaleString("en-IN")}`, color: "text-orange-600", icon: "📊" },
-            { label: "Net Earnings", value: `₹${netEarnings.toLocaleString("en-IN")}`, color: "text-green-700", icon: "✅" },
-          ].map((s) => (
-            <div
-              key={s.label}
-              className="bg-white rounded-2xl shadow-sm hover:shadow-md transition p-5"
-            >
-              <div className="text-2xl mb-2">{s.icon}</div>
-              <p className="text-gray-500 text-sm">{s.label}</p>
-              <p className="text-xs text-gray-400 mt-1">{s.subtitle}</p>
-              <h2 className={`text-2xl font-bold mt-1 break-all ${s.color}`}>
-                {s.value}
-              </h2>
-            </div>
-          ))}
-        </div>
+       <SellerDashboardCards
+  totalProducts={totalProducts}
+  totalOrders={totalOrders}
+  pendingOrders={pendingOrders}
+  earnings={earnings}
+  commissionPaid={commissionPaid}
+  netEarnings={netEarnings}
+/>
 
         {/* SECONDARY STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -640,29 +647,19 @@ Manage your products, inventory, orders and business growth from one dashboard.<
             <p className="text-xl font-bold text-orange-600 mt-2">{bestSeller}</p>
           </div>
         </div>
+        </SellerDashboard>
 
-        {/* NOTIFICATIONS */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 mb-8">
-          <h2 className="text-xl font-bold mb-4">🔔 Notifications</h2>
-          <p className="text-gray-500 mb-6">Inventory alerts and important seller updates.</p>
-          {notifications.length === 0 ? (
-            <p className="text-gray-500">No notifications</p>
-          ) : (
-            <div className="space-y-3">
-              {notifications.map((note) => (
-                <div key={note.id} className="border rounded-xl p-4 bg-gray-50">
-                  <h3 className="font-bold">{note.title}</h3>
-                  <p className="text-gray-600 text-sm">{note.message}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+       <SellerNotifications
+  notifications={notifications}
+/>
 
         {/* MAIN GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* FORM */}
-          <div id="add-product" className="bg-white p-6 rounded-2xl shadow-sm h-fit lg:sticky lg:top-6">
+   <div
+  id="add-product"
+  className="bg-white p-6 rounded-2xl shadow-sm h-fit lg:sticky lg:top-6"
+>
             <h2 className="text-2xl font-bold mb-6">
               <p className="text-gray-500 mb-5">
               Create a new product listing for your customers.</p>
@@ -844,6 +841,14 @@ Manage your products, inventory, orders and business growth from one dashboard.<
     </option>
   ))}
 </select>
+<SellerProductSpecifications
+  groupedFields={groupedFields}
+  attributes={attributes}
+  setAttributes={setAttributes}
+/>
+ 
+
+
                 <select
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}
@@ -855,24 +860,7 @@ Manage your products, inventory, orders and business growth from one dashboard.<
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  placeholder="Color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-                <input
-                  type="text"
-                  placeholder="Material"
-                  value={material}
-                  onChange={(e) => setMaterial(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-              </div>
-
-             <div className="space-y-4">
+    <div className="space-y-4">
 
   <div>
     <label className="block font-semibold mb-3">
@@ -912,80 +900,7 @@ Manage your products, inventory, orders and business growth from one dashboard.<
 
     </div>
 
-  </div>
-
-  <input
-    type="text"
-    placeholder="Country Of Origin"
-    value={countryOfOrigin}
-    onChange={(e) =>
-      setCountryOfOrigin(e.target.value)
-    }
-    className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-  />
-  {(
-  category === "Men Fashion" ||
-  category === "Women Fashion" ||
-  category === "Kids Fashion"
-) && (
-
-<div className="space-y-4 border rounded-xl p-4 bg-gray-50">
-
-  <h3 className="font-semibold text-lg">
-    👕 Fashion Details
-  </h3>
-
-  <div className="grid grid-cols-2 gap-3">
-
-    <select
-      value={pattern}
-      onChange={(e)=>setPattern(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    >
-      <option>Solid</option>
-      <option>Printed</option>
-      <option>Checked</option>
-      <option>Striped</option>
-      <option>Floral</option>
-    </select>
-
-    <select
-      value={fitType}
-      onChange={(e)=>setFitType(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    >
-      <option>Regular</option>
-      <option>Slim</option>
-      <option>Relaxed</option>
-      <option>Oversized</option>
-    </select>
-
-    <select
-      value={sleeveType}
-      onChange={(e)=>setSleeveType(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    >
-      <option>Half Sleeve</option>
-      <option>Full Sleeve</option>
-      <option>Sleeveless</option>
-    </select>
-
-    <select
-      value={neckType}
-      onChange={(e)=>setNeckType(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    >
-      <option>Round Neck</option>
-      <option>Polo</option>
-      <option>V-Neck</option>
-      <option>Shirt Collar</option>
-    </select>
-
-  </div>
-
 </div>
-
-)}
 {category === "Mobiles" && (
 
 <div className="space-y-4 border rounded-xl p-4 bg-blue-50">
@@ -1414,61 +1329,19 @@ className="col-span-2 w-full p-3 border rounded-xl"
 
 )}
 </div>
-
-              <textarea
+             <textarea
                 placeholder="Product Description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full p-3.5 border rounded-xl h-28 outline-none focus:ring-2 focus:ring-green-500 transition"
               />
-
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">
-                  Product Images (up to 5)
-                </label>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    for (const file of files) {
-  if (!file.type.startsWith("image/")) {alert("Only image files are allowed."); return;}
-
-  if (file.size > 5 * 1024 * 1024) {alert("Each image must be under 5 MB."); return; } }                   
-                    setImageFiles(files);
-                    const previews = files.map((file) =>
-                      URL.createObjectURL(file)
-                    );
-                    setImages(previews);
-                    setImage(previews[0] || "");
-                  }}
-                  className="w-full border p-3 rounded-xl"
-                />
-              </div>
-
-              {images.length > 0 && (
-                <div>
-
-<img
-src={images[0]}
-className="w-full h-56 object-cover rounded-2xl mb-4"
+<SellerImageUpload
+  images={images}
+  setImages={setImages}
+  imageFiles={imageFiles}
+  setImageFiles={setImageFiles}
+  setImage={setImage}
 />
-<div className="grid grid-cols-5 gap-2">
-{images.map((img,index)=>(
-<img
-key={index}
-src={img}
-className="h-16 w-full object-cover rounded-xl"
-/>
-
-))}
-
-</div>
-
-</div>
-              )}
-
               <button
                 onClick={addOrUpdateProduct}
                 disabled={loading}
@@ -1483,180 +1356,19 @@ className="h-16 w-full object-cover rounded-xl"
             </div>
           </div>
 
-          {/* PRODUCTS */}
-          <div id="products" className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm">
-            <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-              <h2 className="text-2xl font-bold">
-                Products ({products.length})
-              </h2>
-              <input
-                type="text"
-                placeholder="Search products…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="border p-3 rounded-xl w-full md:w-72 outline-none focus:ring-2 focus:ring-green-500 transition"
-              />
-            </div>
-
-            <div className="space-y-4">
-              {products.length === 0 && (
-                <div className="text-center py-8 md:py-12">
-                  <div className="text-4xl mb-2">📦</div>
-                  <p className="text-gray-500">📦 No Products Yet<br/>Start adding products to grow your business.</p>
-                </div>
-              )}
-
-              {products
-                .filter((product) => {
-                  if (!search.trim()) return true;
-                 const q = search.toLowerCase();
-return ( (product.name || "").toLowerCase().includes(q) ||
-  ((product as any).brand || "").toLowerCase().includes(q) ||
-  (product.category || "").toLowerCase().includes(q)); })
-                .map((product) => (
-                  <div
-                    key={product.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border rounded-2xl p-4 hover:shadow-md transition"
-                  >
-                    <div className="flex gap-4">
-                      <div className="flex gap-2">
-                        {(product.images || [product.image])
-                          .slice(0, 3)
-                          .map((img, index) => (
-                            <img
-                              key={index}
-                              src={img}
-                              alt=""
-                              className="w-16 h-16 object-cover rounded-xl border border-gray-100"
-                            />
-                          ))}
-                      </div>
-
-                      <div>
-                        <h3 className="text-lg font-bold line-clamp-1">
-                          <p className="text-sm text-gray-500">
-  Brand: {(product as any).brand || "N/A"}
-</p>
-                          {product.name}
-                        </h3>
-                        <div className="flex gap-2 mt-2">
-<span className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs">
-🟢 Active
-</span>
-{product.stock<=5 && (
-<span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs">
-⚠ Low Stock
-</span>
-)}
-</div>
-                        <p className="text-green-600 font-bold">
-                          ₹{product.price?.toLocaleString("en-IN")}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {product.category}
-                        </p>
-                        <p className="text-sm">
-                          Stock: {product.stock}
-                          {product.stock > 0 && product.stock <= 5 && (
-                            <span className="text-red-500 font-semibold ml-2">
-                              Low Stock
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => editProduct(product)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-semibold transition"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => deleteProduct(product.id)}
-                        className="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-semibold transition"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ORDERS */}
-        <div id="orders" className="bg-white p-6 rounded-2xl shadow-sm mt-8">
-          <h2 className="text-2xl font-bold mb-6">Recent Orders</h2>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b text-left text-gray-500 text-sm">
-                  <th className="py-3">Order ID</th>
-                  <th className="py-3">Customer</th>
-                  <th className="py-3">Amount</th>
-                  <th className="py-3">Status</th>
-                  <th className="py-3">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-            {orders.length === 0 && (
-  <tr>
-    <td
-      colSpan={5}
-      className="text-center py-8 md:py-12 text-gray-500"
-    >
-      🛒 No Orders Yet
-      <br />
-      Orders from customers will appear here.
-    </td>
-  </tr>
-)}
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-b">
-                    <td className="py-4">{order.id?.slice(0, 8)}</td>
-                    <td>{order.customer}</td>
-                    <td className="font-semibold">
-                      ₹{order.amount?.toLocaleString("en-IN")}
-                    </td>
-                     <td>
-                      <div className="mb-2">
-<span
-className={`px-3 py-1 rounded-full text-xs font-semibold
-${order.status==="Delivered"?
-"bg-green-100 text-green-700":
-order.status==="Pending"?
-"bg-yellow-100 text-yellow-700":
-"bg-blue-100 text-blue-700"}`}>
-{order.status}
-</span>
-</div>
-                      <select
-disabled={order.status === "Cancelled"}
-                        value={order.status}
-                        onChange={(e) =>
-                          updateOrderStatus(order.id, e.target.value)
-                        }
-                        className="border p-2 rounded-lg outline-none"
-                      >
-                        <option>Pending</option>
-                        <option>Confirmed</option>
-                        <option>Packed</option>
-                        <option>Shipped</option>
-                        <option>Delivered</option>
-                        <option>Cancelled</option>
-                      </select>
-                    </td>
-                    <td>{order.date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+<SellerProductsTable
+  products={products}
+  search={search}
+  setSearch={setSearch}
+  editProduct={editProduct}
+  deleteProduct={deleteProduct}
+/>
+<SellerOrdersTable
+  orders={orders}
+  updateOrderStatus={updateOrderStatus}
+/>
+ </div>
     </div>
+   
   );
 }

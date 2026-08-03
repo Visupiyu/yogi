@@ -2780,9 +2780,2722 @@ export const catalogTree: CatalogNode[] = [
     },
   ],
 },
+{
+  id: "KIDS_FASHION",
 
-    ], // End FASHION children
+  name: "Kids Fashion",
+
+  slug: "kids-fashion",
+
+  description: "Clothing, Footwear & Accessories for Kids",
+
+  icon: "Baby",
+
+  image: "/categories/kids-fashion.jpg",
+
+  level: 1,
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 9,
+
+  children: [
+
+    {
+      id: "BOYS",
+
+      name: "Boys",
+
+      slug: "boys",
+
+      description: "Boys Fashion",
+
+      icon: "Shirt",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "KIDS_FASHION",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      children: [
+
+        {
+          id: "BOYS_TSHIRTS",
+          name: "T-Shirts",
+          slug: "boys-tshirts",
+          description: "Boys T-Shirts",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "BOYS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+        },
+
+        {
+          id: "BOYS_SHIRTS",
+          name: "Shirts",
+          slug: "boys-shirts",
+          description: "Boys Shirts",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "BOYS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2,
+        },
+
+        {
+          id: "BOYS_JEANS",
+          name: "Jeans",
+          slug: "boys-jeans",
+          description: "Boys Jeans",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "BOYS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3,
+        },
+
+        {
+          id: "BOYS_SHORTS",
+          name: "Shorts",
+          slug: "boys-shorts",
+          description: "Boys Shorts",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "BOYS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 4,
+        },
+
+        {
+          id: "BOYS_ETHNIC",
+          name: "Ethnic Wear",
+          slug: "boys-ethnic",
+          description: "Boys Ethnic Wear",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "BOYS",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 5,
+        },
+
+        {
+          id: "BOYS_SHOES",
+          name: "Shoes",
+          slug: "boys-shoes",
+          description: "Boys Shoes",
+          icon: "Footprints",
+          image: "",
+          level: 3,
+          parentId: "BOYS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 6,
+        }
+
+      ]
+
+    },
+
+    {
+      id: "GIRLS",
+
+      name: "Girls",
+
+      slug: "girls",
+
+      description: "Girls Fashion",
+
+      icon: "Shirt",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "KIDS_FASHION",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      children: [
+
+        {
+          id: "GIRLS_DRESSES",
+          name: "Dresses",
+          slug: "girls-dresses",
+          description: "Girls Dresses",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "GIRLS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+        },
+
+        {
+          id: "GIRLS_TOPS",
+          name: "Tops",
+          slug: "girls-tops",
+          description: "Girls Tops",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "GIRLS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2,
+        },
+
+        {
+          id: "GIRLS_JEANS",
+          name: "Jeans",
+          slug: "girls-jeans",
+          description: "Girls Jeans",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "GIRLS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3,
+        },
+
+        {
+          id: "GIRLS_SKIRTS",
+          name: "Skirts",
+          slug: "girls-skirts",
+          description: "Girls Skirts",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "GIRLS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 4,
+        },
+
+        {
+          id: "GIRLS_ETHNIC",
+          name: "Ethnic Wear",
+          slug: "girls-ethnic",
+          description: "Girls Ethnic Wear",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "GIRLS",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 5,
+        },
+
+        {
+          id: "GIRLS_SHOES",
+          name: "Shoes",
+          slug: "girls-shoes",
+          description: "Girls Shoes",
+          icon: "Footprints",
+          image: "",
+          level: 3,
+          parentId: "GIRLS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 6,
+        }
+
+      ]
+
+    },
+
+    {
+      id: "BABY",
+
+      name: "Baby",
+
+      slug: "baby",
+
+      description: "Baby Clothing & Accessories",
+
+      icon: "Baby",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "KIDS_FASHION",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 3,
+
+      children: [
+
+        {
+          id: "BABY_CLOTHING",
+          name: "Clothing",
+          slug: "baby-clothing",
+          description: "Baby Clothing",
+          icon: "Baby",
+          image: "",
+          level: 3,
+          parentId: "BABY",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+        },
+
+        {
+          id: "BABY_FOOTWEAR",
+          name: "Footwear",
+          slug: "baby-footwear",
+          description: "Baby Footwear",
+          icon: "Footprints",
+          image: "",
+          level: 3,
+          parentId: "BABY",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2,
+        },
+
+        {
+          id: "BABY_ACCESSORIES",
+          name: "Accessories",
+          slug: "baby-accessories",
+          description: "Baby Accessories",
+          icon: "Baby",
+          image: "",
+          level: 3,
+          parentId: "BABY",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3,
+        }
+      ]
+    }
+  ]
+},
+], // End FASHION children
 
   }, // End FASHION
+  {
+  id: "GROCERY",
 
+  name: "Grocery",
+
+  slug: "grocery",
+
+  description: "Daily Grocery Essentials",
+
+  icon: "ShoppingBasket",
+
+  image: "/categories/grocery.jpg",
+
+  level: 1,
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 2,
+
+  children: [
+
+    {
+      id: "GROCERY_FOODGRAINS",
+
+      name: "Foodgrains",
+
+      slug: "foodgrains",
+
+      description: "Rice, Atta, Dal & Pulses",
+
+      icon: "Package",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "GROCERY",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      children: [
+
+        {
+          id: "RICE",
+
+          name: "Rice",
+
+          slug: "rice",
+
+          description: "All Types of Rice",
+
+          icon: "Package",
+
+          image: "",
+
+          level: 3,
+
+          parentId: "GROCERY_FOODGRAINS",
+
+          active: true,
+
+          featured: true,
+
+          searchable: true,
+
+          sortOrder: 1,
+
+          keywords: [
+            "rice",
+            "basmati",
+            "sona masoori",
+            "ponni",
+            "brown rice"
+          ]
+        },
+
+        {
+          id: "ATTA",
+
+          name: "Atta & Flour",
+
+          slug: "atta-flour",
+
+          description: "Atta and Flour",
+
+          icon: "Package",
+
+          image: "",
+
+          level: 3,
+
+          parentId: "GROCERY_FOODGRAINS",
+
+          active: true,
+
+          featured: true,
+
+          searchable: true,
+
+          sortOrder: 2,
+
+          keywords: [
+            "atta",
+            "flour",
+            "wheat flour",
+            "maida",
+            "besan"
+          ]
+        },
+
+        {
+          id: "DAL_PULSES",
+
+          name: "Dal & Pulses",
+
+          slug: "dal-pulses",
+
+          description: "Dal & Pulses",
+
+          icon: "Package",
+
+          image: "",
+
+          level: 3,
+
+          parentId: "GROCERY_FOODGRAINS",
+
+          active: true,
+
+          featured: true,
+
+          searchable: true,
+
+          sortOrder: 3,
+
+          keywords: [
+            "dal",
+            "toor",
+            "moong",
+            "urad",
+            "masoor"
+          ]
+        }
+
+      ]
+
+    },
+
+    {
+      id: "GROCERY_OIL_SPICES",
+
+      name: "Oil & Spices",
+
+      slug: "oil-spices",
+
+      description: "Cooking Oils and Masalas",
+
+      icon: "Package",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "GROCERY",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      children: [
+
+        {
+          id: "COOKING_OIL",
+
+          name: "Cooking Oil",
+
+          slug: "cooking-oil",
+
+          description: "Edible Oils",
+
+          icon: "Package",
+
+          image: "",
+
+          level: 3,
+
+          parentId: "GROCERY_OIL_SPICES",
+
+          active: true,
+
+          featured: true,
+
+          searchable: true,
+
+          sortOrder: 1,
+
+          keywords: [
+            "oil",
+            "sunflower",
+            "mustard",
+            "groundnut",
+            "olive"
+          ]
+        },
+
+        {
+          id: "SPICES",
+
+          name: "Spices & Masala",
+
+          slug: "spices-masala",
+
+          description: "Indian Masalas",
+
+          icon: "Package",
+
+          image: "",
+
+          level: 3,
+
+          parentId: "GROCERY_OIL_SPICES",
+
+          active: true,
+
+          featured: true,
+
+          searchable: true,
+
+          sortOrder: 2,
+
+          keywords: [
+            "masala",
+            "spices",
+            "turmeric",
+            "chilli",
+            "coriander"
+          ]
+        },
+
+        {
+          id: "SALT_SUGAR",
+
+          name: "Salt & Sugar",
+
+          slug: "salt-sugar",
+
+          description: "Salt and Sugar",
+
+          icon: "Package",
+
+          image: "",
+
+          level: 3,
+
+          parentId: "GROCERY_OIL_SPICES",
+
+          active: true,
+
+          featured: false,
+
+          searchable: true,
+
+          sortOrder: 3,
+
+          keywords: [
+            "salt",
+            "sugar",
+            "rock salt",
+            "jaggery"
+          ]
+       
+        }
+      ]
+    }
+  ]
+},
+{
+  id: "GROCERY_BEVERAGES",
+
+  name: "Beverages",
+
+  slug: "beverages",
+
+  description: "Tea, Coffee & Drinks",
+
+  icon: "CupSoda",
+
+  image: "",
+
+  level: 2,
+
+  parentId: "GROCERY",
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 3,
+
+  children: [
+
+    {
+      id: "TEA",
+
+      name: "Tea",
+
+      slug: "tea",
+
+      description: "Tea Products",
+
+      icon: "CupSoda",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_BEVERAGES",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      keywords: [
+        "tea",
+        "green tea",
+        "black tea",
+        "masala tea"
+      ],
+    },
+
+    {
+      id: "COFFEE",
+
+      name: "Coffee",
+
+      slug: "coffee",
+
+      description: "Coffee Products",
+
+      icon: "CupSoda",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_BEVERAGES",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      keywords: [
+        "coffee",
+        "instant coffee",
+        "filter coffee"
+      ],
+    },
+
+    {
+      id: "SOFT_DRINKS",
+
+      name: "Soft Drinks",
+
+      slug: "soft-drinks",
+
+      description: "Soft Drinks",
+
+      icon: "CupSoda",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_BEVERAGES",
+
+      active: true,
+
+      featured: false,
+
+      searchable: true,
+
+      sortOrder: 3,
+
+      keywords: [
+        "soft drink",
+        "cola",
+        "juice"
+      ],
+    }
+
+  ],
+
+},
+
+{
+  id: "GROCERY_SNACKS",
+
+  name: "Snacks & Biscuits",
+
+  slug: "snacks-biscuits",
+
+  description: "Snacks & Biscuits",
+
+  icon: "Cookie",
+
+  image: "",
+
+  level: 2,
+
+  parentId: "GROCERY",
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 4,
+
+  children: [
+
+    {
+      id: "BISCUITS",
+
+      name: "Biscuits",
+
+      slug: "biscuits",
+
+      description: "Biscuits",
+
+      icon: "Cookie",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_SNACKS",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+    },
+
+    {
+      id: "CHIPS",
+
+      name: "Chips",
+
+      slug: "chips",
+
+      description: "Potato Chips",
+
+      icon: "Cookie",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_SNACKS",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+    },
+
+    {
+      id: "NAMKEEN",
+
+      name: "Namkeen",
+
+      slug: "namkeen",
+
+      description: "Indian Snacks",
+
+      icon: "Cookie",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_SNACKS",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 3,
+    },
+
+    {
+      id: "CHOCOLATES",
+
+      name: "Chocolates",
+
+      slug: "chocolates",
+
+      description: "Chocolate Products",
+
+      icon: "Cookie",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_SNACKS",
+
+      active: true,
+
+      featured: false,
+
+      searchable: true,
+
+      sortOrder: 4,
+    }
+
+  ],
+
+},
+
+{
+  id: "GROCERY_DAIRY",
+
+  name: "Dairy & Bakery",
+
+  slug: "dairy-bakery",
+
+  description: "Milk Products & Bakery",
+
+  icon: "Milk",
+
+  image: "",
+
+  level: 2,
+
+  parentId: "GROCERY",
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 5,
+
+  children: [
+
+    {
+      id: "MILK",
+
+      name: "Milk",
+
+      slug: "milk",
+
+      description: "Milk",
+
+      icon: "Milk",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_DAIRY",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+    },
+
+    {
+      id: "CURD",
+
+      name: "Curd",
+
+      slug: "curd",
+
+      description: "Curd",
+
+      icon: "Milk",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_DAIRY",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+    },
+
+    {
+      id: "BREAD",
+
+      name: "Bread",
+
+      slug: "bread",
+
+      description: "Bread",
+
+      icon: "Bread",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_DAIRY",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 3,
+    },
+
+    {
+      id: "CAKES",
+
+      name: "Cakes",
+
+      slug: "cakes",
+
+      description: "Cake Products",
+
+      icon: "Cake",
+
+      image: "",
+
+      level: 3,
+
+      parentId: "GROCERY_DAIRY",
+
+      active: true,
+
+      featured: false,
+
+      searchable: true,
+
+      sortOrder: 4,
+    }
+
+  ],
+
+},
+{
+  id: "BEAUTY",
+
+  name: "Beauty",
+
+  slug: "beauty",
+
+  description: "Beauty, Personal Care & Grooming",
+
+  icon: "Sparkles",
+
+  image: "/categories/beauty.jpg",
+
+  level: 1,
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 3,
+
+  children: [
+
+    {
+      id: "BEAUTY_SKINCARE",
+
+      name: "Skin Care",
+
+      slug: "skin-care",
+
+      description: "Skin Care Products",
+
+      icon: "Sparkles",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "BEAUTY",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      children: [
+
+        {
+          id: "FACE_WASH",
+          name: "Face Wash",
+          slug: "face-wash",
+          description: "Face Wash",
+          icon: "Sparkles",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_SKINCARE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+          keywords: ["face wash","cleanser","skin care"]
+        },
+
+        {
+          id: "FACE_CREAM",
+          name: "Face Cream",
+          slug: "face-cream",
+          description: "Face Cream",
+          icon: "Sparkles",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_SKINCARE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2,
+          keywords: ["cream","moisturizer"]
+        },
+
+        {
+          id: "FACE_SERUM",
+          name: "Face Serum",
+          slug: "face-serum",
+          description: "Face Serum",
+          icon: "Sparkles",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_SKINCARE",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 3
+        },
+
+        {
+          id: "SUNSCREEN",
+          name: "Sunscreen",
+          slug: "sunscreen",
+          description: "Sunscreen",
+          icon: "Sun",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_SKINCARE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 4
+        }
+
+      ]
+
+    },
+
+    {
+      id: "BEAUTY_HAIRCARE",
+
+      name: "Hair Care",
+
+      slug: "hair-care",
+
+      description: "Hair Care Products",
+
+      icon: "Scissors",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "BEAUTY",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      children: [
+
+        {
+          id: "SHAMPOO",
+          name: "Shampoo",
+          slug: "shampoo",
+          description: "Shampoo",
+          icon: "Scissors",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_HAIRCARE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "CONDITIONER",
+          name: "Conditioner",
+          slug: "conditioner",
+          description: "Conditioner",
+          icon: "Scissors",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_HAIRCARE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "HAIR_OIL",
+          name: "Hair Oil",
+          slug: "hair-oil",
+          description: "Hair Oil",
+          icon: "Scissors",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_HAIRCARE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        },
+
+        {
+          id: "HAIR_SERUM",
+          name: "Hair Serum",
+          slug: "hair-serum",
+          description: "Hair Serum",
+          icon: "Scissors",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_HAIRCARE",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 4
+        }
+
+      ]
+
+    },
+
+    {
+      id: "BEAUTY_MAKEUP",
+
+      name: "Makeup",
+
+      slug: "makeup",
+
+      description: "Makeup Products",
+
+      icon: "Palette",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "BEAUTY",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 3,
+
+      children: [
+
+        {
+          id: "LIPSTICK",
+          name: "Lipstick",
+          slug: "lipstick",
+          description: "Lipstick",
+          icon: "Palette",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_MAKEUP",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "FOUNDATION",
+          name: "Foundation",
+          slug: "foundation",
+          description: "Foundation",
+          icon: "Palette",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_MAKEUP",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "COMPACT",
+          name: "Compact Powder",
+          slug: "compact-powder",
+          description: "Compact Powder",
+          icon: "Palette",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_MAKEUP",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 3
+        },
+
+        {
+          id: "MASCARA",
+          name: "Mascara",
+          slug: "mascara",
+          description: "Mascara",
+          icon: "Palette",
+          image: "",
+          level: 3,
+          parentId: "BEAUTY_MAKEUP",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 4
+        }
+
+      ]
+
+    }
+
+  ]
+
+},
+{
+  id: "ELECTRONICS",
+
+  name: "Electronics",
+
+  slug: "electronics",
+
+  description: "Electronics & Gadgets",
+
+  icon: "Cpu",
+
+  image: "/categories/electronics.jpg",
+
+  level: 1,
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 4,
+
+  children: [
+
+    {
+      id: "ELECTRONICS_COMPUTERS",
+
+      name: "Computers",
+
+      slug: "computers",
+
+      description: "Computers & Accessories",
+
+      icon: "Laptop",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "ELECTRONICS",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      children: [
+
+        {
+          id: "LAPTOPS",
+          name: "Laptops",
+          slug: "laptops",
+          description: "Laptop Computers",
+          icon: "Laptop",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_COMPUTERS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+          keywords: ["laptop","notebook","computer"]
+        },
+
+        {
+          id: "DESKTOPS",
+          name: "Desktop Computers",
+          slug: "desktop-computers",
+          description: "Desktop PCs",
+          icon: "Monitor",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_COMPUTERS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "MONITORS",
+          name: "Monitors",
+          slug: "monitors",
+          description: "Computer Monitors",
+          icon: "Monitor",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_COMPUTERS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        },
+
+        {
+          id: "PRINTERS",
+          name: "Printers",
+          slug: "printers",
+          description: "Printers & Scanners",
+          icon: "Printer",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_COMPUTERS",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 4
+        }
+
+      ]
+
+    },
+
+    {
+      id: "ELECTRONICS_AUDIO",
+
+      name: "Audio",
+
+      slug: "audio",
+
+      description: "Audio Devices",
+
+      icon: "Headphones",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "ELECTRONICS",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      children: [
+
+        {
+          id: "HEADPHONES",
+          name: "Headphones",
+          slug: "headphones",
+          description: "Headphones",
+          icon: "Headphones",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_AUDIO",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "EARPHONES",
+          name: "Earphones",
+          slug: "earphones",
+          description: "Earphones",
+          icon: "Headphones",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_AUDIO",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "BLUETOOTH_SPEAKERS",
+          name: "Bluetooth Speakers",
+          slug: "bluetooth-speakers",
+          description: "Wireless Speakers",
+          icon: "Speaker",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_AUDIO",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        },
+
+        {
+          id: "SOUNDBARS",
+          name: "Soundbars",
+          slug: "soundbars",
+          description: "Home Audio",
+          icon: "Speaker",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_AUDIO",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 4
+        }
+
+      ]
+
+    },
+
+    {
+      id: "ELECTRONICS_CAMERAS",
+
+      name: "Cameras",
+
+      slug: "cameras",
+
+      description: "Photography",
+
+      icon: "Camera",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "ELECTRONICS",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 3,
+
+      children: [
+
+        {
+          id: "DSLR_CAMERAS",
+          name: "DSLR Cameras",
+          slug: "dslr-cameras",
+          description: "DSLR Cameras",
+          icon: "Camera",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_CAMERAS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "MIRRORLESS_CAMERAS",
+          name: "Mirrorless Cameras",
+          slug: "mirrorless-cameras",
+          description: "Mirrorless Cameras",
+          icon: "Camera",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_CAMERAS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "ACTION_CAMERAS",
+          name: "Action Cameras",
+          slug: "action-cameras",
+          description: "Action Cameras",
+          icon: "Camera",
+          image: "",
+          level: 3,
+          parentId: "ELECTRONICS_CAMERAS",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 3
+        }
+
+      ]
+
+    }
+
+  ]
+
+},
+{
+  id: "MOBILES",
+
+  name: "Mobiles",
+
+  slug: "mobiles",
+
+  description: "Smartphones & Mobile Accessories",
+
+  icon: "Smartphone",
+
+  image: "/categories/mobiles.jpg",
+
+  level: 1,
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 5,
+
+  children: [
+
+    {
+      id: "MOBILES_PHONES",
+
+      name: "Mobile Phones",
+
+      slug: "mobile-phones",
+
+      description: "Smartphones & Feature Phones",
+
+      icon: "Smartphone",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "MOBILES",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      children: [
+
+        {
+          id: "SMARTPHONES",
+          name: "Smartphones",
+          slug: "smartphones",
+          description: "Android & iPhone",
+          icon: "Smartphone",
+          image: "",
+          level: 3,
+          parentId: "MOBILES_PHONES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+          keywords: [
+            "android",
+            "iphone",
+            "5g",
+            "smartphone"
+          ]
+        },
+
+        {
+          id: "FEATURE_PHONES",
+          name: "Feature Phones",
+          slug: "feature-phones",
+          description: "Basic Mobile Phones",
+          icon: "Phone",
+          image: "",
+          level: 3,
+          parentId: "MOBILES_PHONES",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 2,
+          keywords: [
+            "feature phone",
+            "keypad phone"
+          ]
+        }
+
+      ]
+
+    },
+
+    {
+      id: "MOBILES_ACCESSORIES",
+
+      name: "Accessories",
+
+      slug: "accessories",
+
+      description: "Mobile Accessories",
+
+      icon: "Cable",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "MOBILES",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      children: [
+
+        {
+          id: "CHARGERS",
+          name: "Chargers",
+          slug: "chargers",
+          description: "Mobile Chargers",
+          icon: "Cable",
+          image: "",
+          level: 3,
+          parentId: "MOBILES_ACCESSORIES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "POWER_BANKS",
+          name: "Power Banks",
+          slug: "power-banks",
+          description: "Power Banks",
+          icon: "Battery",
+          image: "",
+          level: 3,
+          parentId: "MOBILES_ACCESSORIES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "MOBILE_CASES",
+          name: "Cases & Covers",
+          slug: "cases-covers",
+          description: "Cases & Covers",
+          icon: "Shield",
+          image: "",
+          level: 3,
+          parentId: "MOBILES_ACCESSORIES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        },
+
+        {
+          id: "SCREEN_PROTECTORS",
+          name: "Screen Protectors",
+          slug: "screen-protectors",
+          description: "Tempered Glass & Screen Guards",
+          icon: "Shield",
+          image: "",
+          level: 3,
+          parentId: "MOBILES_ACCESSORIES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 4
+        },
+
+        {
+          id: "EARBUDS",
+          name: "Earbuds",
+
+          slug: "earbuds",
+
+          description: "True Wireless Earbuds",
+
+          icon: "Headphones",
+
+          image: "",
+
+          level: 3,
+
+          parentId: "MOBILES_ACCESSORIES",
+
+          active: true,
+
+          featured: true,
+
+          searchable: true,
+
+          sortOrder: 5
+        }
+
+      ]
+
+    }
+
+  ]
+},
+{
+  id: "APPLIANCES",
+
+  name: "Appliances",
+
+  slug: "appliances",
+
+  description: "Home & Kitchen Appliances",
+
+  icon: "Home",
+
+  image: "/categories/appliances.jpg",
+
+  level: 1,
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 6,
+
+  children: [
+
+    {
+      id: "HOME_APPLIANCES",
+
+      name: "Home Appliances",
+
+      slug: "home-appliances",
+
+      description: "Large Home Appliances",
+
+      icon: "Home",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "APPLIANCES",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      children: [
+
+        {
+          id: "TELEVISIONS",
+          name: "Televisions",
+          slug: "televisions",
+          description: "LED, OLED & Smart TVs",
+          icon: "Tv",
+          image: "",
+          level: 3,
+          parentId: "HOME_APPLIANCES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+          keywords: [
+            "tv",
+            "smart tv",
+            "led",
+            "oled"
+          ]
+        },
+
+        {
+          id: "REFRIGERATORS",
+          name: "Refrigerators",
+          slug: "refrigerators",
+          description: "Single & Double Door Refrigerators",
+          icon: "Refrigerator",
+          image: "",
+          level: 3,
+          parentId: "HOME_APPLIANCES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "WASHING_MACHINES",
+          name: "Washing Machines",
+          slug: "washing-machines",
+          description: "Automatic & Semi Automatic",
+          icon: "WashingMachine",
+          image: "",
+          level: 3,
+          parentId: "HOME_APPLIANCES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        },
+
+        {
+          id: "AIR_CONDITIONERS",
+          name: "Air Conditioners",
+          slug: "air-conditioners",
+          description: "Split & Window AC",
+          icon: "Snowflake",
+          image: "",
+          level: 3,
+          parentId: "HOME_APPLIANCES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 4
+        }
+
+      ]
+
+    },
+
+    {
+      id: "KITCHEN_APPLIANCES",
+
+      name: "Kitchen Appliances",
+
+      slug: "kitchen-appliances",
+
+      description: "Kitchen Essentials",
+
+      icon: "ChefHat",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "APPLIANCES",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      children: [
+
+        {
+          id: "MICROWAVE_OVENS",
+          name: "Microwave Ovens",
+          slug: "microwave-ovens",
+          description: "Microwave Ovens",
+          icon: "Microwave",
+          image: "",
+          level: 3,
+          parentId: "KITCHEN_APPLIANCES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "MIXER_GRINDERS",
+          name: "Mixer Grinders",
+          slug: "mixer-grinders",
+          description: "Mixer Grinders",
+          icon: "Blender",
+          image: "",
+          level: 3,
+          parentId: "KITCHEN_APPLIANCES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "INDUCTION_COOKTOPS",
+          name: "Induction Cooktops",
+          slug: "induction-cooktops",
+          description: "Induction Stoves",
+          icon: "Flame",
+          image: "",
+          level: 3,
+          parentId: "KITCHEN_APPLIANCES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        },
+
+        {
+          id: "WATER_PURIFIERS",
+          name: "Water Purifiers",
+          slug: "water-purifiers",
+          description: "RO & UV Water Purifiers",
+          icon: "Droplets",
+          image: "",
+          level: 3,
+          parentId: "KITCHEN_APPLIANCES",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 4
+        }
+
+      ]
+
+    },
+
+    {
+      id: "SMALL_APPLIANCES",
+
+      name: "Small Appliances",
+
+      slug: "small-appliances",
+
+      description: "Daily Use Appliances",
+
+      icon: "Plug",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "APPLIANCES",
+
+      active: true,
+
+      featured: false,
+
+      searchable: true,
+
+      sortOrder: 3,
+
+      children: [
+
+        {
+          id: "ELECTRIC_KETTLES",
+          name: "Electric Kettles",
+          slug: "electric-kettles",
+          description: "Electric Kettles",
+          icon: "CupSoda",
+          image: "",
+          level: 3,
+          parentId: "SMALL_APPLIANCES",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "IRONS",
+          name: "Irons",
+          slug: "irons",
+          description: "Steam & Dry Irons",
+          icon: "Shirt",
+          image: "",
+          level: 3,
+          parentId: "SMALL_APPLIANCES",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "VACUUM_CLEANERS",
+          name: "Vacuum Cleaners",
+          slug: "vacuum-cleaners",
+          description: "Vacuum Cleaners",
+          icon: "Sparkles",
+          image: "",
+          level: 3,
+          parentId: "SMALL_APPLIANCES",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 3
+        }
+
+      ]
+
+    }
+
+  ]
+
+},
+{
+  id: "FURNITURE",
+
+  name: "Furniture",
+
+  slug: "furniture",
+
+  description: "Home & Office Furniture",
+
+  icon: "Sofa",
+
+  image: "/categories/furniture.jpg",
+
+  level: 1,
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 7,
+
+  children: [
+
+    {
+      id: "LIVING_ROOM",
+
+      name: "Living Room",
+
+      slug: "living-room",
+
+      description: "Living Room Furniture",
+
+      icon: "Sofa",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "FURNITURE",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      children: [
+
+        {
+          id: "SOFAS",
+          name: "Sofas",
+          slug: "sofas",
+          description: "Sofas & Couches",
+          icon: "Sofa",
+          image: "",
+          level: 3,
+          parentId: "LIVING_ROOM",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+          keywords: ["sofa","couch","living room"]
+        },
+
+        {
+          id: "TV_UNITS",
+          name: "TV Units",
+          slug: "tv-units",
+          description: "TV Cabinets",
+          icon: "Tv",
+          image: "",
+          level: 3,
+          parentId: "LIVING_ROOM",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "COFFEE_TABLES",
+          name: "Coffee Tables",
+          slug: "coffee-tables",
+          description: "Coffee Tables",
+          icon: "Table",
+          image: "",
+          level: 3,
+          parentId: "LIVING_ROOM",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        }
+
+      ]
+
+    },
+
+    {
+      id: "BEDROOM",
+
+      name: "Bedroom",
+
+      slug: "bedroom",
+
+      description: "Bedroom Furniture",
+
+      icon: "Bed",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "FURNITURE",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      children: [
+
+        {
+          id: "BEDS",
+          name: "Beds",
+          slug: "beds",
+          description: "Beds",
+          icon: "Bed",
+          image: "",
+          level: 3,
+          parentId: "BEDROOM",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "MATTRESSES",
+          name: "Mattresses",
+          slug: "mattresses",
+          description: "Mattresses",
+          icon: "Bed",
+          image: "",
+          level: 3,
+          parentId: "BEDROOM",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "WARDROBES",
+          name: "Wardrobes",
+          slug: "wardrobes",
+          description: "Wardrobes",
+          icon: "Cabinet",
+          image: "",
+          level: 3,
+          parentId: "BEDROOM",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        }
+
+      ]
+
+    },
+
+    {
+      id: "DINING_ROOM",
+
+      name: "Dining Room",
+
+      slug: "dining-room",
+
+      description: "Dining Furniture",
+
+      icon: "Utensils",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "FURNITURE",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 3,
+
+      children: [
+
+        {
+          id: "DINING_TABLES",
+          name: "Dining Tables",
+          slug: "dining-tables",
+          description: "Dining Tables",
+          icon: "Table",
+          image: "",
+          level: 3,
+          parentId: "DINING_ROOM",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "DINING_CHAIRS",
+          name: "Dining Chairs",
+          slug: "dining-chairs",
+          description: "Dining Chairs",
+          icon: "Armchair",
+          image: "",
+          level: 3,
+          parentId: "DINING_ROOM",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 2
+        }
+
+      ]
+
+    },
+
+    {
+      id: "OFFICE_FURNITURE",
+
+      name: "Office Furniture",
+
+      slug: "office-furniture",
+
+      description: "Office Furniture",
+
+      icon: "Briefcase",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "FURNITURE",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 4,
+
+      children: [
+
+        {
+          id: "OFFICE_CHAIRS",
+          name: "Office Chairs",
+          slug: "office-chairs",
+          description: "Office Chairs",
+          icon: "Armchair",
+          image: "",
+          level: 3,
+          parentId: "OFFICE_FURNITURE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "OFFICE_DESKS",
+          name: "Office Desks",
+          slug: "office-desks",
+          description: "Office Desks",
+          icon: "Table",
+          image: "",
+          level: 3,
+          parentId: "OFFICE_FURNITURE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "BOOKSHELVES",
+          name: "Bookshelves",
+          slug: "bookshelves",
+          description: "Bookshelves",
+          icon: "Library",
+          image: "",
+          level: 3,
+          parentId: "OFFICE_FURNITURE",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 3
+        }
+
+      ]
+
+    }
+
+  ]
+
+},
+{
+  id: "BOOKS",
+
+  name: "Books",
+
+  slug: "books",
+
+  description: "Books, Education & Reading",
+
+  icon: "BookOpen",
+
+  image: "/categories/books.jpg",
+
+  level: 1,
+
+  active: true,
+
+  featured: true,
+
+  searchable: true,
+
+  sortOrder: 8,
+
+  children: [
+
+    {
+      id: "ACADEMIC_BOOKS",
+
+      name: "Academic Books",
+
+      slug: "academic-books",
+
+      description: "School & College Books",
+
+      icon: "GraduationCap",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "BOOKS",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 1,
+
+      children: [
+
+        {
+          id: "SCHOOL_BOOKS",
+          name: "School Books",
+          slug: "school-books",
+          description: "School Textbooks",
+          icon: "BookOpen",
+          image: "",
+          level: 3,
+          parentId: "ACADEMIC_BOOKS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1,
+          keywords: [
+            "school",
+            "cbse",
+            "icse",
+            "state board"
+          ]
+        },
+
+        {
+          id: "COLLEGE_BOOKS",
+          name: "College Books",
+          slug: "college-books",
+          description: "College & University Books",
+          icon: "BookOpen",
+          image: "",
+          level: 3,
+          parentId: "ACADEMIC_BOOKS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "COMPETITIVE_EXAMS",
+          name: "Competitive Exams",
+          slug: "competitive-exams",
+          description: "UPSC, SSC, Banking, NEET, JEE",
+          icon: "BookOpen",
+          image: "",
+          level: 3,
+          parentId: "ACADEMIC_BOOKS",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 3
+        }
+
+      ]
+
+    },
+
+    {
+      id: "LITERATURE",
+
+      name: "Literature",
+
+      slug: "literature",
+
+      description: "Novels & Literature",
+
+      icon: "Library",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "BOOKS",
+
+      active: true,
+
+      featured: true,
+
+      searchable: true,
+
+      sortOrder: 2,
+
+      children: [
+
+        {
+          id: "NOVELS",
+          name: "Novels",
+          slug: "novels",
+          description: "Fiction & Literature",
+          icon: "Book",
+          image: "",
+          level: 3,
+          parentId: "LITERATURE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "CHILDREN_BOOKS",
+          name: "Children Books",
+          slug: "children-books",
+          description: "Kids Books",
+          icon: "Book",
+          image: "",
+          level: 3,
+          parentId: "LITERATURE",
+          active: true,
+          featured: true,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "COMICS",
+          name: "Comics",
+
+          slug: "comics",
+
+          description: "Comic Books",
+
+          icon: "Book",
+
+          image: "",
+
+          level: 3,
+
+          parentId: "LITERATURE",
+
+          active: true,
+
+          featured: true,
+
+          searchable: true,
+
+          sortOrder: 3
+        }
+
+      ]
+
+    },
+
+    {
+      id: "RELIGIOUS_BOOKS",
+
+      name: "Religious & Spiritual",
+
+      slug: "religious-books",
+
+      description: "Religious Books",
+
+      icon: "BookHeart",
+
+      image: "",
+
+      level: 2,
+
+      parentId: "BOOKS",
+
+      active: true,
+
+      featured: false,
+
+      searchable: true,
+
+      sortOrder: 3,
+
+      children: [
+
+        {
+          id: "HINDU_BOOKS",
+          name: "Hindu Books",
+          slug: "hindu-books",
+          description: "Hindu Religious Books",
+          icon: "BookHeart",
+          image: "",
+          level: 3,
+          parentId: "RELIGIOUS_BOOKS",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 1
+        },
+
+        {
+          id: "ISLAMIC_BOOKS",
+          name: "Islamic Books",
+          slug: "islamic-books",
+          description: "Islamic Books",
+          icon: "BookHeart",
+          image: "",
+          level: 3,
+          parentId: "RELIGIOUS_BOOKS",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 2
+        },
+
+        {
+          id: "CHRISTIAN_BOOKS",
+          name: "Christian Books",
+          slug: "christian-books",
+          description: "Christian Books",
+          icon: "BookHeart",
+          image: "",
+          level: 3,
+          parentId: "RELIGIOUS_BOOKS",
+          active: true,
+          featured: false,
+          searchable: true,
+          sortOrder: 3
+        }
+
+      ]
+
+    }
+
+  ]
+
+},
 ]; // End catalogTree
