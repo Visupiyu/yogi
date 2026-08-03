@@ -182,7 +182,7 @@ export default function ProductCard({ id, name, price, image, stock
 
   whileHover={{
     y:-4,
-    scale:1.01
+    scale:1.02
   }}
 
   transition={{
@@ -220,38 +220,15 @@ export default function ProductCard({ id, name, price, image, stock
   alt={name}
   className="
     w-full
-    h-44
-    md:h-48
+    h-48
+    md:h-52
     object-cover
     group-hover:scale-105
     transition
     duration-500
   "
 />
- 
-
-        </Link>
-
-        {/* DISCOUNT */}
-
-        <motion.div className="
-          absolute
-          top-2
-          left-2
-        bg-gradient-to-r
-        from-orange-500
-         to-red-500
-          text-white
-          text-xs
-          font-bold
-          px-2
-          py-0.5
-          rounded-full
-        ">
-            25% OFF
-
-      </motion.div>
-
+         </Link>
         {/* WISHLIST */}
 
         <motion.button
@@ -296,7 +273,7 @@ to-gray-50
       {/* CONTENT */}
 
       <motion.div className="
-  p-1.5
+  p-2
 ">
 
         {/* NAME */}
@@ -309,7 +286,7 @@ to-gray-50
             font-semibold
            text-sm
             line-clamp-2
-            min-h-[24px]
+            min-h-[42px]
             hover:text-green-600
             transition
           ">
@@ -319,70 +296,45 @@ to-gray-50
           </h3>
 
         </Link>
+ {/* PRICE + DETAILS */}
 
-        {/* PRICE */}
+<div className="flex mt-3">
 
-        <motion.div className="
-          flex
-          items-center
-          gap-2
-      
-        ">
+  {/* PRICE */}
 
-          <p className="
-            text-green-600
-            font-bold
-            text-sm
-          ">
-
-            ₹{price}
-
-          </p>
-
-          <p className="
-            text-gray-400
-            line-through
-            text-sm
-          ">
-
-           ₹{Math.round(price * 1.25)}
-
-          </p>
-       </motion.div>
-<div className="flex gap-2 mt-3">
-
-  <button
-    onClick={addToCompare}
+  <div
     className="
       flex-1
-      bg-blue-600
-      hover:bg-blue-700
+      bg-green-600
       text-white
-      py-1.5
-      rounded-lg
-      text-xs
-      font-semibold
-      transition
+      text-center
+      py-2
+      rounded-l-lg
+      font-bold
+      text-sm
     "
   >
-    Compare
-  </button>
+    ₹{Number(price).toLocaleString("en-IN")}
+  </div>
+
+  {/* DETAILS */}
 
   <Link
-    href="/compare"
+    href={`/product/${id}`}
     className="
       flex-1
-      bg-gray-100
-      hover:bg-gray-200
+      bg-gray-900
+      hover:bg-black
+      text-white
       text-center
-      py-1.5
-      rounded-lg
-      text-xs
+      py-2
+      rounded-r-lg
+      text-sm
       font-semibold
       transition
     "
   >
-    View
+    Details →
   </Link>
 
 </div>

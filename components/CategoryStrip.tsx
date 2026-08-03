@@ -19,7 +19,7 @@ const categories = [
 export default function CategoryStrip() {
   return (
     <section className="bg-gradient-to-r from-green-50 via-white to-blue-50 border-b border-gray-200">
-      <div className="max-w-screen-2xl mx-auto px-4 py-5 flex justify-start items-center gap-6 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center justify-center gap-4 py-4 overflow-x-auto scrollbar-hide">
         {categories.map((cat) => (
           <motion.div
             key={cat.name}
@@ -28,18 +28,18 @@ export default function CategoryStrip() {
           >
             <Link
               href={`/category/${encodeURIComponent(cat.name)}`}
-              className="flex flex-col items-center min-w-[90px] shrink-0 group"
+              className="flex flex-col items-center min-w-[55px] shrink-0 group"
             >
               <div
-                className={`w-16 h-16 md:w-20 md:h-20 rounded-full ${cat.bg} flex items-center justify-center shadow-sm group-hover:shadow-lg transition overflow-hidden`}
+                className={`w-10 h-10 md:w-12 md:h-12 rounded-full ${cat.bg} flex items-center justify-center shadow-sm group-hover:shadow-lg transition overflow-hidden`}
               >
                 <img
                   src={cat.image}
                   alt={cat.name}
-                  className="w-8 h-8 md:w-10 md:h-10 object-contain"
+                  className="w-5 h-5 md:w-7 md:h-7 object-contain"
                 />
               </div>
-              <p className="mt-3 text-sm font-semibold text-gray-700 group-hover:text-green-600 transition text-center">
+              <p className="mt-1 text-xs font-semibold text-gray-700 group-hover:text-green-600 transition text-center">
                 {cat.name}
               </p>
             </Link>

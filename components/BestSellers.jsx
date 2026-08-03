@@ -6,12 +6,12 @@ import { db } from "@/lib/firebase";
 import ProductCard from "./ProductCard";
 import { motion } from "framer-motion";
 
-async function fetchBestSellers() {
+async function fetchNewArrivals() {
   const q = query(
-    collection(db, "products"),
-    orderBy("sales", "desc"),
-    limit(12)
-  );
+  collection(db, "products"),
+  orderBy("createdAt", "desc"),
+  limit(12)
+);
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
@@ -29,8 +29,8 @@ function ProductSkeleton() {
 
 export default function BestSellers() {
   const { data: products, isLoading, error } = useQuery({
-    queryKey: ["best-sellers"],
-    queryFn: fetchBestSellers,
+    queryKey: ["new-arrivals"],
+queryFn: fetchNewArrivals,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -40,29 +40,18 @@ export default function BestSellers() {
 
   <div>
 
-    <span className="inline-block bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-semibold mb-2">
-      🏆 TOP SELLING
-    </span>
-
-    <h2 className="text-2xl md:text-2xl font-bold text-gray-900">
-      Best Sellers
+     <h2 className="text-2xl md:text-2xl font-bold text-gray-900">
+     🆕 New Arrivals
     </h2>
 
     </div>
-
-  <a
-    href="/search"
-    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-  >
-    View All →
-  </a>
 
 </div>
 
       {error && <div className="text-center py-10 bg-red-50 rounded-2xl border border-red-200">
 
   <p className="text-red-600 font-semibold">
-    Failed to load best sellers.
+   Failed to load new arrivals.
   </p>
 
 </div>}
@@ -98,15 +87,15 @@ export default function BestSellers() {
           <div className="text-center py-10 md:py-16">
 
   <div className="text-6xl mb-4">
-    🏆
+    🆕
   </div>
 
   <h3 className="text-2xl font-bold text-gray-800">
-    No Best Sellers Yet
+   No New Arrivals Yet
   </h3>
 
   <p className="text-gray-500 mt-2">
-    Best-selling products will appear here once orders start coming in.
+    Newly added products will appear here automatically.
   </p>
 
 </div>

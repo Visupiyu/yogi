@@ -8,19 +8,37 @@ export default function CategoryRow({ title, products }: any) {
   }
 
   return (
-    <section className="max-w-7xl mx-auto px-2 py-6">
-      <h2 className="text-2xl md:text-3xl font-bold mb-4">{title}</h2>
+    <section className="max-w-7xl mx-auto px-2 py-2">
+      <div className="flex items-center justify-between mb-3">
 
-     <div
+  <h2 className="text-xl md:text-2xl font-bold">
+    {title}
+  </h2>
+
+  <a
+    href="/search"
+    className="
+      text-green-600
+      hover:text-green-700
+      font-semibold
+      text-sm
+    "
+  >
+    View All →
+  </a>
+
+</div>
+
+<div
   className="
     flex
     flex-nowrap
-    gap-4
-    overflow-x-scroll
+    gap-2
+    overflow-x-auto
     overflow-y-hidden
-    pb-4
-    border-2
-    border-red-500
+    scrollbar-hide
+    scroll-smooth
+    pb-2
   "
 >
         {products.map((product: any) => (

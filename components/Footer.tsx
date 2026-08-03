@@ -30,11 +30,11 @@ export default function Footer() {
   height={100}
   className="h-24 sm:h-28 md:h-28 w-auto object-contain"
 />
-          <p className="text-gray-600 leading-6">
-  <span className="font-bold text-green-700">YOMICO</span> is India's
-  modern multi-vendor marketplace connecting customers with trusted
-  sellers for groceries, fashion, electronics, beauty, home essentials
-  and much more.
+          <p className="text-gray-600 leading-7 mt-3">
+  India's Trusted Multi-Vendor Marketplace.
+  <br />
+  Shop groceries, fashion, electronics,
+  beauty and much more from trusted sellers.
 </p>
         </div>
 
@@ -98,6 +98,7 @@ export default function Footer() {
           </div>
         </div>
       </div>
+      
 
       {/* TRUST ROW */}
       <div className="border-t border-b py-2 px-4">
@@ -147,7 +148,7 @@ export default function Footer() {
      <div className="border-t py-3 text-center text-xs sm:text-sm text-gray-500 leading-6">
       © 2026 YOMICO. All Rights Reserved.
 
-Designed & Developed with ❤️ in India 🇮🇳
+Made with ❤️ in India 🇮🇳
       </div>
     </footer>
   );

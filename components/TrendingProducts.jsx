@@ -1,115 +1,285 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import ProductCard from "./ProductCard";
+import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  limit,
+} from "firebase/firestore";
+
+import { db } from "@/lib/firebase";
 
 async function fetchTrendingProducts() {
-  const q = query(
-    collection(db, "products"),
-    orderBy("views", "desc"),
-    limit(8)
-  );
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-}
 
-function ProductSkeleton() {
-  return (
-    <div className="bg-white rounded-3xl shadow-sm p-4 animate-pulse">
-      <div className="h-56 bg-gray-200 rounded-xl mb-3" />
-      <div className="h-4 bg-gray-200 rounded mb-2" />
-      <div className="h-4 bg-gray-200 rounded w-2/3 mb-2" />
-      <div className="h-6 bg-gray-200 rounded w-1/3" />
-    </div>
+  const q = query(
+
+    collection(db, "products"),
+
+    orderBy("views", "desc"),
+
+    limit(8)
+
   );
+
+  const snapshot = await getDocs(q);
+
+  return snapshot.docs.map((doc) => ({
+
+    id: doc.id,
+
+    ...doc.data(),
+
+  }));
+
 }
 
 export default function TrendingProducts() {
-  const { data: products, isLoading, error } = useQuery({
+
+  const {
+
+    data: products,
+
+    isLoading,
+
+    error,
+
+  } = useQuery({
+
     queryKey: ["trending-products"],
+
     queryFn: fetchTrendingProducts,
+
     staleTime: 1000 * 60 * 5,
+
   });
 
-  return (
-    <section className="max-w-7xl mx-auto px-2 py-5">
-     <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-2">
+  if (isLoading) {
 
-  <div>
+    return (
 
-    <span className="inline-block bg-red-100 text-red-600 px-4 py-1 rounded-full text-sm font-semibold mb-3">
-      🔥 TRENDING NOW
-    </span>
+      <section className="max-w-7xl mx-auto px-2 py-4">
 
-    <h2 className="text-2xl md:text-2xl font-bold text-gray-900">
-      Trending Products
-    </h2>
-     </div>
+        <div className="animate-pulse">
 
-  <a
-    href="/search"
-    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-  >
-    View All →
-  </a>
+          <div className="h-8 w-60 bg-gray-200 rounded mb-3"/>
 
-</div>
+          <div className="flex gap-2 overflow-hidden">
 
-      {error && <div className="text-center py-10 bg-red-50 rounded-2xl border border-red-200">
+            {[...Array(8)].map((_,index)=>(
 
-  <p className="text-red-600 font-semibold">
-    Failed to load trending products.
-  </p>
+              <div
 
-</div>}
+                key={index}
 
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {[...Array(8)].map((_, index) => (
-            <ProductSkeleton key={index} />
-          ))}
+                className="
+
+                min-w-[180px]
+
+                bg-white
+
+                rounded-3xl
+
+                p-4
+
+                shadow
+
+                "
+
+              >
+
+                <div className="h-44 bg-gray-200 rounded-2xl"/>
+
+                <div className="h-4 bg-gray-200 rounded mt-4"/>
+
+              </div>
+
+            ))}
+
+          </div>
+
         </div>
-      ) : products && products.length > 0 ? (
-        <motion.div
-  initial={{ opacity: 0, y: 30 }}
-  whileInView={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.6 }}
-  viewport={{ once: true }}
-  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
->
-  {products.map((product) => (
-    <ProductCard
-      key={product.id}
-      id={product.id}
-      name={product.name}
-      price={product.price}
-      image={product.image}
-      stock={product.stock}
-    />
-  ))}
-</motion.div>
-      ) : (
-        !error && (
-         <div className="text-center py-10 md:py-16">
 
-  <div className="text-6xl mb-4">
-    📦
+      </section>
+
+    );
+
+  }
+
+  if (error) {
+
+    return (
+
+      <section className="max-w-7xl mx-auto px-3 py-6">
+
+        <div className="bg-red-50 border border-red-200 rounded-3xl p-8 text-center">
+
+          <h2 className="text-red-600 font-bold">
+
+            Unable to load Trending Products.
+
+          </h2>
+
+        </div>
+
+      </section>
+
+    );
+
+  }
+
+  return (
+    <section className="max-w-7xl mx-auto px-3 py-6">
+
+  {/* Header */}
+
+  <div className="flex items-center justify-between mb-4">
+
+    <div>
+
+      <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+        🔥 Trending Products
+      </h2>
+
+      <p className="text-gray-500 mt-1">
+        Discover what customers are exploring today
+      </p>
+
+    </div>
+
+    <Link
+      href="/store"
+      className="
+      hidden
+      md:inline-flex
+      text-blue-700
+      font-semibold
+      hover:text-orange-500
+      transition
+      "
+    >
+      View All →
+    </Link>
+
   </div>
 
-  <h3 className="text-2xl font-bold text-gray-800">
-    No Trending Products Yet
-  </h3>
+  {/* Products */}
 
-  <p className="text-gray-500 mt-2">
-    Check back soon for the latest arrivals.
-  </p>
+  <motion.div
 
-</div>
-        )
-      )}
-    </section>
+    initial={{ opacity: 0, y: 30 }}
+
+    whileInView={{ opacity: 1, y: 0 }}
+
+    transition={{ duration: 0.6 }}
+
+    viewport={{ once: true }}
+
+    className="
+    flex
+    gap-2
+    overflow-x-auto
+    scrollbar-hide
+    pb-3
+    "
+
+  >
+
+    {products?.map((product) => (
+
+      <Link
+
+        key={product.id}
+
+        href={`/product/${product.id}`}
+
+        className="
+        min-w-[180px]
+        sm:min-w-[210px]
+        bg-white
+        rounded-3xl
+        shadow
+        hover:shadow-xl
+        transition-all
+        duration-300
+        hover:-translate-y-2
+        p-4
+        flex-shrink-0
+        "
+
+      >
+
+        <div
+          className="
+          relative
+          w-full
+          h-36
+          overflow-hidden
+          rounded-2xl
+          bg-gray-50
+          "
+        >
+
+         <Image
+  src={product.image || "/placeholder.png"}
+
+            alt={product.name}
+
+            fill
+
+            className="
+            object-contain
+            hover:scale-110
+            transition-all
+            duration-500
+            "
+
+          />
+
+        </div>
+
+       <h3
+  className="
+    mt-1
+    text-sm
+    font-medium
+    text-gray-800
+    leading-5
+    line-clamp-2
+    h-[28px]
+    hover:text-blue-600
+    transition-colors
+  "
+>
+  {product.name}
+</h3>
+
+      </Link>
+
+    ))}
+
+  </motion.div>
+
+  <div className="mt-6 text-center md:hidden">
+
+    <Link
+
+      href="/store"
+
+      className="
+      text-blue-700
+      font-semibold
+      "
+
+    >
+      View All →
+    </Link>
+
+  </div>
+  </section>
   );
 }

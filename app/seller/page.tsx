@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { catalogTree } from "@/lib/catalog/catalogTree";
 import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch,} from "firebase/firestore";
 import { auth, db, storage } from "@/lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -29,6 +30,17 @@ export default function SellerPage() {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [category, setCategory] = useState("Grocery");
+const [mainCategory, setMainCategory] = useState("");
+
+const [subCategory, setSubCategory] = useState("");
+
+const [department, setDepartment] = useState("");
+
+const [section, setSection] = useState("");
+
+const [productType, setProductType] = useState("");
+
+const [productVariant, setProductVariant] = useState("");
   const [vendorName, setVendorName] = useState("");
   const [image, setImage] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -82,7 +94,37 @@ const [pages, setPages] = useState("");
   const [bestSeller, setBestSeller] = useState("None");
   const SIZE_OPTIONS = ["XS","S","M","L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL",];
   const [notifications, setNotifications] = useState<Notification[]>([]);
+const mainCategories = catalogTree;
 
+const selectedMain = catalogTree.find(
+  item => item.id === mainCategory
+);
+
+const subCategories = selectedMain?.children || [];
+
+const selectedSub = subCategories.find(
+  item => item.id === subCategory
+);
+
+const departments = selectedSub?.children || [];
+
+const selectedDepartment = departments.find(
+  item => item.id === department
+);
+
+const sections = selectedDepartment?.children || [];
+
+const selectedSection = sections.find(
+  item => item.id === section
+);
+
+const productTypes = selectedSection?.children || [];
+
+const selectedType = productTypes.find(
+  item => item.id === productType
+);
+
+const productVariants = selectedType?.children || [];
   const buildNotifications = (items: Product[]) => {
     const alerts: Notification[] = [];
     items.forEach((product: any) => {
@@ -671,22 +713,137 @@ Manage your products, inventory, orders and business growth from one dashboard.<
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                >
-                  <option>Grocery</option>
-                  <option>Men Fashion</option>
-                  <option>Women Fashion</option>
-                  <option>Kids Fashion</option>
-                  <option>Beauty</option>
-                  <option>Electronics</option>
-                  <option>Furniture</option>
-                  <option>Mobiles</option>
-                  <option>Appliances</option>
-                  <option>Books</option>
-                </select>
+              <select
+  value={mainCategory}
+  onChange={(e) => {
+    setMainCategory(e.target.value);
+
+    setSubCategory("");
+    setDepartment("");
+    setSection("");
+    setProductType("");
+    setProductVariant("");
+  }}
+  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
+>
+  <option value="">Select Main Category</option>
+
+  {mainCategories.map((item) => (
+    <option
+      key={item.id}
+      value={item.id}
+    >
+      {item.name}
+    </option>
+  ))}
+</select>
+<select
+  value={subCategory}
+  onChange={(e) => {
+    setSubCategory(e.target.value);
+
+    setDepartment("");
+    setSection("");
+    setProductType("");
+    setProductVariant("");
+  }}
+  disabled={!mainCategory}
+  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+>
+  <option value="">Select Sub Category</option>
+
+  {subCategories.map((item) => (
+    <option
+      key={item.id}
+      value={item.id}
+    >
+      {item.name}
+    </option>
+  ))}
+</select>
+<select
+  value={department}
+  onChange={(e) => {
+    setDepartment(e.target.value);
+
+    setSection("");
+    setProductType("");
+    setProductVariant("");
+  }}
+  disabled={!subCategory}
+  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+>
+  <option value="">Select Department</option>
+
+  {departments.map((item) => (
+    <option
+      key={item.id}
+      value={item.id}
+    >
+      {item.name}
+    </option>
+  ))}
+</select>
+<select
+  value={section}
+  onChange={(e) => {
+    setSection(e.target.value);
+
+    setProductType("");
+    setProductVariant("");
+  }}
+  disabled={!department}
+  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+>
+  <option value="">Select Section</option>
+
+  {sections.map((item) => (
+    <option
+      key={item.id}
+      value={item.id}
+    >
+      {item.name}
+    </option>
+  ))}
+</select>
+<select
+  value={productType}
+  onChange={(e) => {
+    setProductType(e.target.value);
+
+    setProductVariant("");
+  }}
+  disabled={!section}
+  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+>
+  <option value="">Select Product Type</option>
+
+  {productTypes.map((item) => (
+    <option
+      key={item.id}
+      value={item.id}
+    >
+      {item.name}
+    </option>
+  ))}
+</select>
+<select
+  value={productVariant}
+  onChange={(e) => setProductVariant(e.target.value)}
+  disabled={!productType}
+  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
+>
+  <option value="">Select Variant</option>
+
+  {productVariants.map((item) => (
+    <option
+      key={item.id}
+      value={item.id}
+    >
+      {item.name}
+    </option>
+  ))}
+</select>
                 <select
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}

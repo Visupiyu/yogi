@@ -7,32 +7,35 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const slides = [
   {
-    title: "Mega Grocery Sale",
-    subtitle: "Up to 70% OFF on Daily Essentials",
+    title: "Shop Smarter. Live Better.",
+subtitle:  "Groceries • Electronics • Fashion • Home Essentials from trusted local sellers.",
     offer: "🔥 LIMITED TIME OFFER",
     image: "/banners/grocery.jpg",
     button: "Shop Now",
     category: "Grocery",
   },
   {
-    title: "Latest Electronics",
-    subtitle: "Mobiles • Laptops • Smart Gadgets",
+    title: "Discover Amazing Deals",
+subtitle:
+  "Save more on every purchase with trusted sellers across India.",
     offer: "⚡ BEST PRICE GUARANTEE",
     image: "/banners/electronics.jpg",
     button: "Explore",
     category: "Electronics",
   },
   {
-    title: "Fashion Festival",
-    subtitle: "Men • Women • Kids Collection",
+   title: "Everything You Need",
+subtitle:
+  "One marketplace for groceries, electronics, fashion, home and much more.",
     offer: "👗 NEW ARRIVALS",
     image: "/banners/fashion.jpg",
     button: "Shop Fashion",
     category: "Women Fashion",
   },
   {
-    title: "YOMICO Shopping Days",
-    subtitle: "Thousands of Deals Every Day",
+    title: "Support Local Businesses",
+subtitle:
+  "Buy directly from verified sellers and help local businesses grow.",
     offer: "🎉 FREE SHIPPING ABOVE ₹499",
     image: "/banners/mega-sale.jpg",
     button: "View Deals",
@@ -58,7 +61,7 @@ const nextSlide = () => {
 };
 
   return (
-    <div className="relative w-full h-[220px] sm:h-[260px] md:h-[340px] overflow-hidden rounded-2xl mb-6">
+    <div className="relative w-full h-[260px] sm:h-[340px] md:h-[420px] lg:h-[480px] overflow-hidden rounded-2xl mb-6">
       {slides.map((slide, index) => {
         const active = current === index;
         return (
@@ -92,25 +95,75 @@ const nextSlide = () => {
               className="w-full h-full object-cover"
             />
 
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
+         <div
+  className="
+    absolute
+    inset-0
+    bg-gradient-to-r
+    from-blue-900/85
+    via-blue-700/65
+    to-orange-500/40
+  "
+/>
 
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.7 }}
-              className="absolute inset-0 flex flex-col justify-center px-5 sm:px-8 md:px-20 text-white max-w-xl z-10"
-            >
-              <span className="inline-block bg-yellow-400 text-black px-4 py-1 rounded-full text-xs md:text-sm font-bold mb-4 shadow-lg">
+           <motion.div
+initial={{ opacity: 0, scale: 0.95 }}
+animate={{ opacity: 1, scale: 1 }}
+transition={{ duration: 0.7 }}
+className="
+absolute
+left-6
+top-1/2
+-translate-y-1/2
+z-10
+max-w-lg
+rounded-3xl
+bg-black/20
+backdrop-blur-md
+border
+border-white/20
+p-6
+md:p-8
+text-white
+"
+>
+              <span className="inline-block bg-yellow-400 text-black px-3 py-1 rounded-full text-[11px] md:text-xs font-bold mb-4 shadow-lg">
   {slide.offer}
 </span>
-              <h1 className="text-xl sm:text-3xl md:text-5xl font-extrabold leading-tight mb-3">
-                {slide.title}
-              </h1>
-              <p className="text-xs sm:text-sm md:text-lg text-gray-100 mb-5 max-w-lg">
+<h1 className="
+text-2xl
+sm:text-3xl
+md:text-4xl
+lg:text-5xl
+leading-tight
+tracking-tight
+drop-shadow-xl
+">
+{slide.title}
+ </h1>
+ <p className="
+mt-4
+text-xs
+sm:text-sm
+md:text-lg
+lg:text-xl
+text-gray-100
+max-w-xl
+leading-relaxed
+drop-shadow
+">
                 {slide.subtitle}
               </p>
 
-              <div className="flex flex-wrap gap-4">
+              <div
+ className="
+mt-5
+flex
+items-center
+gap-3
+flex-wrap
+"
+>
 
   <motion.div
     animate={{ y: [0, -6, 0] }}
@@ -118,7 +171,25 @@ const nextSlide = () => {
   >
     <Link
       href={`/category/${encodeURIComponent(slide.category)}`}
-      className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 px-4 py-2 sm:px-6 sm:py-3 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition"
+     className="
+inline-flex
+items-center
+justify-center
+bg-gradient-to-r
+from-blue-700
+to-orange-500
+hover:from-blue-600
+hover:to-orange-400
+px-4
+py-2
+rounded-xl
+text-sm
+font-semibold
+shadow-xl
+transition-all
+duration-300
+hover:scale-105
+"
     >
       {slide.button}
     </Link>
@@ -128,13 +199,56 @@ const nextSlide = () => {
 
   <Link
     href="/vendor-register"
-   className="bg-white text-gray-900 hover:bg-gray-100 px-5 py-2 sm:px-8 sm:py-4 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition"
+   className="
+inline-flex
+items-center
+justify-center
+bg-white/15
+backdrop-blur-md
+border
+border-white/40
+text-white
+hover:bg-white/25
+px-4
+py-2
+rounded-xl
+text-sm
+font-semibold
+shadow-xl
+transition-all
+duration-300
+hover:scale-105
+"
   >
     Become a Seller
   </Link>
 
 </div>
-            </motion.div>
+<div
+  className="
+mt-6
+flex
+flex-wrap
+gap-4
+text-xs
+sm:text-sm
+font-medium
+text-white
+"
+>
+  <div className="flex items-center gap-2">
+    🔒 <span>100% Secure Payments</span>
+  </div>
+
+  <div className="flex items-center gap-2">
+    🚚 <span>Fast Delivery</span>
+  </div>
+
+  <div className="flex items-center gap-2">
+    ✅ <span>Verified Sellers</span>
+  </div>
+</div>
+ </motion.div>
     
           </div>
         );

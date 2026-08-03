@@ -13,29 +13,18 @@ const categories = [
 
 export default function FeaturedCategories() {
   return (
-    <section className="max-w-7xl mx-auto px-2 py-6">
-      <div className="text-center mb-10">
-
-  <span className="inline-block bg-green-100 text-green-700 px-4 py-1 rounded-full text-sm font-semibold mb-3">
-    SHOP BY CATEGORY
-  </span>
-
-  <h2 className="text-3xl md:text-4xl font-bold text-gray-900">
-    Explore Top Categories
-  </h2>
-</div>
-
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+    <section className="max-w-7xl mx-auto px-2 py-3">
+      
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {categories.map((category) => (
           <Link
             key={category.name}
             href={`/category/${encodeURIComponent(category.name)}`}
           >
             
-   <div className="relative bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition duration-300 group cursor-pointer">
+   <div className="relative bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition duration-300 group cursor-pointer">
 
-  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-gray-800 shadow-lg z-10">
+  <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-800 shadow-lg z-10">
     Popular
   </div>
 
@@ -46,14 +35,12 @@ export default function FeaturedCategories() {
                   onError={(e) => {
                     e.currentTarget.src = "/no-image.png";
                   }}
-                  className="w-full h-36 object-cover group-hover:scale-110 group-hover:rotate-1 transition duration-500"
+                  className="w-full h-24 object-cover group-hover:scale-110 group-hover:rotate-1 transition duration-500"
                 />
               </div>
-              <div className="p-4 text-center">
-                <h3 className="font-bold text-base">{category.name}</h3>
-                <p className="text-green-600 font-semibold mt-2">
-  Explore →
-</p>
+              <div className="p-2 text-center">
+                <h3 className="font-semibold text-sm">{category.name}</h3>
+               
               </div>
             </div>
           </Link>
