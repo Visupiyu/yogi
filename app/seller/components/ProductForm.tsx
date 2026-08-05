@@ -1,0 +1,1575 @@
+"use client";
+import { useState, useMemo } from "react";
+import { Product } from "@/lib/products/product";
+import { generateSKU, generateSlug } from "@/lib/products/helpers";
+import CategorySelector from "./CategorySelector";
+import BrandSelector from "./BrandSelector";
+import VariantSelector from "./VariantSelector";
+import SpecificationForm from "./SpecificationForm";
+import ProductPreview from "./ProductPreview";
+import {validateProduct} from "@/lib/products/validation";
+import { db, storage } from "@/lib/firebase";
+import { collection,addDoc,serverTimestamp,} from "firebase/firestore";
+import {ref,uploadBytes,getDownloadURL,} from "firebase/storage";
+import { useRouter } from "next/navigation";
+
+interface ProductFormProps {vendorId: string;vendorName: string;}
+export default function ProductForm({ vendorId,vendorName,}: ProductFormProps) {
+
+  // ==========================================
+  // Initial Product
+  // ==========================================
+const [imageFiles, setImageFiles] = useState<File[]>([]);
+
+const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const initialProduct = useMemo<Product>(() => ({
+
+    // Identity
+
+    id: "",
+
+    sku: "",
+
+    slug: "",
+
+    // Category
+
+    categoryId: "",
+
+    subCategoryId: "",
+
+    leafCategoryId: "",
+
+    // Basic
+
+    title: "",
+
+    shortTitle: "",
+
+    description: "",
+
+    brand: "",
+
+    model: "",
+
+    // Pricing
+
+    mrp: 0,
+
+    sellingPrice: 0,
+
+    costPrice: 0,
+
+    discount: 0,
+
+    currency: "INR",
+
+    // Inventory
+
+    stock: 0,
+
+    minStock: 5,
+
+    maxStock: 1000,
+
+    // Images
+
+    thumbnail: "",
+
+    images: [],
+
+    video: "",
+
+    // Specifications
+
+    specifications: {},
+
+    // Variants
+
+    variants: {},
+
+    // Shipping
+
+    weight: 0,
+
+    length: 0,
+
+    width: 0,
+
+    height: 0,
+
+    // Warranty
+
+    warranty: "",
+
+    returnDays: 7,
+
+    // Seller
+
+    vendorId,
+
+    vendorName,
+
+    // SEO
+
+    metaTitle: "",
+
+    metaDescription: "",
+
+    keywords: [],
+
+    // Status
+
+    active: true,
+
+    featured: false,
+
+    approved: false,
+
+    // Ratings
+
+    rating: 0,
+
+    reviewCount: 0,
+
+    // Analytics
+
+    views: 0,
+
+    sales: 0,
+
+    wishlistCount: 0,
+
+    // Dates
+
+    createdAt: new Date(),
+
+    updatedAt: new Date(),
+
+  }), [vendorId, vendorName]);
+
+  // ==========================================
+  // State
+  // ==========================================
+
+  const [product, setProduct] =
+
+    useState<Product>(initialProduct);
+
+  const [loading, setLoading] =
+
+    useState(false);
+
+  const [error, setError] =
+
+    useState("");
+
+  const [success, setSuccess] =
+
+    useState("");
+    const router = useRouter();
+
+  // ==========================================
+  // Auto Generate
+  // ==========================================
+
+  const updateTitle = (
+
+    value: string
+
+  ) => {
+
+    setProduct(prev => ({
+
+      ...prev,
+
+      title: value,
+
+      slug: generateSlug(value),
+
+    }));
+
+  };
+
+  const updateBrand = (
+
+    value: string
+
+  ) => {
+
+    setProduct(prev => ({
+
+      ...prev,
+
+      brand: value,
+
+      sku: generateSKU(
+
+        prev.categoryId,
+
+        value
+
+      ),
+
+    }));
+
+  };
+  const handleImageChange = (
+
+  e: React.ChangeEvent<HTMLInputElement>
+
+) => {
+
+  const files = Array.from(
+
+    e.target.files || []
+
+  );
+
+  if (files.length > 5) {
+
+    setError("Maximum 5 images allowed.");
+
+    return;
+
+  }
+
+  setError("");
+
+  setImageFiles(files);
+
+  const previews = files.map(file =>
+
+    URL.createObjectURL(file)
+
+  );
+
+  setImagePreviews(previews);
+
+};
+// ==========================================
+// Validate Product
+// ==========================================
+
+const validateForm = (): boolean => {
+
+setError("");
+
+setSuccess("");
+
+const result = validateProduct(product);
+
+if(!result.valid){
+
+setError(
+
+result.errors.join("\n")
+
+);
+
+return false;
+
+}
+
+return true;
+
+};
+// ==========================================
+// Submit
+// ==========================================
+
+const handleSubmit = async (
+
+e: React.FormEvent
+
+)=>{
+
+e.preventDefault();
+
+if(!validateForm())
+
+return;
+
+setLoading(true);
+
+try {
+
+  const uploadedImages: string[] = [];
+
+  // Upload Images
+  for (const file of imageFiles) {
+
+    const storageRef = ref(
+      storage,
+      `products/${Date.now()}-${file.name}`
+    );
+
+    await uploadBytes(
+      storageRef,
+      file
+    );
+
+    const url =
+      await getDownloadURL(storageRef);
+
+    uploadedImages.push(url);
+
+  }
+
+  // Save Product
+
+  await addDoc(
+
+    collection(db, "products"),
+
+    {
+
+      ...product,
+
+      thumbnail:
+        uploadedImages[0] || "",
+
+      images: uploadedImages,
+
+      createdAt:
+        serverTimestamp(),
+
+      updatedAt:
+        serverTimestamp(),
+
+    }
+
+  );
+
+  setSuccess(
+
+    "Product Added Successfully."
+
+  );
+
+  router.push(
+
+    "/seller/products"
+
+  );
+
+}
+catch (error) {
+
+  console.error(error);
+
+  setError(
+
+    "Failed to save product."
+
+  );
+
+}
+
+finally{
+
+setLoading(false);
+
+}
+
+};
+
+  // ==========================================
+  // UI
+  // ==========================================
+
+ return(
+
+<form
+
+onSubmit={handleSubmit}
+
+className="space-y-8"
+>
+
+{/* ========================================== */}
+{/* Basic Information */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Basic Information
+
+</h2>
+
+<div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+{/* Product Name */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Product Name *
+
+</label>
+
+<input
+
+type="text"
+
+value={product.title}
+
+onChange={(e)=>updateTitle(e.target.value)}
+
+placeholder="Enter Product Name"
+
+className="w-full rounded-lg border p-3 outline-none focus:border-blue-600"
+
+/>
+
+</div>
+
+{/* Short Name */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Short Name
+
+</label>
+
+<input
+
+type="text"
+
+value={product.shortTitle}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+shortTitle:e.target.value,
+
+})
+
+}
+
+placeholder="Short Product Name"
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+{/* Brand */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Brand *
+
+</label>
+
+</div>
+
+{/* Model */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Model
+
+</label>
+
+<input
+
+type="text"
+
+value={product.model}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+model:e.target.value,
+
+})
+
+}
+
+placeholder="Model Number"
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+{/* SKU */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+SKU
+
+</label>
+
+<input
+
+readOnly
+
+value={product.sku}
+
+className="w-full rounded-lg border bg-gray-100 p-3"
+
+/>
+
+</div>
+
+{/* Slug */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Slug
+
+</label>
+
+<input
+
+readOnly
+
+value={product.slug}
+
+className="w-full rounded-lg border bg-gray-100 p-3"
+
+/>
+
+</div>
+
+</div>
+
+{/* Description */}
+
+<div className="mt-6">
+
+<label className="mb-2 block text-sm font-semibold">
+
+Description *
+
+</label>
+
+<textarea
+
+rows={6}
+
+value={product.description}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+description:e.target.value,
+
+})
+
+}
+
+placeholder="Write complete product description..."
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+</div>
+
+{/* Error */}
+
+{
+
+error && (
+
+<div className="rounded-lg bg-red-100 p-4 text-red-700">
+
+{error}
+
+</div>
+
+)
+
+}
+
+{/* Success */}
+
+{
+
+success && (
+
+<div className="rounded-lg bg-green-100 p-4 text-green-700">
+
+{success}
+
+</div>
+
+)
+
+}
+
+{/* ========================================== */}
+{/* Category */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Category
+
+</h2>
+
+<div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+
+{/* Category */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Category *
+
+</label>
+
+<CategorySelector
+
+value={product.categoryId}
+
+onChange={(category)=>{
+
+setProduct({
+
+...product,
+
+categoryId:category,
+
+subCategoryId:"",
+
+leafCategoryId:"",
+
+sku:generateSKU(
+
+category,
+
+product.brand
+
+),
+
+});
+
+}}
+
+ />
+
+</div>
+
+{/* Brand */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Brand *
+
+</label>
+
+<BrandSelector
+
+category={product.categoryId}
+
+value={product.brand}
+
+onChange={updateBrand}
+
+/>
+
+</div>
+
+</div>
+
+</div>
+
+{/* ========================================== */}
+{/* Variants */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Variants
+
+</h2>
+
+<VariantSelector
+
+category={product.categoryId}
+
+variants={product.variants}
+
+onChange={(variants)=>
+
+setProduct({
+
+...product,
+
+variants,
+
+})
+
+}
+
+/>
+
+</div>
+
+{/* ========================================== */}
+{/* Specifications */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Specifications
+
+</h2>
+
+<SpecificationForm
+
+category={product.categoryId}
+
+specifications={product.specifications}
+
+onChange={(specifications)=>
+
+setProduct({
+
+...product,
+
+specifications,
+
+})
+
+}
+
+/>
+
+</div>
+{/* ========================================== */}
+{/* Pricing */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Pricing
+
+</h2>
+
+<div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+
+{/* MRP */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+MRP *
+
+</label>
+
+<input
+
+type="number"
+
+value={product.mrp}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+mrp:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+{/* Selling Price */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Selling Price *
+
+</label>
+
+<input
+
+type="number"
+
+value={product.sellingPrice}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+sellingPrice:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+{/* Cost Price */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Cost Price
+
+</label>
+
+<input
+
+type="number"
+
+value={product.costPrice}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+costPrice:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+{/* Currency */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Currency
+
+</label>
+
+<select
+
+value={product.currency}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+currency:e.target.value,
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+>
+
+<option value="INR">INR ₹</option>
+
+<option value="USD">USD $</option>
+
+<option value="EUR">EUR €</option>
+
+</select>
+
+</div>
+
+</div>
+
+<div className="mt-6 rounded-lg bg-green-50 p-4">
+
+<p className="font-semibold">
+
+Discount :
+
+{
+
+product.mrp>0
+
+?
+
+Math.round(
+
+((product.mrp-product.sellingPrice)
+
+/product.mrp)
+
+*100
+
+)
+
+:0
+
+} %
+
+</p>
+
+</div>
+
+</div>
+
+{/* ========================================== */}
+{/* Inventory */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Inventory
+
+</h2>
+
+<div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+
+{/* Stock */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Available Stock
+
+</label>
+
+<input
+
+type="number"
+
+value={product.stock}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+stock:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+{/* Minimum Stock */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Minimum Stock
+
+</label>
+
+<input
+
+type="number"
+
+value={product.minStock}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+minStock:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+{/* Maximum Stock */}
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Maximum Stock
+
+</label>
+
+<input
+
+type="number"
+
+value={product.maxStock}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+maxStock:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+</div>
+
+<div className="mt-6 rounded-lg bg-blue-50 p-4">
+
+<p>
+
+Current Status :
+
+{
+
+product.stock<=0
+
+?
+
+" Out of Stock"
+
+:
+
+product.stock<=product.minStock
+
+?
+
+" Low Stock"
+
+:
+
+" In Stock"
+
+}
+
+</p>
+
+</div>
+
+</div>
+{/* ========================================== */}
+{/* Shipping */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Shipping
+
+</h2>
+
+<div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Weight (kg)
+
+</label>
+
+<input
+
+type="number"
+
+step="0.01"
+
+value={product.weight}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+weight:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Length (cm)
+
+</label>
+
+<input
+
+type="number"
+
+value={product.length}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+length:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Width (cm)
+
+</label>
+
+<input
+
+type="number"
+
+value={product.width}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+width:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Height (cm)
+
+</label>
+
+<input
+
+type="number"
+
+value={product.height}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+height:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+</div>
+
+</div>
+
+{/* ========================================== */}
+{/* Warranty */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Warranty & Return
+
+</h2>
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Warranty
+
+</label>
+
+<input
+
+type="text"
+
+placeholder="1 Year Manufacturer Warranty"
+
+value={product.warranty}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+warranty:e.target.value,
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Return Days
+
+</label>
+
+<input
+
+type="number"
+
+value={product.returnDays}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+returnDays:Number(e.target.value),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+</div>
+
+</div>
+
+{/* ========================================== */}
+{/* SEO */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+SEO
+
+</h2>
+
+<div className="space-y-6">
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Meta Title
+
+</label>
+
+<input
+
+type="text"
+
+value={product.metaTitle}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+metaTitle:e.target.value,
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Meta Description
+
+</label>
+
+<textarea
+
+rows={4}
+
+value={product.metaDescription}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+metaDescription:e.target.value,
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+<div>
+
+<label className="mb-2 block text-sm font-semibold">
+
+Keywords
+
+</label>
+
+<input
+
+type="text"
+
+placeholder="mobile, samsung, 5g, smartphone"
+
+value={(product.keywords ?? []).join(", ")}
+
+onChange={(e)=>
+
+setProduct({
+
+...product,
+
+keywords:e.target.value
+
+.split(",")
+
+.map(item=>item.trim())
+
+.filter(Boolean),
+
+})
+
+}
+
+className="w-full rounded-lg border p-3"
+
+/>
+
+</div>
+
+</div>
+
+</div>
+{/* ========================================== */}
+{/* Product Images */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Product Images
+
+</h2>
+
+<input
+
+type="file"
+
+multiple
+
+accept="image/*"
+
+onChange={handleImageChange}
+
+className="mb-6"
+
+/>
+
+<p className="mb-4 text-sm text-gray-500">
+
+Upload up to 5 product images.
+
+</p>
+
+<div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
+
+{imagePreviews.map((image, index) => (
+
+  <div
+    key={index}
+    className="overflow-hidden rounded-lg border"
+  >
+
+    <img
+      src={image}
+      alt={`Preview ${index + 1}`}
+      className="h-40 w-full object-cover"
+    />
+
+  </div>
+
+))}
+
+</div>   {/* closes image grid */}
+
+<div className="flex justify-end mt-8">
+
+  <button
+    type="submit"
+    disabled={loading}
+    className="rounded-lg bg-blue-600 px-8 py-3 text-white"
+  >
+    {loading ? "Saving..." : "Save Product"}
+  </button>
+
+</div>
+
+</div>   {/* closes Product Images card */}
+
+
+
+
+{/* ========================================== */}
+{/* Product Preview */}
+{/* ========================================== */}
+
+<div className="rounded-xl border bg-white p-6 shadow-sm">
+
+<h2 className="mb-6 text-2xl font-bold">
+
+Live Preview
+
+</h2>
+
+<ProductPreview product={product} />
+
+<div className="flex justify-end mt-8">
+
+  <button
+    type="submit"
+    disabled={loading}
+    className="rounded-lg bg-blue-600 px-8 py-3 text-white"
+  >
+    {loading ? "Saving..." : "Save Product"}
+  </button>
+
+</div>
+
+</div>
+
+</form>
+
+);
+
+}

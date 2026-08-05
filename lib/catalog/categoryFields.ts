@@ -12558,4 +12558,4904 @@ GAMING: [
 },
 
 ],
+REFRIGERATORS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  capacity: [
+
+    "grossCapacity",
+
+    "netCapacity",
+
+    "freezerCapacity",
+
+    "refrigeratorCapacity"
+
+  ],
+
+  type: [
+
+    "refrigeratorType",
+
+    "doorType",
+
+    "defrostSystem",
+
+    "compressorType",
+
+    "coolingTechnology"
+
+  ],
+
+  performance: [
+
+    "energyRating",
+
+    "annualPowerConsumption",
+
+    "stabilizerFreeOperation",
+
+    "inverterTechnology",
+
+    "temperatureControl",
+
+    "fastCooling",
+
+    "fastFreezing"
+
+  ],
+
+  storage: [
+
+    "numberOfShelves",
+
+    "shelfMaterial",
+
+    "vegetableBox",
+
+    "doorBins",
+
+    "eggTray",
+
+    "bottleRack",
+
+    "iceTray"
+
+  ],
+
+  smartFeatures: [
+
+    "wifi",
+
+    "smartDiagnosis",
+
+    "digitalDisplay",
+
+    "touchControl",
+
+    "doorAlarm"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "finish",
+
+    "dimensions",
+
+    "weight",
+
+    "wheelSupport",
+
+    "handleType"
+
+  ],
+
+  packageContents: [
+
+    "refrigerator",
+
+    "iceTray",
+
+    "eggTray",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "compressorWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "capacity",
+
+    "color",
+
+    "doorType"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "capacity",
+
+    "doorType",
+
+    "energyRating",
+
+    "compressorType",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "capacity",
+
+    "doorType",
+
+    "refrigeratorType",
+
+    "energyRating",
+
+    "compressorType",
+
+    "coolingTechnology",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+WASHING_MACHINES: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  type: [
+
+    "washingMachineType",
+
+    "loadingType",
+
+    "capacity",
+
+    "spinSpeed",
+
+    "motorType"
+
+  ],
+
+  washPrograms: [
+
+    "numberOfPrograms",
+
+    "quickWash",
+
+    "ecoWash",
+
+    "cottonWash",
+
+    "woolWash",
+
+    "delicateWash",
+
+    "babyCare",
+
+    "steamWash"
+
+  ],
+
+  performance: [
+
+    "energyRating",
+
+    "waterConsumption",
+
+    "powerConsumption",
+
+    "noiseLevel",
+
+    "inverterTechnology"
+
+  ],
+
+  smartFeatures: [
+
+    "wifi",
+
+    "smartDiagnosis",
+
+    "digitalDisplay",
+
+    "touchControl",
+
+    "childLock",
+
+    "delayTimer",
+
+    "autoRestart"
+
+  ],
+
+  drum: [
+
+    "drumMaterial",
+
+    "drumType",
+
+    "drumVolume"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "bodyMaterial",
+
+    "dimensions",
+
+    "weight",
+
+    "adjustableLegs"
+
+  ],
+
+  packageContents: [
+
+    "washingMachine",
+
+    "inletPipe",
+
+    "drainPipe",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "motorWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "capacity",
+
+    "color",
+
+    "loadingType"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "washingMachineType",
+
+    "loadingType",
+
+    "capacity",
+
+    "spinSpeed",
+
+    "energyRating",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "washingMachineType",
+
+    "loadingType",
+
+    "capacity",
+
+    "spinSpeed",
+
+    "energyRating",
+
+    "motorType",
+
+    "inverterTechnology",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+AIR_CONDITIONERS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  type: [
+
+    "acType",
+
+    "capacity",
+
+    "inverterTechnology",
+
+    "compressorType",
+
+    "coolingCapacity"
+
+  ],
+
+  performance: [
+
+    "energyRating",
+
+    "annualPowerConsumption",
+
+    "iseerRating",
+
+    "airFlow",
+
+    "coolingCoverage",
+
+    "noiseLevel"
+
+  ],
+
+  operatingModes: [
+
+    "coolMode",
+
+    "dryMode",
+
+    "fanMode",
+
+    "sleepMode",
+
+    "turboMode",
+
+    "ecoMode",
+
+    "autoMode"
+
+  ],
+
+  smartFeatures: [
+
+    "wifi",
+
+    "smartControl",
+
+    "voiceControl",
+
+    "mobileApp",
+
+    "autoRestart",
+
+    "timer",
+
+    "selfDiagnosis"
+
+  ],
+
+  airQuality: [
+
+    "airFilter",
+
+    "pmFilter",
+
+    "antiBacterialFilter",
+
+    "dustFilter",
+
+    "dehumidifier"
+
+  ],
+
+  physical: [
+
+    "indoorUnitDimensions",
+
+    "outdoorUnitDimensions",
+
+    "indoorWeight",
+
+    "outdoorWeight",
+
+    "color",
+
+    "refrigerantType"
+
+  ],
+
+  installation: [
+
+    "installationKit",
+
+    "copperPipeIncluded",
+
+    "remoteControl",
+
+    "wallMountKit"
+
+  ],
+
+  packageContents: [
+
+    "indoorUnit",
+
+    "outdoorUnit",
+
+    "remoteControl",
+
+    "batteries",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "compressorWarranty",
+
+    "pcbWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "capacity",
+
+    "color",
+
+    "energyRating"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "acType",
+
+    "capacity",
+
+    "compressorType",
+
+    "energyRating",
+
+    "refrigerantType",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "acType",
+
+    "capacity",
+
+    "energyRating",
+
+    "inverterTechnology",
+
+    "compressorType",
+
+    "coolingCoverage",
+
+    "noiseLevel",
+
+    "wifi",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+MICROWAVE_OVENS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  type: [
+
+    "microwaveType",
+
+    "capacity",
+
+    "installationType",
+
+    "doorOpening",
+
+    "controlType"
+
+  ],
+
+  cookingFeatures: [
+
+    "grillFunction",
+
+    "convectionFunction",
+
+    "autoCookMenu",
+
+    "defrost",
+
+    "reheat",
+
+    "keepWarm",
+
+    "fermentation",
+
+    "steamCooking"
+
+  ],
+
+  performance: [
+
+    "microwavePower",
+
+    "grillPower",
+
+    "convectionPower",
+
+    "powerLevels",
+
+    "powerConsumption"
+
+  ],
+
+  smartFeatures: [
+
+    "digitalDisplay",
+
+    "touchControl",
+
+    "childLock",
+
+    "timer",
+
+    "clock",
+
+    "wifi",
+
+    "voiceControl"
+
+  ],
+
+  interior: [
+
+    "turntableDiameter",
+
+    "cavityMaterial",
+
+    "interiorLight"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "finish",
+
+    "dimensions",
+
+    "weight"
+
+  ],
+
+  packageContents: [
+
+    "microwaveOven",
+
+    "glassTurntable",
+
+    "rollerRing",
+
+    "grillRack",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "magnetronWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "capacity",
+
+    "color",
+
+    "microwaveType"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "microwaveType",
+
+    "capacity",
+
+    "microwavePower",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "microwaveType",
+
+    "capacity",
+
+    "grillFunction",
+
+    "convectionFunction",
+
+    "autoCookMenu",
+
+    "powerLevels",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+MIXER_GRINDERS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  type: [
+
+    "mixerType",
+
+    "power",
+
+    "motorType",
+
+    "speedSettings",
+
+    "numberOfJars"
+
+  ],
+
+  jars: [
+
+    "liquidizingJar",
+
+    "grindingJar",
+
+    "chutneyJar",
+
+    "juiceJar",
+
+    "jarMaterial",
+
+    "jarCapacity"
+
+  ],
+
+  performance: [
+
+    "rpm",
+
+    "overloadProtection",
+
+    "stainlessSteelBlades",
+
+    "pulseFunction",
+
+    "powerConsumption"
+
+  ],
+
+  smartFeatures: [
+
+    "digitalDisplay",
+
+    "touchControl",
+
+    "autoShutOff",
+
+    "safetyLock"
+
+  ],
+
+  physical: [
+
+    "bodyMaterial",
+
+    "bladeMaterial",
+
+    "color",
+
+    "dimensions",
+
+    "weight",
+
+    "cordLength"
+
+  ],
+
+  packageContents: [
+
+    "mixerGrinder",
+
+    "jars",
+
+    "lids",
+
+    "spatula",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "motorWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "power",
+
+    "color",
+
+    "numberOfJars"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "power",
+
+    "numberOfJars",
+
+    "motorType",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "power",
+
+    "numberOfJars",
+
+    "motorType",
+
+    "jarMaterial",
+
+    "overloadProtection",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+INDUCTION_COOKTOPS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  type: [
+
+    "cooktopType",
+
+    "numberOfCookingZones",
+
+    "power",
+
+    "controlType",
+
+    "installationType"
+
+  ],
+
+  cookingFeatures: [
+
+    "presetMenus",
+
+    "temperatureSettings",
+
+    "timer",
+
+    "keepWarm",
+
+    "boostMode",
+
+    "autoPanDetection",
+
+    "pauseFunction"
+
+  ],
+
+  performance: [
+
+    "powerLevels",
+
+    "powerConsumption",
+
+    "heatingEfficiency",
+
+    "voltage",
+
+    "frequency"
+
+  ],
+
+  safetyFeatures: [
+
+    "childLock",
+
+    "autoShutOff",
+
+    "overheatProtection",
+
+    "overflowProtection",
+
+    "residualHeatIndicator"
+
+  ],
+
+  smartFeatures: [
+
+    "digitalDisplay",
+
+    "touchControl",
+
+    "wifi",
+
+    "voiceControl"
+
+  ],
+
+  physical: [
+
+    "surfaceMaterial",
+
+    "bodyMaterial",
+
+    "color",
+
+    "dimensions",
+
+    "weight",
+
+    "cordLength"
+
+  ],
+
+  packageContents: [
+
+    "inductionCooktop",
+
+    "powerCord",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "power",
+
+    "color",
+
+    "numberOfCookingZones"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "power",
+
+    "numberOfCookingZones",
+
+    "controlType",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "power",
+
+    "numberOfCookingZones",
+
+    "controlType",
+
+    "presetMenus",
+
+    "childLock",
+
+    "surfaceMaterial",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+WATER_PURIFIERS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  purification: [
+
+    "purifierType",
+
+    "purificationTechnology",
+
+    "storageCapacity",
+
+    "flowRate",
+
+    "waterSource",
+
+    "tdsControl",
+
+    "mineralEnhancer"
+
+  ],
+
+  filters: [
+
+    "sedimentFilter",
+
+    "preCarbonFilter",
+
+    "roMembrane",
+
+    "uvLamp",
+
+    "ufMembrane",
+
+    "postCarbonFilter",
+
+    "filterLife"
+
+  ],
+
+  performance: [
+
+    "purificationCapacity",
+
+    "recoveryRate",
+
+    "rejectionRate",
+
+    "operatingPressure",
+
+    "operatingTemperature",
+
+    "powerConsumption"
+
+  ],
+
+  smartFeatures: [
+
+    "digitalDisplay",
+
+    "filterChangeIndicator",
+
+    "tankFullIndicator",
+
+    "smartDiagnosis",
+
+    "wifi",
+
+    "mobileApp"
+
+  ],
+
+  safetyFeatures: [
+
+    "autoShutOff",
+
+    "overflowProtection",
+
+    "leakProtection",
+
+    "childLock"
+
+  ],
+
+  physical: [
+
+    "mountType",
+
+    "bodyMaterial",
+
+    "color",
+
+    "dimensions",
+
+    "weight"
+
+  ],
+
+  packageContents: [
+
+    "waterPurifier",
+
+    "installationKit",
+
+    "inletPipe",
+
+    "drainPipe",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "electricalPartsWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "storageCapacity",
+
+    "color",
+
+    "purificationTechnology"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "purifierType",
+
+    "purificationTechnology",
+
+    "storageCapacity",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "purifierType",
+
+    "purificationTechnology",
+
+    "storageCapacity",
+
+    "waterSource",
+
+    "tdsControl",
+
+    "filterChangeIndicator",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+ELECTRIC_KETTLES: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "capacity",
+
+    "power",
+
+    "voltage",
+
+    "frequency",
+
+    "heatingElement",
+
+    "bodyMaterial"
+
+  ],
+
+  features: [
+
+    "autoShutOff",
+
+    "boilDryProtection",
+
+    "temperatureControl",
+
+    "keepWarmFunction",
+
+    "concealedHeatingElement",
+
+    "cordlessOperation",
+
+    "360DegreeBase",
+
+    "waterLevelIndicator",
+
+    "indicatorLight"
+
+  ],
+
+  performance: [
+
+    "boilingTime",
+
+    "powerConsumption",
+
+    "noiseLevel"
+
+  ],
+
+  safetyFeatures: [
+
+    "coolTouchHandle",
+
+    "lockingLid",
+
+    "steamRelease",
+
+    "overheatProtection"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "finish",
+
+    "dimensions",
+
+    "weight",
+
+    "cordLength"
+
+  ],
+
+  packageContents: [
+
+    "electricKettle",
+
+    "powerBase",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "capacity",
+
+    "color"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "capacity",
+
+    "power",
+
+    "bodyMaterial",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "capacity",
+
+    "power",
+
+    "bodyMaterial",
+
+    "temperatureControl",
+
+    "autoShutOff",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+IRONS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "ironType",
+
+    "power",
+
+    "voltage",
+
+    "frequency",
+
+    "soleplateMaterial",
+
+    "waterTankCapacity"
+
+  ],
+
+  features: [
+
+    "steamFunction",
+
+    "verticalSteam",
+
+    "sprayFunction",
+
+    "selfCleaning",
+
+    "antiDrip",
+
+    "antiCalc",
+
+    "temperatureControl",
+
+    "autoShutOff",
+
+    "continuousSteam",
+
+    "steamBoost"
+
+  ],
+
+  performance: [
+
+    "heatingTime",
+
+    "powerConsumption",
+
+    "steamOutput"
+
+  ],
+
+  safetyFeatures: [
+
+    "overheatProtection",
+
+    "coolTouchHandle",
+
+    "indicatorLight",
+
+    "cordSwivel"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "bodyMaterial",
+
+    "dimensions",
+
+    "weight",
+
+    "cordLength"
+
+  ],
+
+  packageContents: [
+
+    "iron",
+
+    "measuringCup",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "ironType",
+
+    "color"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "ironType",
+
+    "power",
+
+    "soleplateMaterial",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "ironType",
+
+    "power",
+
+    "soleplateMaterial",
+
+    "steamFunction",
+
+    "autoShutOff",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+VACUUM_CLEANERS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "series",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "vacuumType",
+
+    "power",
+
+    "suctionPower",
+
+    "dustCapacity",
+
+    "filterType",
+
+    "collectionType"
+
+  ],
+
+  cleaningFeatures: [
+
+    "dryCleaning",
+
+    "wetCleaning",
+
+    "blowerFunction",
+
+    "bagless",
+
+    "cyclonicTechnology",
+
+    "multiSurfaceCleaning",
+
+    "petHairCleaning",
+
+    "edgeCleaning"
+
+  ],
+
+  performance: [
+
+    "noiseLevel",
+
+    "powerConsumption",
+
+    "runtime",
+
+    "chargingTime",
+
+    "cordLength"
+
+  ],
+
+  smartFeatures: [
+
+    "digitalDisplay",
+
+    "batteryIndicator",
+
+    "autoMode",
+
+    "wifi",
+
+    "mobileApp",
+
+    "voiceControl"
+
+  ],
+
+  accessories: [
+
+    "floorBrush",
+
+    "creviceTool",
+
+    "upholsteryBrush",
+
+    "extensionTube",
+
+    "dustingBrush",
+
+    "petBrush"
+
+  ],
+
+  safetyFeatures: [
+
+    "overheatProtection",
+
+    "motorProtection",
+
+    "autoShutOff"
+
+  ],
+
+  physical: [
+
+    "bodyMaterial",
+
+    "color",
+
+    "dimensions",
+
+    "weight"
+
+  ],
+
+  packageContents: [
+
+    "vacuumCleaner",
+
+    "accessories",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "motorWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "vacuumType",
+
+    "color",
+
+    "dustCapacity"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "vacuumType",
+
+    "power",
+
+    "dustCapacity",
+
+    "filterType",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "vacuumType",
+
+    "power",
+
+    "dustCapacity",
+
+    "filterType",
+
+    "bagless",
+
+    "wetCleaning",
+
+    "blowerFunction",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+SOFAS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "sofaType",
+
+    "seatingCapacity",
+
+    "upholsteryMaterial",
+
+    "frameMaterial",
+
+    "fillingMaterial",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "seatHeight",
+
+    "seatDepth",
+
+    "weight"
+
+  ],
+
+  comfortFeatures: [
+
+    "recliner",
+
+    "adjustableHeadrest",
+
+    "storage",
+
+    "sofaBed",
+
+    "armrest",
+
+    "cushionsIncluded"
+
+  ],
+
+  upholstery: [
+
+    "fabricType",
+
+    "fabricFinish",
+
+    "washableCover",
+
+    "waterResistant",
+
+    "scratchResistant"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "finish",
+
+    "legMaterial",
+
+    "legColor"
+
+  ],
+
+  packageContents: [
+
+    "sofa",
+
+    "cushions",
+
+    "assemblyKit",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "frameWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "color",
+
+    "seatingCapacity",
+
+    "upholsteryMaterial"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "sofaType",
+
+    "seatingCapacity",
+
+    "upholsteryMaterial",
+
+    "frameMaterial",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "sofaType",
+
+    "seatingCapacity",
+
+    "upholsteryMaterial",
+
+    "frameMaterial",
+
+    "recliner",
+
+    "sofaBed",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+TV_UNITS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "tvSizeCompatibility",
+
+    "mountType",
+
+    "material",
+
+    "finish",
+
+    "numberOfShelves",
+
+    "numberOfDrawers",
+
+    "numberOfCabinets",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "weight",
+
+    "maxLoadCapacity"
+
+  ],
+
+  storageFeatures: [
+
+    "openShelves",
+
+    "closedCabinets",
+
+    "glassDoors",
+
+    "cableManagement",
+
+    "displayShelf"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "surfaceFinish",
+
+    "frameMaterial",
+
+    "legMaterial"
+
+  ],
+
+  packageContents: [
+
+    "tvUnit",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "manufacturingWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "color",
+
+    "material",
+
+    "tvSizeCompatibility"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "tvSizeCompatibility",
+
+    "material",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "tvSizeCompatibility",
+
+    "material",
+
+    "numberOfShelves",
+
+    "numberOfDrawers",
+
+    "assemblyRequired",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+COFFEE_TABLES: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "tableType",
+
+    "shape",
+
+    "material",
+
+    "tableTopMaterial",
+
+    "frameMaterial",
+
+    "finish",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "weight",
+
+    "maxLoadCapacity"
+
+  ],
+
+  features: [
+
+    "storageShelf",
+
+    "drawer",
+
+    "foldable",
+
+    "nesting",
+
+    "wheels",
+
+    "glassTop"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "legMaterial",
+
+    "surfaceFinish"
+
+  ],
+
+  packageContents: [
+
+    "coffeeTable",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "manufacturingWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "color",
+
+    "material",
+
+    "shape"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "material",
+
+    "shape",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "shape",
+
+    "material",
+
+    "glassTop",
+
+    "drawer",
+
+    "storageShelf",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+BEDS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "bedType",
+
+    "bedSize",
+
+    "material",
+
+    "frameMaterial",
+
+    "headboardIncluded",
+
+    "storageType",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "groundClearance",
+
+    "weight",
+
+    "maximumLoadCapacity"
+
+  ],
+
+  mattressSupport: [
+
+    "mattressIncluded",
+
+    "recommendedMattressSize",
+
+    "slatMaterial",
+
+    "slatCount"
+
+  ],
+
+  features: [
+
+    "hydraulicStorage",
+
+    "boxStorage",
+
+    "drawerStorage",
+
+    "foldable",
+
+    "upholstered",
+
+    "adjustableHeadboard"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "finish",
+
+    "legMaterial"
+
+  ],
+
+  packageContents: [
+
+    "bedFrame",
+
+    "headboard",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "frameWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "bedSize",
+
+    "color",
+
+    "material"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "bedType",
+
+    "bedSize",
+
+    "material",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "bedType",
+
+    "bedSize",
+
+    "material",
+
+    "storageType",
+
+    "headboardIncluded",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+MATTRESSES: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "mattressType",
+
+    "mattressSize",
+
+    "thickness",
+
+    "firmness",
+
+    "comfortLayer",
+
+    "supportLayer",
+
+    "coverMaterial"
+
+  ],
+
+  materials: [
+
+    "foamType",
+
+    "springType",
+
+    "latex",
+
+    "memoryFoam",
+
+    "coir",
+
+    "gelInfusedFoam"
+
+  ],
+
+  comfortFeatures: [
+
+    "orthopedic",
+
+    "pressureRelief",
+
+    "motionIsolation",
+
+    "coolingTechnology",
+
+    "antiMicrobial",
+
+    "hypoallergenic",
+
+    "reversible"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "weight"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "fabricFinish"
+
+  ],
+
+  packageContents: [
+
+    "mattress",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "replacementPolicy",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "mattressSize",
+
+    "thickness",
+
+    "firmness"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "mattressType",
+
+    "mattressSize",
+
+    "thickness",
+
+    "firmness",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "mattressType",
+
+    "mattressSize",
+
+    "thickness",
+
+    "firmness",
+
+    "orthopedic",
+
+    "memoryFoam",
+
+    "latex",
+
+    "price"
+
+  ]
+
+},
+WARDROBES: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "wardrobeType",
+
+    "doorType",
+
+    "numberOfDoors",
+
+    "numberOfDrawers",
+
+    "numberOfShelves",
+
+    "material",
+
+    "finish",
+
+    "assemblyRequired"
+
+  ],
+
+  storageFeatures: [
+
+    "hangingRod",
+
+    "locker",
+
+    "mirrorIncluded",
+
+    "softCloseDoors",
+
+    "adjustableShelves",
+
+    "shoeStorage"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "weight",
+
+    "maximumLoadCapacity"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "surfaceFinish",
+
+    "handleMaterial",
+
+    "frameMaterial"
+
+  ],
+
+  packageContents: [
+
+    "wardrobe",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "manufacturingWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "color",
+
+    "material",
+
+    "numberOfDoors"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "wardrobeType",
+
+    "numberOfDoors",
+
+    "material",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "wardrobeType",
+
+    "doorType",
+
+    "numberOfDoors",
+
+    "material",
+
+    "mirrorIncluded",
+
+    "softCloseDoors",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+DINING_TABLES: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "tableShape",
+
+    "seatingCapacity",
+
+    "material",
+
+    "tableTopMaterial",
+
+    "frameMaterial",
+
+    "finish",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "weight",
+
+    "maximumLoadCapacity"
+
+  ],
+
+  features: [
+
+    "extendable",
+
+    "foldable",
+
+    "storageShelf",
+
+    "glassTop",
+
+    "scratchResistant",
+
+    "waterResistant"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "surfaceFinish",
+
+    "legMaterial"
+
+  ],
+
+  packageContents: [
+
+    "diningTable",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "manufacturingWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "seatingCapacity",
+
+    "color",
+
+    "material"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "tableShape",
+
+    "seatingCapacity",
+
+    "material",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "tableShape",
+
+    "seatingCapacity",
+
+    "material",
+
+    "extendable",
+
+    "foldable",
+
+    "glassTop",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+DINING_CHAIRS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "chairType",
+
+    "material",
+
+    "frameMaterial",
+
+    "seatMaterial",
+
+    "backrestType",
+
+    "armrest",
+
+    "foldable",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "seatHeight",
+
+    "weight",
+
+    "maximumLoadCapacity"
+
+  ],
+
+  comfortFeatures: [
+
+    "cushionedSeat",
+
+    "upholstered",
+
+    "ergonomicDesign",
+
+    "footrest",
+
+    "adjustableHeight"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "finish",
+
+    "legMaterial",
+
+    "surfaceFinish"
+
+  ],
+
+  packageContents: [
+
+    "diningChair",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "manufacturingWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "color",
+
+    "material",
+
+    "chairType"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "chairType",
+
+    "material",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "chairType",
+
+    "material",
+
+    "cushionedSeat",
+
+    "armrest",
+
+    "foldable",
+
+    "upholstered",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+OFFICE_CHAIRS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "chairType",
+
+    "ergonomic",
+
+    "frameMaterial",
+
+    "seatMaterial",
+
+    "backMaterial",
+
+    "baseMaterial",
+
+    "wheelType",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "seatHeight",
+
+    "backHeight",
+
+    "weight",
+
+    "maximumLoadCapacity"
+
+  ],
+
+  adjustmentFeatures: [
+
+    "heightAdjustable",
+
+    "tiltMechanism",
+
+    "tiltLock",
+
+    "headrest",
+
+    "lumbarSupport",
+
+    "armrestAdjustable",
+
+    "swivel360",
+
+    "reclineAngle"
+
+  ],
+
+  comfortFeatures: [
+
+    "meshBack",
+
+    "cushionedSeat",
+
+    "breathableFabric",
+
+    "footrest",
+
+    "neckSupport"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "finish",
+
+    "casterMaterial"
+
+  ],
+
+  packageContents: [
+
+    "officeChair",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "manufacturingWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "color",
+
+    "chairType",
+
+    "seatMaterial"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "chairType",
+
+    "seatMaterial",
+
+    "maximumLoadCapacity",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "chairType",
+
+    "ergonomic",
+
+    "heightAdjustable",
+
+    "headrest",
+
+    "lumbarSupport",
+
+    "meshBack",
+
+    "swivel360",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+OFFICE_DESKS: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "deskType",
+
+    "shape",
+
+    "material",
+
+    "tableTopMaterial",
+
+    "frameMaterial",
+
+    "finish",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "legroomHeight",
+
+    "weight",
+
+    "maximumLoadCapacity"
+
+  ],
+
+  storageFeatures: [
+
+    "numberOfDrawers",
+
+    "numberOfShelves",
+
+    "keyboardTray",
+
+    "cpuStand",
+
+    "fileCabinet",
+
+    "cableManagement",
+
+    "monitorStand"
+
+  ],
+
+  workFeatures: [
+
+    "heightAdjustable",
+
+    "foldable",
+
+    "cornerDesk",
+
+    "lShaped",
+
+    "standingDesk"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "surfaceFinish",
+
+    "legMaterial"
+
+  ],
+
+  packageContents: [
+
+    "officeDesk",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "manufacturingWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "color",
+
+    "material",
+
+    "deskType"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "deskType",
+
+    "material",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "deskType",
+
+    "material",
+
+    "heightAdjustable",
+
+    "numberOfDrawers",
+
+    "keyboardTray",
+
+    "lShaped",
+
+    "standingDesk",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+BOOKSHELVES: {
+
+  basicInformation: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "collection",
+
+    "sku",
+
+    "countryOfOrigin"
+
+  ],
+
+  specifications: [
+
+    "bookshelfType",
+
+    "material",
+
+    "frameMaterial",
+
+    "finish",
+
+    "numberOfShelves",
+
+    "adjustableShelves",
+
+    "assemblyRequired"
+
+  ],
+
+  dimensions: [
+
+    "length",
+
+    "width",
+
+    "height",
+
+    "shelfDepth",
+
+    "weight",
+
+    "maximumLoadCapacity"
+
+  ],
+
+  storageFeatures: [
+
+    "openShelves",
+
+    "closedCabinets",
+
+    "drawers",
+
+    "displayCompartments",
+
+    "wallMountable",
+
+    "cornerDesign"
+
+  ],
+
+  durability: [
+
+    "scratchResistant",
+
+    "waterResistant",
+
+    "termiteResistant",
+
+    "rustResistant"
+
+  ],
+
+  physical: [
+
+    "color",
+
+    "surfaceFinish",
+
+    "legMaterial"
+
+  ],
+
+  packageContents: [
+
+    "bookshelf",
+
+    "assemblyKit",
+
+    "installationGuide",
+
+    "userManual",
+
+    "warrantyCard"
+
+  ],
+
+  warranty: [
+
+    "productWarranty",
+
+    "manufacturingWarranty",
+
+    "serviceType"
+
+  ],
+
+  variants: [
+
+    "color",
+
+    "material",
+
+    "numberOfShelves"
+
+  ],
+
+  requiredFields: [
+
+    "brand",
+
+    "model",
+
+    "productTitle",
+
+    "bookshelfType",
+
+    "material",
+
+    "numberOfShelves",
+
+    "color",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "brand",
+
+    "bookshelfType",
+
+    "material",
+
+    "numberOfShelves",
+
+    "adjustableShelves",
+
+    "wallMountable",
+
+    "closedCabinets",
+
+    "color",
+
+    "price"
+
+  ]
+
+},
+SCHOOL_BOOKS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "subject",
+
+    "class",
+
+    "board",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  academicInformation: [
+
+    "academicYear",
+
+    "syllabus",
+
+    "semester",
+
+    "stream",
+
+    "standard"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  packageContents: [
+
+    "book"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "board",
+
+    "class",
+
+    "edition"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "subject",
+
+    "class",
+
+    "board",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "board",
+
+    "class",
+
+    "subject",
+
+    "language",
+
+    "publisher",
+
+    "edition",
+
+    "price"
+
+  ]
+
+},
+COLLEGE_BOOKS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "course",
+
+    "subject",
+
+    "branch",
+
+    "semester",
+
+    "university",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  academicInformation: [
+
+    "degree",
+
+    "stream",
+
+    "academicYear",
+
+    "curriculum",
+
+    "syllabus"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  packageContents: [
+
+    "book"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "edition",
+
+    "semester",
+
+    "university"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "course",
+
+    "subject",
+
+    "branch",
+
+    "semester",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "course",
+
+    "branch",
+
+    "semester",
+
+    "subject",
+
+    "university",
+
+    "language",
+
+    "publisher",
+
+    "edition",
+
+    "price"
+
+  ]
+
+},
+COMPETITIVE_EXAMS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "examName",
+
+    "subject",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  examInformation: [
+
+    "examCategory",
+
+    "examLevel",
+
+    "syllabus",
+
+    "practiceQuestions",
+
+    "previousYearPapers",
+
+    "mockTests",
+
+    "solvedPapers"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  packageContents: [
+
+    "book"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "edition",
+
+    "examName"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "examName",
+
+    "subject",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "examName",
+
+    "examCategory",
+
+    "subject",
+
+    "language",
+
+    "publisher",
+
+    "edition",
+
+    "previousYearPapers",
+
+    "mockTests",
+
+    "price"
+
+  ]
+
+},
+NOVELS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  literature: [
+
+    "genre",
+
+    "subGenre",
+
+    "series",
+
+    "volume",
+
+    "fictionType",
+
+    "targetAudience"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  digital: [
+
+    "ebookAvailable",
+
+    "audiobookAvailable"
+
+  ],
+
+  packageContents: [
+
+    "book"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "bindingType",
+
+    "edition"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "genre",
+
+    "language",
+
+    "bindingType",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "author",
+
+    "genre",
+
+    "subGenre",
+
+    "language",
+
+    "publisher",
+
+    "bindingType",
+
+    "targetAudience",
+
+    "price"
+
+  ]
+
+},
+CHILDREN_BOOKS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  bookDetails: [
+
+    "ageGroup",
+
+    "readingLevel",
+
+    "genre",
+
+    "subGenre",
+
+    "series",
+
+    "illustrated"
+
+  ],
+
+  educationalFeatures: [
+
+    "activityBook",
+
+    "learningTopics",
+
+    "moralStories",
+
+    "interactiveContent",
+
+    "pictureBook",
+
+    "phonicsSupport"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  digital: [
+
+    "ebookAvailable",
+
+    "audiobookAvailable"
+
+  ],
+
+  packageContents: [
+
+    "book"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "bindingType",
+
+    "edition"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "ageGroup",
+
+    "language",
+
+    "bindingType",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "ageGroup",
+
+    "genre",
+
+    "readingLevel",
+
+    "illustrated",
+
+    "activityBook",
+
+    "pictureBook",
+
+    "language",
+
+    "price"
+
+  ]
+
+},
+COMICS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "author",
+
+    "illustrator",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  comicDetails: [
+
+    "comicSeries",
+
+    "volume",
+
+    "issueNumber",
+
+    "genre",
+
+    "superheroUniverse",
+
+    "character",
+
+    "ageGroup"
+
+  ],
+
+  artwork: [
+
+    "coloredPages",
+
+    "blackAndWhite",
+
+    "hardcover",
+
+    "paperback",
+
+    "specialEdition",
+
+    "collectorEdition"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  digital: [
+
+    "ebookAvailable",
+
+    "digitalCopyIncluded"
+
+  ],
+
+  packageContents: [
+
+    "comicBook"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "bindingType",
+
+    "edition"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "comicSeries",
+
+    "language",
+
+    "bindingType",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "comicSeries",
+
+    "genre",
+
+    "character",
+
+    "superheroUniverse",
+
+    "language",
+
+    "collectorEdition",
+
+    "coloredPages",
+
+    "price"
+
+  ]
+
+},
+HINDU_BOOKS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  religiousDetails: [
+
+    "scripture",
+
+    "category",
+
+    "deity",
+
+    "philosophy",
+
+    "tradition",
+
+    "commentary",
+
+    "translator"
+
+  ],
+
+  content: [
+
+    "originalText",
+
+    "translatedText",
+
+    "romanTransliteration",
+
+    "illustrated",
+
+    "largePrint",
+
+    "hardcover"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  digital: [
+
+    "ebookAvailable",
+
+    "audiobookAvailable"
+
+  ],
+
+  packageContents: [
+
+    "book"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "bindingType",
+
+    "edition"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "language",
+
+    "scripture",
+
+    "bindingType",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "scripture",
+
+    "deity",
+
+    "category",
+
+    "language",
+
+    "tradition",
+
+    "illustrated",
+
+    "bindingType",
+
+    "price"
+
+  ]
+
+},
+ISLAMIC_BOOKS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  religiousDetails: [
+
+    "scripture",
+
+    "category",
+
+    "scholar",
+
+    "schoolOfThought",
+
+    "commentary",
+
+    "translator",
+
+    "originalLanguage"
+
+  ],
+
+  content: [
+
+    "arabicText",
+
+    "translatedText",
+
+    "romanTransliteration",
+
+    "illustrated",
+
+    "largePrint",
+
+    "hardcover"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  digital: [
+
+    "ebookAvailable",
+
+    "audiobookAvailable"
+
+  ],
+
+  packageContents: [
+
+    "book"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "bindingType",
+
+    "edition"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "language",
+
+    "scripture",
+
+    "bindingType",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "scripture",
+
+    "category",
+
+    "scholar",
+
+    "schoolOfThought",
+
+    "language",
+
+    "bindingType",
+
+    "illustrated",
+
+    "price"
+
+  ]
+
+},
+CHRISTIAN_BOOKS: {
+
+  basicInformation: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "isbn",
+
+    "language",
+
+    "edition"
+
+  ],
+
+  religiousDetails: [
+
+    "scripture",
+
+    "category",
+
+    "denomination",
+
+    "commentary",
+
+    "translator",
+
+    "studyEdition",
+
+    "originalLanguage"
+
+  ],
+
+  content: [
+
+    "oldTestament",
+
+    "newTestament",
+
+    "illustrated",
+
+    "largePrint",
+
+    "redLetterEdition",
+
+    "hardcover"
+
+  ],
+
+  publication: [
+
+    "publicationDate",
+
+    "publicationYear",
+
+    "countryOfPublication"
+
+  ],
+
+  physical: [
+
+    "bindingType",
+
+    "coverType",
+
+    "numberOfPages",
+
+    "paperType",
+
+    "bookDimensions",
+
+    "weight"
+
+  ],
+
+  digital: [
+
+    "ebookAvailable",
+
+    "audiobookAvailable"
+
+  ],
+
+  packageContents: [
+
+    "book"
+
+  ],
+
+  variants: [
+
+    "language",
+
+    "bindingType",
+
+    "edition"
+
+  ],
+
+  requiredFields: [
+
+    "bookTitle",
+
+    "author",
+
+    "publisher",
+
+    "language",
+
+    "scripture",
+
+    "bindingType",
+
+    "price",
+
+    "stock"
+
+  ],
+
+  searchFilters: [
+
+    "scripture",
+
+    "category",
+
+    "denomination",
+
+    "language",
+
+    "studyEdition",
+
+    "redLetterEdition",
+
+    "bindingType",
+
+    "price"
+
+  ]
+
+},
 };
