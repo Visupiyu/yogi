@@ -112,7 +112,10 @@ const productVariants = getChildren(productType);
 const selectedCategoryFields = categoryFields[ productVariant || productType || section || department] || [];
 const groupedFields =
   selectedCategoryFields.reduce(
-    (groups, field) => {
+    (
+      groups: Record<string, typeof selectedCategoryFields>,
+      field: (typeof selectedCategoryFields)[number]
+    ) => {
       const group = field.group || "General";
 
       if (!groups[group]) {

@@ -66,7 +66,7 @@ allowCustomValue?: boolean;
 
 }
 
-export const categoryFields: Record<string, CategoryField[]> = {
+export const categoryFields: Record<string, any> = {
 
   MEN_TSHIRTS: [
 

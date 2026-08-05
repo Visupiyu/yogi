@@ -463,22 +463,6 @@ className="w-full rounded-lg border p-3"
 
 </div>
 
-{/* Brand */}
-
-<div>
-
-<label className="mb-2 block text-sm font-semibold">
-
-Brand *
-
-</label>
-
-</div>
-
-{/* Model */}
-
-<div>
-
 <label className="mb-2 block text-sm font-semibold">
 
 Model
@@ -593,7 +577,6 @@ className="w-full rounded-lg border p-3"
 
 </div>
 
-</div>
 
 {/* Error */}
 
