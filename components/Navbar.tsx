@@ -190,7 +190,8 @@ useEffect(() => {
           {/* LOGO */}
   <Link href="/" className="shrink-0 flex items-center gap-2">
   <Image
-    src="/logo.png"
+   src="/logo.png"
+   loading="eager"
     alt="YOMICO"
     width={160}
     height={64}

@@ -26,6 +26,9 @@ export default function SellerStorePage() {
   const [search, setSearch] = useState("");
 
 const [category, setCategory] = useState("All");
+  useEffect(() => {
+    
+  }, [seller]);
 
   useEffect(() => {
 
@@ -41,10 +44,13 @@ const [category, setCategory] = useState("All");
         );
 
         const vendorSnap = await getDocs(vendorQuery);
+       
+        console.log("Seller state before render:", seller);
 
         if (!vendorSnap.empty) {
-          setSeller(vendorSnap.docs[0].data());
-        }
+  console.log(vendorSnap.docs[0].data());
+  setSeller(vendorSnap.docs[0].data());
+}
 
         const productQuery = query(
           collection(db, "products"),
@@ -89,21 +95,20 @@ const [category, setCategory] = useState("All");
         Loading Seller...
       </div>
     );
-
   }
 
-  if (!seller) {
+  console.log("Current seller state:", seller);
 
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Seller not found.
-      </div>
-    );
-
-  }
+if (!seller) {
 
   return (
+    <div className="min-h-screen flex items-center justify-center">
+      Seller not found.
+    </div>
+  );
 
+}
+  return (
     <section className="min-h-screen bg-gray-50 py-10">
 
       <div className="max-w-7xl mx-auto px-5">

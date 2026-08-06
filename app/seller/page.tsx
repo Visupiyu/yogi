@@ -16,6 +16,12 @@ import SellerProductSpecifications from "@/components/seller/SellerProductSpecif
 import SellerProductsTable from "@/components/seller/SellerProductsTable";
 import SellerOrdersTable from "@/components/seller/SellerOrdersTable";
 import SellerDashboard from "@/components/seller/SellerDashboard";
+import DashboardCards from "./components/DashboardCards";
+import QuickActions from "./components/QuickActions";
+import NotificationsPanel from "./components/NotificationsPanel";
+import SalesChart from "./components/SalesChart";
+import RecentOrders from "./components/RecentOrders";
+import LowStockProducts from "./components/LowStockProducts";
 
 type Product = { id: string; name: string; price: number; image: string; images?: string[]; stock: number; category: string;};
 type Notification = {id: string; title: string; message: string; read: boolean;};
@@ -625,8 +631,28 @@ setPages((product as any).pages || "");
 Manage your products, inventory, orders and business growth from one dashboard.</p>
       </div>
       <SellerDashboard>
-        {/* STATS */}
-       <SellerDashboardCards
+        <DashboardCards />
+
+<div className="mt-6">
+  <QuickActions />
+</div>
+
+<div className="mt-6">
+  <NotificationsPanel />
+</div>
+
+<div className="mt-6">
+  <SalesChart />
+</div>
+
+<div className="mt-6">
+  <RecentOrders />
+</div>
+
+<div className="mt-6">
+  <LowStockProducts />
+</div>
+<DashboardCards
   totalProducts={totalProducts}
   totalOrders={totalOrders}
   pendingOrders={pendingOrders}
@@ -634,8 +660,7 @@ Manage your products, inventory, orders and business growth from one dashboard.<
   commissionPaid={commissionPaid}
   netEarnings={netEarnings}
 />
-
-        {/* SECONDARY STATS */}
+               {/* SECONDARY STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="bg-white p-6 rounded-2xl shadow-sm">
             <p className="text-gray-500 flex items-center gap-2">👁 Total Views</p>
