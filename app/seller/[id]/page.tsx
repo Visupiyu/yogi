@@ -48,7 +48,6 @@ const [category, setCategory] = useState("All");
         console.log("Seller state before render:", seller);
 
         if (!vendorSnap.empty) {
-  console.log(vendorSnap.docs[0].data());
   setSeller(vendorSnap.docs[0].data());
 }
 
@@ -97,8 +96,7 @@ const [category, setCategory] = useState("All");
     );
   }
 
-  console.log("Current seller state:", seller);
-
+  
 if (!seller) {
 
   return (
