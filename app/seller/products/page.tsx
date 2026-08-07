@@ -233,97 +233,80 @@ const handleDelete = async (id: string) => {
 
       </td>
     </tr>
-
   ) : (
-
     products.map((product) => (
-
       <tr
         key={product.id}
         className="border-t"
       >
-
         <td className="p-4">
-
           {product.thumbnail ? (
-
             <img
               src={product.thumbnail}
               alt={product.title}
               className="h-16 w-16 rounded object-cover"
             />
-
           ) : (
-
             <div className="h-16 w-16 rounded bg-gray-200" />
-
           )}
-
         </td>
-
         <td className="p-4">
           {product.title}
         </td>
-
         <td className="p-4">
           {product.categoryId}
         </td>
-
         <td className="p-4">
-          ₹₹{product.sellingPrice}
+        ₹{product.sellingPrice ? product.sellingPrice.toLocaleString("en-IN") : 0}
         </td>
-
-        <td className="p-4">
-          {product.stock}
-        </td>
-
-        <td className="p-4">
-          {product.active ? "Active" : "Inactive"}
-        </td>
-
-        <td className="p-4">
-
-          <div className="flex gap-2">
-
-           <Link
+       <span
+  className={
+    product.stock <= 5
+      ? "text-red-600 font-bold"
+      : product.stock <= 20
+      ? "text-orange-600 font-bold"
+      : "text-green-600 font-bold"
+  }
+>
+  {product.stock}
+</span>
+<span
+  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+    product.active
+      ? "bg-green-100 text-green-700"
+      : "bg-red-100 text-red-700"
+  }`}
+>
+  {product.active ? "Active" : "Inactive"}
+</span>
+<td className="p-4">
+<div className="flex gap-2">
+<Link
   href={`/seller/products/view/${product.id}`}
   className="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
 >
   View
 </Link>
-
-            <Link
+<Link
   href={`/seller/products/edit/${product.id}`}
   className="rounded bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
 >
   Edit
 </Link>
-
-           <Link
-  href={`/seller/products/delete/${product.id}`}
+ <button
+  onClick={() => handleDelete(product.id)}
   className="rounded bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
 >
   Delete
-</Link>
-
-          </div>
-
-        </td>
-
-      </tr>
-
-    ))
-
-  )}
-
+</button>
+</div>
+</td>
+</tr>
+))
+)}
 </tbody>
-
-        </table>
-
-      </div>
-
-    </div>
-
-  );
-
+</table>
+</div>
+</div>
+);
 }

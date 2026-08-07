@@ -1,20 +1,11 @@
 "use client";
 
+
 import { useEffect, useState } from "react";
-import { catalogTree } from "@/lib/catalog/catalogTree";
-import {findNodeById, getChildren, } from "@/lib/catalog/categoryUtils";
-import { categoryFields } from "@/lib/catalog/categoryFields";
-import { collection, getDocs, query, where, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch,} from "firebase/firestore";
-import { auth, db, storage } from "@/lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { useRouter } from "next/navigation";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import SellerDashboardCards from "@/components/seller/SellerDashboardCards";
-import SellerNotifications from "@/components/seller/SellerNotifications";
-import SellerImageUpload from "@/components/seller/SellerImageUpload";
-import SellerProductSpecifications from "@/components/seller/SellerProductSpecifications";
-import SellerProductsTable from "@/components/seller/SellerProductsTable";
-import SellerOrdersTable from "@/components/seller/SellerOrdersTable";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useVendor } from "@/hooks/useVendor";
+
 import SellerDashboard from "@/components/seller/SellerDashboard";
 import DashboardCards from "./components/DashboardCards";
 import QuickActions from "./components/QuickActions";
@@ -23,1380 +14,206 @@ import SalesChart from "./components/SalesChart";
 import RecentOrders from "./components/RecentOrders";
 import LowStockProducts from "./components/LowStockProducts";
 
-type Product = { id: string; name: string; price: number; image: string; images?: string[]; stock: number; category: string;};
-type Notification = {id: string; title: string; message: string; read: boolean;};
-type Order = { id: string; customer: string; amount: number; status: string; date: string;};
-
 export default function SellerPage() {
-  const router = useRouter();
+  const { vendor, vendorId, loading: vendorLoading } = useVendor();
 
-  const [totalProducts, setTotalProducts] = useState(0);
-  const [totalOrders, setTotalOrders] = useState(0);
-  const [pendingOrders, setPendingOrders] = useState(0);
-  const [earnings, setEarnings] = useState(0);
-  const [commissionPaid, setCommissionPaid] = useState(0);
-  const [netEarnings, setNetEarnings] = useState(0);
-  const [totalViews, setTotalViews] = useState(0);
-  const [totalSales, setTotalSales] = useState(0);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [search, setSearch] = useState("");
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [stock, setStock] = useState("");
-  const [category, setCategory] = useState("Grocery");
-const [mainCategory, setMainCategory] = useState("");
-const [subCategory, setSubCategory] = useState("");
-const [department, setDepartment] = useState("");
-const [section, setSection] = useState("");
-const [productType, setProductType] = useState("");
-const [productVariant, setProductVariant] = useState("");
-const [attributes, setAttributes] = useState<Record<string, string>>({});
-  const [vendorName, setVendorName] = useState("");
-  const [image, setImage] = useState("");
-  const [images, setImages] = useState<string[]>([]);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [editingId, setEditingId] = useState("");
-  const [brand, setBrand] = useState("");
-  const [mrp, setMrp] = useState("");
-  const [gender, setGender] = useState("Men");
-  const [color, setColor] = useState("");
-  const [material, setMaterial] = useState("");
-  const [sizes, setSizes] = useState<string[]>([]);
-  const [countryOfOrigin, setCountryOfOrigin] = useState("India");
-  const [pattern, setPattern] = useState("Solid");
-const [fitType, setFitType] = useState("Regular");
-const [sleeveType, setSleeveType] = useState("Half Sleeve");
-const [neckType, setNeckType] = useState("Round Neck");
-const [modelNumber, setModelNumber] = useState("");
-const [ram, setRam] = useState("");
-const [storageCapacity, setStorageCapacity] = useState("");
-const [processor, setProcessor] = useState("");
-const [displaySize, setDisplaySize] = useState("");
-const [battery, setBattery] = useState("");
-const [camera, setCamera] = useState("");
-const [operatingSystem, setOperatingSystem] = useState("");
-const [warranty, setWarranty] = useState("No Warranty");
-const [powerSource, setPowerSource] = useState("");
-const [voltage, setVoltage] = useState("");
-const [accessories, setAccessories] = useState("");
-const [weight, setWeight] = useState("");
-const [unit, setUnit] = useState("g");
-const [expiryDate, setExpiryDate] = useState("");
-const [fssaiNumber, setFssaiNumber] = useState("");
-const [organic, setOrganic] = useState(false);
-const [skinType, setSkinType] = useState("Normal");
-const [hairType, setHairType] = useState("Normal");
-const [ingredients, setIngredients] = useState("");
-const [netQuantity, setNetQuantity] = useState("");
-const [dimensions, setDimensions] = useState("");
-const [weightCapacity, setWeightCapacity] = useState("");
-const [assemblyRequired, setAssemblyRequired] = useState(false);
-const [furnitureWarranty, setFurnitureWarranty] = useState("No Warranty");
-const [author, setAuthor] = useState("");
-const [publisher, setPublisher] = useState("");
-const [language, setLanguage] = useState("English");
-const [isbn, setIsbn] = useState("");
-const [edition, setEdition] = useState("");
-const [pages, setPages] = useState("");
-const [bestSeller, setBestSeller] = useState("None");
-const SIZE_OPTIONS = ["XS","S","M","L", "XL", "XXL", "3XL", "4XL", "5XL", "6XL", "7XL",];
-const [notifications, setNotifications] = useState<Notification[]>([]);
-const mainCategories = catalogTree;
-const selectedMain = findNodeById(mainCategory);
-const subCategories = getChildren(mainCategory);
-const selectedSub = subCategories.find(item => item.id === subCategory);
-const departments = getChildren(subCategory);
-const selectedDepartment = departments.find(item => item.id === department);
-const sections = getChildren(department);
-const selectedSection = sections.find(item => item.id === section);
-const productTypes = getChildren(section);
-const selectedType = productTypes.find(item => item.id === productType);
-const productVariants = getChildren(productType);
-const selectedCategoryFields = categoryFields[ productVariant || productType || section || department] || [];
-const groupedFields =
-  selectedCategoryFields.reduce(
-    (
-      groups: Record<string, typeof selectedCategoryFields>,
-      field: (typeof selectedCategoryFields)[number]
-    ) => {
-      const group = field.group || "General";
-
-      if (!groups[group]) {
-        groups[group] = [];
-      }
-
-      groups[group].push(field);
-
-      return groups;
-    },
-    {} as Record<string, typeof selectedCategoryFields>
-  );
-const buildNotifications = (items: Product[]) => {
-const alerts: Notification[] = [];
-    items.forEach((product: any) => {
-      if (product.stock === 0) {
-        alerts.push({
-          id: product.id + "-out",
-          title: "Out Of Stock",
-          message: `${product.name} is out of stock`,
-          read: false,
-        });
-      } else if (product.stock <= 5) {
-        alerts.push({
-          id: product.id + "-low",
-          title: "Low Stock",
-          message: `${product.name} has only ${product.stock} left`,
-          read: false, });  }  });
-    setNotifications(alerts); };
-
-  async function loadProducts() { if (!auth.currentUser) return;
-
-    const q = query( collection(db, "products"), where("vendorId", "==", auth.currentUser.uid) );
-    const productSnapshot = await getDocs(q);
-    const items: Product[] = [];
-    productSnapshot.forEach((docItem) => {
-      items.push({ id: docItem.id, ...docItem.data() } as Product);});
-
-    setProducts(items);
-    buildNotifications(items);}
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/vendor-login");
-        return;
-      }
-
-      const vendorSnap = await getDocs(
-        query(collection(db, "vendors"), where("email", "==", user.email))
-      );
-      if (vendorSnap.empty) {
-        await signOut(auth);
-        router.push("/vendor-login");
-        return;
-      }
-      const vendorData = vendorSnap.docs[0].data();
-      if (vendorData.status === "Pending" || vendorData.status === "Rejected") {
-        await signOut(auth);
-        router.push("/vendor-login");
-        return;
-      }
-
-      setVendorName(vendorData.businessName || "");
-
-      await loadProducts();
-      await fetchDashboardData();
-      await loadVendorOrders();
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  const loadVendorOrders = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-    const vendorId = user.uid;
-
-   const snapshot = await getDocs(
-  query(
-    collection(db, "orders"),
-    where("vendorIds", "array-contains", vendorId)
-  )
-);
-    const vendorOrders: Order[] = [];
-
-    snapshot.forEach((docSnap) => {
-      const order = docSnap.data();
-      const sellerItems = (order.items || []).filter(
-        (item: any) => item.vendorId === vendorId
-      );
-
-      if (sellerItems.length > 0) {
-        vendorOrders.push({
-          id: docSnap.id,
-          customer: order.customerName,
-          amount: sellerItems.reduce(
-            (sum: number, item: any) => sum + item.price * item.qty,
-            0
-          ),
-          status: order.status,
-          date: order.createdAt?.toDate()?.toLocaleDateString(),
-        });
-      }
-    });
-
-    setOrders(vendorOrders);
-  };
-
-  const clearForm = () => {
-    setName("");
-    setPrice("");
-    setStock("");
-    setCategory("Grocery");
-    setImage("");
-    setImages([]);
-    setImageFiles([]);
-    setDescription("");
-    setEditingId("");
-    setBrand("");
-    setMrp("");
-    setGender("Men");
-    setColor("");
-    setMaterial("");
-    setSizes([]);
-    setCountryOfOrigin("India");
-    setPattern("Solid");
-    setFitType("Regular");
-   setSleeveType("Half Sleeve");
-    setNeckType("Round Neck");
-    setModelNumber("");
-setRam("");
-setStorageCapacity("");
-setProcessor("");
-setDisplaySize("");
-setBattery("");
-setCamera("");
-setOperatingSystem("");
-setWarranty("No Warranty");
-setPowerSource("");
-setVoltage("");
-setAccessories("");
-setWeight("");
-setUnit("g");
-setExpiryDate("");
-setFssaiNumber("");
-setOrganic(false);
-
-setSkinType("Normal");
-setHairType("Normal");
-setIngredients("");
-setNetQuantity("");
-setDimensions("");
-setWeightCapacity("");
-setAssemblyRequired(false);
-setFurnitureWarranty("No Warranty");
-
-setAuthor("");
-setPublisher("");
-setLanguage("English");
-setIsbn("");
-setEdition("");
-setPages("");
-  };
-
-  const lowStockNotify = async (productName: string, qty: number) => {
-    if (qty <= 5) {
-      await addDoc(collection(db, "notifications"), {
-        title: "Low Stock Alert",
-        message: `${productName} stock is only ${qty}`,
-        type: "stock",
-        read: false,
-        createdAt: serverTimestamp(),
-      });
-    }
-  };
-  const notifyWaitingCustomers = async (
-  productId: string,
-  productName: string,
-  stock: number
-) => {
-  if (stock <= 0) return;
-
-  const waitingSnap = await getDocs(
-    query(
-      collection(db, "stockNotifications"),
-      where("productId", "==", productId)
-    )
-  );
-
-  if (waitingSnap.empty) return;
-
-  const batch = writeBatch(db);
-
-  waitingSnap.forEach((docSnap) => {
-    const data = docSnap.data();
-
-    batch.set(doc(collection(db, "notifications")), {
-      title: "🎉 Product Back In Stock",
-      message: `${productName} is back in stock. Order now before it sells out.`,
-      userId: data.userId,
-      role: "customer",
-      type: "stock",
-      read: false,
-      createdAt: serverTimestamp(),
-    });
-
-    batch.delete(doc(db, "stockNotifications", docSnap.id));
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    totalOrders: 0,
+    pendingOrders: 0,
+    earnings: 0,
+    commissionPaid: 0,
+    netEarnings: 0,
+    totalViews: 0,
+    totalSales: 0,
+    bestSeller: "None",
   });
 
-  await batch.commit();
-};
+  useEffect(() => {
+    if (!vendorId) return;
 
-  const addOrUpdateProduct = async () => {
-    if (!name || !price || !stock) {
-      alert("Fill All Fields");
-      return;
-    }
-    if (!editingId && imageFiles.length === 0) {
-      alert("Please add at least one product image");
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      const uploadedImages: string[] = [];
-      for (const file of imageFiles) {
-        const storageRef = ref(
-          storage,
-          `products/${Date.now()}-${file.name}`
-        );
-        await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(storageRef);
-        uploadedImages.push(url);
-      }
-
-      const discountPercent =
-        mrp && Number(mrp) > 0
-          ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100)
-          : 0;
-
-      const baseData = {
-  name,
-  brand,
-  mrp: mrp ? Number(mrp) : 0,
-  discountPercent,
-  gender,
-  color,
-  material,
-  sizes,
-  pattern,
-  fitType,
-  sleeveType,
-  neckType,
-  countryOfOrigin,
-  price: Number(price),
-  stock: Number(stock),
-  category,
-  mainCategory,
-subCategory,
-department,
-section,
-productType,
-productVariant,
-categoryId:
-  productVariant ||
-  productType ||
-  section ||
-  department ||
-  subCategory ||
-  mainCategory,
-categoryPath: {
-  main: mainCategory,
-  sub: subCategory,
-  department,
-  section,
-  productType,
-  variant: productVariant,
-},
-  description,
-  modelNumber,
-ram,
-storageCapacity,
-processor,
-displaySize,
-battery,
-camera,
-operatingSystem,
-warranty,
-powerSource,
-voltage,
-accessories,
-weight,
-unit,
-expiryDate,
-fssaiNumber,
-organic,
-skinType,
-hairType,
-ingredients,
-netQuantity,
-dimensions,
-weightCapacity,
-assemblyRequired,
-furnitureWarranty,
-author,
-publisher,
-language,
-isbn,
-edition,
-pages,
-attributes,
-};
-
-      if (editingId) {
-     await updateDoc(doc(db, "products", editingId), {
-  ...baseData,
-  image: uploadedImages[0] || image,
-  images: uploadedImages.length > 0 ? uploadedImages : images,
-});
-
-await lowStockNotify(name, Number(stock));
-
-await notifyWaitingCustomers(
-  editingId,
-  name,
-  Number(stock)
-);
-
-alert("Product Updated");
-      } else {
-        await addDoc(collection(db, "products"), {
-          ...baseData,
-          image: uploadedImages[0],
-          images: uploadedImages,
-          vendorId: auth.currentUser!.uid,
-          vendorName,
-          views: 0,
-          sales: 0,
-          createdAt: serverTimestamp(),
-        });
-        await lowStockNotify(name, Number(stock));
-        alert("Product Added");
-      }
-
-      clearForm();
-      await loadProducts();
-    } catch (error) {
-      console.error(error);
-      alert(error instanceof Error ? error.message : String(error));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const editProduct = (product: Product) => {
-    setName(product.name);
-    setPrice(product.price.toString());
-    setStock(product.stock.toString());
-    setCategory(product.category);
-    setImage(product.image);
-    setImages(product.images || [product.image]);
-    setDescription((product as any).description || "");
-    setBrand((product as any).brand || "");
-    setMrp(String((product as any).mrp || ""));
-    setGender((product as any).gender || "Men");
-    setColor((product as any).color || "");
-    setMaterial((product as any).material || "");
-    setPattern((product as any).pattern || "Solid");
-setFitType((product as any).fitType || "Regular");
-setSleeveType((product as any).sleeveType || "Half Sleeve");
-setNeckType((product as any).neckType || "Round Neck");
-    setSizes((product as any).sizes || []);
-    setCountryOfOrigin((product as any).countryOfOrigin || "India");
-    setEditingId(product.id);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setModelNumber((product as any).modelNumber || "");
-setRam((product as any).ram || "");
-setStorageCapacity((product as any).storageCapacity || "");
-setProcessor((product as any).processor || "");
-setDisplaySize((product as any).displaySize || "");
-setBattery((product as any).battery || "");
-setCamera((product as any).camera || "");
-setOperatingSystem((product as any).operatingSystem || "");
-setWarranty((product as any).warranty || "No Warranty");
-setPowerSource((product as any).powerSource || "");
-setVoltage((product as any).voltage || "");
-setAccessories((product as any).accessories || "");
-setWeight((product as any).weight || "");
-setUnit((product as any).unit || "g");
-setExpiryDate((product as any).expiryDate || "");
-setFssaiNumber((product as any).fssaiNumber || "");
-setOrganic((product as any).organic || false);
-
-setSkinType((product as any).skinType || "Normal");
-setHairType((product as any).hairType || "Normal");
-setIngredients((product as any).ingredients || "");
-setNetQuantity((product as any).netQuantity || "");
-setDimensions((product as any).dimensions || "");
-setWeightCapacity((product as any).weightCapacity || "");
-setAssemblyRequired((product as any).assemblyRequired || false);
-setFurnitureWarranty((product as any).furnitureWarranty || "No Warranty");
-
-setAuthor((product as any).author || "");
-setPublisher((product as any).publisher || "");
-setLanguage((product as any).language || "English");
-setIsbn((product as any).isbn || "");
-setEdition((product as any).edition || "");
-setPages((product as any).pages || "");
-  };
-
-  const deleteProduct = async (id: string) => {
-    if (!confirm("Delete this product?")) return;
-    await deleteDoc(doc(db, "products", id));
-    await loadProducts();
-    alert("Product deleted successfully");
-  };
-
-  const updateOrderStatus = async (id: string, status: string) => {
-    try {
-      await updateDoc(doc(db, "orders", id), { status });
-      await loadVendorOrders();
-      await fetchDashboardData();
-      alert("Order status updated");
-    } catch (error) {
-      console.error("Update order error:", error);
-      alert(error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
-    const vendorId = user.uid;
-
-    const productSnap = await getDocs(
-      query(collection(db, "products"), where("vendorId", "==", vendorId))
-    );
-    setTotalProducts(productSnap.size);
-
-    let views = 0;
-    let sales = 0;
-    let topProduct = "";
-    let topSales = 0;
-
-    productSnap.forEach((docSnap) => {
-      const product = docSnap.data();
-      views += product.views || 0;
-      sales += product.sales || 0;
-      if ((product.sales || 0) > topSales) {
-        topSales = product.sales || 0;
-        topProduct = product.name;
-      }
-    });
-
-    setTotalViews(views);
-    setTotalSales(sales);
-    setBestSeller(topProduct || "None");
-
-    const ordersSnap = await getDocs(
-  query(
-    collection(db, "orders"),
-    where("vendorIds", "array-contains", vendorId)
-  )
-);
-    let ordersCount = 0;
-    let pendingCount = 0;
-    let totalEarnings = 0;
-    let totalCommission = 0;
-    let totalNetEarnings = 0;
-
-    ordersSnap.forEach((docSnap) => {
-      const order = docSnap.data();
-      const sellerItems = (order.items || []).filter(
-        (item: any) => item.vendorId === vendorId
+    const fetchDashboardData = async () => {
+      // ---- Products (scoped by vendorId = uid) ----
+      const productSnap = await getDocs(
+        query(collection(db, "products"), where("vendorId", "==", vendorId))
       );
 
-      if (sellerItems.length > 0) {
-        ordersCount++;
-        if (order.status === "Pending") pendingCount++;
-        sellerItems.forEach((item: any) => {
-          totalEarnings += item.price * item.qty;
-        });
-        totalCommission += order.commission || 0;
-        totalNetEarnings += order.sellerEarning || 0;
-      }
-    });
+      let views = 0;
+      let sales = 0;
+      let topProduct = "";
+      let topSales = 0;
 
-    setTotalOrders(ordersCount);
-    setPendingOrders(pendingCount);
-    setEarnings(totalEarnings);
-    setCommissionPaid(totalCommission);
-    setNetEarnings(totalNetEarnings);
-  };
+      productSnap.forEach((docSnap) => {
+        const product: any = docSnap.data();
+        views += product.views || 0;
+        sales += product.sales || 0;
+        if ((product.sales || 0) > topSales) {
+          topSales = product.sales || 0;
+          topProduct = product.name;
+        }
+      });
 
+      // ---- Orders (scoped by vendorIds array-contains) ----
+      const ordersSnap = await getDocs(
+        query(
+          collection(db, "orders"),
+          where("vendorIds", "array-contains", vendorId)
+        )
+      );
+
+      let ordersCount = 0;
+      let pendingCount = 0;
+      let totalEarnings = 0;
+      let totalCommission = 0;
+      let totalNetEarnings = 0;
+
+      ordersSnap.forEach((docSnap) => {
+        const order: any = docSnap.data();
+        if (order.status === "Cancelled") return;
+
+        const sellerItems = (order.items || []).filter(
+          (item: any) => item.vendorId === vendorId
+        );
+
+        if (sellerItems.length > 0) {
+          ordersCount++;
+          if (order.status === "Pending") pendingCount++;
+          sellerItems.forEach((item: any) => {
+            totalEarnings += (item.price || 0) * (item.qty || 0);
+          });
+          totalCommission += order.commission || 0;
+          totalNetEarnings += order.sellerEarning || 0;
+        }
+      });
+
+      setStats({
+        totalProducts: productSnap.size,
+        totalOrders: ordersCount,
+        pendingOrders: pendingCount,
+        earnings: totalEarnings,
+        commissionPaid: totalCommission,
+        netEarnings: totalNetEarnings,
+        totalViews: views,
+        totalSales: sales,
+        bestSeller: topProduct || "None",
+      });
+    };
+
+    fetchDashboardData().catch(console.error);
+  }, [vendorId]);
+
+  if (vendorLoading) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* HEADER */}
-      <div className="bg-gradient-to-r from-green-700 via-teal-600 to-blue-700 text-white px-8 py-6">
-        <p className="text-sm uppercase tracking-widest opacity-80">
-  YOMICO Seller Dashboard</p>
-<h1 className="text-4xl md:text-5xl font-bold mt-2">
-👋 Welcome Back,</h1>
-<h2 className="text-2xl mt-2"> {vendorName} </h2>
-<p className="mt-3 opacity-90">
-Manage your products, inventory, orders and business growth from one dashboard.</p>
-      </div>
-      <SellerDashboard>
-        <DashboardCards />
-
-<div className="mt-6">
-  <QuickActions />
-</div>
-
-<div className="mt-6">
-  <NotificationsPanel />
-</div>
-
-<div className="mt-6">
-  <SalesChart />
-</div>
-
-<div className="mt-6">
-  <RecentOrders />
-</div>
-
-<div className="mt-6">
-  <LowStockProducts />
-</div>
-<DashboardCards
-  totalProducts={totalProducts}
-  totalOrders={totalOrders}
-  pendingOrders={pendingOrders}
-  earnings={earnings}
-  commissionPaid={commissionPaid}
-  netEarnings={netEarnings}
-/>
-               {/* SECONDARY STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-2xl shadow-sm">
-            <p className="text-gray-500 flex items-center gap-2">👁 Total Views</p>
-            <p className="text-3xl font-bold text-indigo-600 mt-2">{totalViews}</p>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm">
-            <p className="text-gray-500 flex items-center gap-2">📦 Units Sold</p>
-            <p className="text-3xl font-bold text-green-600 mt-2">{totalSales}</p>
-          </div>
-          <div className="bg-white p-6 rounded-2xl shadow-sm">
-            <p className="text-gray-500 flex items-center gap-2">🏆 Best Seller</p>
-            <p className="text-xl font-bold text-orange-600 mt-2">{bestSeller}</p>
-          </div>
-        </div>
-        </SellerDashboard>
-
-       <SellerNotifications
-  notifications={notifications}
-/>
-
-        {/* MAIN GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* FORM */}
-   <div
-  id="add-product"
-  className="bg-white p-6 rounded-2xl shadow-sm h-fit lg:sticky lg:top-6"
->
-            <h2 className="text-2xl font-bold mb-6">
-              <p className="text-gray-500 mb-5">
-              Create a new product listing for your customers.</p>
-              {editingId ? "✏️ Edit Product" : "➕ Add Product"}
-            </h2>
-
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Product Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-              />
-
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="number"
-                  placeholder="Price"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-                <input
-                  type="number"
-                  placeholder="Stock"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <input
-                  type="number"
-                  placeholder="MRP"
-                  value={mrp}
-                  onChange={(e) => setMrp(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-                <input
-                  type="text"
-                  placeholder="Brand Name"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-              <select
-  value={mainCategory}
-  onChange={(e) => {
-    setMainCategory(e.target.value);
-
-    setSubCategory("");
-    setDepartment("");
-    setSection("");
-    setProductType("");
-    setProductVariant("");
-  }}
-  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
->
-  <option value="">Select Main Category</option>
-
-  {mainCategories.map((item) => (
-    <option
-      key={item.id}
-      value={item.id}
-    >
-      {item.name}
-    </option>
-  ))}
-</select>
-<select
-  value={subCategory}
-  onChange={(e) => {
-    setSubCategory(e.target.value);
-
-    setDepartment("");
-    setSection("");
-    setProductType("");
-    setProductVariant("");
-  }}
-  disabled={!mainCategory}
-  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
->
-  <option value="">Select Sub Category</option>
-
-  {subCategories.map((item) => (
-    <option
-      key={item.id}
-      value={item.id}
-    >
-      {item.name}
-    </option>
-  ))}
-</select>
-<select
-  value={department}
-  onChange={(e) => {
-    setDepartment(e.target.value);
-
-    setSection("");
-    setProductType("");
-    setProductVariant("");
-  }}
-  disabled={!subCategory}
-  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
->
-  <option value="">Select Department</option>
-
-  {departments.map((item) => (
-    <option
-      key={item.id}
-      value={item.id}
-    >
-      {item.name}
-    </option>
-  ))}
-</select>
-<select
-  value={section}
-  onChange={(e) => {
-    setSection(e.target.value);
-
-    setProductType("");
-    setProductVariant("");
-  }}
-  disabled={!department}
-  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
->
-  <option value="">Select Section</option>
-
-  {sections.map((item) => (
-    <option
-      key={item.id}
-      value={item.id}
-    >
-      {item.name}
-    </option>
-  ))}
-</select>
-<select
-  value={productType}
-  onChange={(e) => {
-    setProductType(e.target.value);
-
-    setProductVariant("");
-  }}
-  disabled={!section}
-  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
->
-  <option value="">Select Product Type</option>
-
-  {productTypes.map((item) => (
-    <option
-      key={item.id}
-      value={item.id}
-    >
-      {item.name}
-    </option>
-  ))}
-</select>
-<select
-  value={productVariant}
-  onChange={(e) => setProductVariant(e.target.value)}
-  disabled={!productType}
-  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
->
-  <option value="">Select Variant</option>
-
-  {productVariants.map((item) => (
-    <option
-      key={item.id}
-      value={item.id}
-    >
-      {item.name}
-    </option>
-  ))}
-</select>
-<SellerProductSpecifications
-  groupedFields={groupedFields}
-  attributes={attributes}
-  setAttributes={setAttributes}
-/>
- 
-
-
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  className="w-full p-3.5 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-                >
-                  <option>Men</option>
-                  <option>Women</option>
-                  <option>Kids</option>
-                </select>
-              </div>
-
-    <div className="space-y-4">
-
-  <div>
-    <label className="block font-semibold mb-3">
-      Available Sizes
-    </label>
-
-    <div className="grid grid-cols-4 md:grid-cols-6 gap-2">
-
-      {SIZE_OPTIONS.map((size) => (
-
-        <label
-          key={size}
-          className="flex items-center gap-2 border rounded-lg p-2 cursor-pointer hover:bg-gray-50"
-        >
-
-          <input
-            type="checkbox"
-            checked={sizes.includes(size)}
-            onChange={(e) => {
-
-              if (e.target.checked) {
-                setSizes([...sizes, size]);
-              } else {
-                setSizes(
-                  sizes.filter((s) => s !== size)
-                );
-              }
-
-            }}
-          />
-
-          <span>{size}</span>
-
-        </label>
-
-      ))}
-
+    <div className="flex min-h-screen items-center justify-center">
+      Loading dashboard...
     </div>
-
-</div>
-{category === "Mobiles" && (
-
-<div className="space-y-4 border rounded-xl p-4 bg-blue-50">
-
-<h3 className="font-semibold text-lg">
-📱 Mobile Details
-</h3>
-
-<div className="grid grid-cols-2 gap-3">
-
-<input
-type="text"
-placeholder="Model Number"
-value={modelNumber}
-onChange={(e)=>setModelNumber(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<input
-type="text"
-placeholder="RAM (8 GB)"
-value={ram}
-onChange={(e)=>setRam(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<input
-type="text"
-placeholder="Storage (128 GB)"
-value={storageCapacity}
-onChange={(e)=>setStorageCapacity(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<input
-type="text"
-placeholder="Processor"
-value={processor}
-onChange={(e)=>setProcessor(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<input
-type="text"
-placeholder="Display Size"
-value={displaySize}
-onChange={(e)=>setDisplaySize(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<input
-type="text"
-placeholder="Battery"
-value={battery}
-onChange={(e)=>setBattery(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<input
-type="text"
-placeholder="Camera"
-value={camera}
-onChange={(e)=>setCamera(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<input
-type="text"
-placeholder="Operating System"
-value={operatingSystem}
-onChange={(e)=>setOperatingSystem(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<select
-value={warranty}
-onChange={(e)=>setWarranty(e.target.value)}
-className="w-full p-3 border rounded-xl"
->
-<option>No Warranty</option>
-<option>6 Months</option>
-<option>1 Year</option>
-<option>2 Years</option>
-</select>
-
-</div>
-
-</div>
-
-)}
-{(
-  category === "Electronics" ||
-  category === "Appliances"
-) && (
-
-<div className="space-y-4 border rounded-xl p-4 bg-yellow-50">
-
-<h3 className="font-semibold text-lg">
-💻 Electronics/Appliances Details
-</h3>
-
-<div className="grid grid-cols-2 gap-3">
-
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Model Number
-  </label>
-
-  <input
-    type="text"
-    placeholder="e.g. SM-A546E"
-    value={modelNumber}
-    onChange={(e) => setModelNumber(e.target.value)}
-    className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 transition"
-  />
-</div>
-
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Warranty
-  </label>
-
-  <select
-    value={warranty}
-    onChange={(e) => setWarranty(e.target.value)}
-    className="w-full p-3 border rounded-xl"
-  >
-    <option>No Warranty</option>
-    <option>6 Months</option>
-    <option>1 Year</option>
-    <option>2 Years</option>
-  </select>
-</div>
-
-<div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">
-    Power Source
-  </label>
-
-  <input
-    type="text"
-    placeholder="Electric / Battery"
-    value={powerSource}
-    onChange={(e) => setPowerSource(e.target.value)}
-    className="w-full p-3 border rounded-xl"
-  />
-</div>
-
-<input
-type="text"
-placeholder="Voltage"
-value={voltage}
-onChange={(e)=>setVoltage(e.target.value)}
-className="w-full p-3 border rounded-xl"
-/>
-
-<input
-type="text"
-placeholder="Included Accessories"
-value={accessories}
-onChange={(e)=>setAccessories(e.target.value)}
-className="col-span-2 w-full p-3 border rounded-xl"
-/>
-
-</div>
-
-</div>
-
-)}
-{category === "Grocery" && (
-
-<div className="space-y-4 border rounded-xl p-4 bg-green-50">
-
-  <h3 className="text-lg font-semibold">
-    🛒 Grocery Details
-  </h3>
-
-  <div className="grid grid-cols-2 gap-3">
-
-    <input
-      type="number"
-      placeholder="Weight"
-      value={weight}
-      onChange={(e)=>setWeight(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <select
-      value={unit}
-      onChange={(e)=>setUnit(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    >
-      <option>g</option>
-      <option>kg</option>
-      <option>ml</option>
-      <option>L</option>
-    </select>
-
-    <input
-      type="date"
-      value={expiryDate}
-      onChange={(e)=>setExpiryDate(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <input
-      type="text"
-      placeholder="FSSAI Number"
-      value={fssaiNumber}
-      onChange={(e)=>setFssaiNumber(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <label className="flex items-center gap-2 col-span-2">
-
-      <input
-        type="checkbox"
-        checked={organic}
-        onChange={(e)=>setOrganic(e.target.checked)}
-      />
-
-      Organic Product
-
-    </label>
-
-  </div>
-
-</div>
-
-)}
-{category === "Beauty" && (
-
-<div className="space-y-4 border rounded-xl p-4 bg-pink-50">
-
-  <h3 className="text-lg font-semibold">
-    💄 Beauty Details
-  </h3>
-
-  <div>
-  <label className="block text-sm font-medium mb-1">
-    Skin Type
-  </label>
-
-  <select
-    value={skinType}
-    onChange={(e) => setSkinType(e.target.value)}
-    className="w-full p-3 border rounded-xl"
-  >
-    <option>Normal</option>
-    <option>Dry</option>
-    <option>Oily</option>
-    <option>Combination</option>
-    <option>Sensitive</option>
-  </select>
-</div>
-
-<div>
-  <label className="block text-sm font-medium mb-1">
-    Hair Type
-  </label>
-
-  <select
-    value={hairType}
-    onChange={(e) => setHairType(e.target.value)}
-    className="w-full p-3 border rounded-xl"
-  >
-    <option>Normal</option>
-    <option>Dry</option>
-    <option>Oily</option>
-    <option>Damaged</option>
-    <option>Curly</option>
-  </select>
-</div>
-    <input
-      type="text"
-      placeholder="Net Quantity"
-      value={netQuantity}
-      onChange={(e)=>setNetQuantity(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <input
-      type="date"
-      value={expiryDate}
-      onChange={(e)=>setExpiryDate(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <textarea
-      placeholder="Ingredients"
-      value={ingredients}
-      onChange={(e)=>setIngredients(e.target.value)}
-      className="col-span-2 w-full p-3 border rounded-xl"
-    />
-
-  </div>
-)}
-
-{category === "Furniture" && (
-
-<div className="space-y-4 border rounded-xl p-4 bg-orange-50">
-
-  <h3 className="text-lg font-semibold">
-    🪑 Furniture Details
-  </h3>
-
-  <div className="grid grid-cols-2 gap-3">
-
-    <div>
-      <label className="block text-sm mb-1">Dimensions</label>
-      <input
-        type="text"
-        placeholder="L × W × H"
-        value={dimensions}
-        onChange={(e)=>setDimensions(e.target.value)}
-        className="w-full p-3 border rounded-xl"
-      />
-    </div>
-
-    <div>
-      <label className="block text-sm mb-1">Weight Capacity</label>
-      <input
-        type="text"
-        placeholder="100 kg"
-        value={weightCapacity}
-        onChange={(e)=>setWeightCapacity(e.target.value)}
-        className="w-full p-3 border rounded-xl"
-      />
-    </div>
-
-    <label className="flex items-center gap-2">
-      <input
-        type="checkbox"
-        checked={assemblyRequired}
-        onChange={(e)=>setAssemblyRequired(e.target.checked)}
-      />
-      Assembly Required
-    </label>
-
-    <div>
-      <label className="block text-sm mb-1">Warranty</label>
-      <select
-        value={furnitureWarranty}
-        onChange={(e)=>setFurnitureWarranty(e.target.value)}
-        className="w-full p-3 border rounded-xl"
-      >
-        <option>No Warranty</option>
-        <option>6 Months</option>
-        <option>1 Year</option>
-        <option>2 Years</option>
-        <option>5 Years</option>
-      </select>
-    </div>
-
-  </div>
-
-</div>
-
-)}
-{category === "Books" && (
-
-<div className="space-y-4 border rounded-xl p-4 bg-indigo-50">
-
-  <h3 className="text-lg font-semibold">
-    📚 Book Details
-  </h3>
-
-  <div className="grid grid-cols-2 gap-3">
-
-    <input
-      type="text"
-      placeholder="Author"
-      value={author}
-      onChange={(e)=>setAuthor(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <input
-      type="text"
-      placeholder="Publisher"
-      value={publisher}
-      onChange={(e)=>setPublisher(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <select
-      value={language}
-      onChange={(e)=>setLanguage(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    >
-      <option>English</option>
-      <option>Hindi</option>
-      <option>Tamil</option>
-      <option>Telugu</option>
-      <option>Kannada</option>
-      <option>Malayalam</option>
-    </select>
-
-    <input
-      type="text"
-      placeholder="ISBN"
-      value={isbn}
-      onChange={(e)=>setIsbn(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <input
-      type="text"
-      placeholder="Edition"
-      value={edition}
-      onChange={(e)=>setEdition(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-    <input
-      type="number"
-      placeholder="Pages"
-      value={pages}
-      onChange={(e)=>setPages(e.target.value)}
-      className="w-full p-3 border rounded-xl"
-    />
-
-  </div>
-
-</div>
-
-)}
-</div>
-             <textarea
-                placeholder="Product Description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full p-3.5 border rounded-xl h-28 outline-none focus:ring-2 focus:ring-green-500 transition"
-              />
-<SellerImageUpload
-  images={images}
-  setImages={setImages}
-  imageFiles={imageFiles}
-  setImageFiles={setImageFiles}
-  setImage={setImage}
-/>
-              <button
-                onClick={addOrUpdateProduct}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 disabled:opacity-60 text-white py-4 rounded-xl text-lg font-semibold transition"
-              >
-                {loading
-                  ? "Saving..."
-                  : editingId
-                  ? "Update Product"
-                  : "Add Product"}
-              </button>
-            </div>
-          </div>
-
-<SellerProductsTable
-  products={products}
-  search={search}
-  setSearch={setSearch}
-  editProduct={editProduct}
-  deleteProduct={deleteProduct}
-/>
-<SellerOrdersTable
-  orders={orders}
-  updateOrderStatus={updateOrderStatus}
-/>
- </div>
-    </div>
-   
   );
+}
+return (
+<div className="min-h-screen bg-gray-50">
+
+  {/* HEADER */}
+
+  <div className="bg-gradient-to-r from-green-700 via-teal-600 to-blue-700 px-8 py-6 text-white">
+
+    <p className="text-sm uppercase tracking-widest opacity-80">
+      YOMICO Seller Dashboard
+    </p>
+
+    <h1 className="mt-2 text-4xl font-bold md:text-5xl">
+      👋 Welcome Back,
+    </h1>
+
+    <h2 className="mt-2 text-2xl">
+      {vendor?.businessName || vendor?.storeName || "Seller"}
+    </h2>
+
+    <p className="mt-3 opacity-90">
+      Manage your products, inventory, orders and business growth from one dashboard.
+    </p>
+
+  </div>
+
+  <div className="p-6">
+
+    <SellerDashboard>
+
+      <DashboardCards
+        totalProducts={stats.totalProducts}
+        totalOrders={stats.totalOrders}
+        pendingOrders={stats.pendingOrders}
+        earnings={stats.earnings}
+        commissionPaid={stats.commissionPaid}
+        netEarnings={stats.netEarnings}
+      />
+
+      <div className="mt-6">
+        <QuickActions />
+      </div>
+
+      <div className="mt-6">
+        <NotificationsPanel />
+      </div>
+
+      <div className="mt-6">
+        <SalesChart />
+      </div>
+
+      <div className="mt-6">
+        <RecentOrders />
+      </div>
+
+      <div className="mt-6">
+        <LowStockProducts />
+      </div>
+
+      {/* SECONDARY STATS */}
+
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+
+          <p className="flex items-center gap-2 text-gray-500">
+            👁 Total Views
+          </p>
+
+          <p className="mt-2 text-3xl font-bold text-indigo-600">
+            {stats.totalViews}
+          </p>
+
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+
+          <p className="flex items-center gap-2 text-gray-500">
+            📦 Units Sold
+          </p>
+
+          <p className="mt-2 text-3xl font-bold text-green-600">
+            {stats.totalSales}
+          </p>
+
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-sm">
+
+          <p className="flex items-center gap-2 text-gray-500">
+            🏆 Best Seller
+          </p>
+
+          <p className="mt-2 text-xl font-bold text-orange-600">
+            {stats.bestSeller}
+          </p>
+
+        </div>
+
+      </div>
+
+    </SellerDashboard>
+
+  </div>
+
+</div>
+
+);
 }

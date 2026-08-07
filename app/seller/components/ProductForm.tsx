@@ -317,67 +317,39 @@ try {
   }
 
   // Save Product
-
+console.log(product);
+console.log(uploadedImages);
+console.log("Saving Product:", product);
   await addDoc(
-
-    collection(db, "products"),
-
-    {
-
-      ...product,
-
-      thumbnail:
-        uploadedImages[0] || "",
-
-      images: uploadedImages,
-
-      createdAt:
-        serverTimestamp(),
-
-      updatedAt:
-        serverTimestamp(),
-
-    }
-
-  );
-
+  collection(db, "products"),
+  {
+    ...product,
+    thumbnail: uploadedImages[0] || "",
+    images: uploadedImages,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }
+);
   setSuccess(
-
     "Product Added Successfully."
-
   );
-
   router.push(
-
     "/seller/products"
-
   );
-
 }
 catch (error) {
-
   console.error(error);
-
   setError(
-
     "Failed to save product."
-
   );
-
 }
-
 finally{
-
 setLoading(false);
-
 }
-
 };
-
   // ==========================================
   // UI
   // ==========================================
-
  return(
 
 <form

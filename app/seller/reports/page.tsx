@@ -119,7 +119,11 @@ export default function SellerReportsPage(){
         }
 
       });
-
+data.sort(
+  (a, b) =>
+    new Date(b.date).getTime() -
+    new Date(a.date).getTime()
+);
       setOrders(data);
 
     }catch(error){
@@ -242,7 +246,10 @@ export default function SellerReportsPage(){
     );
 
   };
-
+const totalRevenue = orders.reduce(
+  (sum, order) => sum + order.amount,
+  0
+);
   if(loading){
 
     return(
@@ -297,7 +304,17 @@ export default function SellerReportsPage(){
           </p>
 
         </div>
+<div className="mb-8 rounded-3xl bg-white p-6 shadow">
 
+  <p className="text-gray-500">
+    Total Revenue
+  </p>
+
+  <h2 className="mt-2 text-4xl font-bold text-green-600">
+    ₹{totalRevenue.toLocaleString("en-IN")}
+  </h2>
+
+</div>
         <div className="
           flex
           gap-4

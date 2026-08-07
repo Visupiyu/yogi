@@ -1,42 +1,30 @@
 "use client";
-"use client";
-
 import { useEffect,useState } from "react";
-
-import {
-  collection,
-  getDocs,
-  addDoc,
-  query,
-  where,
-  serverTimestamp,
-} from "firebase/firestore";
+import {collection,   getDocs,   addDoc,   query,   where,   serverTimestamp,} from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 
 export default function SellerWalletPage() {
-    const [walletBalance,setWalletBalance] =
-  useState(0);
-  const [pendingAmount,setPendingAmount] =
-  useState(0);
 
-const [totalWithdrawn,setTotalWithdrawn] =
-  useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);
 
-const [amount,setAmount] =
-  useState("");
+  const [pendingAmount, setPendingAmount] = useState(0);
 
-const [loading,setLoading] =
-  useState(true);
+  const [totalWithdrawn, setTotalWithdrawn] = useState(0);
 
-const [withdrawals,setWithdrawals] =
-  useState<any[]>([]);
-  useEffect(()=>{
+  const [amount, setAmount] = useState("");
 
-  loadWallet();
-  
+  const [loading, setLoading] = useState(true);
 
-},[]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+
+  useEffect(() => {
+
+    loadWallet();
+
+  }, []);
 
 const loadWallet =
 async()=>{
@@ -50,7 +38,6 @@ async()=>{
       ) || "{}"
 
     );
-
     setWalletBalance(
 
       Number(
@@ -92,7 +79,11 @@ async()=>{
 
       }
     );
-
+items.sort(
+  (a, b) =>
+    (b.createdAt?.seconds || 0) -
+    (a.createdAt?.seconds || 0)
+);
     setWithdrawals(items);
     const pending =
 
@@ -157,6 +148,7 @@ setTotalWithdrawn(
 
   }finally{
 
+
     setLoading(false);
 
   }
@@ -165,8 +157,7 @@ setTotalWithdrawn(
 
 const requestWithdrawal =
 async()=>{
-
-  try{
+  try{ setSubmitting(true);
 
     const vendor = JSON.parse(
 
@@ -205,7 +196,6 @@ async()=>{
       return;
 
     }
-
     await addDoc(
 
       collection(
@@ -270,26 +260,21 @@ async()=>{
 
     loadWallet();
 
-  }catch(error){
+ }catch(error){
 
-    console.log(error);
+  console.log(error);
 
-  }
+}finally{
+
+  setSubmitting(false);
+
+}
 
 };
-
   return (
+    <div className=" min-h-screen bg-gray-100 p-6 ">
 
-    <div className="
-      min-h-screen
-      bg-gray-100
-      p-6
-    ">
-
-      <div className="
-        max-w-6xl
-        mx-auto
-      ">
+      <div className=" max-w-6xl mx-auto ">
 
         <div className="
           bg-gradient-to-r
@@ -425,10 +410,8 @@ async()=>{
     />
 
     <button
-
-      onClick={
-        requestWithdrawal
-      }
+  onClick={requestWithdrawal}
+  disabled={submitting}
 
       className="
         bg-green-600

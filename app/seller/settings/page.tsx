@@ -1,0 +1,250 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import {
+  doc,
+  getDoc,
+  updateDoc,
+} from "firebase/firestore";
+
+import {
+  auth,
+  db,
+} from "@/lib/firebase";
+
+import {
+  onAuthStateChanged,
+} from "firebase/auth";
+export default function SellerSettingsPage() {
+const [loading, setLoading] = useState(true);
+
+const [saving, setSaving] = useState(false);
+
+const [vendorId, setVendorId] = useState("");
+
+const [form, setForm] = useState({
+    businessName: "",
+    fullName: "",
+    businessType: "",
+    email: "",
+    businessPhone: "",
+    street: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    storeLogo: "",
+    storeBanner: "",
+    aboutStore: "",
+    returnPolicy: "",
+    shippingPolicy: "",
+  });
+useEffect(() => {
+
+  const unsubscribe = onAuthStateChanged(
+
+    auth,
+
+    async (user) => {
+
+      if (!user) {
+
+        setLoading(false);
+
+        return;
+
+      }
+
+      setVendorId(user.uid);
+
+      const ref = doc(db, "vendors", user.uid);
+
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+
+        setForm((prev) => ({
+
+          ...prev,
+
+          ...snap.data(),
+
+        }));
+
+      }
+
+      setLoading(false);
+
+    }
+
+  );
+
+  return () => unsubscribe();
+
+}, []);
+const saveSettings = async () => {
+
+  try {
+
+    setSaving(true);
+
+    await updateDoc(
+
+      doc(db, "vendors", vendorId),
+
+      form
+
+    );
+
+    alert("Store updated successfully.");
+
+  } catch (error) {
+
+    console.error(error);
+
+    alert("Failed to update store.");
+
+  } finally {
+
+    setSaving(false);
+
+  }
+
+};
+
+  return (
+
+<div className="min-h-screen bg-gray-100 p-6">
+
+<div className="max-w-5xl mx-auto">
+
+<h1 className="text-4xl font-bold mb-8">
+Store Settings
+</h1>
+
+<div className="bg-white rounded-3xl shadow p-8 space-y-6">
+
+{/* Business Name */}
+
+<div>
+
+<label className="font-semibold">
+Business Name
+</label>
+
+<input
+className="w-full mt-2 border rounded-xl p-3"
+value={form.businessName}
+onChange={(e)=>
+setForm({
+...form,
+businessName:e.target.value,
+})
+}
+/>
+
+</div>
+
+{/* Owner */}
+
+<div>
+
+<label className="font-semibold">
+Owner Name
+</label>
+
+<input
+className="w-full mt-2 border rounded-xl p-3"
+value={form.fullName}
+onChange={(e)=>
+setForm({
+...form,
+fullName:e.target.value,
+})
+}
+/>
+
+</div>
+
+{/* Email */}
+
+<div>
+
+<label className="font-semibold">
+Email
+</label>
+
+<input
+className="w-full mt-2 border rounded-xl p-3"
+value={form.email}
+onChange={(e)=>
+setForm({
+...form,
+email:e.target.value,
+})
+}
+/>
+
+</div>
+
+{/* Phone */}
+
+<div>
+
+<label className="font-semibold">
+Phone
+</label>
+
+<input
+className="w-full mt-2 border rounded-xl p-3"
+value={form.businessPhone}
+onChange={(e)=>
+setForm({
+...form,
+businessPhone:e.target.value,
+})
+}
+/>
+
+</div>
+
+{/* About */}
+
+<div>
+
+<label className="font-semibold">
+About Store
+</label>
+
+<textarea
+rows={5}
+className="w-full mt-2 border rounded-xl p-3"
+value={form.aboutStore}
+onChange={(e)=>
+setForm({
+...form,
+aboutStore:e.target.value,
+})
+}
+/>
+
+</div>
+
+<button
+onClick={saveSettings}
+disabled={saving}
+className="bg-green-600 text-white px-8 py-3 rounded-xl hover:bg-green-700 disabled:opacity-50"
+>
+
+{saving ? "Saving..." : "Save Changes"}
+
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+);
+}
