@@ -15,6 +15,8 @@ import {
 import { db } from "@/lib/firebase";
 
 import type { Product } from "@/lib/products/product";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function SellerProductsPage() {
   const [products, setProducts] =
@@ -26,46 +28,44 @@ const [loading, setLoading] =
   useState(true);
 useEffect(() => {
 
-  const loadProducts = async () => {
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
 
-      // Temporary seller ID
-      // Later this will come from Firebase Auth
-
-      const vendorId = "seller-demo";
+      const vendorId = user.uid;
 
       const q = query(
-
         collection(db, "products"),
-
         where("vendorId", "==", vendorId)
-
       );
 
       const snapshot = await getDocs(q);
 
-      const list = snapshot.docs.map(doc => ({
-
+      const list = snapshot.docs.map((doc) => ({
         id: doc.id,
-
         ...doc.data(),
-
       })) as Product[];
 
       setProducts(list);
 
-    }
+    } catch (error) {
 
-    finally {
+      console.error(error);
+
+    } finally {
 
       setLoading(false);
 
     }
 
-  };
+  });
 
-  loadProducts();
+  return () => unsubscribe();
 
 }, []);
 const handleDelete = async (id: string) => {
@@ -270,7 +270,7 @@ const handleDelete = async (id: string) => {
         </td>
 
         <td className="p-4">
-          ₹{product.sellingPrice}
+          ₹₹{product.sellingPrice}
         </td>
 
         <td className="p-4">
@@ -285,20 +285,26 @@ const handleDelete = async (id: string) => {
 
           <div className="flex gap-2">
 
-            <button className="rounded bg-blue-500 px-3 py-1 text-sm text-white">
-              View
-            </button>
+           <Link
+  href={`/seller/products/view/${product.id}`}
+  className="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+>
+  View
+</Link>
 
-            <button className="rounded bg-green-500 px-3 py-1 text-sm text-white">
-              Edit
-            </button>
+            <Link
+  href={`/seller/products/edit/${product.id}`}
+  className="rounded bg-green-500 px-3 py-1 text-sm text-white hover:bg-green-600"
+>
+  Edit
+</Link>
 
-           <button
-  onClick={() => handleDelete(product.id)}
+           <Link
+  href={`/seller/products/delete/${product.id}`}
   className="rounded bg-red-500 px-3 py-1 text-sm text-white hover:bg-red-600"
 >
   Delete
-</button>
+</Link>
 
           </div>
 
