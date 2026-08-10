@@ -1,5 +1,13 @@
 // lib/products/product.ts
+export interface ProductVariant {
+  id: string;
 
+  attributes: Record<string, string>;
+
+  stock: number;
+
+  price: number;
+}
 export interface Product {
 
   // Identity
@@ -40,7 +48,7 @@ maxStock: number;
   specifications: Record<string, string>;
 
   // Variants
- variants: Record<string, string>;
+variants: ProductVariant[];
 
   // Shipping
   weight?: number;

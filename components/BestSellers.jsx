@@ -8,21 +8,25 @@ import { motion } from "framer-motion";
 
 async function fetchNewArrivals() {
   const q = query(
-  collection(db, "products"),
-  orderBy("createdAt", "desc"),
-  limit(12)
-);
+    collection(db, "products"),
+    orderBy("createdAt", "desc"),
+    limit(12)
+  );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })); 
 }
 
 function ProductSkeleton() {
   return (
-    <div className="bg-white rounded-3xl shadow-lg p-4 animate-pulse">
-      <div className="h-56 bg-gray-200 rounded-xl mb-3" />
-      <div className="h-4 bg-gray-200 rounded mb-2" />
-      <div className="h-4 bg-gray-200 rounded w-2/3 mb-2" />
-      <div className="h-6 bg-gray-200 rounded w-1/3" />
+    <div className="bg-pink-200 rounded-3xl shadow-lg p-4 animate-pulse">
+      <div className="h-56 bg-pink-100 rounded-xl mb-3" />
+      <div className="h-4 bg-pink-100 rounded mb-2" />
+      <div className="h-4 bg-pink-100 rounded w-2/3 mb-2" />
+      <div className="h-6 bg-pink-100 rounded w-1/3" />
     </div>
   );
 }
@@ -70,16 +74,21 @@ queryFn: fetchNewArrivals,
   viewport={{ once: true }}
   className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3"
 >
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              id={product.id}
-              name={product.name}
-              price={product.price}
-              image={product.image}
-              stock={product.stock}
-            />
-          ))}
+ {products.map((product) => (
+  <ProductCard
+    key={product.id}
+    id={product.id}
+    name={product.title || product.name || "Product"}
+    price={product.sellingPrice ?? product.price ?? 0}
+    image={
+      product.thumbnail ||
+      product.images?.[0] ||
+      product.image ||
+      ""
+    }
+    stock={product.stock ?? 0}
+  />
+))}
     
         </motion.div>
       ) : (

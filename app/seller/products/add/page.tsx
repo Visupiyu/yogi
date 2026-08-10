@@ -7,11 +7,6 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
 export default function AddProductPage() {
-
-  // TODO:
-  // Later we'll get these values
-  // from Firebase Auth / Seller Profile.
-
  const [vendorId, setVendorId] = useState("");
 const [vendorName, setVendorName] = useState("");
 

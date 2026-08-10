@@ -30,8 +30,17 @@ export default function FeaturedProducts() {
           items.push({
             id: doc.id,
             name: data.name || "",
-            price: Number(data.price || 0),
-            image: data.image || "",
+          price: Number(
+  data.sellingPrice ??
+  data.price ??
+  0
+),
+
+image:
+  data.thumbnail ||
+  data.images?.[0] ||
+  data.image ||
+  "",
             stock: Number(data.stock || 0),
           });
         });

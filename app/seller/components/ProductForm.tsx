@@ -86,7 +86,7 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
     // Variants
 
-    variants: {},
+    variants: [],
 
     // Shipping
 
@@ -279,73 +279,124 @@ return true;
 // ==========================================
 
 const handleSubmit = async (
+  e: React.FormEvent
+) => {
 
-e: React.FormEvent
+  e.preventDefault();
 
-)=>{
+  setError("");
+  setSuccess("");
 
-e.preventDefault();
-
-if(!validateForm())
-
-return;
-
-setLoading(true);
-
-try {
-
-  const uploadedImages: string[] = [];
-
-  // Upload Images
-  for (const file of imageFiles) {
-
-    const storageRef = ref(
-      storage,
-      `products/${Date.now()}-${file.name}`
-    );
-
-    await uploadBytes(
-      storageRef,
-      file
-    );
-
-    const url =
-      await getDownloadURL(storageRef);
-
-    uploadedImages.push(url);
-
-  }
-
-  // Save Product
-console.log(product);
-console.log(uploadedImages);
-console.log("Saving Product:", product);
-  await addDoc(
-  collection(db, "products"),
-  {
+  // Basic validation first
+  const result = validateProduct({
     ...product,
-    thumbnail: uploadedImages[0] || "",
-    images: uploadedImages,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    vendorId: vendorId,
+    vendorName: vendorName,
+    thumbnail: "pending",
+    images: imageFiles.length > 0 ? ["pending"] : [],
+  });
+
+  if (!result.valid) {
+    setError(result.errors.join("\n"));
+    return;
   }
-);
-  setSuccess(
-    "Product Added Successfully."
-  );
-  router.push(
-    "/seller/products"
-  );
-}
-catch (error) {
-  console.error(error);
-  setError(
-    "Failed to save product."
-  );
-}
-finally{
-setLoading(false);
-}
+
+  // At least one image must be selected
+  if (imageFiles.length === 0) {
+    setError("Please select at least one product image.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+
+    const uploadedImages: string[] = [];
+
+    // ==========================================
+    // Upload Images
+    // ==========================================
+
+    for (const file of imageFiles) {
+
+      const storageRef = ref(
+        storage,
+        `products/${Date.now()}-${file.name}`
+      );
+
+      await uploadBytes(
+        storageRef,
+        file
+      );
+
+      const url =
+        await getDownloadURL(storageRef);
+
+      uploadedImages.push(url);
+    }
+
+    // ==========================================
+    // Final Product Data
+    // ==========================================
+
+    const finalProduct = {
+      ...product,
+
+      vendorId,
+      vendorName,
+
+      thumbnail:
+        uploadedImages[0] || "",
+
+      images:
+        uploadedImages,
+
+      discount:
+        product.mrp > 0
+          ? Math.round(
+              ((product.mrp - product.sellingPrice) /
+                product.mrp) *
+                100
+            )
+          : 0,
+
+      createdAt:
+        serverTimestamp(),
+
+      updatedAt:
+        serverTimestamp(),
+    };
+
+    // ==========================================
+    // Save Product
+    // ==========================================
+
+    await addDoc(
+      collection(db, "products"),
+      finalProduct
+    );
+
+    setSuccess(
+      "Product Added Successfully."
+    );
+
+    router.push(
+      "/seller/products"
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    setError(
+      "Failed to save product."
+    );
+
+  } finally {
+
+    setLoading(false);
+
+  }
 };
   // ==========================================
   // UI
@@ -607,57 +658,50 @@ Category *
 </label>
 
 <CategorySelector
+  value={product.categoryId}
+  onChange={(category, path) => {
+    setProduct({
+      ...product,
 
-value={product.categoryId}
+      // Top-level category
+      categoryId: path[0] || "",
 
-onChange={(category)=>{
+      // First sub-category
+      subCategoryId: path[1] || "",
 
-setProduct({
+      // Last selected category
+      leafCategoryId:
+        path[path.length - 1] || "",
 
-...product,
-
-categoryId:category,
-
-subCategoryId:"",
-
-leafCategoryId:"",
-
-sku:generateSKU(
-
-category,
-
-product.brand
-
-),
-
-});
-
-}}
-
- />
-
+      // SKU based on top-level category
+      sku: generateSKU(
+        path[0] || category,
+        product.brand
+      ),
+    });
+  }}
+/>
 </div>
 
 {/* Brand */}
 
 <div>
+  <label className="mb-2 block font-medium">
+    Brand Name
+  </label>
 
-<label className="mb-2 block text-sm font-semibold">
-
-Brand *
-
-</label>
-
-<BrandSelector
-
-category={product.categoryId}
-
-value={product.brand}
-
-onChange={updateBrand}
-
-/>
-
+  <input
+    type="text"
+    value={product.brand}
+    onChange={(e) =>
+      setProduct({
+        ...product,
+        brand: e.target.value,
+      })
+    }
+    placeholder="Enter brand name"
+    className="w-full rounded-xl border p-3"
+  />
 </div>
 
 </div>
@@ -677,23 +721,14 @@ Variants
 </h2>
 
 <VariantSelector
-
-category={product.categoryId}
-
-variants={product.variants}
-
-onChange={(variants)=>
-
-setProduct({
-
-...product,
-
-variants,
-
-})
-
-}
-
+  category={product.categoryId}
+  variants={product.variants}
+  onChange={(variants) =>
+    setProduct({
+      ...product,
+      variants,
+    })
+  }
 />
 
 </div>
@@ -802,40 +837,6 @@ setProduct({
 ...product,
 
 sellingPrice:Number(e.target.value),
-
-})
-
-}
-
-className="w-full rounded-lg border p-3"
-
-/>
-
-</div>
-
-{/* Cost Price */}
-
-<div>
-
-<label className="mb-2 block text-sm font-semibold">
-
-Cost Price
-
-</label>
-
-<input
-
-type="number"
-
-value={product.costPrice}
-
-onChange={(e)=>
-
-setProduct({
-
-...product,
-
-costPrice:Number(e.target.value),
 
 })
 
@@ -1490,16 +1491,13 @@ Upload up to 5 product images.
 
 </div>
 
-</div>   {/* closes Product Images card */}
-
-
-
+</div>   
 
 {/* ========================================== */}
 {/* Product Preview */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="mt-8">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1507,19 +1505,22 @@ Live Preview
 
 </h2>
 
-<ProductPreview product={product} />
-
+<ProductPreview
+  product={product}
+  previewImages={imagePreviews}
+/>
+</div>
 <div className="flex justify-end mt-8">
 
   <button
-    type="submit"
-    disabled={loading}
-    className="rounded-lg bg-blue-600 px-8 py-3 text-white"
-  >
-    {loading ? "Saving..." : "Save Product"}
-  </button>
+      type="submit"
+      disabled={loading}
+      className="rounded-lg bg-blue-600 px-8 py-3 text-white"
+    >
+      {loading ? "Saving..." : "Save Product"}
+    </button>
 
-</div>
+
 
 </div>
 

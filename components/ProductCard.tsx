@@ -174,42 +174,39 @@ export default function ProductCard({ id, name, price, image, stock
 
   return(
 
-    <motion.div
-
-  initial={{ opacity:0, y:20 }}
-
-  animate={{ opacity:1, y:0 }}
-
+ <motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
   whileHover={{
-    y:-4,
-    scale:1.02
+    y: -4,
+    scale: 1.02,
   }}
-
   transition={{
-    duration:0.3
+    duration: 0.3,
   }}
-
- className="
-  bg-gradient-to-b
-  from-white
-  to-gray-50
-  rounded-2xl
-  overflow-hidden
- shadow-lg
+  className="
+    bg-gradient-to-b
+    from-pink-50
+    to-white
+    rounded-2xl
+    overflow-hidden
+    shadow-lg
     hover:shadow-2xl
     transition
     duration-300
     group
   "
->    
+>
 
       {/* IMAGE */}
 
-      <motion.div className="
-  relative
-  overflow-hidden
-  bg-slate-50
-">
+<motion.div
+  className="
+    relative
+    overflow-hidden
+    bg-pink-50
+  "
+>
 
         <Link
           href={`/product/${id}`}
