@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createUserWithEmailAndPassword,  signOut, } from "firebase/auth";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import Image from "next/image";
@@ -189,6 +189,28 @@ if (!aadhaarDoc || !chequeDoc) {
         totalOrders: 0,
         totalRevenue: 0,
         pendingPayout: 0,
+        createdAt: serverTimestamp(),
+      });
+
+      // Public-safe mirror for storefront pages — vendors/ holds banking &
+      // KYC PII and is locked to owner/admin only, so store/seller pages
+      // read from this doc instead.
+      await setDoc(doc(db, "vendors_public", uid), {
+        uid,
+        businessName: formData.businessName,
+        fullName: formData.fullName,
+        email: formData.email.trim().toLowerCase(),
+        businessPhone: formData.businessPhone,
+        businessType: formData.businessType,
+        city: formData.city,
+        state: formData.state,
+        storeLogo: "",
+        storeBanner: "",
+        rating: 0,
+        totalOrders: 0,
+        totalSales: 0,
+        totalRevenue: 0,
+        status: "Pending",
         createdAt: serverTimestamp(),
       });
 

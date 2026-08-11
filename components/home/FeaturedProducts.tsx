@@ -29,7 +29,7 @@ export default function FeaturedProducts() {
           const data = doc.data();
           items.push({
             id: doc.id,
-            name: data.name || "",
+            name: data.title || data.name || "",
           price: Number(
   data.sellingPrice ??
   data.price ??

@@ -141,7 +141,7 @@ if ((product.stock ?? 0) <= 10) {
               >
 
                 <td className="p-3">
-                  {product.name}
+                  {product.title}
                 </td>
 
                 <td className="p-3 font-bold">

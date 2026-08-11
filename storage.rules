@@ -1,22 +1,61 @@
 rules_version = '2';
 
-service firebase.storage {
+// ===============================================================
+// Assumed path model (from actual upload call sites)
+// ===============================================================
+//
+// vendor-kyc/{uid}/{label}-{timestamp}-{filename}
+//   The only genuinely uid-scoped path in the app today. Holds GST/Aadhaar/
+//   cancelled-cheque documents — sensitive PII, owner + admin read only.
+//
+// products/{timestamp}-{filename}
+// chat/{timestamp}-{filename}
+// delivery-proof/{orderId}-{timestamp}
+//   None of these embed a uid in the path (confirmed via codebase scan), so
+//   per-owner path scoping isn't possible without an app-code change to the
+//   upload call sites (app/seller/components/ProductForm.tsx,
+//   app/chat/[id]/page.tsx, app/seller/messages/[chatId]/page.tsx,
+//   app/delivery/[id]/page.tsx). Until then, writes to these paths are
+//   restricted to signed-in users with file-type/size limits to block abuse;
+//   this is a narrower guarantee than per-owner scoping.
+//
+// ===============================================================
 
+service firebase.storage {
   match /b/{bucket}/o {
 
-    function signedIn() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    // Public read for all uploaded files
-    match /{allPaths=**} {
-
-      allow read: if true;
-
-      allow write: if signedIn();
-
+    function isImageUnderLimit(maxMb) {
+      return request.resource.contentType.matches('image/.*')
+        && request.resource.size < maxMb * 1024 * 1024;
     }
 
-  }
+    match /vendor-kyc/{uid}/{fileName} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow write: if isSignedIn() && request.auth.uid == uid
+        && request.resource.size < 10 * 1024 * 1024;
+    }
 
+    match /products/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isImageUnderLimit(5);
+    }
+
+    match /chat/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isImageUnderLimit(5);
+    }
+
+    match /delivery-proof/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isImageUnderLimit(5);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
 }

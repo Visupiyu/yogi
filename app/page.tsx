@@ -20,19 +20,19 @@ import { Search } from "lucide-react";
 import QuickCategories from "@/components/home/QuickCategories";
 import CollectionStrip from "@/components/home/CollectionStrip";
 import PromoBanner from "@/components/home/PromoBanner";
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  stock: number;
-  category: string;
-};
+import { catalogTree, type CatalogNode } from "@/lib/catalog/catalogTree";
+import { toLegacyProduct, type LegacyProductView } from "@/lib/products/legacyDisplay";
 
+type Product = LegacyProductView;
+
+// "name" here is the catalog node's own display name (used to resolve the
+// real categoryId/subCategoryId), which isn't always the same as the row's
+// on-page title — e.g. Men/Women are subcategories of "Fashion", not their
+// own top-level category.
 const CATEGORY_ROWS = [
   { title: "📱 Mobiles", name: "Mobiles" },
-  { title: "👔 Men Fashion", name: "Men Fashion" },
-  { title: "👗 Women Fashion", name: "Women Fashion" },
+  { title: "👔 Men Fashion", name: "Men" },
+  { title: "👗 Women Fashion", name: "Women" },
   { title: "🧒 Kids Fashion", name: "Kids Fashion" },
   { title: "💻 Electronics", name: "Electronics" },
   { title: "💄 Beauty", name: "Beauty" },
@@ -40,12 +40,26 @@ const CATEGORY_ROWS = [
   { title: "🛒 Grocery", name: "Grocery" },
 ];
 
+function findCategoryNode(
+  nodes: CatalogNode[],
+  targetName: string
+): CatalogNode | null {
+  for (const node of nodes) {
+    if (node.name.toLowerCase() === targetName.toLowerCase()) return node;
+    if (node.children?.length) {
+      const found = findCategoryNode(node.children, targetName);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 async function loadProducts(): Promise<Product[]> {
   try {
     const snapshot = await getDocs(collection(db, "products"));
     const items: Product[] = [];
-    snapshot.forEach((doc) => {
-      items.push({ id: doc.id, ...doc.data() } as Product);
+    snapshot.forEach((docSnap) => {
+      items.push(toLegacyProduct(docSnap.id, docSnap.data()));
     });
     return items;
   } catch (err) {
@@ -97,8 +111,18 @@ if (filteredData.length === 0) {
     </main>
   );
 }
-  const byCategory = (name: string) =>
-    filteredData.filter((p) => p.category === name);
+  const byCategory = (name: string) => {
+    const node = findCategoryNode(catalogTree, name);
+    if (!node) return [];
+
+    if (node.level === 0) {
+      return filteredData.filter((p) => p.categoryId === node.id);
+    }
+    return filteredData.filter(
+      (p) =>
+        p.subCategoryId === node.id || p.leafCategoryId === node.id
+    );
+  };
 
   return (
     <main className="min-h-screen bg-gray-100 pb-16 md:pb-0">

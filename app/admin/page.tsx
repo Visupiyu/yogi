@@ -189,7 +189,7 @@ export default function AdminPage() {
     // Notifications
     const alerts: string[] = [];
     items.forEach((product) => {
-      if (product.stock < 5) alerts.push(`⚠️ Low stock: ${product.name}`);
+      if (product.stock < 5) alerts.push(`⚠️ Low stock: ${(product as any).title || product.name}`);
     });
     vendorList.forEach((vendor) => {
       if (vendor.status === "Pending")

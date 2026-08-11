@@ -50,7 +50,7 @@ export default function SellerQuestionsPage(){
         where(
           "vendorId",
           "==",
-          vendor.vendorId
+          vendor.uid
         )
 
       )

@@ -109,6 +109,8 @@ export default function EditProductPage() {
 
      vendorName={product.vendorName ?? ""}
 
+        product={product as Product & { id: string }}
+
       />
 
     </div>

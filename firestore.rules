@@ -1,43 +1,550 @@
 rules_version = '2';
 
-service cloud.firestore {
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Admin authorization: there is no custom claim or Firestore role field.
+// The app gates admin UI purely on a hardcoded email (app/admin/layout.tsx).
+// isAdmin() below mirrors that. The `adminUsers` collection is a separate,
+// disconnected staff directory and is NOT the admin gate.
+//
+// Collection: products            Doc ID: auto-id
+//   vendorId(string=uid, immutable), title, thumbnail, images(array<string>),
+//   sellingPrice(number), mrp(number), costPrice(number), stock(number),
+//   active(bool), approved(bool), categoryId, ... (many descriptive fields)
+//   Read: public. Write: owning vendor or admin. Checkout is additionally
+//   allowed to decrement `stock` / increment `sales` only (no vendor account
+//   is involved in that step).
+//
+// Collection: orders               Doc ID: auto-id
+//   userId(string=uid, immutable), vendorIds(array<string=uid>), items(array),
+//   total(number), status(string), paymentStatus(string).
+//   Create: the customer, for themselves. Read: owning customer, any vendor
+//   listed in vendorIds, or admin. Update: admin (any field), owning customer
+//   (cancel only, Pending->Cancelled), listed vendor (status only).
+//
+// Collection: vendors               Doc ID: auto-id (NOT the vendor's uid —
+//   several app call sites incorrectly assume doc-id==uid; ownership here is
+//   always via the `uid` field, never the document id)
+//   uid(string, immutable), status(string,"Pending"|"Approved"|"Rejected"),
+//   kycStatus(string), plus bank account/PAN/Aadhaar/KYC-doc-URL fields (PII).
+//   Create: signed-in user creating their own application, status/kycStatus
+//   forced to "Pending". Read/update: owner or admin only — this collection
+//   holds banking/KYC PII and must never be broadly readable, even though the
+//   public storefront page currently tries to read it (see follow-ups).
+//
+// Collection: users                 Doc ID: uid
+//   uid, name, email, role("customer"), rewardPoints(number), status.
+//   Owner CRUD on their own doc, role/status immutable by the owner. A signup
+//   referral bonus performs a narrow cross-user write of exactly
+//   {rewardPoints, totalReferrals} (increasing only) on the referrer's doc —
+//   allowed as a scoped carve-out, nothing else.
+//
+// Collection: chats                 Doc ID: auto-id
+//   sellerId(string=uid, always present). customerId(uid) and/or
+//   customerEmail are present depending on which of 3 code paths created the
+//   chat. A participant is: sellerId==auth.uid, OR customerId==auth.uid (if
+//   present), OR customerEmail==auth.token.email (if present).
+//
+// Collection: messages              Doc ID: auto-id (top-level, linked to
+//   chats only via a `chatId` field — not a subcollection)
+//   chatId(string), text/image, createdAt. The live UI never writes a uid on
+//   the message itself, so authorization is derived by reading the parent
+//   chats/{chatId} document and checking participant membership there.
+//
+// Collection: notifications         Doc ID: auto-id
+//   userId(uid, present for customer/seller docs), role("customer"|"seller"|
+//   "admin"), read(bool). These are written as a side effect of many
+//   different authenticated flows (checkout, admin actions, chat) on behalf
+//   of another user, so create is validated by shape only, not by creator
+//   identity. Read/update(mark read) restricted to the named recipient
+//   (userId==uid) or admin (for role=="admin" docs).
+//
+// Collection: addresses, tickets, returns, withdrawals   Doc ID: auto-id
+//   No uid field in any of these — ownership is by `userEmail` /
+//   `vendorEmail` matching request.auth.token.email.
+//
+// Collection: coupons               Doc ID: auto-id
+//   Admin-written only. Read allowed to any signed-in user (checkout needs to
+//   look up a coupon by code before purchase).
+//
+// Collection: rewardTransactions    Doc ID: auto-id
+//   Normally {userEmail, ...}, self-write only. The signup referral-bonus
+//   path additionally writes {userId(=referrer), type:"Referral Bonus",
+//   points} with no userEmail — allowed as a narrow, bounded carve-out.
+//
+// Collection: stockNotifications    Doc ID: auto-id
+//   {userEmail, vendorId(=product's vendor uid)}. Create: self (by email).
+//   Read/delete: the named vendor or admin.
+//
+// Collection: productQuestions, productReviews   Doc ID: auto-id
+//   Public Q&A/review content on product pages. No vendorId is ever written
+//   on productQuestions (a pre-existing app bug — the seller "answer
+//   questions" feature's query already returns nothing against real data),
+//   so answering is restricted to admin until the app is fixed to denormalize
+//   vendorId at write time.
+//
+// Collection: adminUsers, vendor_payouts, deliveryPartners   Doc ID: auto-id
+//   Admin-only in every direction. No legitimate client write/read path
+//   exists for these outside the admin console today.
+//
+// ===============================================================
 
+service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
+    // ---------------------------------------------------------
+    // Helper functions
+    // ---------------------------------------------------------
+
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    // Public product catalog
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == 'adminyogimart@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function isOwnerUid(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isOwnerEmail(email) {
+      return isSignedIn() && request.auth.token.email == email;
+    }
+
+    function affectedKeysOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function unchanged(field) {
+      // A field being deleted entirely (present before, absent after) must
+      // count as a change, not "unchanged" — otherwise an update can strip a
+      // protected field via FieldValue.delete() to bypass this check.
+      return (field in resource.data) == (field in request.resource.data)
+        && (!(field in resource.data) || request.resource.data[field] == resource.data[field]);
+    }
+
+    function isValidString(field, maxLen) {
+      return field in request.resource.data
+        && request.resource.data[field] is string
+        && request.resource.data[field].size() <= maxLen;
+    }
+
+    // ---------------------------------------------------------
+    // products
+    // ---------------------------------------------------------
+
+    function isValidProduct() {
+      let d = request.resource.data;
+      return d.vendorId is string
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.sellingPrice is number && d.sellingPrice >= 0
+        && d.stock is number && d.stock >= 0;
+    }
+
+    function isCheckoutStockUpdate() {
+      // Any signed-in customer completing checkout may decrement stock /
+      // increment sales on a product line item — nothing else may change.
+      return isSignedIn()
+        && affectedKeysOnly(['stock', 'sales'])
+        && request.resource.data.stock is number
+        && request.resource.data.stock <= resource.data.stock
+        && request.resource.data.stock >= 0;
+    }
+
     match /products/{productId} {
-  allow read: if true;
+      allow read: if true;
 
-  allow create: if signedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.vendorId == request.auth.uid
+        && isValidProduct();
 
-  allow update, delete: if signedIn()
-    && resource.data.vendorId == request.auth.uid;
-}
+      allow update: if isAdmin()
+        || (
+          isOwnerUid(resource.data.vendorId)
+          && unchanged('vendorId')
+          && unchanged('approved')
+          && unchanged('featured')
+          && isValidProduct()
+        )
+        || isCheckoutStockUpdate();
 
-    // Orders
+      allow delete: if isAdmin() || isOwnerUid(resource.data.vendorId);
+    }
+
+    // ---------------------------------------------------------
+    // orders
+    // ---------------------------------------------------------
+
+    function isValidOrder() {
+      let d = request.resource.data;
+      return d.userId is string
+        && d.vendorIds is list
+        && d.items is list
+        && d.total is number && d.total >= 0
+        && d.status == 'Pending';
+    }
+
     match /orders/{orderId} {
-      allow read, write: if signedIn();
+      allow read: if isAdmin()
+        || isOwnerUid(resource.data.userId)
+        || (isSignedIn() && request.auth.uid in resource.data.vendorIds);
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && isValidOrder();
+
+      allow update: if isAdmin()
+        || (
+          isOwnerUid(resource.data.userId)
+          && resource.data.status == 'Pending'
+          && request.resource.data.status == 'Cancelled'
+          && affectedKeysOnly(['status', 'updatedAt'])
+        )
+        || (
+          isSignedIn()
+          && request.auth.uid in resource.data.vendorIds
+          && affectedKeysOnly(['status', 'updatedAt'])
+          && request.resource.data.status in
+            ['Pending', 'Confirmed', 'Packed', 'Shipped', 'Out For Delivery', 'Delivered']
+        );
+
+      allow delete: if isAdmin();
     }
 
-    // Chats
+    // ---------------------------------------------------------
+    // vendors
+    // ---------------------------------------------------------
+
+    function isValidVendorApplication() {
+      let d = request.resource.data;
+      return d.uid == request.auth.uid
+        && d.status == 'Pending'
+        && d.kycStatus == 'Pending';
+    }
+
+    match /vendors/{vendorDocId} {
+      allow read: if isAdmin() || isOwnerUid(resource.data.uid);
+
+      allow create: if isSignedIn() && isValidVendorApplication();
+
+      allow update: if isAdmin()
+        || (
+          isOwnerUid(resource.data.uid)
+          && unchanged('uid')
+          && unchanged('status')
+          && unchanged('kycStatus')
+          && unchanged('commissionRate')
+          && unchanged('totalSales')
+          && unchanged('totalOrders')
+          && unchanged('totalRevenue')
+          && unchanged('pendingPayout')
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // vendors_public — public-safe mirror of vendors, keyed by uid.
+    // Storefront pages read this instead of the PII-bearing vendors doc.
+    // ---------------------------------------------------------
+
+    function isValidPublicVendorProfile() {
+      let d = request.resource.data;
+      return d.uid is string
+        && d.businessName is string && d.businessName.size() <= 200
+        && d.status in ['Pending', 'Approved', 'Rejected', 'Blocked'];
+    }
+
+    match /vendors_public/{uid} {
+      allow read: if true;
+
+      allow create: if isAdmin()
+        || (isOwnerUid(uid) && request.resource.data.uid == uid && isValidPublicVendorProfile());
+
+      allow update: if isAdmin()
+        || (
+          isOwnerUid(uid)
+          && unchanged('uid')
+          && unchanged('status')
+          && isValidPublicVendorProfile()
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // users
+    // ---------------------------------------------------------
+
+    function isValidNewUser() {
+      let d = request.resource.data;
+      return d.uid == request.auth.uid && d.role == 'customer';
+    }
+
+    function isReferralBonusUpdate() {
+      return isSignedIn()
+        && affectedKeysOnly(['rewardPoints', 'totalReferrals'])
+        && request.resource.data.rewardPoints is number
+        && request.resource.data.rewardPoints >= resource.data.rewardPoints
+        && request.resource.data.totalReferrals is number
+        && request.resource.data.totalReferrals >= resource.data.totalReferrals;
+    }
+
+    match /users/{userId} {
+      allow read: if isAdmin() || isOwnerUid(userId);
+
+      allow create: if isOwnerUid(userId) && isValidNewUser();
+
+      allow update: if isAdmin()
+        || (isOwnerUid(userId) && unchanged('role') && unchanged('status') && unchanged('uid'))
+        || isReferralBonusUpdate();
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // chats
+    // ---------------------------------------------------------
+
+    function isChatParticipant(chatData) {
+      return isSignedIn()
+        && (
+          chatData.sellerId == request.auth.uid
+          || ('customerId' in chatData && chatData.customerId == request.auth.uid)
+          || ('customerEmail' in chatData && chatData.customerEmail == request.auth.token.email)
+        );
+    }
+
+    function chatCreatorIsCustomer() {
+      let d = request.resource.data;
+      // At least one of customerId/customerEmail must be present AND match
+      // the caller — a chat can't be created with neither identifier set.
+      return d.sellerId is string
+        && (
+          ('customerId' in d && d.customerId == request.auth.uid)
+          || ('customerEmail' in d && d.customerEmail == request.auth.token.email)
+        );
+    }
+
     match /chats/{chatId} {
-      allow read, write: if signedIn();
+      allow read: if isChatParticipant(resource.data);
+
+      allow create: if isSignedIn() && chatCreatorIsCustomer();
+
+      allow update: if isChatParticipant(resource.data)
+        && unchanged('sellerId') && unchanged('customerId') && unchanged('customerEmail')
+        && unchanged('productId')
+        && affectedKeysOnly([
+          'lastMessage', 'lastSender', 'updatedAt', 'lastMessageAt',
+          'customerUnread', 'sellerUnread'
+        ]);
+
+      allow delete: if isAdmin();
     }
 
-    // Messages
+    // ---------------------------------------------------------
+    // messages (top-level; linked to chats via chatId field)
+    // ---------------------------------------------------------
+
     match /messages/{messageId} {
-      allow read, write: if signedIn();
+      allow read: if isChatParticipant(
+        get(/databases/$(database)/documents/chats/$(resource.data.chatId)).data
+      );
+
+      allow create: if isSignedIn()
+        && request.resource.data.chatId is string
+        && isChatParticipant(
+          get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data
+        );
+
+      allow update: if isChatParticipant(
+          get(/databases/$(database)/documents/chats/$(resource.data.chatId)).data
+        )
+        && affectedKeysOnly(['read']);
+
+      allow delete: if isAdmin();
     }
 
-    // All remaining collections
+    // ---------------------------------------------------------
+    // notifications
+    // ---------------------------------------------------------
+
+    match /notifications/{notificationId} {
+      allow read: if isAdmin()
+        || ('userId' in resource.data && isOwnerUid(resource.data.userId));
+
+      allow create: if isSignedIn()
+        && request.resource.data.role in ['customer', 'seller', 'admin']
+        && isValidString('title', 200)
+        && isValidString('message', 1000)
+        && (request.resource.data.role == 'admin' || request.resource.data.userId is string);
+
+      allow update: if (
+          isAdmin()
+          || ('userId' in resource.data && isOwnerUid(resource.data.userId))
+        )
+        && affectedKeysOnly(['read']);
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // addresses / tickets / returns  (owner = userEmail)
+    // ---------------------------------------------------------
+
+    match /addresses/{addressId} {
+      allow read, update, delete: if isAdmin() || isOwnerEmail(resource.data.userEmail);
+      allow create: if isSignedIn()
+        && request.resource.data.userEmail == request.auth.token.email;
+    }
+
+    match /tickets/{ticketId} {
+      allow read: if isAdmin() || isOwnerEmail(resource.data.userEmail);
+      allow create: if isSignedIn()
+        && request.resource.data.userEmail == request.auth.token.email
+        && isValidString('subject', 200)
+        && isValidString('message', 2000);
+      allow update: if isAdmin() && affectedKeysOnly(['status', 'adminReply']);
+      allow delete: if isAdmin();
+    }
+
+    match /returns/{returnId} {
+      allow read: if isAdmin() || isOwnerEmail(resource.data.userEmail);
+      allow create: if isSignedIn()
+        && request.resource.data.userEmail == request.auth.token.email
+        && request.resource.data.orderId is string;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isAdmin() || isOwnerEmail(resource.data.vendorEmail);
+      allow create: if isSignedIn()
+        && request.resource.data.vendorEmail == request.auth.token.email
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // coupons
+    // ---------------------------------------------------------
+
+    match /coupons/{couponId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // rewardTransactions
+    // ---------------------------------------------------------
+
+    match /rewardTransactions/{transactionId} {
+      allow read: if isAdmin()
+        || ('userEmail' in resource.data && isOwnerEmail(resource.data.userEmail));
+
+      allow create: if isAdmin()
+        || (
+          isSignedIn()
+          && 'userEmail' in request.resource.data
+          && request.resource.data.userEmail == request.auth.token.email
+        )
+        || (
+          // Signup referral-bonus carve-out: credits another user's uid,
+          // bounded and type-locked, no userEmail written.
+          isSignedIn()
+          && !('userEmail' in request.resource.data)
+          && request.resource.data.type == 'Referral Bonus'
+          && request.resource.data.points is number
+          && request.resource.data.points > 0
+          && request.resource.data.points <= 1000
+        );
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // stockNotifications
+    // ---------------------------------------------------------
+
+    match /stockNotifications/{notificationId} {
+      allow read: if isAdmin()
+        || isOwnerUid(resource.data.vendorId)
+        || isOwnerEmail(resource.data.userEmail);
+
+      allow create: if isSignedIn()
+        && request.resource.data.userEmail == request.auth.token.email
+        && request.resource.data.vendorId is string;
+
+      allow delete: if isAdmin() || isOwnerUid(resource.data.vendorId);
+      allow update: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // productQuestions / productReviews  (public Q&A/reviews)
+    // ---------------------------------------------------------
+
+    match /productQuestions/{questionId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.productId is string
+        && isValidString('question', 1000)
+        && request.resource.data.status == 'Pending';
+      // vendorId is now written at creation (denormalized from the
+      // product), so the owning vendor can answer directly. Older docs
+      // created before this fix have no vendorId and fall through to
+      // admin-only, same as before.
+      allow update: if isAdmin()
+        || (
+          isSignedIn()
+          && 'vendorId' in resource.data
+          && resource.data.vendorId == request.auth.uid
+          && affectedKeysOnly(['answer', 'status'])
+          && request.resource.data.status == 'Answered'
+        );
+      allow delete: if isAdmin();
+    }
+
+    match /productReviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userEmail == request.auth.token.email
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && isValidString('review', 2000);
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // Admin-only collections (no legitimate client write path exists
+    // outside the admin console today)
+    // ---------------------------------------------------------
+
+    match /adminUsers/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /vendor_payouts/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /deliveryPartners/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // Everything else: default deny
+    // ---------------------------------------------------------
+
     match /{document=**} {
-      allow read, write: if signedIn();
+      allow read, write: if false;
     }
-
   }
-
 }

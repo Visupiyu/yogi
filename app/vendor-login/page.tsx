@@ -83,6 +83,12 @@ export default function VendorLoginPage() {
         return;
       }
 
+      if (vendorData.status === "Blocked") {
+        await signOut(auth);
+        alert("Your vendor account has been blocked. Please contact support.");
+        return;
+      }
+
      // Clear previous customer/admin session
 localStorage.removeItem("user");
 localStorage.removeItem("admin");

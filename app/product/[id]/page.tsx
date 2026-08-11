@@ -61,6 +61,39 @@ type CartItem = {
   vendorName: string;
 };
 
+// Real product docs (written by the seller's ProductForm) use
+// title/thumbnail/sellingPrice/categoryId — this page's UI was built against
+// name/image/price/category. Normalize once here rather than rewriting every
+// reference below.
+function normalizeProduct(id: string, data: any): Product {
+  return {
+    id,
+    name: data.title || data.name || "",
+    image:
+      data.thumbnail ||
+      data.image ||
+      (Array.isArray(data.images) ? data.images[0] : "") ||
+      "",
+    images: Array.isArray(data.images) ? data.images : [],
+    price:
+      typeof data.sellingPrice === "number" ? data.sellingPrice : data.price || 0,
+    mrp: data.mrp,
+    discountPercent: data.discount,
+    stock: typeof data.stock === "number" ? data.stock : 0,
+    category: data.categoryId || data.category || "",
+    description: data.description || "",
+    vendorId: data.vendorId || "",
+    vendorName: data.vendorName || "",
+    color: data.color,
+    sizes: data.sizes,
+    material: data.material,
+    brand: data.brand,
+    countryOfOrigin: data.countryOfOrigin,
+    warranty: data.warranty,
+    ...(data.specifications || {}),
+  } as Product;
+}
+
 export default function ProductPage() {
   const params = useParams();
   const router = useRouter();
@@ -93,10 +126,7 @@ const [quantity, setQuantity] = useState(1);
 
         if (snap.exists()) {
           const productData = snap.data();
-         const fullProduct: Product = {
-  id: snap.id,
-  ...(productData as Omit<Product, "id">),
-};
+         const fullProduct: Product = normalizeProduct(snap.id, productData);
 
 setProduct(fullProduct);
 
@@ -129,19 +159,14 @@ setSelectedImage(
           const relatedSnap = await getDocs(
             query(
               collection(db, "products"),
-              where("category", "==", productData.category)
+              where("categoryId", "==", productData.categoryId)
             )
           );
           const related: Product[] = [];
 
 relatedSnap.forEach((d) => {
-  const data = d.data() as Omit<Product, "id">;
-
   if (d.id !== snap.id) {
-    related.push({
-      id: d.id,
-      ...data,
-    });
+    related.push(normalizeProduct(d.id, d.data()));
   }
 });
           setRelatedProducts(related.slice(0, 4));
@@ -304,7 +329,8 @@ questionSnap.forEach((d) => {
     try {
       await addDoc(collection(db, "productQuestions"), {
         productId: product.id,
-        productName: product.name,
+        productName: (product as any).title || product.name,
+        vendorId: product.vendorId || "",
         customerName: user.name || "Customer",
         question,
         answer: "",

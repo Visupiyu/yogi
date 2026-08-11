@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 import {
   BarChart,
   Bar,
@@ -36,7 +37,7 @@ export default function AdminAnalyticsPage() {
         ]);
 
         setOrders(oSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setProducts(pSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setProducts(pSnap.docs.map((d) => toLegacyProduct(d.id, d.data())));
         setVendors(vSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setCustomers(
           uSnap.docs

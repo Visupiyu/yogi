@@ -12,7 +12,7 @@ export default function StoresPage() {
   useEffect(() => {
     const loadStores = async () => {
       try {
-        const snap = await getDocs(collection(db, "vendors"));
+        const snap = await getDocs(collection(db, "vendors_public"));
         const data = snap.docs
           .map((doc) => ({ id: doc.id, ...doc.data() }))
           .filter((vendor: any) => vendor.status === "Approved");

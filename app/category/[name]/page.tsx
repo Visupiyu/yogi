@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductCard from "@/components/ProductCard";
+import { catalogTree } from "@/lib/catalog/catalogTree";
+import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 
 type Product = {
   id: string;
@@ -32,21 +34,29 @@ export default function CategoryPage() {
     async function loadProducts() {
       setLoading(true);
       try {
+        // categoryId on product docs is the catalog node's internal code
+        // (e.g. "FASHION"), not its display name — resolve the URL's
+        // display name back to that code before querying.
+        const matchedNode = catalogTree.find(
+          (node) => node.name.toLowerCase() === name.toLowerCase()
+        );
+        const categoryCode = matchedNode?.id || name;
+
         const snapshot = await getDocs(
-          query(collection(db, "products"), where("category", "==", name))
+          query(collection(db, "products"), where("categoryId", "==", categoryCode))
         );
         const items: Product[] = [];
         snapshot.forEach((docSnap) => {
-          const data: any = docSnap.data();
+          const legacy = toLegacyProduct(docSnap.id, docSnap.data());
           items.push({
-            id: docSnap.id,
-            name: data.name || "",
-            price: Number(data.price || 0),
-            image: data.image || "",
-            stock: Number(data.stock || 0),
-            brand: data.brand || "Other",
-            rating: Number(data.rating || 0),
-            createdAt: data.createdAt,
+            id: legacy.id,
+            name: legacy.name,
+            price: legacy.price,
+            image: legacy.image,
+            stock: legacy.stock,
+            brand: legacy.brand || "Other",
+            rating: Number((docSnap.data() as any).rating || 0),
+            createdAt: (docSnap.data() as any).createdAt,
           });
         });
         setProducts(items);

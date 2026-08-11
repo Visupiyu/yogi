@@ -7,9 +7,24 @@ import {
   getDocs,
   query,
   where,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import { toLegacyProduct } from "@/lib/products/legacyDisplay";
+import { findNodeByName } from "@/lib/catalog";
+
+// "Men Fashion"/"Women Fashion" are display-only labels; the catalog tree
+// itself just has "Men"/"Women" nested under "Fashion".
+const CATEGORY_NAME_ALIASES: Record<string, string> = {
+  "Men Fashion": "Men",
+  "Women Fashion": "Women",
+};
+
+function resolveCategoryNode(displayName: string) {
+  return findNodeByName(CATEGORY_NAME_ALIASES[displayName] || displayName);
+}
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -38,18 +53,13 @@ const [category, setCategory] = useState("All");
 
       try {
 
-        const vendorQuery = query(
-          collection(db, "vendors"),
-          where("uid", "==", id)
-        );
+        // Public-safe vendor mirror (vendors/ itself holds banking/KYC PII
+        // and is locked to owner/admin only)
+        const vendorDoc = await getDoc(doc(db, "vendors_public", String(id)));
 
-        const vendorSnap = await getDocs(vendorQuery);
-       
-        console.log("Seller state before render:", seller);
-
-        if (!vendorSnap.empty) {
-  setSeller(vendorSnap.docs[0].data());
-}
+        if (vendorDoc.exists()) {
+          setSeller(vendorDoc.data());
+        }
 
         const productQuery = query(
           collection(db, "products"),
@@ -62,10 +72,7 @@ const [category, setCategory] = useState("All");
 
         productSnap.forEach((docSnap) => {
 
-          items.push({
-            id: docSnap.id,
-            ...docSnap.data(),
-          });
+          items.push(toLegacyProduct(docSnap.id, docSnap.data()));
 
         });
 
@@ -375,9 +382,16 @@ if (!seller) {
           ?.toLowerCase()
           .includes(search.toLowerCase());
 
+      const categoryNode =
+        category === "All" ? null : resolveCategoryNode(category);
+
       const matchesCategory =
         category === "All" ||
-        product.category === category;
+        (categoryNode &&
+          (categoryNode.level === 0
+            ? product.categoryId === categoryNode.id
+            : product.subCategoryId === categoryNode.id ||
+              product.leafCategoryId === categoryNode.id));
 
       return matchesSearch && matchesCategory;
 

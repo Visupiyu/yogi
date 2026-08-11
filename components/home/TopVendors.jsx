@@ -12,7 +12,7 @@ export default function TopVendors() {
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const snapshot = await getDocs(collection(db, "vendors"));
+        const snapshot = await getDocs(collection(db, "vendors_public"));
         const items = [];
         snapshot.forEach((doc) => {
           items.push({ id: doc.id, ...doc.data() });

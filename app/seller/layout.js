@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import {usePathname, useRouter, } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useVendor } from "@/hooks/useVendor";
 import Image from "next/image";
 
 const navItems = [
@@ -21,17 +22,88 @@ const navItems = [
   { href: "/seller/stock-notifications", label: "Stock Notifications", icon: "🔔" },
 ];
 
+// First path segment for every real seller-dashboard route. Anything under
+// /seller/{x} whose first segment ISN'T one of these is the public
+// storefront (/seller/[vendorUid], linked from product & order pages) and
+// must NOT get the vendor-only gate or dashboard chrome.
+const SELLER_ROUTE_SEGMENTS = new Set([
+  "add",
+  "analytics",
+  "assistant",
+  "chat",
+  "edit",
+  "inventory",
+  "invoice",
+  "messages",
+  "notifications",
+  "orders",
+  "payouts",
+  "products",
+  "questions",
+  "reports",
+  "settings",
+  "stock-notifications",
+  "store",
+  "wallet",
+]);
+
+const BLOCKED_MESSAGES = {
+  Pending: "Vendor Approval Pending",
+  Rejected: "Vendor Account Rejected",
+  Blocked: "Your vendor account has been blocked. Please contact support.",
+};
+
 export default function SellerLayout({ children }) {
-  const pathname = usePathname();
+  const pathname = usePathname() || "";
   const router = useRouter();
 
-useEffect(() => {
-  const vendor = localStorage.getItem("vendor");
+  const segments = pathname.split("/").filter(Boolean); // ["seller", ...]
+  const firstSegment = segments[1];
+  const isPublicStorefront =
+    firstSegment !== undefined && !SELLER_ROUTE_SEGMENTS.has(firstSegment);
 
-  if (!vendor) {
-    router.replace("/vendor-login");
+  const { user, vendor, status, loading, error } = useVendor();
+
+  useEffect(() => {
+    if (isPublicStorefront) return;
+    if (loading) return;
+
+    if (!user) {
+      router.replace("/vendor-login");
+      return;
+    }
+
+    if (error === "no-vendor" || !vendor) {
+      signOut(auth);
+      localStorage.removeItem("vendor");
+      router.replace("/vendor-login");
+      return;
+    }
+
+    if (status && status !== "Approved") {
+      signOut(auth);
+      localStorage.removeItem("vendor");
+      alert(BLOCKED_MESSAGES[status] || "Vendor account is not active.");
+      router.replace("/vendor-login");
+    }
+  }, [isPublicStorefront, loading, user, vendor, status, error, router]);
+
+  // Public storefront pages render standalone — no vendor gate, no
+  // dashboard chrome.
+  if (isPublicStorefront) {
+    return <>{children}</>;
   }
-}, [router]);
+
+  // Gate all real seller-dashboard content until the session is verified
+  // as an approved vendor — re-checked live on every load, so a vendor
+  // blocked mid-session is kicked out immediately, not just at login.
+  if (loading || !user || !vendor || status !== "Approved") {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        Checking seller access…
+      </div>
+    );
+  }
 
   const logout = async () => {
     await signOut(auth);
@@ -97,7 +169,7 @@ Seller Support
 
       {/* CONTENT */}
       <main className="flex-1 min-w-0">{children}</main>
-      
+
     </div>
   );
 }

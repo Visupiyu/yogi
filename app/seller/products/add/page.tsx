@@ -4,7 +4,7 @@ import ProductForm from "../../components/ProductForm";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 
 export default function AddProductPage() {
  const [vendorId, setVendorId] = useState("");
@@ -18,11 +18,12 @@ useEffect(() => {
 
     setVendorId(user.uid);
 
-    const vendorRef = doc(db, "vendors", user.uid);
-    const vendorSnap = await getDoc(vendorRef);
+    const vendorSnap = await getDocs(
+      query(collection(db, "vendors"), where("uid", "==", user.uid))
+    );
 
-    if (vendorSnap.exists()) {
-      const data = vendorSnap.data();
+    if (!vendorSnap.empty) {
+      const data = vendorSnap.docs[0].data();
       setVendorName(data.businessName || data.fullName || "");
     }
 

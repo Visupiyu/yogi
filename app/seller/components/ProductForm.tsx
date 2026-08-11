@@ -9,20 +9,29 @@ import SpecificationForm from "./SpecificationForm";
 import ProductPreview from "./ProductPreview";
 import {validateProduct} from "@/lib/products/validation";
 import { db, storage } from "@/lib/firebase";
-import { collection,addDoc,serverTimestamp,} from "firebase/firestore";
+import { collection,addDoc,doc,updateDoc,serverTimestamp,} from "firebase/firestore";
 import {ref,uploadBytes,getDownloadURL,} from "firebase/storage";
 import { useRouter } from "next/navigation";
 
-interface ProductFormProps {vendorId: string;vendorName: string;}
-export default function ProductForm({ vendorId,vendorName,}: ProductFormProps) {
+interface ProductFormProps {
+  vendorId: string;
+  vendorName: string;
+  product?: Product & { id: string }; // pass to edit an existing product
+}
+export default function ProductForm({ vendorId,vendorName,product: existingProduct,}: ProductFormProps) {
+  const isEditing = Boolean(existingProduct?.id);
 
   // ==========================================
   // Initial Product
   // ==========================================
 const [imageFiles, setImageFiles] = useState<File[]>([]);
 
-const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const initialProduct = useMemo<Product>(() => ({
+const [imagePreviews, setImagePreviews] = useState<string[]>(
+  existingProduct?.images && existingProduct.images.length > 0
+    ? existingProduct.images
+    : []
+);
+  const defaultProduct = useMemo<Product>(() => ({
 
     // Identity
 
@@ -147,6 +156,16 @@ const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     updatedAt: new Date(),
 
   }), [vendorId, vendorName]);
+
+  const initialProduct = useMemo<Product>(() => {
+    if (!existingProduct) return defaultProduct;
+    return {
+      ...defaultProduct,
+      ...existingProduct,
+      vendorId,
+      vendorName,
+    };
+  }, [defaultProduct, existingProduct, vendorId, vendorName]);
 
   // ==========================================
   // State
@@ -287,13 +306,21 @@ const handleSubmit = async (
   setError("");
   setSuccess("");
 
+  const hasExistingImages =
+    isEditing && (product.thumbnail || (product.images?.length ?? 0) > 0);
+
   // Basic validation first
   const result = validateProduct({
     ...product,
     vendorId: vendorId,
     vendorName: vendorName,
-    thumbnail: "pending",
-    images: imageFiles.length > 0 ? ["pending"] : [],
+    thumbnail: imageFiles.length > 0 ? "pending" : product.thumbnail,
+    images:
+      imageFiles.length > 0
+        ? ["pending"]
+        : hasExistingImages
+        ? product.images
+        : [],
   });
 
   if (!result.valid) {
@@ -301,8 +328,9 @@ const handleSubmit = async (
     return;
   }
 
-  // At least one image must be selected
-  if (imageFiles.length === 0) {
+  // At least one image is required for a brand-new product; when editing,
+  // the existing images are kept unless the seller selects new ones.
+  if (imageFiles.length === 0 && !hasExistingImages) {
     setError("Please select at least one product image.");
     return;
   }
@@ -314,25 +342,27 @@ const handleSubmit = async (
     const uploadedImages: string[] = [];
 
     // ==========================================
-    // Upload Images
+    // Upload Images (only if new ones were picked)
     // ==========================================
 
-    for (const file of imageFiles) {
+    if (imageFiles.length > 0) {
+      for (const file of imageFiles) {
 
-      const storageRef = ref(
-        storage,
-        `products/${Date.now()}-${file.name}`
-      );
+        const storageRef = ref(
+          storage,
+          `products/${Date.now()}-${file.name}`
+        );
 
-      await uploadBytes(
-        storageRef,
-        file
-      );
+        await uploadBytes(
+          storageRef,
+          file
+        );
 
-      const url =
-        await getDownloadURL(storageRef);
+        const url =
+          await getDownloadURL(storageRef);
 
-      uploadedImages.push(url);
+        uploadedImages.push(url);
+      }
     }
 
     // ==========================================
@@ -346,10 +376,10 @@ const handleSubmit = async (
       vendorName,
 
       thumbnail:
-        uploadedImages[0] || "",
+        uploadedImages[0] || product.thumbnail || "",
 
       images:
-        uploadedImages,
+        uploadedImages.length > 0 ? uploadedImages : product.images || [],
 
       discount:
         product.mrp > 0
@@ -360,9 +390,6 @@ const handleSubmit = async (
             )
           : 0,
 
-      createdAt:
-        serverTimestamp(),
-
       updatedAt:
         serverTimestamp(),
     };
@@ -371,14 +398,28 @@ const handleSubmit = async (
     // Save Product
     // ==========================================
 
-    await addDoc(
-      collection(db, "products"),
-      finalProduct
-    );
+    if (isEditing && existingProduct) {
+      const { id, createdAt, ...updatePayload } = finalProduct as typeof finalProduct & {
+        id?: string;
+      };
+      await updateDoc(
+        doc(db, "products", existingProduct.id),
+        updatePayload
+      );
 
-    setSuccess(
-      "Product Added Successfully."
-    );
+      setSuccess(
+        "Product Updated Successfully."
+      );
+    } else {
+      await addDoc(
+        collection(db, "products"),
+        { ...finalProduct, createdAt: serverTimestamp() }
+      );
+
+      setSuccess(
+        "Product Added Successfully."
+      );
+    }
 
     router.push(
       "/seller/products"
@@ -1486,7 +1527,7 @@ Upload up to 5 product images.
     disabled={loading}
     className="rounded-lg bg-blue-600 px-8 py-3 text-white"
   >
-    {loading ? "Saving..." : "Save Product"}
+    {loading ? "Saving..." : isEditing ? "Update Product" : "Save Product"}
   </button>
 
 </div>
@@ -1517,7 +1558,7 @@ Live Preview
       disabled={loading}
       className="rounded-lg bg-blue-600 px-8 py-3 text-white"
     >
-      {loading ? "Saving..." : "Save Product"}
+      {loading ? "Saving..." : isEditing ? "Update Product" : "Save Product"}
     </button>
 
 

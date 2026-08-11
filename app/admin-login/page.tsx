@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  sendEmailVerification,
+} from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import Image from "next/image";
@@ -31,6 +35,18 @@ const userEmail = (result.user.email || "").toLowerCase();
 if (!adminEmails.includes(userEmail)) {
   await signOut(auth);
   alert("Not Admin Account");
+  return;
+}
+
+if (!result.user.emailVerified) {
+  await sendEmailVerification(result.user);
+  await signOut(auth);
+  alert(
+    "This admin account's email isn't verified yet, which the security rules now require for admin access. " +
+      "We just sent a verification link to " +
+      userEmail +
+      " — open it, then log in again here."
+  );
   return;
 }
 

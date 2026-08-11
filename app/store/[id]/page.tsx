@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductCard from "@/components/ProductCard";
+import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 
 export default function StorePage() {const params = useParams(); const router = useRouter();
 
@@ -30,17 +31,17 @@ export default function StorePage() {const params = useParams(); const router = 
         );
         const snapshot = await getDocs(q);
         const items: any[] = [];
-        snapshot.forEach((doc) => {
-          items.push({ id: doc.id, ...doc.data() });
+        snapshot.forEach((docSnap) => {
+          items.push(toLegacyProduct(docSnap.id, docSnap.data()));
         });
         setProducts(items);
 
-        // Vendor record (look up by uid to match the link)
-        const vendorSnap = await getDocs(
-          query(collection(db, "vendors"), where("uid", "==", params.id))
-        );
-        if (!vendorSnap.empty) {
-          setVendorInfo(vendorSnap.docs[0].data());
+        // Public-safe vendor mirror (vendors/ itself holds banking/KYC PII
+        // and is locked to owner/admin only)
+        const vendorDoc = await getDoc(doc(db, "vendors_public", String(params.id)));
+        const vendorData = vendorDoc.exists() ? vendorDoc.data() : null;
+        if (vendorData) {
+          setVendorInfo(vendorData);
         }
 
         setTotalProducts(items.length);
@@ -50,8 +51,8 @@ export default function StorePage() {const params = useParams(); const router = 
 
         if (items.length > 0) {
           setVendorName(items[0].vendorName || "Vendor Store");
-        } else if (!vendorSnap.empty) {
-          setVendorName(vendorSnap.docs[0].data().businessName || "Vendor Store");
+        } else if (vendorData) {
+          setVendorName(vendorData.businessName || "Vendor Store");
         }
       } catch (error) {
         console.error(error);

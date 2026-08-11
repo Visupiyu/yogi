@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
 type Vendor = {
   id: string;
+  uid: string;
   fullName: string;
   businessName: string;
   email: string;
@@ -22,6 +23,7 @@ export default function AdminVendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [backfilling, setBackfilling] = useState(false);
 
   useEffect(() => {
     loadVendors();
@@ -35,6 +37,7 @@ export default function AdminVendorsPage() {
         const data: any = docSnap.data();
         items.push({
           id: docSnap.id,
+          uid: data.uid || "",
           fullName: data.fullName || "-",
           businessName: data.businessName || data.storeName || "-",
           email: data.email || "-",
@@ -63,11 +66,63 @@ export default function AdminVendorsPage() {
   const updateVendorStatus = async (vendor: Vendor, status: string) => {
     try {
       await updateDoc(doc(db, "vendors", vendor.id), { status });
+      if (vendor.uid) {
+        await setDoc(
+          doc(db, "vendors_public", vendor.uid),
+          { status },
+          { merge: true }
+        );
+      }
       toast.success(`Vendor ${status}.`);
       loadVendors();
     } catch (error) {
       console.error(error);
       toast.error("Update failed.");
+    }
+  };
+
+  const backfillPublicProfiles = async () => {
+    // One-time migration: vendors registered before the vendors_public
+    // mirror existed have no public-safe profile yet, so they're invisible
+    // on /stores, /seller/[id] and the homepage Top Vendors strip. Safe to
+    // re-run any time (idempotent merge writes).
+    setBackfilling(true);
+    try {
+      const snapshot = await getDocs(collection(db, "vendors"));
+      let count = 0;
+      for (const vendorDoc of snapshot.docs) {
+        const data: any = vendorDoc.data();
+        if (!data.uid) continue;
+        await setDoc(
+          doc(db, "vendors_public", data.uid),
+          {
+            uid: data.uid,
+            businessName: data.businessName || "",
+            fullName: data.fullName || "",
+            email: data.email || "",
+            businessPhone: data.businessPhone || "",
+            businessType: data.businessType || "",
+            city: data.city || "",
+            state: data.state || "",
+            storeLogo: data.storeLogo || "",
+            storeBanner: data.storeBanner || "",
+            rating: data.rating || 0,
+            totalOrders: data.totalOrders || 0,
+            totalSales: data.totalSales || 0,
+            totalRevenue: data.totalRevenue || 0,
+            status: data.status || "Pending",
+            createdAt: data.createdAt || null,
+          },
+          { merge: true }
+        );
+        count++;
+      }
+      toast.success(`Backfilled ${count} vendor public profiles.`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Backfill failed.");
+    } finally {
+      setBackfilling(false);
     }
   };
 
@@ -114,7 +169,15 @@ export default function AdminVendorsPage() {
           <p className="mt-2 opacity-90">Manage all marketplace vendors</p>
         </div>
 
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-end gap-3 mb-6">
+          <button
+            onClick={backfillPublicProfiles}
+            disabled={backfilling}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition text-white px-6 py-3 rounded-xl"
+            title="One-time: populate public storefront profiles for vendors that registered before this existed"
+          >
+            {backfilling ? "Backfilling..." : "🔄 Backfill Public Profiles"}
+          </button>
           <button
             onClick={exportCSV}
             className="bg-green-600 hover:bg-green-700 transition text-white px-6 py-3 rounded-xl"
@@ -237,7 +300,7 @@ export default function AdminVendorsPage() {
 
                         <div className="flex gap-3 mt-3 text-sm">
                           <Link
-                            href={`/store/${vendor.id}`}
+                            href={`/store/${vendor.uid}`}
                             className="text-blue-600 font-semibold hover:underline"
                           >
                             Products

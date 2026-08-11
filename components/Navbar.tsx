@@ -135,13 +135,18 @@ useEffect(() => {
         const items: ProductSuggestion[] = [];
         snapshot.forEach((doc) => {
   const data = doc.data();
+  const title: string = data.title || data.name || "";
 
-  if (data.name?.toLowerCase().includes(trimmed.toLowerCase())) {
+  if (title.toLowerCase().includes(trimmed.toLowerCase())) {
     items.push({
       id: doc.id,
-      name: data.name,
-      image: data.image,
-      price: data.price,
+      name: title,
+      image:
+        data.thumbnail ||
+        (Array.isArray(data.images) ? data.images[0] : "") ||
+        data.image ||
+        "",
+      price: Number(data.sellingPrice ?? data.price ?? 0),
     });
   }
 });

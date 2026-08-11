@@ -89,6 +89,43 @@ export function findNodeBySlug(
 }
 
 /**
+ * Find category by display name (case-insensitive)
+ */
+
+export function findNodeByName(
+  name: string,
+  nodes: CatalogNode[] = catalogTree
+): CatalogNode | undefined {
+
+  const lower = name.toLowerCase();
+
+  for (const node of nodes) {
+
+    if (node.name.toLowerCase() === lower) {
+      return node;
+    }
+
+    if (node.children) {
+
+      const found =
+        findNodeByName(
+          name,
+          node.children
+        );
+
+      if (found) {
+        return found;
+      }
+
+    }
+
+  }
+
+  return undefined;
+
+}
+
+/**
  * Get direct children
  */
 

@@ -7,18 +7,23 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductFilters from "@/components/ProductFilters";
 import { addToCart as addToCartHelper } from "@/lib/cart";
+import { findNodeByName } from "@/lib/catalog";
+import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 
+// label = shown in the dropdown, value = the catalog node name used to
+// resolve the real categoryId/subCategoryId (Men/Women are subcategories of
+// "Fashion" in the catalog tree, not their own top-level category).
 const CATEGORIES = [
-  "Men Fashion",
-  "Women Fashion",
-  "Kids Fashion",
-  "Electronics",
-  "Beauty",
-  "Appliances",
-  "Furniture",
-  "Grocery",
-  "Mobiles",
-  "Books",
+  { label: "Men Fashion", value: "Men" },
+  { label: "Women Fashion", value: "Women" },
+  { label: "Kids Fashion", value: "Kids Fashion" },
+  { label: "Electronics", value: "Electronics" },
+  { label: "Beauty", value: "Beauty" },
+  { label: "Appliances", value: "Appliances" },
+  { label: "Furniture", value: "Furniture" },
+  { label: "Grocery", value: "Grocery" },
+  { label: "Mobiles", value: "Mobiles" },
+  { label: "Books", value: "Books" },
 ];
 
 function SearchContent() {
@@ -50,12 +55,12 @@ const [quickColor, setQuickColor] = useState("");
         const items = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
-          const searchText = `${data.name || ""} ${data.category || ""} ${
-            data.description || ""
-          }`.toLowerCase();
+          const searchText = `${data.title || data.name || ""} ${
+            data.brand || ""
+          } ${data.description || ""}`.toLowerCase();
 
           if (searchText.includes(query.trim().toLowerCase())) {
-            items.push({ id: doc.id, ...data });
+            items.push(toLegacyProduct(doc.id, data));
           }
         });
         setProducts(items);
@@ -105,7 +110,14 @@ if (inStockOnly) {
 }
 
     if (category) {
-      items = items.filter((item) => item.category === category);
+      const node = findNodeByName(category);
+      items = items.filter((item) =>
+        node
+          ? node.level === 0
+            ? item.categoryId === node.id
+            : item.subCategoryId === node.id || item.leafCategoryId === node.id
+          : false
+      );
     }
     if (minimumRating > 0) {
   items = items.filter(
@@ -181,8 +193,8 @@ if (minimumDiscount > 0) {
           >
             <option value="">All Categories</option>
             {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
+              <option key={c.value} value={c.value}>
+                {c.label}
               </option>
             ))}
           </select>

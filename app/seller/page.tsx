@@ -48,7 +48,7 @@ export default function SellerPage() {
         sales += product.sales || 0;
         if ((product.sales || 0) > topSales) {
           topSales = product.sales || 0;
-          topProduct = product.name;
+          topProduct = product.title;
         }
       });
 

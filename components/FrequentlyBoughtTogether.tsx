@@ -38,15 +38,22 @@ export default function FrequentlyBoughtTogether({
 
           if (
             doc.id !== currentProductId &&
-            data.category === category
+            data.categoryId === category
           ) {
             items.push({
               id: doc.id,
-              name: data.name || "",
-              image: data.image || "",
-              price: Number(data.price || 0),
+              name: data.title || data.name || "",
+              image:
+                data.thumbnail ||
+                (Array.isArray(data.images) ? data.images[0] : "") ||
+                data.image ||
+                "",
+              price:
+                typeof data.sellingPrice === "number"
+                  ? data.sellingPrice
+                  : Number(data.price || 0),
               stock: Number(data.stock || 0),
-              category: data.category || "",
+              category: data.categoryId || "",
             });
           }
         });

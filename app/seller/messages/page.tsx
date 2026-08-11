@@ -140,6 +140,8 @@ export default function SellerMessagesPage() {
     id: docSnap.id,
   };
 });
+
+           setChats(list);
           } catch (error) {
 
             console.error(error);

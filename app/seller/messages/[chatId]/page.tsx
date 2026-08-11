@@ -32,7 +32,7 @@ export default function SellerChatPage() {
 
   const params = useParams();
 
-  const chatId = params.Id as string;
+  const chatId = params.chatId as string;
 
   const bottomRef =
     useRef<HTMLDivElement>(null);

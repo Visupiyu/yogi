@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 
 import {
+  collection,
   doc,
-  getDoc,
+  getDocs,
+  query,
+  setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
 
 import {
@@ -21,7 +25,9 @@ const [loading, setLoading] = useState(true);
 
 const [saving, setSaving] = useState(false);
 
-const [vendorId, setVendorId] = useState("");
+const [vendorId, setVendorId] = useState(""); // auth uid
+const [vendorDocId, setVendorDocId] = useState(""); // vendors/ collection doc ID
+const [vendorStatus, setVendorStatus] = useState("Pending");
 
 const [form, setForm] = useState({
     businessName: "",
@@ -57,17 +63,20 @@ useEffect(() => {
 
       setVendorId(user.uid);
 
-      const ref = doc(db, "vendors", user.uid);
+      const snap = await getDocs(
+        query(collection(db, "vendors"), where("uid", "==", user.uid))
+      );
 
-      const snap = await getDoc(ref);
+      if (!snap.empty) {
 
-      if (snap.exists()) {
+        setVendorDocId(snap.docs[0].id);
+        setVendorStatus(snap.docs[0].data().status || "Pending");
 
         setForm((prev) => ({
 
           ...prev,
 
-          ...snap.data(),
+          ...snap.docs[0].data(),
 
         }));
 
@@ -88,12 +97,36 @@ const saveSettings = async () => {
 
     setSaving(true);
 
+    if (!vendorDocId) {
+      alert("Vendor record not found.");
+      return;
+    }
+
     await updateDoc(
 
-      doc(db, "vendors", vendorId),
+      doc(db, "vendors", vendorDocId),
 
       form
 
+    );
+
+    // Keep the public storefront mirror in sync with the display-safe fields
+    await setDoc(
+      doc(db, "vendors_public", vendorId),
+      {
+        uid: vendorId,
+        status: vendorStatus,
+        businessName: form.businessName,
+        fullName: form.fullName,
+        email: form.email,
+        businessPhone: form.businessPhone,
+        businessType: form.businessType,
+        city: form.city,
+        state: form.state,
+        storeLogo: form.storeLogo,
+        storeBanner: form.storeBanner,
+      },
+      { merge: true }
     );
 
     alert("Store updated successfully.");

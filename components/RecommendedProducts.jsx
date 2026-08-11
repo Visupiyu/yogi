@@ -12,6 +12,8 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import { findNodeByName } from "@/lib/catalog";
+import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 
 const collections = [
   {
@@ -38,18 +40,20 @@ const collections = [
 
 async function getCategoryProducts(category) {
 
+  const node = findNodeByName(category);
+  if (!node) return [];
+
   const q = query(
     collection(db, "products"),
-    where("category", "==", category),
+    node.level === 0
+      ? where("categoryId", "==", node.id)
+      : where("subCategoryId", "==", node.id),
     limit(4)
   );
 
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  return snapshot.docs.map((doc) => toLegacyProduct(doc.id, doc.data()));
 
 }
 

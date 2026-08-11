@@ -48,14 +48,20 @@ export default function AdminProductsPage() {
         const data: any = docSnap.data();
         items.push({
           id: docSnap.id,
-          name: data.name || "Product",
-          image: data.image || "",
-          category: data.category || "Others",
+          name: data.title || data.name || "Product",
+          image:
+            data.thumbnail ||
+            (Array.isArray(data.images) ? data.images[0] : "") ||
+            data.image ||
+            "",
+          category: data.categoryId || data.category || "Others",
           vendorName: data.vendorName || "Unknown",
-          price: data.price || 0,
+          price: typeof data.sellingPrice === "number" ? data.sellingPrice : data.price || 0,
           stock: data.stock || 0,
           sales: data.sales || 0,
-          status: data.status || "Active",
+          // Real schema gates visibility via `active` (bool), not a status
+          // string — derive the display label from that.
+          status: data.active === false ? "Blocked" : "Active",
         });
       });
       setProducts(items);
@@ -69,7 +75,7 @@ export default function AdminProductsPage() {
   const toggleStatus = async (product: Product) => {
     try {
       await updateDoc(doc(db, "products", product.id), {
-        status: product.status === "Active" ? "Blocked" : "Active",
+        active: product.status !== "Active",
       });
       toast.success("Product updated.");
       loadProducts();

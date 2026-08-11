@@ -36,15 +36,20 @@ export default function Header() {
         const items: Product[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
+          const title: string = data.title || data.name || "";
           if (
-  data.name?.toLowerCase().includes(search.toLowerCase()) &&
+  title.toLowerCase().includes(search.toLowerCase()) &&
   Number(data.stock || 0) > 0
 ) {
             items.push({
               id: doc.id,
-              name: data.name || "",
-              price: Number(data.price || 0),
-              image: data.image || "",
+              name: title,
+              price: Number(data.sellingPrice ?? data.price ?? 0),
+              image:
+                data.thumbnail ||
+                (Array.isArray(data.images) ? data.images[0] : "") ||
+                data.image ||
+                "",
               stock: Number(data.stock || 0),
             });
           }

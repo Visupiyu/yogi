@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export default function AdminKYCPage() {
@@ -45,6 +45,14 @@ setVendors(items);
         kycStatus: status,
         status: status,
       });
+      const uid = vendors.find((vendor) => vendor.id === id)?.uid;
+      if (uid) {
+        await setDoc(
+          doc(db, "vendors_public", uid),
+          { status },
+          { merge: true }
+        );
+      }
       setVendors(
         vendors.map((vendor) =>
           vendor.id === id
