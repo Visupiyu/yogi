@@ -41,6 +41,20 @@ export default function CategorySelector({
   const [selectedPath, setSelectedPath] =
     useState<string[]>([]);
 
+  // "Other (please specify)" fallback: the predefined catalog can never
+  // cover every product type. When a seller picks this, they type their
+  // own category name instead of being blocked. The typed text is stored
+  // directly as that level's path entry (prefixed so it's unambiguous),
+  // so anything downstream that resolves a category id back to a display
+  // name and falls back to the raw value when no match is found (as the
+  // product page already does) still shows something readable.
+  const CUSTOM_OPTION = "__OTHER__";
+  const CUSTOM_PREFIX = "CUSTOM:";
+  const isCustomValue = (v: string) => v.startsWith(CUSTOM_PREFIX);
+
+  const [customLevels, setCustomLevels] =
+    useState<Record<number, boolean>>({});
+
   // ==========================================
   // Find complete category path (walk up via parentId)
   // ==========================================
@@ -156,6 +170,17 @@ export default function CategorySelector({
     level: number,
     categoryId: string
   ) => {
+    if (categoryId === CUSTOM_OPTION) {
+      setCustomLevels((prev) => ({ ...prev, [level]: true }));
+
+      const truncated = selectedPath.slice(0, level);
+      setSelectedPath(truncated);
+      onChange(truncated[0] || "", truncated);
+      return;
+    }
+
+    setCustomLevels((prev) => ({ ...prev, [level]: false }));
+
     if (!categoryId) {
       const newPath =
         selectedPath.slice(0, level);
@@ -191,6 +216,20 @@ export default function CategorySelector({
     );
   };
 
+  const handleCustomInput = (
+    level: number,
+    text: string
+  ) => {
+    const trimmed = text.trim();
+
+    const newPath = trimmed
+      ? [...selectedPath.slice(0, level), `${CUSTOM_PREFIX}${trimmed}`]
+      : selectedPath.slice(0, level);
+
+    setSelectedPath(newPath);
+    onChange(newPath[0] || "", newPath);
+  };
+
   // ==========================================
   // UI
   // ==========================================
@@ -200,8 +239,14 @@ export default function CategorySelector({
 
       {levels.map(
         (options, level) => {
-          const selectedValue =
-            selectedPath[level] || "";
+          const isCustom = !!customLevels[level] ||
+            isCustomValue(selectedPath[level] || "");
+          const selectedValue = isCustom
+            ? CUSTOM_OPTION
+            : selectedPath[level] || "";
+          const customText = isCustomValue(selectedPath[level] || "")
+            ? (selectedPath[level] || "").slice(CUSTOM_PREFIX.length)
+            : "";
 
           return (
             <div key={level}>
@@ -256,7 +301,35 @@ export default function CategorySelector({
                   )
                 )}
 
+                <option value={CUSTOM_OPTION}>
+                  Other (please specify)
+                </option>
+
               </select>
+
+              {isCustom && (
+                <input
+                  type="text"
+                  autoFocus
+                  defaultValue={customText}
+                  onChange={(e) =>
+                    handleCustomInput(level, e.target.value)
+                  }
+                  placeholder="Type your category name"
+                  className="
+                    mt-2
+                    w-full
+                    rounded-lg
+                    border
+                    border-blue-300
+                    p-3
+                    focus:border-blue-600
+                    focus:outline-none
+                    focus:ring-2
+                    focus:ring-blue-100
+                  "
+                />
+              )}
 
             </div>
           );

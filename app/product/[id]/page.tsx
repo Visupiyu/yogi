@@ -516,8 +516,12 @@ const savings = hasDiscount ? mrp - price : 0;
     (product as any).leafCategoryId ||
     (product as any).subCategoryId ||
     product.category;
-  const categoryDisplayName =
-    findNodeById(displayCategoryId ?? "")?.name || product.category;
+  // A seller-typed "Other" category is stored as "CUSTOM:<their text>" —
+  // show their text directly rather than falling back to the real
+  // top-level category, which would be misleading.
+  const categoryDisplayName = displayCategoryId?.startsWith("CUSTOM:")
+    ? displayCategoryId.slice("CUSTOM:".length)
+    : findNodeById(displayCategoryId ?? "")?.name || product.category;
 
   const specifications: [string, string | undefined][] = [
     ["Brand", product.brand],

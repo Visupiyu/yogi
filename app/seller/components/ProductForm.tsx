@@ -698,12 +698,6 @@ Category
 
 <div>
 
-<label className="mb-2 block text-sm font-semibold">
-
-Category *
-
-</label>
-
 <CategorySelector
   value={product.categoryId}
   onChange={(category, path) => {
