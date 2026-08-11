@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { categoryFields } from "@/lib/catalog/categoryFields";
 
 interface SpecificationFormProps {
@@ -40,10 +41,96 @@ export default function SpecificationForm({
     });
   };
 
+  // ==========================================
+  // Custom specifications (fallback for categories
+  // with no predefined field set)
+  // ==========================================
+
+  const [newSpecKey, setNewSpecKey] = useState("");
+  const [newSpecValue, setNewSpecValue] = useState("");
+
+  const addCustomSpec = () => {
+    const key = newSpecKey.trim();
+    const value = newSpecValue.trim();
+
+    if (!key || !value) {
+      alert("Enter both a name and a value.");
+      return;
+    }
+
+    if (specifications[key] !== undefined) {
+      alert("A specification with this name already exists.");
+      return;
+    }
+
+    onChange({
+      ...specifications,
+      [key]: value,
+    });
+
+    setNewSpecKey("");
+    setNewSpecValue("");
+  };
+
+  const removeCustomSpec = (key: string) => {
+    const updated = { ...specifications };
+    delete updated[key];
+    onChange(updated);
+  };
+
   if (fields.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed p-6 text-center text-gray-500">
-        No specifications available for this category.
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          No predefined specifications for this category yet — add your
+          own below.
+        </p>
+
+        {Object.entries(specifications).length > 0 && (
+          <div className="space-y-2">
+            {Object.entries(specifications).map(([key, value]) => (
+              <div
+                key={key}
+                className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-2"
+              >
+                <span className="text-sm">
+                  <span className="font-semibold">{key}:</span> {value}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeCustomSpec(key)}
+                  className="text-sm font-semibold text-red-600 hover:text-red-700"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input
+            type="text"
+            value={newSpecKey}
+            onChange={(e) => setNewSpecKey(e.target.value)}
+            placeholder="Specification name (e.g. Material)"
+            className="flex-1 rounded-lg border border-gray-300 p-3 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          />
+          <input
+            type="text"
+            value={newSpecValue}
+            onChange={(e) => setNewSpecValue(e.target.value)}
+            placeholder="Value (e.g. Cotton)"
+            className="flex-1 rounded-lg border border-gray-300 p-3 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+          />
+          <button
+            type="button"
+            onClick={addCustomSpec}
+            className="rounded-lg border border-blue-600 px-5 py-3 font-semibold text-blue-600 hover:bg-blue-50"
+          >
+            + Add
+          </button>
+        </div>
       </div>
     );
   }

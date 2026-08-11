@@ -10,6 +10,8 @@ import { db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
 import { addToCart as addToCartHelper } from "@/lib/cart";
+import { categoryFields } from "@/lib/catalog/categoryFields";
+import { findNodeById } from "@/lib/catalog/categoryUtils";
 
 type Product = { id: string; name: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
@@ -81,6 +83,8 @@ function normalizeProduct(id: string, data: any): Product {
     discountPercent: data.discount,
     stock: typeof data.stock === "number" ? data.stock : 0,
     category: data.categoryId || data.category || "",
+    subCategoryId: data.subCategoryId || "",
+    leafCategoryId: data.leafCategoryId || "",
     description: data.description || "",
     vendorId: data.vendorId || "",
     vendorName: data.vendorName || "",
@@ -90,7 +94,7 @@ function normalizeProduct(id: string, data: any): Product {
     brand: data.brand,
     countryOfOrigin: data.countryOfOrigin,
     warranty: data.warranty,
-    ...(data.specifications || {}),
+    specifications: data.specifications || {},
   } as Product;
 }
 
@@ -491,93 +495,41 @@ const savings = hasDiscount ? mrp - price : 0;
   const ratingCounts = [5, 4, 3, 2, 1].map(
   (star) => reviews.filter((r) => r.rating === star).length
 );
+  // The seller's specification form writes into product.specifications
+  // (a plain {fieldId: value} map — predefined field IDs like "material"/
+  // "fitType" for categories that have them defined, or free-text keys for
+  // custom specs). Resolve field IDs back to their human-readable labels
+  // where a matching category field definition exists; fall back to the
+  // raw key for custom specs.
+  const categoryFieldDefs: any[] =
+    categoryFields[(product as any).leafCategoryId ?? ""] ??
+    categoryFields[(product as any).subCategoryId ?? ""] ??
+    categoryFields[product.category ?? ""] ??
+    [];
+
+  const specLabel = (key: string) => {
+    const match = categoryFieldDefs.find((f) => f.id === key);
+    return match?.label || key;
+  };
+
+  const displayCategoryId =
+    (product as any).leafCategoryId ||
+    (product as any).subCategoryId ||
+    product.category;
+  const categoryDisplayName =
+    findNodeById(displayCategoryId ?? "")?.name || product.category;
+
   const specifications: [string, string | undefined][] = [
-  ["Brand", product.brand],
-  ["Category", product.category],
-  ["Country of Origin", product.countryOfOrigin],
-];
-
-if (
-  product.category === "Men Fashion" ||
-  product.category === "Women Fashion" ||
-  product.category === "Kids Fashion"
-) {
-  specifications.push(
-    ["Material", product.material],
-    ["Color", product.color],
-    ["Pattern", product.pattern],
-    ["Fit Type", product.fitType],
-    ["Sleeve Type", product.sleeveType],
-    ["Neck Type", product.neckType],
-    ["Sizes", product.sizes?.join(", ")]
-  );
-}
-
-if (product.category === "Mobiles") {
-  specifications.push(
-    ["Model Number", product.modelNumber],
-    ["RAM", product.ram],
-    ["Storage", product.storageCapacity],
-    ["Processor", product.processor],
-    ["Display", product.displaySize],
-    ["Battery", product.battery],
-    ["Camera", product.camera],
-    ["Operating System", product.operatingSystem],
-    ["Warranty", product.warranty]
-  );
-}
-
-if (
-  product.category === "Electronics" ||
-  product.category === "Appliances"
-) {
-  specifications.push(
-    ["Model Number", product.modelNumber],
-    ["Power Source", product.powerSource],
-    ["Voltage", product.voltage],
-    ["Accessories", product.accessories],
-    ["Warranty", product.warranty]
-  );
-}
-
-if (product.category === "Grocery") {
-  specifications.push(
-    ["Weight", product.weight],
-    ["Unit", product.unit],
-    ["Expiry Date", product.expiryDate],
-    ["Organic", product.organic],
-    ["FSSAI Number", product.fssaiNumber]
-  );
-}
-
-if (product.category === "Beauty") {
-  specifications.push(
-    ["Skin Type", product.skinType],
-    ["Hair Type", product.hairType],
-    ["Ingredients", product.ingredients],
-    ["Net Quantity", product.netQuantity]
-  );
-}
-
-if (product.category === "Furniture") {
-  specifications.push(
-    ["Dimensions", product.dimensions],
-    ["Weight Capacity", product.weightCapacity],
-    ["Assembly Required", product.assemblyRequired],
-    ["Warranty", product.furnitureWarranty]
-  );
-}
-
-if (product.category === "Books") {
-  specifications.push(
-    ["Author", product.author],
-    ["Publisher", product.publisher],
-    ["Language", product.language],
-    ["ISBN", product.isbn],
-    ["Edition", product.edition],
-    ["Pages", product.pages]
-  );
-}
+    ["Brand", product.brand],
+    ["Category", categoryDisplayName],
+    ["Country of Origin", (product as any).countryOfOrigin],
+    ...Object.entries((product as any).specifications || {}).map(
+      ([key, value]): [string, string | undefined] => [
+        specLabel(key),
+        value as string,
+      ]
+    ),
+  ];
 const badges: string[] = [];
 
 if ((product.discountPercent ?? 0) >= 40) {
