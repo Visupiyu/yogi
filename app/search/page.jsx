@@ -7,7 +7,7 @@ import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductFilters from "@/components/ProductFilters";
 import { addToCart as addToCartHelper } from "@/lib/cart";
-import { findNodeByName } from "@/lib/catalog";
+import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 
 // label = shown in the dropdown, value = the catalog node name used to
@@ -113,7 +113,7 @@ if (inStockOnly) {
       const node = findNodeByName(category);
       items = items.filter((item) =>
         node
-          ? node.level === 0
+          ? isTopLevelCategory(node)
             ? item.categoryId === node.id
             : item.subCategoryId === node.id || item.leafCategoryId === node.id
           : false

@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-import { findNodeByName } from "@/lib/catalog";
+import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 
 async function getProducts(category) {
@@ -24,7 +24,7 @@ async function getProducts(category) {
 
   const q = query(
     collection(db, "products"),
-    node.level === 0
+    isTopLevelCategory(node)
       ? where("categoryId", "==", node.id)
       : where("subCategoryId", "==", node.id),
     limit(12)

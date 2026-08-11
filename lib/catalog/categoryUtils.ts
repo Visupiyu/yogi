@@ -130,6 +130,19 @@ export function findNodeByName(
 }
 
 /**
+ * Is this node a top-level category? The catalog tree's own `level` field
+ * starts at 1 for top-level nodes (not 0) — use this instead of comparing
+ * against a raw number so that assumption only has to be correct in one
+ * place.
+ */
+
+export function isTopLevelCategory(
+  node: CatalogNode
+): boolean {
+  return node.level === 1;
+}
+
+/**
  * Get direct children
  */
 

@@ -13,7 +13,7 @@ import {
 
 import { db } from "@/lib/firebase";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
-import { findNodeByName } from "@/lib/catalog";
+import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 
 // "Men Fashion"/"Women Fashion" are display-only labels; the catalog tree
 // itself just has "Men"/"Women" nested under "Fashion".
@@ -388,7 +388,7 @@ if (!seller) {
       const matchesCategory =
         category === "All" ||
         (categoryNode &&
-          (categoryNode.level === 0
+          (isTopLevelCategory(categoryNode)
             ? product.categoryId === categoryNode.id
             : product.subCategoryId === categoryNode.id ||
               product.leafCategoryId === categoryNode.id));

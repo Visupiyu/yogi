@@ -21,7 +21,7 @@ import QuickCategories from "@/components/home/QuickCategories";
 import CollectionStrip from "@/components/home/CollectionStrip";
 import PromoBanner from "@/components/home/PromoBanner";
 import { catalogTree } from "@/lib/catalog/catalogTree";
-import { findNodeByName } from "@/lib/catalog/categoryUtils";
+import { findNodeByName, isTopLevelCategory } from "@/lib/catalog/categoryUtils";
 import { toLegacyProduct, type LegacyProductView } from "@/lib/products/legacyDisplay";
 
 type Product = LegacyProductView;
@@ -102,7 +102,7 @@ if (filteredData.length === 0) {
     const node = findNodeByName(name, catalogTree);
     if (!node) return [];
 
-    if (node.level === 0) {
+    if (isTopLevelCategory(node)) {
       return filteredData.filter((p) => p.categoryId === node.id);
     }
     return filteredData.filter(
