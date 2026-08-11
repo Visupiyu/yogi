@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 
+// "Home" and "Sports" were never real categories in the catalog — those
+// tiles always led to a permanently empty page. Replaced with real
+// top-level categories (Mobiles, Books) that actually have products.
 const categories = [
   { name: "Grocery", icon: "🥦" },
   { name: "Electronics", icon: "📱" },
   { name: "Fashion", icon: "👗" },
   { name: "Beauty", icon: "💄" },
   { name: "Furniture", icon: "🪑" },
-  { name: "Home", icon: "🏠" },
-  { name: "Kids", icon: "🧸" },
-  { name: "Sports", icon: "⚽" },
+  { name: "Mobiles", icon: "📱" },
+  { name: "Kids Fashion", icon: "🧸" },
+  { name: "Books", icon: "📚" },
 ];
 
 export default function QuickCategories() {

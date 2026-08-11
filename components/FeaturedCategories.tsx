@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 
+// `name` is shown to the user; `categoryName` is the real catalog node
+// name used to resolve products (Men/Women are sub-categories of Fashion,
+// not their own top-level category).
 const categories = [
-  { name: "Men Fashion", image: "/man-fashion.jpg" },
-  { name: "Women Fashion", image: "/woman-fashion.jpg" },
-  { name: "Electronics", image: "/Electronics.jpg" },
-  { name: "Grocery", image: "/Grocery.jpg" },
-  { name: "Kids Fashion", image: "/Kids-fashion.jpg" },
-  { name: "Beauty", image: "/beauty.jpg" },
+  { name: "Men Fashion", categoryName: "Men", image: "/man-fashion.jpg" },
+  { name: "Women Fashion", categoryName: "Women", image: "/woman-fashion.jpg" },
+  { name: "Electronics", categoryName: "Electronics", image: "/Electronics.jpg" },
+  { name: "Grocery", categoryName: "Grocery", image: "/Grocery.jpg" },
+  { name: "Kids Fashion", categoryName: "Kids Fashion", image: "/Kids-fashion.jpg" },
+  { name: "Beauty", categoryName: "Beauty", image: "/beauty.jpg" },
 ];
 
 export default function FeaturedCategories() {
@@ -19,7 +22,7 @@ export default function FeaturedCategories() {
         {categories.map((category) => (
           <Link
             key={category.name}
-            href={`/category/${encodeURIComponent(category.name)}`}
+            href={`/category/${encodeURIComponent(category.categoryName)}`}
           >
             
    <div className="relative bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition duration-300 group cursor-pointer">

@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductCard from "@/components/ProductCard";
-import { catalogTree } from "@/lib/catalog/catalogTree";
+import { findNodeByName, isTopLevelCategory } from "@/lib/catalog/categoryUtils";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 
 type Product = {
@@ -34,31 +34,39 @@ export default function CategoryPage() {
     async function loadProducts() {
       setLoading(true);
       try {
-        // categoryId on product docs is the catalog node's internal code
-        // (e.g. "FASHION"), not its display name — resolve the URL's
-        // display name back to that code before querying.
-        const matchedNode = catalogTree.find(
-          (node) => node.name.toLowerCase() === name.toLowerCase()
-        );
-        const categoryCode = matchedNode?.id || name;
-
-        const snapshot = await getDocs(
-          query(collection(db, "products"), where("categoryId", "==", categoryCode))
-        );
+        // categoryId/subCategoryId on product docs are the catalog node's
+        // internal codes (e.g. "FASHION", "FASHION_MEN"), not display
+        // names — resolve the URL's display name back to the right node
+        // and field first. Supports both top-level categories (Fashion)
+        // and sub-categories (Men, Women).
+        const matchedNode = findNodeByName(name);
         const items: Product[] = [];
-        snapshot.forEach((docSnap) => {
-          const legacy = toLegacyProduct(docSnap.id, docSnap.data());
-          items.push({
-            id: legacy.id,
-            name: legacy.name,
-            price: legacy.price,
-            image: legacy.image,
-            stock: legacy.stock,
-            brand: legacy.brand || "Other",
-            rating: Number((docSnap.data() as any).rating || 0),
-            createdAt: (docSnap.data() as any).createdAt,
+
+        if (matchedNode) {
+          const snapshot = await getDocs(
+            query(
+              collection(db, "products"),
+              isTopLevelCategory(matchedNode)
+                ? where("categoryId", "==", matchedNode.id)
+                : where("subCategoryId", "==", matchedNode.id)
+            )
+          );
+          snapshot.forEach((docSnap) => {
+            const legacy = toLegacyProduct(docSnap.id, docSnap.data());
+            items.push({
+              id: legacy.id,
+              name: legacy.name,
+              price: legacy.price,
+              image: legacy.image,
+              stock: legacy.stock,
+              brand: legacy.brand || "Other",
+              rating: Number((docSnap.data() as any).rating || 0),
+              createdAt: (docSnap.data() as any).createdAt,
+            });
           });
-        });
+        }
+        // unknown category name (matchedNode is null) -> items stays empty
+
         setProducts(items);
       } catch (error) {
         console.error(error);

@@ -30,7 +30,7 @@ subtitle:
     offer: "👗 NEW ARRIVALS",
     image: "/banners/fashion.jpg",
     button: "Shop Fashion",
-    category: "Women Fashion",
+    category: "Women",
   },
   {
     title: "Support Local Businesses",

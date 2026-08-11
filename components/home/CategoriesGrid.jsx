@@ -3,44 +3,55 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 
+// `name` is shown to the user; `categoryName` is the real catalog node
+// name used to resolve products (Men/Women are sub-categories of Fashion,
+// not their own top-level category).
 const categories = [
   {
     name: "Men Fashion",
+    categoryName: "Men",
     image:
       "https://images.unsplash.com/photo-1441986300917-64674bd600d8?q=80&w=1200",
   },
   {
     name: "Women Fashion",
+    categoryName: "Women",
     image:
       "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=1200",
   },
   {
     name: "Electronics",
+    categoryName: "Electronics",
     image:
       "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1200",
   },
   {
     name: "Mobiles",
+    categoryName: "Mobiles",
     image:
       "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?q=80&w=1200",
   },
   {
     name: "Beauty",
+    categoryName: "Beauty",
     image:
       "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1200",
   },
   {
     name: "Grocery",
+    categoryName: "Grocery",
     image:
       "https://images.unsplash.com/photo-1542838132-92c53300491e?q=80&w=1200",
   },
   {
     name: "Appliances",
+    categoryName: "Appliances",
     image:
       "https://images.unsplash.com/photo-1556911220-bff31c812dba?q=80&w=1200",
   },
   {
     name: "Furniture",
+    categoryName: "Furniture",
     image:
       "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200",
   },
@@ -76,7 +87,7 @@ export default function CategoriesGrid() {
           {categories.map((category) => (
             <Link
               key={category.name}
-              href={`/category/${encodeURIComponent(category.name)}`}
+              href={`/category/${encodeURIComponent(category.categoryName)}`}
               className="flex-shrink-0 block"
             >
               <div className="group relative min-w-[170px] md:min-w-[220px] h-40 md:h-52 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl hover:-translate-y-2 transition duration-300">
