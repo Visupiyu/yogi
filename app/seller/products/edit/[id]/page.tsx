@@ -45,9 +45,9 @@ export default function EditProductPage() {
 
           setProduct({
 
-            id: snap.id,
-
             ...snap.data(),
+
+            id: snap.id,
 
           } as Product);
 

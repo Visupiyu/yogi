@@ -29,6 +29,11 @@ export type LegacyProductView = {
 
 export function toLegacyProduct(id: string, data: any): LegacyProductView {
   return {
+    // Spread first — some product docs carry a stray, useless `id: ""`
+    // field written by the seller form itself. The real Firestore
+    // document ID (the `id` param) and every field below it MUST win over
+    // whatever is in the raw doc, so they come last, never first.
+    ...data,
     id,
     name: data.title || data.name || "",
     price:
@@ -47,6 +52,5 @@ export function toLegacyProduct(id: string, data: any): LegacyProductView {
     vendorId: data.vendorId || "",
     vendorName: data.vendorName || "",
     brand: data.brand,
-    ...data,
   };
 }

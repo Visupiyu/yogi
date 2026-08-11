@@ -15,9 +15,9 @@ async function fetchNewArrivals() {
   const snapshot = await getDocs(q);
 
   return snapshot.docs.map((doc) => ({
-    id: doc.id,
     ...doc.data(),
-  })); 
+    id: doc.id,
+  }));
 }
 
 function ProductSkeleton() {

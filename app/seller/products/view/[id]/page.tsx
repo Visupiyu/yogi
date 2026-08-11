@@ -42,8 +42,8 @@ export default function ViewProductPage() {
         if (snap.exists()) {
 
           setProduct({
-            id: snap.id,
             ...snap.data(),
+            id: snap.id,
           } as Product);
 
         }

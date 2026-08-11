@@ -39,7 +39,7 @@ export default function SellerAnalyticsPage() {
       const productSnap = await getDocs(collection(db, "products"));
       const productList: any[] = [];
       productSnap.forEach((doc) => {
-        const data: any = { id: doc.id, ...doc.data() };
+        const data: any = { ...doc.data(), id: doc.id };
         if (data.vendorId === vendor.uid) productList.push(data);
       });
       setProducts(productList);

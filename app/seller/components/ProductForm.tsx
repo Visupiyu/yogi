@@ -411,9 +411,15 @@ const handleSubmit = async (
         "Product Updated Successfully."
       );
     } else {
+      // `id` is just local form state (always "" for a new product) —
+      // Firestore assigns the real document ID; never write this
+      // placeholder into the document itself.
+      const { id: _unusedId, ...newProductPayload } = finalProduct as typeof finalProduct & {
+        id?: string;
+      };
       await addDoc(
         collection(db, "products"),
-        { ...finalProduct, createdAt: serverTimestamp() }
+        { ...newProductPayload, createdAt: serverTimestamp() }
       );
 
       setSuccess(

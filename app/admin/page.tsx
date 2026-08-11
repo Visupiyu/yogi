@@ -120,7 +120,7 @@ export default function AdminPage() {
     const snapshot = await getDocs(collection(db, "products"));
     const items: Product[] = [];
     snapshot.forEach((docItem) => {
-      items.push({ id: docItem.id, ...docItem.data() } as Product);
+      items.push({ ...docItem.data(), id: docItem.id } as Product);
     });
     setProducts(items);
 

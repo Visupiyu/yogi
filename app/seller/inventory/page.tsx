@@ -39,8 +39,8 @@ useEffect(() => {
       const snapshot = await getDocs(q);
 
       const list = snapshot.docs.map((doc) => ({
-        id: doc.id,
         ...doc.data(),
+        id: doc.id,
       })) as Product[];
       console.log(list);
 

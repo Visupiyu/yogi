@@ -44,8 +44,8 @@ export default function LowStockProducts() {
         snapshot.forEach((docSnap) => {
 
           const product: any = {
-  id: docSnap.id,
   ...docSnap.data(),
+  id: docSnap.id,
 };
 
 if ((product.stock ?? 0) <= 10) {
