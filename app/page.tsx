@@ -16,8 +16,6 @@ import BestSellers from "@/components/BestSellers";
 import RecommendedProducts from "@/components/RecommendedProducts";
 import CategoryRow from "@/components/CategoryRow";
 import FeaturedCategories from "@/components/FeaturedCategories";
-import { Search } from "lucide-react";
-import QuickCategories from "@/components/home/QuickCategories";
 import CollectionStrip from "@/components/home/CollectionStrip";
 import PromoBanner from "@/components/home/PromoBanner";
 import { catalogTree } from "@/lib/catalog/catalogTree";
@@ -118,90 +116,6 @@ if (filteredData.length === 0) {
 
       <section className="max-w-7xl mx-auto px-2 py-2">
   <HeroSlider />
-  <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -20 relative z-20">
-
-  <div className="
-bg-white
-rounded-3xl
-shadow-2xl
-hover:shadow-2xl
-transition-all
-duration-300
-border
-border-gray-100
-p-5">
-
-    <div className="flex flex-col lg:flex-row gap-4">
-
-      {/* Search */}
-
-      <div className="flex-1 relative">
-
-        <input
-          type="text"
-          placeholder="Search products, brands, categories..."
-          className="
-w-full
-h-14
-rounded-2xl
-bg-gray-50
-border
-border-gray-200
-pl-14
-pr-5
-text-gray-700
-placeholder:text-gray-400
-focus:outline-none
-focus:ring-2
-focus:ring-blue-500
-focus:border-blue-500
-transition-all
-text-base
-"
-        />
-
-        <span
-          className="
-          absolute
-          left-5
-          top-1/2
-          -translate-y-1/2
-          text-2xl
-          "
-        >
-        <Search className="w-6 h-6 text-gray-400" />
-        </span>
-
-      </div>
-
-      {/* Button */}
-
-      <button
-       className="
-h-14
-px-10
-rounded-2xl
-bg-gradient-to-r
-from-blue-700
-to-orange-500
-text-white
-font-semibold
-shadow-lg
-hover:shadow-xl
-hover:scale-105
-transition-all
-duration-300
-"
-      >
-        Search
-      </button>
-
-    </div>
-
-  </div>
-
-</section>
-<QuickCategories />
 </section>
 
 <section className="max-w-7xl mx-auto px-2 pb-4">
