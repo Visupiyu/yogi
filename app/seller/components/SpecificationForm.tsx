@@ -3,7 +3,9 @@
 import { categoryFields } from "@/lib/catalog/categoryFields";
 
 interface SpecificationFormProps {
-  category: string;
+  categoryId: string;
+  subCategoryId?: string;
+  leafCategoryId?: string;
   specifications: Record<string, string>;
   onChange: (
     specifications: Record<string, string>
@@ -11,13 +13,21 @@ interface SpecificationFormProps {
 }
 
 export default function SpecificationForm({
-  category,
+  categoryId,
+  subCategoryId,
+  leafCategoryId,
   specifications,
   onChange,
 }: SpecificationFormProps) {
+ // categoryFields is keyed by specific leaf-style codes (e.g. MEN_TSHIRTS),
+ // not top-level categories — try the most specific level the seller
+ // picked first. No fallback to an unrelated category's fields: showing
+ // the wrong fields (e.g. t-shirt sizing on a phone listing) is worse
+ // than showing none.
  const fields =
-  categoryFields[category] ??
-  categoryFields.MEN_TSHIRTS ??
+  categoryFields[leafCategoryId ?? ""] ??
+  categoryFields[subCategoryId ?? ""] ??
+  categoryFields[categoryId] ??
   [];
 
   const updateField = (

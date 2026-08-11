@@ -768,7 +768,9 @@ Variants
 </h2>
 
 <VariantSelector
-  category={product.categoryId}
+  categoryId={product.categoryId}
+  subCategoryId={product.subCategoryId}
+  leafCategoryId={product.leafCategoryId}
   variants={product.variants}
   onChange={(variants) =>
     setProduct({
@@ -794,7 +796,11 @@ Specifications
 
 <SpecificationForm
 
-category={product.categoryId}
+categoryId={product.categoryId}
+
+subCategoryId={product.subCategoryId}
+
+leafCategoryId={product.leafCategoryId}
 
 specifications={product.specifications}
 

@@ -11,18 +11,28 @@ interface ProductVariant {
 }
 
 interface VariantSelectorProps {
-  category: string;
+  categoryId: string;
+  subCategoryId?: string;
+  leafCategoryId?: string;
   variants: ProductVariant[];
   onChange: (variants: ProductVariant[]) => void;
 }
 
 export default function VariantSelector({
-  category,
+  categoryId,
+  subCategoryId,
+  leafCategoryId,
   variants,
   onChange,
 }: VariantSelectorProps) {
+  // CATEGORY_VARIANTS mixes top-level codes (FASHION, MOBILES) with
+  // leaf-style codes (FOOTWEAR, LAPTOPS) — try the most specific level
+  // the seller picked first, then fall back up to the top-level category.
   const fields =
-    CATEGORY_VARIANTS[category.toUpperCase()] || [];
+    CATEGORY_VARIANTS[(leafCategoryId ?? "").toUpperCase()] ||
+    CATEGORY_VARIANTS[(subCategoryId ?? "").toUpperCase()] ||
+    CATEGORY_VARIANTS[categoryId.toUpperCase()] ||
+    [];
 
   // ==========================================
   // Custom colors and sizes
