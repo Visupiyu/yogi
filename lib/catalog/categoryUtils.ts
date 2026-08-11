@@ -99,30 +99,34 @@ export function findNodeByName(
 
   const lower = name.toLowerCase();
 
-  for (const node of nodes) {
+  // Breadth-first: a shallower match (e.g. the top-level "Beauty" category)
+  // must always win over a same-named node buried deeper in the tree (e.g.
+  // "Beauty" nested under Fashion > Women), or filtering by name silently
+  // resolves to the wrong category.
+  let currentLevel = nodes;
 
-    if (node.name.toLowerCase() === lower) {
-      return node;
+  while (currentLevel.length > 0) {
+
+    const match = currentLevel.find(
+      (node) => node.name.toLowerCase() === lower
+    );
+
+    if (match) {
+      return match;
     }
 
-    if (node.children) {
+    const nextLevel: CatalogNode[] = [];
 
-      const found =
-        findNodeByName(
-          name,
-          node.children
-        );
-
-      if (found) {
-        return found;
+    for (const node of currentLevel) {
+      if (node.children) {
+        nextLevel.push(...node.children);
       }
-
     }
 
+    currentLevel = nextLevel;
   }
 
   return undefined;
-
 }
 
 /**

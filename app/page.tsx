@@ -20,7 +20,8 @@ import { Search } from "lucide-react";
 import QuickCategories from "@/components/home/QuickCategories";
 import CollectionStrip from "@/components/home/CollectionStrip";
 import PromoBanner from "@/components/home/PromoBanner";
-import { catalogTree, type CatalogNode } from "@/lib/catalog/catalogTree";
+import { catalogTree } from "@/lib/catalog/catalogTree";
+import { findNodeByName } from "@/lib/catalog/categoryUtils";
 import { toLegacyProduct, type LegacyProductView } from "@/lib/products/legacyDisplay";
 
 type Product = LegacyProductView;
@@ -39,20 +40,6 @@ const CATEGORY_ROWS = [
   { title: "🏠 Appliances", name: "Appliances" },
   { title: "🛒 Grocery", name: "Grocery" },
 ];
-
-function findCategoryNode(
-  nodes: CatalogNode[],
-  targetName: string
-): CatalogNode | null {
-  for (const node of nodes) {
-    if (node.name.toLowerCase() === targetName.toLowerCase()) return node;
-    if (node.children?.length) {
-      const found = findCategoryNode(node.children, targetName);
-      if (found) return found;
-    }
-  }
-  return null;
-}
 
 async function loadProducts(): Promise<Product[]> {
   try {
@@ -112,7 +99,7 @@ if (filteredData.length === 0) {
   );
 }
   const byCategory = (name: string) => {
-    const node = findCategoryNode(catalogTree, name);
+    const node = findNodeByName(name, catalogTree);
     if (!node) return [];
 
     if (node.level === 0) {

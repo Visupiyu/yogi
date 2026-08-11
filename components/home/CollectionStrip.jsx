@@ -122,6 +122,10 @@ export default function CollectionStrip({
 
   }
 
+  if (!products || products.length === 0) {
+    return null;
+  }
+
   return (
     <section className="max-w-7xl mx-auto px-4 py-8">
 
