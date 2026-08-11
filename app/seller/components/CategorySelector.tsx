@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { catalogTree } from "@/lib/catalog/catalogTree";
+import { flattenTree } from "@/lib/catalog/categoryUtils";
 
 interface CategorySelectorProps {
   value: string;
@@ -16,6 +17,8 @@ interface CategoryNode {
   id: string;
   name: string;
   active?: boolean;
+  level: number;
+  parentId?: string;
   children?: CategoryNode[];
 }
 
@@ -23,42 +26,39 @@ export default function CategorySelector({
   value,
   onChange,
 }: CategorySelectorProps) {
-  const tree = catalogTree as CategoryNode[];
+  // The catalog data file has bracket-nesting mistakes in places — some
+  // nodes claim (via their own level/parentId fields) to be nested under
+  // a parent but are physically siblings in the array instead. Rather
+  // than trust the JS object nesting (children), flatten the whole tree
+  // once and rebuild the hierarchy purely from each node's own level/
+  // parentId metadata, which stays correct regardless of where a node
+  // physically sits.
+  const allNodes = useMemo(
+    () => flattenTree(catalogTree) as CategoryNode[],
+    []
+  );
 
   const [selectedPath, setSelectedPath] =
     useState<string[]>([]);
 
   // ==========================================
-  // Find complete category path
+  // Find complete category path (walk up via parentId)
   // ==========================================
 
   const findPath = (
-    nodes: CategoryNode[],
-    targetId: string,
-    path: string[] = []
+    targetId: string
   ): string[] | null => {
-    for (const node of nodes) {
-      if (node.id === targetId) {
-        return [...path, node.id];
-      }
+    const path: string[] = [];
+    let current = allNodes.find((n) => n.id === targetId);
 
-      if (
-        node.children &&
-        node.children.length > 0
-      ) {
-        const result = findPath(
-          node.children,
-          targetId,
-          [...path, node.id]
-        );
-
-        if (result) {
-          return result;
-        }
-      }
+    while (current) {
+      path.unshift(current.id);
+      current = current.parentId
+        ? allNodes.find((n) => n.id === current!.parentId)
+        : undefined;
     }
 
-    return null;
+    return path.length > 0 ? path : null;
   };
 
   // ==========================================
@@ -71,7 +71,7 @@ export default function CategorySelector({
       return;
     }
 
-    const path = findPath(tree, value);
+    const path = findPath(value);
 
     if (path) {
       setSelectedPath(path);
@@ -79,47 +79,16 @@ export default function CategorySelector({
   }, [value]);
 
   // ==========================================
-  // Find node by ID
-  // ==========================================
-
-  const findNode = (
-    nodes: CategoryNode[],
-    targetId: string
-  ): CategoryNode | null => {
-    for (const node of nodes) {
-      if (node.id === targetId) {
-        return node;
-      }
-
-      if (
-        node.children &&
-        node.children.length > 0
-      ) {
-        const found = findNode(
-          node.children,
-          targetId
-        );
-
-        if (found) {
-          return found;
-        }
-      }
-    }
-
-    return null;
-  };
-
-  // ==========================================
-  // Get options for level
+  // Get options for level (by declared level/parentId, not JS nesting)
   // ==========================================
 
   const getOptionsForLevel = (
     level: number
   ): CategoryNode[] => {
     if (level === 0) {
-      return tree.filter(
+      return allNodes.filter(
         (category) =>
-          category.active !== false
+          category.level === 1 && category.active !== false
       );
     }
 
@@ -130,16 +99,9 @@ export default function CategorySelector({
       return [];
     }
 
-    const parent = findNode(
-      tree,
-      parentId
-    );
-
-    return (
-      parent?.children?.filter(
-        (child) =>
-          child.active !== false
-      ) || []
+    return allNodes.filter(
+      (node) =>
+        node.parentId === parentId && node.active !== false
     );
   };
 
