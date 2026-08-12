@@ -13,6 +13,7 @@ import {
   query,
   where,
   limit,
+  runTransaction,
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
@@ -177,11 +178,14 @@ setAddress(userData.address || "");
     ...new Set(items.map((i: any) => i.vendorId).filter(Boolean)),
   ];
 
-  // Shared side-effects after an order document is created.
+  // Shared side-effects after an order document is created. Stock/sales are
+  // NOT touched here — reserveStock() already committed them atomically
+  // before the order was created (see placeCODOrder/payNow).
   const applyPostOrderEffects = async (
     firebaseUser: any,
     orderId: string,
-    paymentStatus: string
+    paymentStatus: string,
+    stockIssueItems: any[] = []
   ) => {
     const earnedPoints = Math.floor(grandTotal / 100);
 
@@ -195,19 +199,25 @@ setAddress(userData.address || "");
       createdAt: Timestamp.now(),
     });
 
-   // Stock + sales per item, and seller notifications
-    for (const item of items) {
+    if (stockIssueItems.length > 0) {
       try {
-        await updateDoc(doc(db, "products", item.id), {
-          sales: increment(item.qty),
-          stock: increment(-item.qty),
+        await addDoc(collection(db, "notifications"), {
+          title: "⚠ Stock oversold after payment",
+          message: `Order ${orderId.slice(0, 8)}: ${stockIssueItems
+            .map((i) => i.name)
+            .join(", ")} sold out during checkout — payment was captured, stock was not decremented. Needs manual review.`,
+          type: "order",
+          role: "admin",
+          read: false,
+          createdAt: Timestamp.now(),
         });
-        console.log("✅ Product updated:", item.name);
       } catch (e) {
-        console.error("❌ Product update failed:", item.name, e);
-        // Do NOT throw — a stock-write hiccup shouldn't fail the whole order
+        console.error("❌ Stock-issue admin notification failed:", e);
       }
+    }
 
+    // Seller notifications
+    for (const item of items) {
       if (item.vendorId) {
         try {
           await addDoc(collection(db, "notifications"), {
@@ -340,6 +350,14 @@ localStorage.setItem( "user", JSON.stringify(user));
 
     setLoading(true);
     try {
+      // COD hasn't captured any payment yet, so a failed reservation can
+      // simply block the order — nothing to reconcile.
+      const reservation = await reserveStock();
+      if (!reservation.ok) {
+        alert(reservation.message);
+        return;
+      }
+
       const orderRef = await addDoc(
         collection(db, "orders"),
         buildOrderData(firebaseUser, "Pending")
@@ -411,11 +429,22 @@ localStorage.setItem( "user", JSON.stringify(user));
 
         setLoading(true);
         try {
+          // Payment is already captured at this point, so stock issues
+          // can no longer block the order — reserve what's available and
+          // flag the rest for manual follow-up instead of losing track of
+          // captured payment.
+          const failedItems = await reserveStockBestEffort();
+
           const orderRef = await addDoc(
             collection(db, "orders"),
             buildOrderData(firebaseUser, "Paid")
           );
-          await applyPostOrderEffects(firebaseUser, orderRef.id, "Paid");
+          await applyPostOrderEffects(
+            firebaseUser,
+            orderRef.id,
+            "Paid",
+            failedItems
+          );
 
           alert("Order Placed Successfully");
           window.location.href = "/orders";
@@ -442,6 +471,9 @@ localStorage.setItem( "user", JSON.stringify(user));
     if (paymentMethod === "ONLINE") payNow();
     else placeCODOrder();
   };
+  // Cheap, read-only pre-flight check — good UX (fail fast before opening
+  // Razorpay) but NOT the authoritative check, since a plain read-then-write
+  // has a race window. reserveStock() below is what actually commits.
   const validateStock = async () => {
 
   for (const item of items) {
@@ -456,13 +488,12 @@ localStorage.setItem( "user", JSON.stringify(user));
     }
 
     const product = snap.data();
-    if (product.status === "Inactive") {
-  alert(`${item.name} is currently unavailable.`);
-  return false;
-}
 
-if (product.approved === false) {
-  alert(`${item.name} is no longer available.`);
+    // The real moderation gate is `active` (see admin/products/page.tsx) —
+    // `status`/`approved` are dead fields nothing in the app ever sets to
+    // enable a product, so checking them here blocked every product.
+    if (product.active === false) {
+  alert(`${item.name} is currently unavailable.`);
   return false;
 }
 
@@ -478,6 +509,125 @@ if (product.approved === false) {
   return true;
 
 };
+
+  // Authoritative stock commit: reads and decrements every item's stock
+  // (plus increments sales) in a single Firestore transaction, so two
+  // customers racing for the last unit can't both succeed — one gets a
+  // clean rejection here instead of the order silently going out with
+  // stock never actually decremented.
+  const reserveStock = async (): Promise<
+    { ok: true } | { ok: false; failedItem?: any; message: string }
+  > => {
+
+    try {
+
+      await runTransaction(db, async (transaction) => {
+
+        const refs = items.map((item: any) => doc(db, "products", item.id));
+        const snaps = await Promise.all(
+          refs.map((ref: any) => transaction.get(ref))
+        );
+
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          const snap = snaps[i];
+
+          if (!snap.exists()) {
+            const err: any = new Error("unavailable");
+            err.failedItem = item;
+            err.message = `${item.name} is no longer available.`;
+            throw err;
+          }
+
+          const product: any = snap.data();
+
+          if (product.active === false) {
+            const err: any = new Error("unavailable");
+            err.failedItem = item;
+            err.message = `${item.name} is currently unavailable.`;
+            throw err;
+          }
+
+          if ((product.stock ?? 0) < item.qty) {
+            const err: any = new Error("stock");
+            err.failedItem = item;
+            err.message = `${item.name} has only ${product.stock ?? 0} item(s) left in stock.`;
+            throw err;
+          }
+        }
+
+        refs.forEach((ref: any, i: number) => {
+          transaction.update(ref, {
+            stock: increment(-items[i].qty),
+            sales: increment(items[i].qty),
+          });
+        });
+
+      });
+
+      return { ok: true };
+
+    } catch (err: any) {
+
+      if (err && err.failedItem) {
+        return { ok: false, failedItem: err.failedItem, message: err.message };
+      }
+
+      console.error("Stock reservation failed:", err);
+      return {
+        ok: false,
+        message: "Something went wrong checking stock. Please try again.",
+      };
+
+    }
+
+  };
+
+  // Used after payment has already been captured (Razorpay), where we can
+  // no longer just reject the order — money changed hands. Reserves each
+  // item independently so one oversold item doesn't block stock from being
+  // correctly decremented for the others; failures are collected and
+  // surfaced via an admin notification instead of silently dropped.
+  const reserveStockBestEffort = async () => {
+
+    const failedItems: any[] = [];
+
+    for (const item of items) {
+
+      try {
+
+        await runTransaction(db, async (transaction) => {
+
+          const ref = doc(db, "products", item.id);
+          const snap = await transaction.get(ref);
+
+          if (!snap.exists()) {
+            throw new Error("missing");
+          }
+
+          const product: any = snap.data();
+
+          if ((product.stock ?? 0) < item.qty) {
+            throw new Error("stock");
+          }
+
+          transaction.update(ref, {
+            stock: increment(-item.qty),
+            sales: increment(item.qty),
+          });
+
+        });
+
+      } catch (err) {
+        console.error("Stock reservation failed for", item.name, err);
+        failedItems.push(item);
+      }
+
+    }
+
+    return failedItems;
+
+  };
 
   return (
     <section className="py-8 px-4 bg-gray-50 min-h-screen">
