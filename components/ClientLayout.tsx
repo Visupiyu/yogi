@@ -20,6 +20,7 @@ const MINIMAL_HEADER_PREFIXES = [
   "/vendor-login",
   "/vendor-register",
   "/vendor-forgot-password",
+  "/sell",
 ];
 
 export default function ClientLayout({

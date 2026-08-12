@@ -6,6 +6,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function VendorLoginPage() {
   const router = useRouter();
@@ -123,82 +124,48 @@ console.error(err);
     }
   };
 
-  const FEATURES = [
-    {
-      icon: "🧑‍🤝‍🧑",
-      title: "Reach more customers",
-      description: "Put your products in front of customers shopping on YOMICO.",
-    },
-    {
-      icon: "📦",
-      title: "Easy product management",
-      description: "Add products, manage inventory and update your catalog easily.",
-    },
-    {
-      icon: "📊",
-      title: "Business insights",
-      description: "Track orders, sales, earnings and product performance.",
-    },
-    {
-      icon: "💰",
-      title: "Seller earnings",
-      description: "Manage payouts, wallet balance and seller transactions.",
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 rounded-3xl shadow-xl overflow-hidden bg-white">
+    <div className="min-h-screen bg-gray-50 pb-16">
 
-        {/* LEFT — brand / benefits panel */}
-        <div className="relative hidden lg:block overflow-hidden bg-gradient-to-br from-teal-600 via-green-600 to-blue-600 text-white p-10">
+      {/* HERO */}
+      <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white">
+        <div className="max-w-5xl mx-auto px-6 py-12">
 
-          <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/10" />
-          <div className="pointer-events-none absolute bottom-0 -left-10 h-40 w-40 rounded-full bg-white/5" />
+          <Link href="/sell" className="text-sm text-white/80 hover:text-white hover:underline">
+            ← Sell on YOMICO
+          </Link>
 
-          <div className="relative">
-            <p className="text-xs font-semibold uppercase tracking-widest text-white/80">
-              YOMICO Seller Platform
-            </p>
+          <div className="mt-4 flex items-center gap-5">
+            <Image
+              src="/logo.png"
+              alt="YOMICO"
+              width={90}
+              height={90}
+              className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-2xl bg-white p-2"
+            />
 
-            <h2 className="mt-4 font-serif text-4xl font-bold leading-tight">
-              Grow your business
-              <br />
-              with <span className="text-yellow-300">YOMICO</span>
-            </h2>
-
-            <p className="mt-4 text-white/90">
-              Reach customers, manage your products, track orders and
-              grow your online business from one powerful seller platform.
-            </p>
-
-            <div className="mt-10 space-y-5">
-              {FEATURES.map((feature) => (
-                <div key={feature.title} className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/15 text-lg">
-                    {feature.icon}
-                  </div>
-                  <div>
-                    <p className="font-bold">{feature.title}</p>
-                    <p className="text-sm text-white/70">{feature.description}</p>
-                  </div>
-                </div>
-              ))}
+            <div>
+              <p className="text-sm uppercase tracking-widest opacity-80">
+                YOMICO Seller Portal
+              </p>
+              <h1 className="text-3xl md:text-4xl font-bold">
+                Seller Login
+              </h1>
             </div>
           </div>
 
-        </div>
-
-        {/* RIGHT — login form */}
-        <div className="p-8 md:p-10">
-
-          <h1 className="font-serif text-3xl font-bold">Seller Login</h1>
-
-          <p className="mt-2 text-gray-500">
+          <p className="mt-4 max-w-xl opacity-90">
             Login to your YOMICO seller account and manage your business.
           </p>
 
-          <div className="mt-8 space-y-5">
+        </div>
+      </div>
+
+      {/* LOGIN FORM */}
+      <div className="max-w-5xl mx-auto px-6 -mt-8">
+        <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-lg p-8">
+
+          <div className="space-y-5">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Email Address
@@ -207,7 +174,7 @@ console.error(err);
                 type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-4 bg-blue-50 rounded-xl outline-none"
+                className="w-full p-4 border rounded-xl outline-none"
               />
             </div>
 
@@ -231,7 +198,7 @@ console.error(err);
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-4 bg-blue-50 rounded-xl outline-none pr-16"
+                  className="w-full p-4 border rounded-xl outline-none pr-16"
                 />
                 <button
                   type="button"
@@ -289,8 +256,8 @@ console.error(err);
           </p>
 
         </div>
-
       </div>
+
     </div>
   );
 }

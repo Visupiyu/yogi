@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -120,13 +121,24 @@ export default function SellOnYomicoPage() {
       <section className="bg-gradient-to-r from-green-600 to-blue-600 text-white">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
 
-          <p className="text-sm uppercase tracking-widest opacity-80">
-            YOMICO for Business
-          </p>
+          <div className="flex items-center gap-5">
+            <Image
+              src="/logo.png"
+              alt="YOMICO"
+              width={90}
+              height={90}
+              className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-2xl bg-white p-2"
+            />
 
-          <h1 className="mt-3 max-w-2xl text-4xl font-bold md:text-5xl">
-            Sell on YOMICO
-          </h1>
+            <div>
+              <p className="text-sm uppercase tracking-widest opacity-80">
+                YOMICO Seller Portal
+              </p>
+              <h1 className="text-3xl font-bold md:text-5xl">
+                Sell on YOMICO
+              </h1>
+            </div>
+          </div>
 
           <p className="mt-4 max-w-xl text-lg opacity-90">
             Bring your business online. List your products, reach YOMICO
