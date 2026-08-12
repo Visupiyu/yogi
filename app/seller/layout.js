@@ -13,13 +13,17 @@ const navItems = [
   { href: "/seller/orders", label: "Orders", icon: "📦" },
   { href: "/seller#add-product", label: "Add Product", icon: "➕" },
   { href: "/seller#products", label: "Products", icon: "🏷️" },
-  { href: "/seller/store", label: "My Stores", icon: "🏬" },
+  { href: "/seller/inventory", label: "Inventory", icon: "📋" },
+  { href: "/seller/settings", label: "Store Settings", icon: "🏬" },
   { href: "/seller/questions", label: "Questions", icon: "❓" },
   { href: "/seller/analytics", label: "Analytics", icon: "📈" },
   { href: "/seller/reports", label: "Reports", icon: "📄" },
+  { href: "/seller/payouts", label: "Payout Report", icon: "🧾" },
+  { href: "/seller/wallet", label: "Wallet", icon: "💰" },
   { href: "/seller/assistant", label: "AI Assistant", icon: "🤖" },
   { href: "/seller/chat", label: "Customer Chats", icon: "💬" },
-  { href: "/seller/stock-notifications", label: "Stock Notifications", icon: "🔔" },
+  { href: "/seller/notifications", label: "Notifications", icon: "🔔" },
+  { href: "/seller/stock-notifications", label: "Stock Notifications", icon: "📥" },
 ];
 
 // First path segment for every real seller-dashboard route. Anything under
@@ -157,12 +161,6 @@ export default function SellerLayout({ children }) {
             <span>🚪</span>
             <span>Logout</span>
           </button>
-          <div className="text-center py-10 text-gray-500">
-Need Help?
-<Link href="/seller/support" className="text-green-600 ml-2 hover:underline" >
-Seller Support
-</Link>
-</div>
         </div>
       </aside>
 

@@ -42,7 +42,6 @@ useEffect(() => {
         ...doc.data(),
         id: doc.id,
       })) as Product[];
-      console.log(list);
 
       setProducts(list);
 
@@ -57,7 +56,6 @@ useEffect(() => {
   return () => unsubscribe();
 
 }, []);
-console.log(products);
 
 return (
 

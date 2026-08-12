@@ -11,13 +11,15 @@ rules_version = '2';
 // products/{timestamp}-{filename}
 // chat/{timestamp}-{filename}
 // delivery-proof/{orderId}-{timestamp}
+// vendor-store/{timestamp}-{filename}
 //   None of these embed a uid in the path (confirmed via codebase scan), so
 //   per-owner path scoping isn't possible without an app-code change to the
 //   upload call sites (app/seller/components/ProductForm.tsx,
-//   app/chat/[id]/page.tsx, app/seller/messages/[chatId]/page.tsx,
-//   app/delivery/[id]/page.tsx). Until then, writes to these paths are
-//   restricted to signed-in users with file-type/size limits to block abuse;
-//   this is a narrower guarantee than per-owner scoping.
+//   app/chat/[id]/page.tsx, app/seller/chat/[id]/page.tsx,
+//   app/delivery/[id]/page.tsx, app/seller/settings/page.tsx). Until then,
+//   writes to these paths are restricted to signed-in users with
+//   file-type/size limits to block abuse; this is a narrower guarantee than
+//   per-owner scoping.
 //
 // ===============================================================
 
@@ -51,6 +53,11 @@ service firebase.storage {
 
     match /delivery-proof/{fileName} {
       allow read: if isSignedIn();
+      allow write: if isSignedIn() && isImageUnderLimit(5);
+    }
+
+    match /vendor-store/{fileName} {
+      allow read: if true;
       allow write: if isSignedIn() && isImageUnderLimit(5);
     }
 

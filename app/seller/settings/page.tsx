@@ -15,15 +15,25 @@ import {
 import {
   auth,
   db,
+  storage,
 } from "@/lib/firebase";
 
 import {
   onAuthStateChanged,
 } from "firebase/auth";
+
+import {
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 export default function SellerSettingsPage() {
 const [loading, setLoading] = useState(true);
 
 const [saving, setSaving] = useState(false);
+
+const [uploadingLogo, setUploadingLogo] = useState(false);
+const [uploadingBanner, setUploadingBanner] = useState(false);
 
 const [vendorId, setVendorId] = useState(""); // auth uid
 const [vendorDocId, setVendorDocId] = useState(""); // vendors/ collection doc ID
@@ -145,6 +155,42 @@ const saveSettings = async () => {
 
 };
 
+const uploadStoreImage = async (
+  file: File,
+  field: "storeLogo" | "storeBanner"
+) => {
+
+  const setUploading =
+    field === "storeLogo" ? setUploadingLogo : setUploadingBanner;
+
+  try {
+
+    setUploading(true);
+
+    const storageRef = ref(
+      storage,
+      `vendor-store/${Date.now()}-${file.name}`
+    );
+
+    await uploadBytes(storageRef, file);
+
+    const url = await getDownloadURL(storageRef);
+
+    setForm((prev) => ({ ...prev, [field]: url }));
+
+  } catch (error) {
+
+    console.error(error);
+    alert("Failed to upload image.");
+
+  } finally {
+
+    setUploading(false);
+
+  }
+
+};
+
   return (
 
 <div className="min-h-screen bg-gray-100 p-6">
@@ -156,6 +202,80 @@ Store Settings
 </h1>
 
 <div className="bg-white rounded-3xl shadow p-8 space-y-6">
+
+{/* Store Logo & Banner */}
+
+<div className="grid md:grid-cols-2 gap-6">
+
+<div>
+
+<label className="font-semibold">
+Store Logo
+</label>
+
+<div className="mt-2 flex items-center gap-4">
+
+{form.storeLogo && (
+  <img
+    src={form.storeLogo}
+    alt="Store logo"
+    className="w-16 h-16 rounded-full object-cover border"
+  />
+)}
+
+<label className="cursor-pointer bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl text-sm font-semibold">
+  {uploadingLogo ? "Uploading..." : "Change Logo"}
+  <input
+    type="file"
+    accept="image/*"
+    className="hidden"
+    disabled={uploadingLogo}
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (file) uploadStoreImage(file, "storeLogo");
+    }}
+  />
+</label>
+
+</div>
+
+</div>
+
+<div>
+
+<label className="font-semibold">
+Store Banner
+</label>
+
+<div className="mt-2 flex items-center gap-4">
+
+{form.storeBanner && (
+  <img
+    src={form.storeBanner}
+    alt="Store banner"
+    className="w-24 h-16 rounded-xl object-cover border"
+  />
+)}
+
+<label className="cursor-pointer bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-xl text-sm font-semibold">
+  {uploadingBanner ? "Uploading..." : "Change Banner"}
+  <input
+    type="file"
+    accept="image/*"
+    className="hidden"
+    disabled={uploadingBanner}
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (file) uploadStoreImage(file, "storeBanner");
+    }}
+  />
+</label>
+
+</div>
+
+</div>
+
+</div>
 
 {/* Business Name */}
 
@@ -238,6 +358,88 @@ businessPhone:e.target.value,
 })
 }
 />
+
+</div>
+
+{/* Address */}
+
+<div>
+
+<label className="font-semibold">
+Street / Area
+</label>
+
+<input
+className="w-full mt-2 border rounded-xl p-3"
+value={form.street}
+onChange={(e)=>
+setForm({
+...form,
+street:e.target.value,
+})
+}
+/>
+
+</div>
+
+<div className="grid md:grid-cols-3 gap-4">
+
+<div>
+
+<label className="font-semibold">
+City
+</label>
+
+<input
+className="w-full mt-2 border rounded-xl p-3"
+value={form.city}
+onChange={(e)=>
+setForm({
+...form,
+city:e.target.value,
+})
+}
+/>
+
+</div>
+
+<div>
+
+<label className="font-semibold">
+State
+</label>
+
+<input
+className="w-full mt-2 border rounded-xl p-3"
+value={form.state}
+onChange={(e)=>
+setForm({
+...form,
+state:e.target.value,
+})
+}
+/>
+
+</div>
+
+<div>
+
+<label className="font-semibold">
+PIN Code
+</label>
+
+<input
+className="w-full mt-2 border rounded-xl p-3"
+value={form.zipCode}
+onChange={(e)=>
+setForm({
+...form,
+zipCode:e.target.value,
+})
+}
+/>
+
+</div>
 
 </div>
 
