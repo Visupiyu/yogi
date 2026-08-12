@@ -91,7 +91,6 @@ setAddress(userData.address || "");
 
   const grandTotal = Math.max(0, finalAmount + shipping - rewardValue);
   const commission = Math.round(grandTotal * 0.1);
-  const sellerEarning = grandTotal - commission;
 
   // Shipping + delivery date recompute whenever the amount changes.
   useEffect(() => {
@@ -386,27 +385,42 @@ setAddress(userData.address || "");
     window.dispatchEvent(new Event("cartUpdated"));
   };
 
-  const buildOrderData = (firebaseUser: any, paymentStatus: string) => ({
-    customerName: name,
-    phone,
-    address,
-    userEmail: firebaseUser.email,
-    userId: firebaseUser.uid,
-    vendorIds: vendorIdsForOrder(),
-    items,
-    total,
-    status: "Pending",
-    paymentMethod,
-    paymentStatus,
-    shippingCharge: shipping,
-    finalTotal: grandTotal,
-    deliveryDate,
-    commission,
-    sellerEarning,
-    couponCode: couponApplied ? coupon : "",
-    discount,
-    createdAt: Timestamp.now(),
-  });
+  const buildOrderData = (
+    firebaseUser: any,
+    paymentStatus: string,
+    // For online payments, this is the amount Razorpay actually
+    // confirmed was captured (from verify-payments) — using it instead
+    // of the client-computed grandTotal means the order record always
+    // matches what was really charged, even if they somehow diverge.
+    verifiedAmount?: number
+  ) => {
+    const finalTotal = verifiedAmount ?? grandTotal;
+    const orderCommission =
+      verifiedAmount != null ? Math.round(verifiedAmount * 0.1) : commission;
+    const orderSellerEarning = finalTotal - orderCommission;
+
+    return {
+      customerName: name,
+      phone,
+      address,
+      userEmail: firebaseUser.email,
+      userId: firebaseUser.uid,
+      vendorIds: vendorIdsForOrder(),
+      items,
+      total,
+      status: "Pending",
+      paymentMethod,
+      paymentStatus,
+      shippingCharge: shipping,
+      finalTotal,
+      deliveryDate,
+      commission: orderCommission,
+      sellerEarning: orderSellerEarning,
+      couponCode: couponApplied ? coupon : "",
+      discount,
+      createdAt: Timestamp.now(),
+    };
+  };
 
   const validateForm = () => {
     if (!name.trim() || !phone.trim() || !address.trim()) {
@@ -520,9 +534,20 @@ setAddress(userData.address || "");
     const response = await fetch("/api/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: grandTotal }),
+      // Send what's in the cart, not a pre-computed total — the amount
+      // actually charged is calculated server-side from real product
+      // prices, not trusted from the browser.
+      body: JSON.stringify({
+        items: items.map((item: any) => ({ id: item.id, qty: item.qty })),
+        discountAmount: discount + rewardValue,
+      }),
     });
     const data = await response.json();
+
+    if (!response.ok || data.error) {
+      alert(data.error || "Couldn't start payment. Please try again.");
+      return;
+    }
 
     const options = {
       key: process.env.NEXT_PUBLIC_RAZORPAY_KEY,
@@ -564,7 +589,7 @@ setAddress(userData.address || "");
 
           const orderRef = await addDoc(
             collection(db, "orders"),
-            buildOrderData(firebaseUser, "Paid")
+            buildOrderData(firebaseUser, "Paid", verifyData.amount)
           );
           await applyPostOrderEffects(
             firebaseUser,

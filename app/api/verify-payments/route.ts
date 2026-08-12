@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import Razorpay from "razorpay";
 
 export async function POST(
   req:Request
@@ -62,12 +63,53 @@ export async function POST(
 
     }
 
+    // The signature only proves order_id/payment_id weren't tampered
+    // with in transit — it says nothing about whether the payment was
+    // actually captured, or for how much. Ask Razorpay directly.
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID!,
+      key_secret: process.env.RAZORPAY_KEY_SECRET!,
+    });
+
+    const [payment, order] = await Promise.all([
+      razorpay.payments.fetch(razorpay_payment_id),
+      razorpay.orders.fetch(razorpay_order_id),
+    ]);
+
+    if (payment.order_id !== razorpay_order_id) {
+      return Response.json({
+        success: false,
+        message: "Payment does not belong to this order",
+      });
+    }
+
+    if (payment.status !== "captured") {
+      return Response.json({
+        success: false,
+        message: "Payment was not captured",
+      });
+    }
+
+    const expectedAmount = order.notes?.expectedAmount;
+
+    if (
+      expectedAmount &&
+      String(payment.amount) !== String(expectedAmount)
+    ) {
+      return Response.json({
+        success: false,
+        message: "Payment amount does not match the order",
+      });
+    }
+
     return Response.json({
 
       success:true,
 
       message:
-        "Payment Verified"
+        "Payment Verified",
+
+      amount: Number(payment.amount) / 100,
 
     });
 
