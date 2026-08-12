@@ -27,6 +27,7 @@ export default function SellerOrderDetailsPage(){
   const [dispatchDate,setDispatchDate] =useState("");
   const [expectedDelivery,setExpectedDelivery] =useState("");
   const [sellerNotes,setSellerNotes] = useState("");
+  const [vendorUid,setVendorUid] = useState("");
   const invoiceRef = useRef<HTMLDivElement>(null);
 const shippingLabelRef = useRef<HTMLDivElement>(null);
    
@@ -39,6 +40,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
         return;
       }
 
+      setVendorUid(user.uid);
       loadOrder(user.uid);
 
     });
@@ -254,6 +256,20 @@ finally{ setSaving(false);} };
     );
 
   }
+
+  // order.finalTotal/commission/sellerEarning are whole-order figures
+  // computed once at checkout — in a multi-vendor order they'd show this
+  // seller the full order's total/commission/earnings instead of just
+  // their own share. Derive that from this seller's own line items.
+  const vendorOrderItems = (order.items || []).filter(
+    (item: any) => item.vendorId === vendorUid
+  );
+  const vendorOrderSubtotal = vendorOrderItems.reduce(
+    (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+    0
+  );
+  const vendorOrderCommission = Math.round(vendorOrderSubtotal * 0.1);
+  const vendorOrderEarning = vendorOrderSubtotal - vendorOrderCommission;
 
   return(
 
@@ -843,23 +859,19 @@ finally{ setSaving(false);} };
 
                     ₹
 
-                    {order.finalTotal ||
-
-                     order.total ||
-
-                     0}
+                    {vendorOrderSubtotal}
                      <p>
 
 <strong>Seller Earnings :</strong>
 
-₹{order.sellerEarning || 0}
+₹{vendorOrderEarning}
 
 </p>
 <p>
 
 <strong>Commission :</strong>
 
-₹{order.commission || 0}
+₹{vendorOrderCommission}
 
 </p>
 

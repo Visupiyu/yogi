@@ -195,7 +195,16 @@ export default function SellerOrdersPage() {
               <p>Method: {order.paymentMethod || "COD"}</p>
               <p>
                 Seller Earnings: ₹
-                {(order.sellerEarning || 0).toLocaleString("en-IN")}
+                {(() => {
+                  // order.sellerEarning is the WHOLE order's earnings —
+                  // wrong for a multi-vendor order. order.items here is
+                  // already filtered to just this seller's own items.
+                  const subtotal = order.items.reduce(
+                    (sum, item) => sum + (item.price || 0) * (item.qty || 0),
+                    0
+                  );
+                  return (subtotal - Math.round(subtotal * 0.1)).toLocaleString("en-IN");
+                })()}
               </p>
 
               <div className="mt-4">

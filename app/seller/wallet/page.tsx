@@ -80,12 +80,20 @@ async(vendorUid: string, vendorEmailArg: string)=>{
 
       if (order.status === "Cancelled") return;
 
-      const hasVendorItems = order.items?.some(
+      const vendorItems = order.items?.filter(
         (item:any) => item.vendorId === vendorUid
-      );
+      ) || [];
 
-      if (hasVendorItems) {
-        totalEarnings += Number(order.sellerEarning || 0);
+      if (vendorItems.length > 0) {
+        // order.sellerEarning is a whole-order figure — in a multi-vendor
+        // order it would credit this vendor the full order's earnings.
+        // Derive their own share from just their line items instead.
+        const vendorSubtotal = vendorItems.reduce(
+          (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+          0
+        );
+        const vendorCommission = Math.round(vendorSubtotal * 0.1);
+        totalEarnings += vendorSubtotal - vendorCommission;
       }
 
     });

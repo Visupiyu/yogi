@@ -86,14 +86,24 @@ export default function SellerPayoutsPage() {
 
           if(vendorItems.length){
 
+            // order.finalTotal/commission/sellerEarning are whole-order
+            // figures computed once at checkout — in a multi-vendor order
+            // reading them here would credit this vendor the full order,
+            // not just their share. Derive from their own line items.
+            const vendorSubtotal = vendorItems.reduce(
+              (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+              0
+            );
+            const vendorCommission = Math.round(vendorSubtotal * 0.1);
+
             totalSales +=
-              order.finalTotal || 0;
+              vendorSubtotal;
 
             totalCommission +=
-              order.commission || 0;
+              vendorCommission;
 
             totalNet +=
-              order.sellerEarning || 0;
+              vendorSubtotal - vendorCommission;
 
           }
 

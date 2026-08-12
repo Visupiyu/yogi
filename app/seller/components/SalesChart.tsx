@@ -54,6 +54,20 @@ export default function SalesChart() {
 
           if (!order.createdAt) return;
 
+          if (order.status === "Cancelled") return;
+
+          // order.finalTotal is the WHOLE order's total — in a
+          // multi-vendor order that would count other sellers' items as
+          // this seller's revenue too. Sum only this seller's own items.
+          const vendorRevenue = (order.items || [])
+            .filter((item: any) => item.vendorId === user.uid)
+            .reduce(
+              (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+              0
+            );
+
+          if (vendorRevenue === 0) return;
+
           const date = order.createdAt.toDate();
 
           const month =
@@ -62,8 +76,7 @@ export default function SalesChart() {
             });
 
           monthly[month] =
-            (monthly[month] || 0) +
-            Number(order.finalTotal || order.total || 0);
+            (monthly[month] || 0) + vendorRevenue;
 
         });
 

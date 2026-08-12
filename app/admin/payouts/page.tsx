@@ -58,9 +58,18 @@ export default function AdminPayoutsPage() {
             [];
 
           if (vendorItems.length) {
-            sales += order.finalTotal || order.total || 0;
-            commission += order.commission || 0;
-            earnings += order.sellerEarning || 0;
+            // order.finalTotal/commission/sellerEarning are whole-order
+            // figures — in a multi-vendor order they'd credit this vendor
+            // the full order instead of just their own items.
+            const vendorSubtotal = vendorItems.reduce(
+              (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+              0
+            );
+            const vendorCommission = Math.round(vendorSubtotal * 0.1);
+
+            sales += vendorSubtotal;
+            commission += vendorCommission;
+            earnings += vendorSubtotal - vendorCommission;
           }
         });
 

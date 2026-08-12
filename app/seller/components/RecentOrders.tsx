@@ -43,10 +43,20 @@ export default function RecentOrders() {
 
         snapshot.forEach((docSnap) => {
 
-          const order = {
+          const order: any = {
             ...docSnap.data(),
             id: docSnap.id,
           };
+
+          // order.finalTotal is the WHOLE order's total — in a
+          // multi-vendor order that would show other sellers' items as
+          // this seller's revenue. Show only this seller's own share.
+          order.vendorAmount = (order.items || [])
+            .filter((item: any) => item.vendorId === user.uid)
+            .reduce(
+              (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+              0
+            );
 
           sellerOrders.push(order);
 
@@ -145,7 +155,7 @@ export default function RecentOrders() {
                 </td>
 
                 <td className="p-3">
-                  ₹{Number(order.finalTotal || order.total || 0).toLocaleString("en-IN")}
+                  ₹{Number(order.vendorAmount || 0).toLocaleString("en-IN")}
                 </td>
 
                 <td className="p-3">

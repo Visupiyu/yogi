@@ -310,14 +310,32 @@ service cloud.firestore {
         && request.resource.data.totalReferrals >= resource.data.totalReferrals;
     }
 
+    function isRewardPointsCheckoutUpdate() {
+      // Checkout earns points on a purchase or spends them on a discount —
+      // the exact delta can't be validated here without knowing the order,
+      // but isolating it to only this field, always a non-negative number,
+      // stops it being silently bundled into an unrelated profile write.
+      return isSignedIn()
+        && affectedKeysOnly(['rewardPoints'])
+        && request.resource.data.rewardPoints is number
+        && request.resource.data.rewardPoints >= 0;
+    }
+
     match /users/{userId} {
       allow read: if isAdmin() || isOwnerUid(userId);
 
       allow create: if isOwnerUid(userId) && isValidNewUser();
 
       allow update: if isAdmin()
-        || (isOwnerUid(userId) && unchanged('role') && unchanged('status') && unchanged('uid'))
-        || isReferralBonusUpdate();
+        || (
+          isOwnerUid(userId)
+          && unchanged('role')
+          && unchanged('status')
+          && unchanged('uid')
+          && unchanged('rewardPoints')
+        )
+        || isReferralBonusUpdate()
+        || isRewardPointsCheckoutUpdate();
 
       allow delete: if isAdmin();
     }
@@ -464,6 +482,14 @@ service cloud.firestore {
     match /coupons/{couponId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    match /couponRedemptions/{redemptionId} {
+      allow read: if isAdmin() || isOwnerUid(resource.data.userId);
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && isValidString('code', 50);
+      allow update, delete: if isAdmin();
     }
 
     // ---------------------------------------------------------

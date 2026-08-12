@@ -78,11 +78,21 @@ export default function SellerPage() {
         if (sellerItems.length > 0) {
           ordersCount++;
           if (order.status === "Pending") pendingCount++;
-          sellerItems.forEach((item: any) => {
-            totalEarnings += (item.price || 0) * (item.qty || 0);
-          });
-          totalCommission += order.commission || 0;
-          totalNetEarnings += order.sellerEarning || 0;
+
+          // order.commission/sellerEarning are computed once for the WHOLE
+          // cart at checkout, not per vendor — in a multi-vendor order,
+          // reading them here would credit each vendor the full order's
+          // commission/earnings. Derive this vendor's own share from just
+          // their line items instead, at the same 10% rate checkout uses.
+          const vendorSubtotal = sellerItems.reduce(
+            (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+            0
+          );
+          const vendorCommission = Math.round(vendorSubtotal * 0.1);
+
+          totalEarnings += vendorSubtotal;
+          totalCommission += vendorCommission;
+          totalNetEarnings += vendorSubtotal - vendorCommission;
         }
       });
 

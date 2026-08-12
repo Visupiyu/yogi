@@ -16,6 +16,7 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 // Free shipping threshold — keep this in sync with TopStrip/cart.
@@ -49,8 +50,28 @@ export default function CheckoutPage() {
     setName(userData.name || "");
 setPhone(userData.phone || "");
 setAddress(userData.address || "");
-    setAvailablePoints(Number(userData.rewardPoints || 0));
     loadDefaultAddress();
+
+    // Reward balance must come from Firestore, not the cached localStorage
+    // value — that's trivially editable client-side and was never actually
+    // the real source of truth (see logic bug notes on redemption below).
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setAvailablePoints(0);
+        return;
+      }
+
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        setAvailablePoints(
+          snap.exists() ? Number(snap.data().rewardPoints || 0) : 0
+        );
+      } catch (error) {
+        console.error("Failed to load reward balance:", error);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const total = items.reduce(
@@ -88,15 +109,40 @@ setAddress(userData.address || "");
       alert("Coupon already applied");
       return;
     }
+
+    if (!auth.currentUser) {
+      alert("Please login first.");
+      router.push("/login");
+      return;
+    }
+
     try {
+      const code = coupon.trim().toUpperCase();
+
       const q = query(
         collection(db, "coupons"),
-        where("code", "==", coupon.trim().toUpperCase())
+        where("code", "==", code)
       );
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
         alert("Invalid coupon");
+        return;
+      }
+
+      // Coupons here have no built-in usage cap or per-user limit — check
+      // this customer hasn't already redeemed this exact code before,
+      // otherwise the same coupon could be reused on every order forever.
+      const redemptionCheck = await getDocs(
+        query(
+          collection(db, "couponRedemptions"),
+          where("userId", "==", auth.currentUser.uid),
+          where("code", "==", code)
+        )
+      );
+
+      if (!redemptionCheck.empty) {
+        alert("You've already used this coupon.");
         return;
       }
 
@@ -263,16 +309,40 @@ setAddress(userData.address || "");
       console.error("Order email failed:", e);
     }
 
-    // Update reward points in localStorage
+    // Reward points: read-modify-write against Firestore atomically, not
+    // just localStorage — the cached value is trivially editable and was
+    // never actually the source of truth, and a plain read-then-write here
+    // would let two concurrent orders both redeem against the same stale
+    // balance. Re-clamps the redemption against the REAL current balance
+    // at write time, not just what the page happened to load with.
+    let actualRedeemed = 0;
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userSnap = await transaction.get(userRef);
+        const currentPoints = userSnap.exists()
+          ? Number(userSnap.data().rewardPoints || 0)
+          : 0;
+
+        actualRedeemed = Math.min(rewardValue, currentPoints);
+        const newBalance = Math.max(
+          0,
+          currentPoints + earnedPoints - actualRedeemed
+        );
+
+        transaction.set(
+          userRef,
+          { rewardPoints: newBalance },
+          { merge: true }
+        );
+      });
+    } catch (error) {
+      console.error("Failed to update reward points:", error);
+    }
+
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const currentPoints = Number(user.rewardPoints || 0);
-    user.rewardPoints = Math.max(
-      0,
-      currentPoints + earnedPoints - rewardValue
-    );
-    localStorage.setItem("user", JSON.stringify(user));
     user.name = name; user.phone = phone; user.address = address;
-localStorage.setItem( "user", JSON.stringify(user));
+    localStorage.setItem("user", JSON.stringify(user));
 
     // Reward transactions (must include userId to satisfy Firestore rules)
     await addDoc(collection(db, "rewardTransactions"), {
@@ -284,14 +354,27 @@ localStorage.setItem( "user", JSON.stringify(user));
       createdAt: Timestamp.now(),
     });
 
-    if (rewardValue > 0) {
+    if (actualRedeemed > 0) {
       await addDoc(collection(db, "rewardTransactions"), {
         userId: firebaseUser.uid,
         userEmail: firebaseUser.email,
         type: "Redeemed",
-        points: rewardValue,
+        points: actualRedeemed,
         createdAt: Timestamp.now(),
       });
+    }
+
+    if (couponApplied && coupon) {
+      try {
+        await addDoc(collection(db, "couponRedemptions"), {
+          userId: firebaseUser.uid,
+          code: coupon.trim().toUpperCase(),
+          orderId,
+          createdAt: Timestamp.now(),
+        });
+      } catch (e) {
+        console.error("Failed to record coupon redemption:", e);
+      }
     }
 
     localStorage.removeItem("cart");
@@ -376,6 +459,15 @@ localStorage.setItem( "user", JSON.stringify(user));
 
   const payNow = async () => {
     if (!validateForm()) return;
+
+    // Must check login BEFORE opening Razorpay, not after payment succeeds
+    // — otherwise a session that expires mid-checkout lets Razorpay
+    // capture real money with no order ever created and no way back to it.
+    if (!auth.currentUser) {
+      alert("Please login again.");
+      router.push("/login");
+      return;
+    }
 
       if (!(await validateStock())) return;
 

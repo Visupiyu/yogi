@@ -128,6 +128,12 @@ export default function ProfilePage() {
  const logout = async () => {
   await signOut(auth);
   localStorage.removeItem("user");
+  // Cart is a plain device-wide localStorage key with no account scoping
+  // — on a shared device, the next person to log in would otherwise
+  // inherit (and could check out) whatever this account left in it.
+  localStorage.removeItem("cart");
+  localStorage.removeItem("checkoutItems");
+  window.dispatchEvent(new Event("cartUpdated"));
   router.push("/login");
 };
 
