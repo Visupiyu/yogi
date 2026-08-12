@@ -6,6 +6,7 @@ import { collection, addDoc, doc, setDoc, serverTimestamp } from "firebase/fires
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import Image from "next/image";
+import Link from "next/link";
 
 const citiesByState = {
   Gujarat: ["Ahmedabad", "Surat", "Vadodara", "Rajkot"],
@@ -241,33 +242,137 @@ if (!aadhaarDoc || !chequeDoc) {
   const fileLabel = (file: File | null) =>
     file ? file.name : "No file chosen";
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 py-12 px-6">
-      <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-xl p-10">
-        {/* LOGO + HEADING */}
-        <div className="text-center mb-6">
-          <Image
-  src="/logo.png"
-  alt="YOMICO"
-  width={180}
-  height={180}
-  className="h-36 md:h-40 w-auto object-contain"
-/>
-          <p className="text-green-600 font-semibold">
-            YOMICO Seller Portal
-          </p>
-        </div>
+  const sections = [
+    {
+      label: "Account",
+      icon: "👤",
+      done: !!(
+        formData.fullName &&
+        formData.email &&
+        formData.password.length >= 6 &&
+        /^\d{10}$/.test(formData.businessPhone)
+      ),
+    },
+    {
+      label: "Business",
+      icon: "🏬",
+      done: !!formData.businessName,
+    },
+    {
+      label: "Address",
+      icon: "📍",
+      done: !!(
+        formData.street &&
+        formData.zipCode &&
+        formData.city &&
+        formData.state
+      ),
+    },
+    {
+      label: "Bank",
+      icon: "🏦",
+      done: !!(
+        formData.accountHolder &&
+        formData.bankName &&
+        formData.accountNumber &&
+        formData.ifsc
+      ),
+    },
+    {
+      label: "Documents",
+      icon: "📄",
+      done: !!(aadhaarDoc && chequeDoc),
+    },
+    {
+      label: "Review",
+      icon: "✅",
+      done: formData.agreed,
+    },
+  ];
 
-        <div className="mb-10">
-          <h1 className="text-5xl font-bold text-blue-600 mb-3">
-            Become a Vendor
-          </h1>
-          <p className="text-gray-500 text-lg">Start selling on YOMICO</p>
+  const completedCount = sections.filter((section) => section.done).length;
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-16">
+
+      {/* HERO */}
+      <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white">
+        <div className="max-w-5xl mx-auto px-6 py-12">
+
+          <Link href="/sell" className="text-sm text-white/80 hover:text-white hover:underline">
+            ← Sell on YOMICO
+          </Link>
+
+          <div className="mt-4 flex items-center gap-5">
+            <Image
+              src="/logo.png"
+              alt="YOMICO"
+              width={90}
+              height={90}
+              className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-2xl bg-white p-2"
+            />
+
+            <div>
+              <p className="text-sm uppercase tracking-widest opacity-80">
+                YOMICO Seller Portal
+              </p>
+              <h1 className="text-3xl md:text-4xl font-bold">
+                Become a Vendor
+              </h1>
+            </div>
+          </div>
+
+          <p className="mt-4 max-w-xl opacity-90">
+            Fill in your business, address, bank and KYC details below.
+            Your application will be reviewed by the YOMICO team before
+            you can start selling.
+          </p>
+
         </div>
+      </div>
+
+      {/* PROGRESS STEPPER */}
+      <div className="max-w-5xl mx-auto px-6 -mt-8">
+        <div className="bg-white rounded-2xl shadow-lg p-5">
+
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-gray-700">
+              Application progress
+            </span>
+            <span className="text-sm font-semibold text-green-600">
+              {completedCount} of {sections.length} sections complete
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {sections.map((section) => (
+              <span
+                key={section.label}
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium ${
+                  section.done
+                    ? "bg-green-50 text-green-700"
+                    : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                <span>{section.icon}</span>
+                {section.done ? "✓" : "○"} {section.label}
+              </span>
+            ))}
+          </div>
+
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-6 mt-8 space-y-6">
 
         {/* BASIC */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold mb-6">Account Details</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg">
+              👤
+            </div>
+            <h2 className="text-2xl font-bold">Account Details</h2>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <input
@@ -318,8 +423,13 @@ if (!aadhaarDoc || !chequeDoc) {
         </div>
 
         {/* BUSINESS */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold mb-6">Business Details</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-lg">
+              🏬
+            </div>
+            <h2 className="text-2xl font-bold">Business Details</h2>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <input
@@ -375,8 +485,13 @@ if (!aadhaarDoc || !chequeDoc) {
         </div>
 
         {/* ADDRESS */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold mb-6">Business Address</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-lg">
+              📍
+            </div>
+            <h2 className="text-2xl font-bold">Business Address</h2>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <input
@@ -419,12 +534,7 @@ if (!aadhaarDoc || !chequeDoc) {
             <select
               name="city"
               value={formData.city}
-            onChange={(e) =>
-  setFormData({
-    ...formData,
-    gstNumber: e.target.value.toUpperCase(),
-  })
-}
+              onChange={handleChange}
               className="p-4 border rounded-2xl"
             >
               <option value="">Select City</option>
@@ -442,8 +552,13 @@ if (!aadhaarDoc || !chequeDoc) {
         </div>
 
         {/* BANK */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold mb-6">Bank Details</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-lg">
+              🏦
+            </div>
+            <h2 className="text-2xl font-bold">Bank Details</h2>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <input
@@ -487,8 +602,13 @@ if (!aadhaarDoc || !chequeDoc) {
         </div>
 
         {/* KYC DOCUMENTS */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold mb-2">KYC Documents</h2>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-lg">
+              📄
+            </div>
+            <h2 className="text-2xl font-bold">KYC Documents</h2>
+          </div>
           <p className="text-gray-500 mb-6">
             Upload clear images or PDFs. These are reviewed before approval.
           </p>
@@ -545,47 +665,57 @@ if (!aadhaarDoc || !chequeDoc) {
           </div>
         </div>
 
-        {/* TERMS */}
-        <div className="bg-gray-50 p-6 rounded-2xl mb-10">
-          <label className="flex items-center gap-3 text-lg font-medium">
-            <input
-              type="checkbox"
-              name="agreed"
-              checked={formData.agreed}
-              onChange={handleChange}
-              className="w-5 h-5"
-            />
-            I agree to the Terms &amp; Conditions
-          </label>
-        </div>
+        {/* REVIEW & SUBMIT */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg">
+              ✅
+            </div>
+            <h2 className="text-2xl font-bold">Review &amp; Submit</h2>
+          </div>
 
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
-          <p className="text-green-700 text-sm">
-            Your application will be reviewed by the YOMICO team before approval.
+          <div className="bg-gray-50 p-6 rounded-2xl mb-6">
+            <label className="flex items-center gap-3 text-lg font-medium">
+              <input
+                type="checkbox"
+                name="agreed"
+                checked={formData.agreed}
+                onChange={handleChange}
+                className="w-5 h-5"
+              />
+              I agree to the Terms &amp; Conditions
+            </label>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
+            <p className="text-green-700 text-sm">
+              Your application will be reviewed by the YOMICO team before approval.
+            </p>
+          </div>
+
+          <button
+            onClick={registerVendor}
+            disabled={loading}
+            className={`w-full text-white py-5 rounded-2xl text-xl font-bold ${
+              loading
+                ? "bg-gray-400"
+                : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500"
+            }`}
+          >
+            {loading ? "Submitting..." : "Register As Vendor"}
+          </button>
+
+          <p className="text-center mt-6 text-gray-600">
+            Already a seller?{" "}
+            <a
+              href="/vendor-login"
+              className="text-blue-600 font-semibold hover:underline"
+            >
+              Login here
+            </a>
           </p>
         </div>
 
-        <button
-          onClick={registerVendor}
-          disabled={loading}
-          className={`w-full text-white py-5 rounded-2xl text-xl font-bold ${
-            loading
-              ? "bg-gray-400"
-              : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500"
-          }`}
-        >
-          {loading ? "Submitting..." : "Register As Vendor"}
-        </button>
-
-        <p className="text-center mt-6 text-gray-600">
-          Already a seller?{" "}
-          <a
-            href="/vendor-login"
-            className="text-blue-600 font-semibold hover:underline"
-          >
-            Login here
-          </a>
-        </p>
       </div>
     </div>
   );
