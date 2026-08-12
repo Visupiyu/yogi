@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useVendor } from "@/hooks/useVendor";
 
 import SellerDashboard from "@/components/seller/SellerDashboard";
+import OnboardingChecklist from "./components/OnboardingChecklist";
 import DashboardCards from "./components/DashboardCards";
 import QuickActions from "./components/QuickActions";
 import NotificationsPanel from "./components/NotificationsPanel";
@@ -136,6 +137,10 @@ return (
   <div className="p-6">
 
     <SellerDashboard>
+
+      {vendor && vendorId && (
+        <OnboardingChecklist vendor={vendor} vendorId={vendorId} />
+      )}
 
       <DashboardCards
         totalProducts={stats.totalProducts}
