@@ -12,6 +12,7 @@ import Image from "next/image";
 import { addToCart as addToCartHelper } from "@/lib/cart";
 import { categoryFields } from "@/lib/catalog/categoryFields";
 import { findNodeById } from "@/lib/catalog/categoryUtils";
+import { UNIVERSAL_SPEC_FIELDS } from "@/lib/catalog/universalSpecFields";
 
 type Product = { id: string; name: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
@@ -508,7 +509,9 @@ const savings = hasDiscount ? mrp - price : 0;
     [];
 
   const specLabel = (key: string) => {
-    const match = categoryFieldDefs.find((f) => f.id === key);
+    const match =
+      categoryFieldDefs.find((f) => f.id === key) ||
+      UNIVERSAL_SPEC_FIELDS.find((f) => f.id === key);
     return match?.label || key;
   };
 

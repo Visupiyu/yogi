@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { categoryFields } from "@/lib/catalog/categoryFields";
+import { UNIVERSAL_SPEC_FIELDS } from "@/lib/catalog/universalSpecFields";
 
 interface SpecificationFormProps {
   categoryId: string;
@@ -51,10 +52,12 @@ export default function SpecificationForm({
 
   const addCustomSpec = () => {
     const key = newSpecKey.trim();
+    // Value is optional here — the seller may just want to note a
+    // specification name without a value yet.
     const value = newSpecValue.trim();
 
-    if (!key || !value) {
-      alert("Enter both a name and a value.");
+    if (!key) {
+      alert("Enter a specification name.");
       return;
     }
 
@@ -80,56 +83,101 @@ export default function SpecificationForm({
 
   if (fields.length === 0) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <p className="text-sm text-gray-500">
-          No predefined specifications for this category yet — add your
-          own below.
+          No predefined specifications for this category yet — fill in
+          whatever applies below, and add anything else under &quot;Other.&quot;
         </p>
 
-        {Object.entries(specifications).length > 0 && (
-          <div className="space-y-2">
-            {Object.entries(specifications).map(([key, value]) => (
-              <div
-                key={key}
-                className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-2"
-              >
-                <span className="text-sm">
-                  <span className="font-semibold">{key}:</span> {value}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeCustomSpec(key)}
-                  className="text-sm font-semibold text-red-600 hover:text-red-700"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Fixed universal specification table — applies to any product */}
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="p-3 text-left font-semibold text-gray-700">
+                  Specification
+                </th>
+                <th className="p-3 text-left font-semibold text-gray-700">
+                  Value
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {UNIVERSAL_SPEC_FIELDS.map((f) => (
+                <tr key={f.id} className="border-t border-gray-200">
+                  <td className="p-3 font-medium text-gray-700 whitespace-nowrap">
+                    {f.label}
+                  </td>
+                  <td className="p-3">
+                    <input
+                      type="text"
+                      value={specifications[f.id] || ""}
+                      onChange={(e) => updateField(f.id, e.target.value)}
+                      placeholder={f.placeholder}
+                      className="w-full rounded-lg border border-gray-300 p-2 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <input
-            type="text"
-            value={newSpecKey}
-            onChange={(e) => setNewSpecKey(e.target.value)}
-            placeholder="Specification name (e.g. Material)"
-            className="flex-1 rounded-lg border border-gray-300 p-3 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          />
-          <input
-            type="text"
-            value={newSpecValue}
-            onChange={(e) => setNewSpecValue(e.target.value)}
-            placeholder="Value (e.g. Cotton)"
-            className="flex-1 rounded-lg border border-gray-300 p-3 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
-          />
-          <button
-            type="button"
-            onClick={addCustomSpec}
-            className="rounded-lg border border-blue-600 px-5 py-3 font-semibold text-blue-600 hover:bg-blue-50"
-          >
-            + Add
-          </button>
+        {/* Other: anything not covered by the fixed rows above */}
+        <div>
+          <p className="mb-2 text-sm font-semibold text-gray-800">
+            Other
+          </p>
+
+          {Object.entries(specifications)
+            .filter(([key]) => !UNIVERSAL_SPEC_FIELDS.some((f) => f.id === key))
+            .length > 0 && (
+            <div className="mb-3 space-y-2">
+              {Object.entries(specifications)
+                .filter(([key]) => !UNIVERSAL_SPEC_FIELDS.some((f) => f.id === key))
+                .map(([key, value]) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-2"
+                  >
+                    <span className="text-sm">
+                      <span className="font-semibold">{key}:</span> {value}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomSpec(key)}
+                      className="text-sm font-semibold text-red-600 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              value={newSpecKey}
+              onChange={(e) => setNewSpecKey(e.target.value)}
+              placeholder="Specification name"
+              className="flex-1 rounded-lg border border-gray-300 p-3 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <input
+              type="text"
+              value={newSpecValue}
+              onChange={(e) => setNewSpecValue(e.target.value)}
+              placeholder="Value (optional)"
+              className="flex-1 rounded-lg border border-gray-300 p-3 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            <button
+              type="button"
+              onClick={addCustomSpec}
+              className="rounded-lg border border-blue-600 px-5 py-3 font-semibold text-blue-600 hover:bg-blue-50"
+            >
+              + Add
+            </button>
+          </div>
         </div>
       </div>
     );
