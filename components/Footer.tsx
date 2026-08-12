@@ -71,7 +71,7 @@ export default function Footer() {
         <div>
           <h3 className="text-lg font-bold mb-3">Seller</h3>
           <ul className="space-y-2 text-gray-600">
-            <li><Link href="/vendor-login" className="hover:text-green-600 transition">Sell on YOMICO</Link></li>
+            <li><Link href="/sell" className="hover:text-green-600 transition">Sell on YOMICO</Link></li>
             <li><Link href="/vendor-register" className="hover:text-green-600 transition">Become a Seller</Link></li>
             <li><Link href="/vendor-login" className="hover:text-green-600 transition">Seller Login</Link></li>
           </ul>

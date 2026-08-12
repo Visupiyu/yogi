@@ -403,6 +403,16 @@ service cloud.firestore {
         && request.resource.data.userEmail == request.auth.token.email;
     }
 
+    match /sellerInquiries/{inquiryId} {
+      allow read: if isAdmin();
+      allow create: if isValidString('fullName', 200)
+        && isValidString('contact', 200)
+        && isValidString('message', 2000)
+        && request.resource.data.status == 'New';
+      allow update: if isAdmin() && affectedKeysOnly(['status', 'adminNote']);
+      allow delete: if isAdmin();
+    }
+
     match /tickets/{ticketId} {
       allow read: if isAdmin() || isOwnerEmail(resource.data.userEmail);
       allow create: if isSignedIn()
