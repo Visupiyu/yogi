@@ -23,6 +23,14 @@ const MINIMAL_HEADER_PREFIXES = [
   "/sell",
 ];
 
+// Matches the prefix as a whole path segment, not a raw string prefix —
+// otherwise "/sell" would also match "/seller-agreement" and "/seller"
+// would also match "/seller-agreement", both of which should behave like
+// an ordinary page (e.g. /terms, /privacy-policy), not the seller funnel.
+function pathMatches(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 export default function ClientLayout({
   children,
 }: {
@@ -31,11 +39,11 @@ export default function ClientLayout({
   const pathname = usePathname() || "";
 
   const hideChrome = HIDE_CHROME_PREFIXES.some((prefix) =>
-    pathname.startsWith(prefix)
+    pathMatches(pathname, prefix)
   );
 
   const minimalHeader = MINIMAL_HEADER_PREFIXES.some((prefix) =>
-    pathname.startsWith(prefix)
+    pathMatches(pathname, prefix)
   );
 
   return (
