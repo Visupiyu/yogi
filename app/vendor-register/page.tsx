@@ -675,15 +675,43 @@ if (!aadhaarDoc || !chequeDoc) {
           </div>
 
           <div className="bg-gray-50 p-6 rounded-2xl mb-6">
-            <label className="flex items-center gap-3 text-lg font-medium">
+            <label className="flex items-start gap-3 text-lg font-medium">
               <input
                 type="checkbox"
                 name="agreed"
                 checked={formData.agreed}
                 onChange={handleChange}
-                className="w-5 h-5"
+                className="w-5 h-5 mt-1"
               />
-              I agree to the Terms &amp; Conditions
+              <span>
+                I agree to the{" "}
+                <a
+                  href="/seller-agreement"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Seller Agreement
+                </a>
+                ,{" "}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Terms of Use
+                </a>
+                {" "}and{" "}
+                <a
+                  href="/privacy-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  Privacy Policy
+                </a>
+              </span>
             </label>
           </div>
 

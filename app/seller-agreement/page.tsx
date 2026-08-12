@@ -1,238 +1,138 @@
-import Link from "next/link";
+import LegalPageLayout from "@/components/legal/LegalPageLayout";
 
-export const metadata = {
-  title: "Seller Agreement | YOMICO",
-  description:
-    "Read the YOMICO Seller Agreement, including seller responsibilities, payouts, product compliance, and marketplace policies.",
-};
-export default function SellerAgreementPage() {
-
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-
-    <div className="min-h-screen bg-gray-50">
-
-      <div className="max-w-5xl mx-auto px-4 py-12">
-
-        <h1 className="text-5xl font-bold text-center mb-8">
-          Seller Agreement
-        </h1>
-
-        <p className="text-center text-gray-500 mb-8">
-          Last Updated: July 2026
-        </p>
-
-        <p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
-  This Seller Agreement outlines the rights, responsibilities, and
-  obligations of sellers using the YOMICO marketplace.
-</p>
-
-        <div className="bg-white p-8 rounded-2xl shadow space-y-6">
-
-         <p>
-
-Welcome to YOMICO. This Seller Agreement governs the relationship between YOMICO and every seller who lists or sells products on the marketplace.
-
-</p>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-1. Seller Eligibility
-
-</h2>
-
-<p>
-
-To become a seller, you must provide accurate business information, complete KYC verification if required, and comply with all applicable Indian laws.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-2. Seller Responsibilities
-
-</h2>
-
-<p>
-
-Sellers are responsible for maintaining accurate product listings, pricing, stock availability, product quality, packaging, shipping, and customer support.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-3. Product Compliance
-
-</h2>
-
-<p>
-
-All products listed on YOMICO must be genuine, legally permitted for sale, and comply with applicable consumer protection, GST, and product safety regulations.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-4. Orders & Fulfilment
-
-</h2>
-
-<p>
-
-Sellers must process confirmed orders promptly, dispatch products within the promised time, and maintain accurate inventory.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-5. Payments & Payouts
-
-</h2>
-
-<p>
-
-Seller payouts will be processed according to YOMICO's payout schedule after applicable marketplace fees, taxes, refunds, or other adjustments.
-
-</p>
-
-</div>
-
-<div>
-
-  <div>
-
-  <h2 className="text-2xl font-bold mb-2">
-    6. Marketplace Fees
-  </h2>
-
-  <p>
-    Sellers agree to pay applicable marketplace commissions, payment
-    processing charges, taxes, and any other fees communicated by
-    YOMICO. Fee structures may be updated from time to time with
-    appropriate notice.
-  </p>
-
-</div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-7. Returns & Refunds
-
-</h2>
-
-<p>
-
-Sellers agree to follow the YOMICO Return & Refund Policy and cooperate in resolving customer issues fairly and promptly.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-8. Suspension or Termination
-
-</h2>
-
-<p>
-
-YOMICO may suspend or terminate seller accounts for fraud, counterfeit products, repeated policy violations, abusive conduct, or any activity that harms customers or the marketplace.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-9. Limitation of Liability
-
-</h2>
-
-<p>
-
-YOMICO provides the marketplace platform but does not manufacture or own products sold by independent sellers. Sellers remain responsible for their products and legal obligations.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-10. Governing Law
-
-</h2>
-
-<p>
-
-This Seller Agreement shall be governed by the laws of India, and disputes shall be subject to the jurisdiction of the competent courts in India.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-11. Seller Support
-
-</h2>
-
-<p>
-
-For questions regarding this Seller Agreement, please contact the YOMICO Seller Support Team through the Contact Us page.
-
-</p>
-
-</div>
-<div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
-
-  <h3 className="text-2xl font-bold mb-2">
-    Need Help as a Seller?
-  </h3>
-
-  <p className="text-gray-600 mb-4">
-    If you have questions about your seller account, payouts, or marketplace policies, our support team is here to help.
-  </p>
-
-  <Link
-    href="/contact"
-    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
-  >
-    Contact Seller Support
-  </Link>
-
-</div>
-
-        </div>
-
+    <section>
+      <h2 className="text-xl font-bold text-gray-900 mb-3">{title}</h2>
+      <div className="text-gray-600 leading-relaxed space-y-3">
+        {children}
       </div>
-
-    </div>
-
+    </section>
   );
+}
 
+export default function SellerAgreementPage() {
+  return (
+    <LegalPageLayout title="Seller Agreement" lastUpdated="12 August 2026">
+
+      <Section title="1. Overview">
+        <p>
+          This Seller Agreement (&quot;Agreement&quot;) governs your participation as
+          a seller on the YOMICO marketplace, in addition to our general{" "}
+          <a href="/terms" className="text-blue-600 hover:underline">Terms of Use</a>.
+          By registering as a seller, you agree to the terms below.
+        </p>
+      </Section>
+
+      <Section title="2. Eligibility and Verification">
+        <p>
+          To sell on YOMICO, you must provide accurate business, identity
+          (KYC), and bank account information as requested during
+          registration. YOMICO reviews and approves seller applications at
+          its discretion, and may request additional documentation, reject
+          an application, or suspend an approved account if information
+          provided is found to be false, incomplete, or non-compliant.
+        </p>
+      </Section>
+
+      <Section title="3. Product Listings">
+        <p>You are responsible for ensuring that every listing you create:</p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li>Accurately describes the product, including price, images, specifications and available stock.</li>
+          <li>Does not mislead customers about the condition, origin, or authenticity of the product.</li>
+          <li>Complies with all applicable Indian laws and regulations for the category the product is listed under.</li>
+          <li>Does not infringe any third party&apos;s intellectual property rights.</li>
+        </ul>
+      </Section>
+
+      <Section title="4. Prohibited Products">
+        <p>
+          You may not list products that are illegal, counterfeit,
+          hazardous, or otherwise prohibited under applicable law or
+          YOMICO policy. YOMICO may remove any listing that violates this
+          Agreement without prior notice.
+        </p>
+      </Section>
+
+      <Section title="5. Order Fulfilment">
+        <p>
+          You agree to keep listed stock quantities accurate, pack and ship
+          orders within the timelines shown in your seller dashboard, and
+          keep order status updated. Repeated failure to fulfil orders may
+          result in account suspension.
+        </p>
+      </Section>
+
+      <Section title="6. Pricing, Commission and Payouts">
+        <p>
+          YOMICO charges a commission on completed sales, as shown in your
+          seller dashboard and Payout Report. Your net earnings, after
+          commission and any applicable deductions, are made available for
+          withdrawal to your registered bank account through the Wallet
+          section of your seller dashboard, subject to YOMICO&apos;s settlement
+          schedule and verification checks.
+        </p>
+      </Section>
+
+      <Section title="7. Returns, Refunds and Cancellations">
+        <p>
+          You agree to honour YOMICO&apos;s returns, refunds and cancellation
+          policies as applicable to your listed products, and to cooperate
+          in resolving customer disputes in good faith.
+        </p>
+      </Section>
+
+      <Section title="8. Compliance with Law">
+        <p>
+          You are solely responsible for complying with all laws applicable
+          to your business and the products you sell, including but not
+          limited to tax (GST), consumer protection, and any
+          category-specific licensing requirements. YOMICO may request
+          proof of such compliance at any time.
+        </p>
+      </Section>
+
+      <Section title="9. Suspension and Termination">
+        <p>
+          YOMICO may suspend or terminate your seller account for breach of
+          this Agreement, repeated customer complaints, suspected fraud, or
+          as required by law. You may also close your seller account by
+          contacting us, subject to settlement of any pending orders and
+          payouts.
+        </p>
+      </Section>
+
+      <Section title="10. Limitation of Liability">
+        <p>
+          To the maximum extent permitted by law, YOMICO is not liable for
+          indirect or consequential losses arising from your use of the
+          seller Platform, including lost sales or profits.
+        </p>
+      </Section>
+
+      <Section title="11. Changes to This Agreement">
+        <p>
+          We may update this Agreement from time to time. Continued use of
+          your seller account after changes take effect constitutes
+          acceptance of the revised Agreement.
+        </p>
+      </Section>
+
+      <Section title="12. Contact Us">
+        <p>
+          For questions about this Agreement, contact us at{" "}
+          <span className="font-medium text-gray-800">
+            [seller support email to be added]
+          </span>.
+        </p>
+      </Section>
+
+    </LegalPageLayout>
+  );
 }

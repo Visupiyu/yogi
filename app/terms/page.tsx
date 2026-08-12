@@ -1,249 +1,139 @@
-import Link from "next/link";
+import LegalPageLayout from "@/components/legal/LegalPageLayout";
 
-export const metadata = {
-  title: "Terms & Conditions | YOMICO",
-  description:
-    "Read the Terms & Conditions for using the YOMICO marketplace, including user responsibilities, orders, payments, and legal policies.",
-};
-export default function TermsPage() {
-
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-
-    <div className="min-h-screen bg-gray-50">
-
-      <div className="max-w-5xl mx-auto px-4 py-12">
-
-        <h1 className="text-5xl font-bold text-center mb-8">
-          Terms & Conditions
-        </h1>
-
-        <p className="text-center text-gray-500 mb-8">
- Last Updated: July 2026
-</p>
-<p className="text-center text-gray-600 max-w-3xl mx-auto mb-10">
-  These Terms & Conditions govern your access to and use of the YOMICO
-  marketplace. By using our platform, you agree to comply with these
-  terms and all applicable laws.
-</p>
-
-        <div className="bg-white p-8 rounded-2xl shadow space-y-6">
-
-          <p>
-            Welcome to YOMICO. By using our platform, you agree to
-            these Terms & Conditions.
-          </p>
-
-          
-
-          <div>
-
-            <div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-1. Eligibility
-
-</h2>
-
-<p>
-
-By using YOMICO, you confirm that you are at least 18 years of age or are using the platform under the supervision of a parent or legal guardian.
-
-</p>
-
-</div>
-
-           <div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-2. User Accounts
-
-</h2>
-
-<p>
-
-You are responsible for maintaining the confidentiality of your account credentials. You agree to provide accurate information and are responsible for all activities that occur under your account.
-
-</p>
-
-</div>
-
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-3. Orders and Payments
-
-</h2>
-
-<p>
-
-All orders placed through YOMICO are subject to product availability and seller acceptance. Payments are processed through secure payment gateways. Prices, taxes, and delivery charges are displayed during checkout.
-
-</p>
-
-</div>
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-4. Delivery
-
-</h2>
-
-<p>
-
-Estimated delivery dates are provided for convenience only. Actual delivery times may vary depending on the seller, courier, weather conditions, or other circumstances beyond our control.
-
-</p>
-
-</div>
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-5. Returns and Refunds
-
-</h2>
-
-<p>
-
-Returns, replacements, and refunds are governed by our Return & Refund Policy. Certain products may not be eligible for return due to hygiene, legal, or seller-specific restrictions.
-
-</p>
-
-</div>
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-6. Prohibited Activities
-
-</h2>
-
-<p>
-
-Users must not engage in fraudulent activities, upload harmful content, misuse the platform, interfere with security, or violate applicable laws while using YOMICO.
-
-</p>
-
-</div>
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-7. Intellectual Property
-
-</h2>
-
-<p>
-
-All trademarks, logos, graphics, software, content, and branding displayed on YOMICO are the property of YOMICO or their respective owners and are protected under applicable intellectual property laws.
-
-</p>
-
-</div>
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-8. Limitation of Liability
-
-</h2>
-
-<p>
-
-YOMICO acts as a marketplace connecting customers and sellers. To the maximum extent permitted by law, YOMICO shall not be liable for indirect, incidental, or consequential damages arising from the use of the platform.
-
-</p>
-
-</div>
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-9. Governing Law
-
-</h2>
-
-<p>
-
-These Terms and Conditions shall be governed by and interpreted in accordance with the laws of India. Any disputes shall be subject to the jurisdiction of the competent courts in India.
-
-</p>
-
-</div>
-<div>
-
-<h2 className="text-2xl font-bold mb-2">
-
-10. Contact Us
-
-</h2>
-
-<p>
-
-If you have any questions regarding these Terms and Conditions, please contact the YOMICO Support Team through the Contact Us page.
-
-</p>
-
-</div>
-          <div>
-
-            <h2 className="text-2xl font-bold mb-2">
-             11. Seller Responsibilities
-            </h2>
-
-            <p>
-              Sellers are responsible for accurate product information,
-              inventory management, shipping, and customer support.
-            </p>
-
-          </div>
-     
-
-    <div>
-   
-           <h2 className="text-2xl font-bold mb-2">
-              12. Changes to Terms
-            </h2>
-
-            <p>
-              YOMICO reserves the right to update these terms at any
-              time. Continued use of the platform constitutes acceptance
-              of any changes.
-            </p>
-     
-  
-</div>
-
-<div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
-
-  <h3 className="text-2xl font-bold mb-2">
-    Need Help?
-  </h3>
-
-  <p className="text-gray-600 mb-4">
-    If you have questions about these Terms & Conditions, our support team is here to help.
-  </p>
-
-  <Link
-    href="/contact"
-    className="inline-block bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition"
-  >
-    Contact Support
-  </Link>
-
-</div>
-
-          </div>
-
-        </div>
-
+    <section>
+      <h2 className="text-xl font-bold text-gray-900 mb-3">{title}</h2>
+      <div className="text-gray-600 leading-relaxed space-y-3">
+        {children}
       </div>
-</div>
-   
+    </section>
   );
+}
 
+export default function TermsOfUsePage() {
+  return (
+    <LegalPageLayout title="Terms of Use" lastUpdated="12 August 2026">
+
+      <Section title="1. Acceptance of Terms">
+        <p>
+          These Terms of Use (&quot;Terms&quot;) govern your access to and use of the
+          YOMICO website, mobile site and any related applications
+          (together, the &quot;Platform&quot;), operated by YOMICO. By creating an
+          account, browsing, or placing an order on the Platform, you agree
+          to be bound by these Terms. If you do not agree, please do not use
+          the Platform.
+        </p>
+      </Section>
+
+      <Section title="2. Eligibility">
+        <p>
+          You must be at least 18 years old, or using the Platform under the
+          supervision of a parent or legal guardian, and capable of forming
+          a legally binding contract under applicable law, to create an
+          account or place an order on YOMICO.
+        </p>
+      </Section>
+
+      <Section title="3. Account Registration">
+        <p>
+          You are responsible for maintaining the confidentiality of your
+          account credentials and for all activity that occurs under your
+          account. You agree to provide accurate, current and complete
+          information when registering, and to keep that information
+          up to date.
+        </p>
+      </Section>
+
+      <Section title="4. Orders, Pricing and Payments">
+        <p>
+          Product listings, prices, offers and availability on YOMICO are
+          provided by independent sellers and may change without notice.
+          YOMICO facilitates the transaction between buyers and sellers but
+          is not itself the seller of record for marketplace listings unless
+          explicitly stated. Payment methods, refund and cancellation rules
+          for a given order are described at checkout and in our order
+          policies.
+        </p>
+      </Section>
+
+      <Section title="5. User Conduct">
+        <p>You agree not to:</p>
+        <ul className="list-disc pl-6 space-y-1">
+          <li>Use the Platform for any unlawful purpose or in violation of these Terms.</li>
+          <li>Post false, misleading, defamatory or infringing content.</li>
+          <li>Attempt to gain unauthorized access to any part of the Platform, other accounts, or our systems.</li>
+          <li>Interfere with or disrupt the Platform&apos;s operation, including through automated scraping or bots.</li>
+        </ul>
+      </Section>
+
+      <Section title="6. Intellectual Property">
+        <p>
+          The YOMICO name, logo, and the design and content of the Platform
+          (excluding seller-provided product content) are the property of
+          YOMICO or its licensors and may not be used without prior written
+          permission.
+        </p>
+      </Section>
+
+      <Section title="7. Third-Party Links and Sellers">
+        <p>
+          The Platform may host content from and link to independent
+          sellers and third parties. YOMICO does not control and is not
+          responsible for the accuracy, quality or legality of third-party
+          content, products or services.
+        </p>
+      </Section>
+
+      <Section title="8. Limitation of Liability">
+        <p>
+          To the maximum extent permitted by law, YOMICO shall not be
+          liable for any indirect, incidental, or consequential damages
+          arising from your use of the Platform, including but not limited
+          to loss of data, revenue, or profits.
+        </p>
+      </Section>
+
+      <Section title="9. Termination">
+        <p>
+          YOMICO may suspend or terminate your account for violation of
+          these Terms, suspected fraud, or as required by law, with or
+          without prior notice where reasonably necessary.
+        </p>
+      </Section>
+
+      <Section title="10. Governing Law">
+        <p>
+          These Terms are governed by the laws of India, and any disputes
+          arising from them shall be subject to the exclusive jurisdiction
+          of the courts at [City, State — to be confirmed].
+        </p>
+      </Section>
+
+      <Section title="11. Changes to These Terms">
+        <p>
+          We may update these Terms from time to time. Material changes
+          will be indicated by updating the &quot;Last updated&quot; date above.
+          Continued use of the Platform after changes take effect
+          constitutes acceptance of the revised Terms.
+        </p>
+      </Section>
+
+      <Section title="12. Contact Us">
+        <p>
+          For questions about these Terms, contact us at{" "}
+          <span className="font-medium text-gray-800">
+            [support email to be added]
+          </span>.
+        </p>
+      </Section>
+
+    </LegalPageLayout>
+  );
 }

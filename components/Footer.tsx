@@ -74,6 +74,7 @@ export default function Footer() {
             <li><Link href="/sell" className="hover:text-green-600 transition">Sell on YOMICO</Link></li>
             <li><Link href="/vendor-register" className="hover:text-green-600 transition">Become a Seller</Link></li>
             <li><Link href="/vendor-login" className="hover:text-green-600 transition">Seller Login</Link></li>
+            <li><Link href="/seller-agreement" className="hover:text-green-600 transition">Seller Agreement</Link></li>
           </ul>
         </div>
 
