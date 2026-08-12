@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import {
   getCartItems,
   updateCartQuantity,
@@ -16,17 +18,40 @@ const SHIPPING_FEE = 99;
 export default function CartPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [savedItems, setSavedItems] = useState<any[]>([]);
-  const [coupon, setCoupon] = useState("");
-  const [discount, setDiscount] = useState(0);
 
  useEffect(() => {
-  setCart(getCartItems());
+  const items = getCartItems();
+  setCart(items);
 
   setSavedItems(
     JSON.parse(
       localStorage.getItem("savedItems") || "[]"
     )
   );
+
+  // item.stock is a snapshot from whenever it was added to the cart —
+  // refresh it here so the quantity controls and "only N left" messaging
+  // reflect what's actually available right now, not stock at add time.
+  const refreshStock = async () => {
+    if (items.length === 0) return;
+
+    try {
+      const updated = await Promise.all(
+        items.map(async (item: any) => {
+          const snap = await getDoc(doc(db, "products", item.id));
+          return snap.exists()
+            ? { ...item, stock: Number(snap.data().stock ?? 0) }
+            : item;
+        })
+      );
+
+      setCart(updated);
+    } catch (error) {
+      console.error("Failed to refresh cart stock:", error);
+    }
+  };
+
+  refreshStock();
 }, []);
 
   const persist = (updated: any[]) => {
@@ -80,15 +105,6 @@ const removeItem = (index: number) => {
 
 };
 
-  const applyCoupon = () => {
-    if (coupon.trim().toUpperCase() === "TEST50") {
-      setDiscount(100);
-      alert("Coupon applied");
-    } else {
-      setDiscount(0);
-      alert("Invalid coupon");
-    }
-  };
   const saveForLater = (index: number) => {
 
   const item = cart[index];
@@ -149,8 +165,8 @@ const moveToCart = (index: number) => {
 
   const productSavings = Math.max(0, mrpTotal - total);
   const shipping = total > FREE_DELIVERY_THRESHOLD || total === 0 ? 0 : SHIPPING_FEE;
-  const grandTotal = Math.max(0, total + shipping - discount);
-  const totalSavings = productSavings + discount + (shipping === 0 && total > 0 ? SHIPPING_FEE : 0);
+  const grandTotal = Math.max(0, total + shipping);
+  const totalSavings = productSavings + (shipping === 0 && total > 0 ? SHIPPING_FEE : 0);
 
   const totalItems = cart.reduce((sum, item) => sum + (Number(item.qty) || 1), 0);
 
@@ -167,7 +183,7 @@ const moveToCart = (index: number) => {
   };
 
   return (
-    <section className="py-8 px-4 bg-gray-50 min-h-screen">
+    <section className="py-8 px-4 pb-24 md:pb-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* CHECKOUT PROGRESS BAR */}
         <div className="flex items-center justify-center gap-2 sm:gap-4 mb-8">
@@ -297,14 +313,8 @@ Popular Categories
 
               {/* PRODUCT CARDS */}
               {cart.map((item: any, index: number) => {
-                const hasMrp =
-                  Number(item.mrp) && Number(item.mrp) > Number(item.price);
                 const lineTotal =
                   (Number(item.price) || 0) * (Number(item.qty) || 1);
-                  console.log("Cart Item:", item);
-console.log("MRP:", item.mrp);
-console.log("Price:", item.price);
-console.log("hasMrp:", hasMrp);
 
                 return (
                   <div
@@ -513,36 +523,6 @@ console.log("hasMrp:", hasMrp);
                 </div>
               )}
 
-              {/* COUPON CARD */}
-              <div className="bg-white rounded-2xl shadow-sm p-5">
-                <h3 className="font-bold mb-3 flex items-center gap-2">
-                  🎟 Apply Coupon
-                </h3>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Enter code"
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    className="flex-1 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                  <button
-                    onClick={applyCoupon}
-                    className="bg-green-600 hover:bg-green-700 text-white px-6 rounded-xl font-semibold transition"
-                  >
-                    Apply
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-3">
-                  Try <b>TEST50</b> to get ₹100 OFF.
-                  </p>
-                {discount > 0 && (
-                  <p className="text-green-600 text-sm mt-2 font-medium">
-                    ✓ Coupon applied — ₹{discount} off
-                  </p>
-                )}
-              </div>
-
               {/* PRICE SUMMARY */}
               <div className="bg-white rounded-2xl shadow-sm p-6">
                 <h2 className="text-xl font-bold mb-5">Order Summary</h2>
@@ -569,12 +549,6 @@ console.log("hasMrp:", hasMrp);
                     </span>
                   </div>
 
-                  {discount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Coupon</span>
-                      <span>- ₹{discount.toLocaleString("en-IN")}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between">
                   <span>GST</span>
                   <span className="text-green-600">Included</span>

@@ -37,7 +37,7 @@ export async function POST(
           "YOMICO <onboarding@resend.dev>",
 
         to:
-          "adminyogimart@gmail.com",
+          customerEmail,
 
         subject:
           "Order Confirmation",

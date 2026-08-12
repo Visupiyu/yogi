@@ -7,7 +7,13 @@ import { Home, Search, Heart, ShoppingCart, User } from "lucide-react";
 export default function MobileBottomNav() {
   const pathname = usePathname() || "";
 
-  if (pathname.startsWith("/seller") || pathname.startsWith("/admin")) {
+  if (
+    pathname.startsWith("/seller") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/checkout")
+  ) {
+    // Checkout has its own "Pay Securely"/"Place Secure Order" CTA that
+    // this fixed-position bar was sitting on top of / behind on mobile.
     return null;
   }
 

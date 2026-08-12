@@ -55,9 +55,13 @@ setAddress(userData.address || "");
     // Reward balance must come from Firestore, not the cached localStorage
     // value — that's trivially editable client-side and was never actually
     // the real source of truth (see logic bug notes on redemption below).
+    // Also the earliest point to catch a logged-out visitor — previously
+    // they could fill out the whole form and even attempt payment before
+    // being told to log in.
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        setAvailablePoints(0);
+        alert("Please login to checkout.");
+        router.push("/login");
         return;
       }
 
@@ -420,9 +424,39 @@ setAddress(userData.address || "");
     return true;
   };
 
+  // Re-checks a points redemption against the REAL current balance right
+  // before the order total is locked in — availablePoints in state was
+  // loaded on page mount and could be stale by the time the customer
+  // actually submits (e.g. redeemed in another tab in the meantime).
+  const validateRewardPoints = async () => {
+    if (!redeemPoints || rewardValue <= 0) return true;
+
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return true; // the login check elsewhere catches this
+
+    try {
+      const snap = await getDoc(doc(db, "users", firebaseUser.uid));
+      const realBalance = snap.exists()
+        ? Number(snap.data().rewardPoints || 0)
+        : 0;
+
+      if (rewardValue > realBalance) {
+        alert("Your reward point balance has changed — please review your order again.");
+        setAvailablePoints(realBalance);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Failed to re-validate reward points:", error);
+      return true;
+    }
+  };
+
   const placeCODOrder = async () => {
     if (!validateForm()) return;
      if (!(await validateStock())) return;
+     if (!(await validateRewardPoints())) return;
 
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
@@ -470,6 +504,7 @@ setAddress(userData.address || "");
     }
 
       if (!(await validateStock())) return;
+      if (!(await validateRewardPoints())) return;
 
     const res: any = await loadRazorpayScript();
     if (!res) {
