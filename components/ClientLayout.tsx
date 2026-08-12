@@ -10,6 +10,9 @@ const HIDE_CHROME_PREFIXES = [
   "/seller",
   "/admin",
   "/invoice",
+  "/vendor-login",
+  "/vendor-register",
+  "/vendor-forgot-password",
 ];
 
 export default function ClientLayout({
