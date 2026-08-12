@@ -38,13 +38,36 @@ async()=>{
       ) || "{}"
 
     );
-    setWalletBalance(
 
-      Number(
-        vendor.pendingPayout || 0
+    // Live earnings from this seller's orders — vendor.pendingPayout on
+    // the vendors doc is never actually written by any admin/order flow,
+    // so it can't be trusted as a balance source.
+    const ordersSnapshot = await getDocs(
+
+      query(
+        collection(db, "orders"),
+        where("vendorIds", "array-contains", vendor.uid)
       )
 
     );
+
+    let totalEarnings = 0;
+
+    ordersSnapshot.forEach((docSnap) => {
+
+      const order:any = docSnap.data();
+
+      if (order.status === "Cancelled") return;
+
+      const hasVendorItems = order.items?.some(
+        (item:any) => item.vendorId === vendor.uid
+      );
+
+      if (hasVendorItems) {
+        totalEarnings += Number(order.sellerEarning || 0);
+      }
+
+    });
 
     const q = query(
 
@@ -93,7 +116,9 @@ items.sort(
       (item)=>
 
         item.status ===
-        "Pending"
+        "Pending" ||
+        item.status ===
+        "Approved"
     )
 
     .reduce(
@@ -141,6 +166,15 @@ setTotalWithdrawn(
   withdrawn
 );
 
+// Available balance = earned so far, minus what's already been paid
+// out, minus what's already tied up in a pending/approved request —
+// so a seller can't request more than what's genuinely left.
+setWalletBalance(
+  Math.max(
+    0,
+    totalEarnings - withdrawn - pending
+  )
+);
 
   }catch(error){
 

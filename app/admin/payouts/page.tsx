@@ -26,7 +26,9 @@ export default function AdminPayoutsPage() {
         getDocs(collection(db, "vendor_payouts")),
       ]);
 
-      // Sum already-paid amounts per vendor from the payouts ledger
+      // Sum already-paid amounts per vendor from the payouts ledger.
+      // Keyed by the seller's auth uid — the same id order items use —
+      // not the vendors-collection document id.
       const paidByVendor: Record<string, number> = {};
       payoutSnapshot.forEach((docSnap) => {
         const p: any = docSnap.data();
@@ -49,8 +51,10 @@ export default function AdminPayoutsPage() {
           const order: any = orderDoc.data();
           if (order.status === "Cancelled") return; // exclude cancelled
 
+          // order items are written with the seller's auth uid as
+          // vendorId, not the vendors-collection document id
           const vendorItems =
-            order.items?.filter((item: any) => item.vendorId === vendorDoc.id) ||
+            order.items?.filter((item: any) => item.vendorId === vendor.uid) ||
             [];
 
           if (vendorItems.length) {
@@ -60,11 +64,12 @@ export default function AdminPayoutsPage() {
           }
         });
 
-        const paidPayout = paidByVendor[vendorDoc.id] || 0;
+        const paidPayout = paidByVendor[vendor.uid] || 0;
         const pendingPayout = Math.max(0, earnings - paidPayout);
 
         vendorData.push({
           id: vendorDoc.id,
+          uid: vendor.uid,
           shopName:
             vendor.storeName || vendor.businessName || vendor.shopName || "Vendor",
           sales,
@@ -101,7 +106,7 @@ export default function AdminPayoutsPage() {
     setSaving(vendor.id);
     try {
       await addDoc(collection(db, "vendor_payouts"), {
-        vendorId: vendor.id,
+        vendorId: vendor.uid,
         vendorName: vendor.shopName,
         amount: vendor.pendingPayout,
         status: "Paid",

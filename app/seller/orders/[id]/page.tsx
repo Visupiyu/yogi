@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 import ShippingLabel from "@/components/ShippingLabel";
 import generateInvoicePDF from "@/components/InvoicePDF";
 import Invoice from "@/components/invoice/Invoice";
@@ -15,6 +16,7 @@ import { useRef } from "react";
 export default function SellerOrderDetailsPage(){
 
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const [loading,setLoading] = useState(true);
   const [order,setOrder] = useState<any>(null);
@@ -28,9 +30,24 @@ export default function SellerOrderDetailsPage(){
   const invoiceRef = useRef<HTMLDivElement>(null);
 const shippingLabelRef = useRef<HTMLDivElement>(null);
    
-  useEffect(()=>{loadOrder();},[]);
+  useEffect(()=>{
 
-  const loadOrder = async()=>{
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+
+      if (!user) {
+        router.push("/vendor-login");
+        return;
+      }
+
+      loadOrder(user.uid);
+
+    });
+
+    return () => unsubscribe();
+
+  },[]);
+
+  const loadOrder = async(vendorUid: string)=>{
     try{
       const snap = await getDoc(
         doc(
@@ -50,6 +67,17 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
           ...snap.data()
 
         };
+
+        if (
+          data.vendorIds &&
+          !data.vendorIds.includes(vendorUid)
+        ) {
+
+          toast.error("This order does not belong to your account.");
+          router.push("/seller/orders");
+          return;
+
+        }
 
         setOrder(data);
 

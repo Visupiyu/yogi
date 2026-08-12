@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import {
   collection,
   getDocs,
+  query,
+  where,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -41,11 +43,14 @@ export default function SellerPayoutsPage() {
             ) || "{}"
           );
 
-        const snapshot =
+        // Orders are Firestore-rules-scoped to vendorIds containing the
+        // signed-in seller's auth uid — a full collection scan is both
+        // denied by the rules and unnecessary.
+        const ordersSnapshot =
           await getDocs(
-            collection(
-              db,
-              "orders"
+            query(
+              collection(db, "orders"),
+              where("vendorIds", "array-contains", vendor.uid)
             )
           );
 
@@ -53,17 +58,21 @@ export default function SellerPayoutsPage() {
         let totalCommission = 0;
         let totalNet = 0;
 
-        snapshot.forEach((doc)=>{
+        ordersSnapshot.forEach((doc)=>{
 
           const order:any =
             doc.data();
+
+          if (order.status === "Cancelled") return;
 
           const vendorItems =
             order.items?.filter(
               (item:any)=>
 
+                // order items store the seller's auth uid, not the
+                // vendors-collection document id
                 item.vendorId ===
-                vendor.id
+                vendor.uid
 
             ) || [];
 
@@ -93,6 +102,31 @@ export default function SellerPayoutsPage() {
         setNetEarnings(
           totalNet
         );
+
+        // "Paid Payout" reflects withdrawal requests this seller can
+        // actually see the status of (the vendor_payouts admin ledger
+        // is admin-only and not readable here).
+        const withdrawalsSnapshot =
+          await getDocs(
+            query(
+              collection(db, "withdrawals"),
+              where("vendorEmail", "==", vendor.email)
+            )
+          );
+
+        let totalPaid = 0;
+
+        withdrawalsSnapshot.forEach((doc)=>{
+
+          const withdrawal:any = doc.data();
+
+          if (withdrawal.status === "Paid") {
+            totalPaid += Number(withdrawal.amount || 0);
+          }
+
+        });
+
+        setPaidPayout(totalPaid);
 
       }catch(error){
 
