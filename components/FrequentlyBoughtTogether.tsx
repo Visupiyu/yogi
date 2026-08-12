@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
 
@@ -29,17 +29,20 @@ export default function FrequentlyBoughtTogether({
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        const snapshot = await getDocs(collection(db, "products"));
+        const snapshot = await getDocs(
+          query(
+            collection(db, "products"),
+            where("categoryId", "==", category),
+            limit(10)
+          )
+        );
 
         const items: Product[] = [];
 
         snapshot.forEach((doc) => {
           const data = doc.data();
 
-          if (
-            doc.id !== currentProductId &&
-            data.categoryId === category
-          ) {
+          if (doc.id !== currentProductId) {
             items.push({
               id: doc.id,
               name: data.title || data.name || "",

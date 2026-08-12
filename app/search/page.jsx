@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, limit, query as firestoreQuery } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductFilters from "@/components/ProductFilters";
 import { addToCart as addToCartHelper } from "@/lib/cart";
@@ -51,7 +51,14 @@ const [quickColor, setQuickColor] = useState("");
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const snapshot = await getDocs(collection(db, "products"));
+        // Firestore has no server-side substring/full-text search, so this
+        // still has to scan and filter client-side — the limit() just
+        // bounds the worst-case read cost as the catalog grows. A real fix
+        // would need a dedicated search index (e.g. Algolia), which is a
+        // separate initiative, not a one-line change.
+        const snapshot = await getDocs(
+          firestoreQuery(collection(db, "products"), limit(300))
+        );
         const items = [];
         snapshot.forEach((doc) => {
           const data = doc.data();

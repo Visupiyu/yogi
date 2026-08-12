@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 type Product = {
@@ -26,17 +26,20 @@ export default function CustomersAlsoBought({
 
   useEffect(() => {
     async function loadProducts() {
-      const snap = await getDocs(collection(db, "products"));
+      const snap = await getDocs(
+        query(
+          collection(db, "products"),
+          where("categoryId", "==", category),
+          limit(10)
+        )
+      );
 
       const items: Product[] = [];
 
       snap.forEach((doc) => {
         const data = doc.data();
 
-        if (
-          doc.id !== currentProductId &&
-          data.categoryId === category
-        ) {
+        if (doc.id !== currentProductId) {
           items.push({
             id: doc.id,
             name: data.title || data.name || "",

@@ -156,6 +156,19 @@ service cloud.firestore {
         && request.resource.data.stock >= 0;
     }
 
+    function isReviewRatingUpdate() {
+      // Any signed-in customer submitting a review may update the
+      // product's aggregate rating/reviewCount — nothing else may change,
+      // reviewCount can only advance by exactly one review at a time, and
+      // rating must stay within a valid 0-5 range.
+      return isSignedIn()
+        && affectedKeysOnly(['rating', 'reviewCount'])
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
+        && request.resource.data.reviewCount is number
+        && request.resource.data.reviewCount == resource.data.reviewCount + 1;
+    }
+
     match /products/{productId} {
       allow read: if true;
 
@@ -169,9 +182,11 @@ service cloud.firestore {
           && unchanged('vendorId')
           && unchanged('approved')
           && unchanged('featured')
+          && unchanged('active')
           && isValidProduct()
         )
-        || isCheckoutStockUpdate();
+        || isCheckoutStockUpdate()
+        || isReviewRatingUpdate();
 
       allow delete: if isAdmin() || isOwnerUid(resource.data.vendorId);
     }

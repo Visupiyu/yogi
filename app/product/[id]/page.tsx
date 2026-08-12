@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc, collection, getDocs, query, where, addDoc, serverTimestamp,limit,} from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, serverTimestamp,limit,} from "firebase/firestore";
 import RecentlyViewed from "@/components/RecentlyViewed";
 import FrequentlyBoughtTogether from "@/components/FrequentlyBoughtTogether";
 import CustomersAlsoBought from "@/components/CustomersAlsoBought";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
 import { addToCart as addToCartHelper } from "@/lib/cart";
@@ -17,6 +17,7 @@ import { UNIVERSAL_SPEC_FIELDS } from "@/lib/catalog/universalSpecFields";
 type Product = { id: string; name: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
   color?: string;  sizes?: string[];  material?: string;  brand?: string;  countryOfOrigin?: string;
+  rating?: number;  reviewCount?: number;
   // Fashion
 pattern?: string;fitType?: string;sleeveType?: string;neckType?: string;
 
@@ -96,6 +97,8 @@ function normalizeProduct(id: string, data: any): Product {
     countryOfOrigin: data.countryOfOrigin,
     warranty: data.warranty,
     specifications: data.specifications || {},
+    rating: typeof data.rating === "number" ? data.rating : 0,
+    reviewCount: typeof data.reviewCount === "number" ? data.reviewCount : 0,
   } as Product;
 }
 
@@ -164,7 +167,8 @@ setSelectedImage(
           const relatedSnap = await getDocs(
             query(
               collection(db, "products"),
-              where("categoryId", "==", productData.categoryId)
+              where("categoryId", "==", productData.categoryId),
+              limit(8)
             )
           );
           const related: Product[] = [];
@@ -326,7 +330,14 @@ questionSnap.forEach((d) => {
   };
 
   const askQuestion = async () => {if (!product) return;
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      alert("Please login first.");
+      router.push("/login");
+      return;
+    }
+
     if (!question.trim()) {
       alert("Enter a question");
       return;
@@ -336,7 +347,7 @@ questionSnap.forEach((d) => {
         productId: product.id,
         productName: (product as any).title || product.name,
         vendorId: product.vendorId || "",
-        customerName: user.name || "Customer",
+        customerName: currentUser.displayName || "Customer",
         question,
         answer: "",
         status: "Pending",
@@ -347,11 +358,19 @@ questionSnap.forEach((d) => {
       window.location.reload();
     } catch (error) {
       console.error(error);
+      alert("Couldn't submit your question. Please try again.");
     }
   };
 
   const submitReview = async () => {if (!product) return;
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      alert("Please login first.");
+      router.push("/login");
+      return;
+    }
+
     if (!reviewText) {
       alert("Enter review");
       return;
@@ -360,16 +379,33 @@ questionSnap.forEach((d) => {
       await addDoc(collection(db, "productReviews"), {
         productId: product.id,
         productName: product.name,
-        customerName: user.name || "Customer",
-        userEmail: user.email || "",
+        customerName: currentUser.displayName || "Customer",
+        userEmail: currentUser.email || "",
         rating,
         review: reviewText,
         createdAt: serverTimestamp(),
       });
+
+      // Keep the product's aggregate rating in sync so category/search
+      // rating filters (which read this field directly) actually work.
+      try {
+        const oldRating = product.rating ?? 0;
+        const oldCount = product.reviewCount ?? 0;
+        const newCount = oldCount + 1;
+
+        await updateDoc(doc(db, "products", product.id), {
+          rating: (oldRating * oldCount + rating) / newCount,
+          reviewCount: newCount,
+        });
+      } catch (aggregateError) {
+        console.error("Failed to update product rating:", aggregateError);
+      }
+
       alert("Review Submitted");
       window.location.reload();
     } catch (error) {
       console.error(error);
+      alert("Couldn't submit your review. Please try again.");
     }
   };
 
@@ -547,10 +583,6 @@ if (product.stock <= 5 && product.stock > 0) {
   badges.push("⚡ Limited Stock");
 }
 
-if (product.category === "Beauty" && product.organic === "Yes") {
-  badges.push("🌿 Organic");
-}
-
 if (reviews.length >= 10 && Number(avgRating) >= 4.5) {
   badges.push("⭐ Top Rated");
 }
@@ -573,10 +605,10 @@ if (product.stock > 20) {
             <Link href="/" className="hover:text-green-600">Home</Link>
             <span>/</span>
             <Link
-              href={`/category/${encodeURIComponent(product.category || "")}`}
+              href={`/category/${encodeURIComponent(categoryDisplayName || "")}`}
               className="hover:text-green-600"
             >
-              {product.category}
+              {categoryDisplayName}
             </Link>
             <span>/</span>
             <span className="text-gray-700 line-clamp-1">{product.name}</span>
@@ -717,9 +749,9 @@ if (product.stock > 20) {
     </span>
   )}
 
-  {product.category && (
+  {categoryDisplayName && (
     <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-      📦 {product.category}
+      📦 {categoryDisplayName}
     </span>
   )}
 
@@ -1346,102 +1378,6 @@ hover:-translate-y-0.5
                   </button>
                 </div>
 
-                {/* HIGHLIGHTS */}
-                <div className="mt-10">
-  <h2 className="text-2xl font-bold mb-5">Highlights</h2>
-
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700">
-
-    {/* Fashion */}
-    {(product.category === "Men Fashion" ||
-      product.category === "Women Fashion" ||
-      product.category === "Kids Fashion") && (
-      <>
-        {product.material && <div>✔ {product.material} Fabric</div>}
-        {product.pattern && <div>✔ {product.pattern}</div>}
-        {product.fitType && <div>✔ {product.fitType} Fit</div>}
-        {product.sleeveType && <div>✔ {product.sleeveType}</div>}
-        {product.neckType && <div>✔ {product.neckType}</div>}
-        {product.countryOfOrigin && (
-          <div>✔ Made in {product.countryOfOrigin}</div>
-        )}
-      </>
-    )}
-
-    {/* Mobiles */}
-    {product.category === "Mobiles" && (
-      <>
-        {product.ram && <div>✔ {product.ram} RAM</div>}
-        {product.storageCapacity && (
-          <div>✔ {product.storageCapacity} Storage</div>
-        )}
-        {product.processor && <div>✔ {product.processor}</div>}
-        {product.battery && <div>✔ {product.battery}</div>}
-        {product.camera && <div>✔ {product.camera}</div>}
-      </>
-    )}
-
-    {/* Electronics / Appliances */}
-    {(product.category === "Electronics" ||
-      product.category === "Appliances") && (
-      <>
-        {product.modelNumber && <div>✔ {product.modelNumber}</div>}
-        {product.powerSource && <div>✔ {product.powerSource}</div>}
-        {product.voltage && <div>✔ {product.voltage}</div>}
-        {product.warranty && <div>✔ {product.warranty} Warranty</div>}
-      </>
-    )}
-
-    {/* Grocery */}
-    {product.category === "Grocery" && (
-      <>
-        {product.weight && (
-          <div>
-            ✔ {product.weight} {product.unit}
-          </div>
-        )}
-        {product.organic && <div>✔ {product.organic}</div>}
-        {product.expiryDate && (
-          <div>✔ Expires: {product.expiryDate}</div>
-        )}
-      </>
-    )}
-
-    {/* Beauty */}
-    {product.category === "Beauty" && (
-      <>
-        {product.skinType && <div>✔ {product.skinType} Skin</div>}
-        {product.hairType && <div>✔ {product.hairType} Hair</div>}
-        {product.netQuantity && <div>✔ {product.netQuantity}</div>}
-      </>
-    )}
-
-    {/* Furniture */}
-    {product.category === "Furniture" && (
-      <>
-        {product.dimensions && <div>✔ {product.dimensions}</div>}
-        {product.weightCapacity && (
-          <div>✔ {product.weightCapacity}</div>
-        )}
-        {product.assemblyRequired && (
-          <div>✔ Assembly: {product.assemblyRequired}</div>
-        )}
-      </>
-    )}
-
-    {/* Books */}
-    {product.category === "Books" && (
-      <>
-        {product.author && <div>✔ {product.author}</div>}
-        {product.publisher && <div>✔ {product.publisher}</div>}
-        {product.language && <div>✔ {product.language}</div>}
-        {product.pages && <div>✔ {product.pages} Pages</div>}
-      </>
-    )}
-
-  </div>
-</div>
-
                 {/* SPECIFICATIONS */}
                 <div className="mt-10">
                   <h2 className="text-2xl font-bold mb-5">Specifications</h2>
@@ -1526,7 +1462,7 @@ p-6
   </div>
 
   <Link
-    href={`/category/${encodeURIComponent(product.category || "")}`}
+    href={`/category/${encodeURIComponent(categoryDisplayName || "")}`}
     className="text-green-600 font-semibold hover:underline"
   >
     View All →
