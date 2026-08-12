@@ -232,7 +232,7 @@ export default function SellOnYomicoPage() {
       </section>
 
       {/* CONTACT / INQUIRY */}
-      <section className="mx-auto max-w-6xl px-6 py-16">
+      <section id="contact" className="mx-auto max-w-6xl px-6 py-16">
 
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:items-center">
 

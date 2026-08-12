@@ -6,7 +6,6 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 
 export default function VendorLoginPage() {
   const router = useRouter();
@@ -124,138 +123,171 @@ console.error(err);
     }
   };
 
+  const FEATURES = [
+    {
+      icon: "🧑‍🤝‍🧑",
+      title: "Reach more customers",
+      description: "Put your products in front of customers shopping on YOMICO.",
+    },
+    {
+      icon: "📦",
+      title: "Easy product management",
+      description: "Add products, manage inventory and update your catalog easily.",
+    },
+    {
+      icon: "📊",
+      title: "Business insights",
+      description: "Track orders, sales, earnings and product performance.",
+    },
+    {
+      icon: "💰",
+      title: "Seller earnings",
+      description: "Manage payouts, wallet balance and seller transactions.",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 rounded-3xl shadow-xl overflow-hidden bg-white">
 
         {/* LEFT — brand / benefits panel */}
-        <div className="hidden lg:flex flex-col justify-between bg-gradient-to-br from-green-600 to-blue-600 text-white p-10">
-          <div>
-            <Link href="/sell" className="text-sm text-white/80 hover:text-white hover:underline">
-              ← Sell on YOMICO
-            </Link>
+        <div className="relative hidden lg:block overflow-hidden bg-gradient-to-br from-teal-600 via-green-600 to-blue-600 text-white p-10">
 
-            <h2 className="mt-8 text-3xl font-bold leading-tight">
-              Welcome back to your seller dashboard
+          <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/10" />
+          <div className="pointer-events-none absolute bottom-0 -left-10 h-40 w-40 rounded-full bg-white/5" />
+
+          <div className="relative">
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/80">
+              YOMICO Seller Platform
+            </p>
+
+            <h2 className="mt-4 font-serif text-4xl font-bold leading-tight">
+              Grow your business
+              <br />
+              with <span className="text-yellow-300">YOMICO</span>
             </h2>
 
             <p className="mt-4 text-white/90">
-              Manage products, orders, inventory and payouts — all from
-              one place.
+              Reach customers, manage your products, track orders and
+              grow your online business from one powerful seller platform.
             </p>
+
+            <div className="mt-10 space-y-5">
+              {FEATURES.map((feature) => (
+                <div key={feature.title} className="flex items-start gap-4">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/15 text-lg">
+                    {feature.icon}
+                  </div>
+                  <div>
+                    <p className="font-bold">{feature.title}</p>
+                    <p className="text-sm text-white/70">{feature.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-4 mt-10">
-            <div className="flex items-center gap-3">
-              <span className="text-xl">📊</span>
-              <span className="text-white/90 text-sm">One dashboard for products, orders and analytics</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xl">💰</span>
-              <span className="text-white/90 text-sm">Track earnings, commission and payouts clearly</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xl">💬</span>
-              <span className="text-white/90 text-sm">Answer customer questions directly</span>
-            </div>
-          </div>
-
-          <p className="text-sm text-white/70 mt-10">
-            New to YOMICO?{" "}
-            <Link href="/sell" className="font-semibold text-white hover:underline">
-              Learn why sellers choose us
-            </Link>
-          </p>
         </div>
 
         {/* RIGHT — login form */}
         <div className="p-8 md:p-10">
-          <div className="text-center mb-5">
-            <Image
-              src="/logo.png"
-              alt="YOMICO"
-              width={180}
-              height={180}
-              className="h-28 md:h-32 w-auto object-contain mx-auto"
-            />
-          </div>
 
-          <p className="text-center text-green-600 font-semibold text-sm mb-2">
-            YOMICO Seller Portal
+          <h1 className="font-serif text-3xl font-bold">Seller Login</h1>
+
+          <p className="mt-2 text-gray-500">
+            Login to your YOMICO seller account and manage your business.
           </p>
 
-          <h1 className="text-3xl font-bold text-center mb-3">Vendor Login</h1>
-
-          <p className="text-center text-gray-500 mb-8">
-            Manage products, orders and grow your business
-          </p>
-
-          <div className="space-y-5">
-            <input
-              type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off"
-              placeholder="Business Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-4 border rounded-2xl outline-none"
-            />
-
-            <input
-              type={showPassword ? "text" : "password"}
-              autoComplete="current-password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-4 border rounded-2xl outline-none"
-            />
-
-            <div className="flex items-center justify-between mt-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={showPassword}
-                  onChange={() => setShowPassword(!showPassword)}
-                />
-                <span className="text-sm text-gray-600">
-                  Show Password
-                </span>
+          <div className="mt-8 space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Email Address
               </label>
+              <input
+                type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-4 bg-blue-50 rounded-xl outline-none"
+              />
+            </div>
 
-              <Link
-                href="/vendor-forgot-password"
-                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
-              >
-                Forgot Password?
-              </Link>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Password
+                </label>
+
+                <Link
+                  href="/vendor-forgot-password"
+                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
+
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-4 bg-blue-50 rounded-xl outline-none pr-16"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
             </div>
           </div>
 
           <button
             onClick={loginVendor}
             disabled={loading}
-            className={`w-full text-white py-4 rounded-2xl mt-8 text-lg font-bold ${
+            className={`w-full text-white py-4 rounded-xl mt-8 text-lg font-bold ${
               loading
                 ? "bg-gray-400"
                 : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500"
             }`}
           >
-            {loading ? "Authenticating..." : "Vendor Login"}
+            {loading ? "Authenticating..." : "Login to Seller Account"}
           </button>
 
-          <p className="text-center mt-5">
-            New Vendor?
-            <Link
-              href="/vendor-register"
-              className="text-blue-600 font-bold ml-2 hover:underline"
-            >
-              Register Here
+          <div className="flex items-center gap-4 my-6">
+            <div className="h-px flex-1 bg-gray-200" />
+            <span className="text-xs font-semibold text-gray-400">OR</span>
+            <div className="h-px flex-1 bg-gray-200" />
+          </div>
+
+          <Link
+            href="/vendor-register"
+            className="block w-full text-center border-2 border-blue-600 text-blue-600 py-4 rounded-xl font-bold hover:bg-blue-50"
+          >
+            Create Seller Account
+          </Link>
+
+          <div className="mt-6 flex items-start gap-3 rounded-xl bg-gray-50 p-4">
+            <span className="text-lg">🔒</span>
+            <div>
+              <p className="font-semibold text-gray-800 text-sm">
+                Secure Seller Login
+              </p>
+              <p className="text-sm text-gray-500">
+                Your account information is protected using secure authentication.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-center mt-6 text-sm text-gray-500">
+            Need help?{" "}
+            <Link href="/sell#contact" className="font-semibold text-blue-600 hover:underline">
+              Contact Seller Support
             </Link>
           </p>
 
-          <p className="text-center mt-2 lg:hidden">
-            <Link href="/sell" className="text-sm text-gray-500 hover:underline">
-              Why sell on YOMICO?
-            </Link>
-          </p>
         </div>
 
       </div>
