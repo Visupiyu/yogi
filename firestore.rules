@@ -169,6 +169,21 @@ service cloud.firestore {
         && request.resource.data.reviewCount == resource.data.reviewCount + 1;
     }
 
+    function isStockRestoreUpdate() {
+      // Cancelling an order (by the customer or the seller/admin) restores
+      // the stock and reverses the sale count that checkout previously
+      // recorded. Bounded to the same direction-only trust level already
+      // used for isCheckoutStockUpdate's decrement — stock can only move
+      // up, sales can only move down, and never negative.
+      return isSignedIn()
+        && affectedKeysOnly(['stock', 'sales'])
+        && request.resource.data.stock is number
+        && request.resource.data.stock >= resource.data.stock
+        && request.resource.data.sales is number
+        && request.resource.data.sales <= resource.data.sales
+        && request.resource.data.sales >= 0;
+    }
+
     match /products/{productId} {
       allow read: if true;
 
@@ -186,7 +201,8 @@ service cloud.firestore {
           && isValidProduct()
         )
         || isCheckoutStockUpdate()
-        || isReviewRatingUpdate();
+        || isReviewRatingUpdate()
+        || isStockRestoreUpdate();
 
       allow delete: if isAdmin() || isOwnerUid(resource.data.vendorId);
     }
@@ -202,6 +218,17 @@ service cloud.firestore {
         && d.items is list
         && d.total is number && d.total >= 0
         && d.status == 'Pending';
+    }
+
+    function isLegalOrderStatusTransition(from, to) {
+      // No skipping ahead, no moving backward, and no un-cancelling —
+      // a seller/admin could previously set any of the 7 values
+      // regardless of the order's current status.
+      return (from == 'Pending' && to in ['Confirmed', 'Cancelled'])
+        || (from == 'Confirmed' && to in ['Packed', 'Cancelled'])
+        || (from == 'Packed' && to in ['Shipped', 'Cancelled'])
+        || (from == 'Shipped' && to == 'Out For Delivery')
+        || (from == 'Out For Delivery' && to == 'Delivered');
     }
 
     match /orders/{orderId} {
@@ -223,9 +250,27 @@ service cloud.firestore {
         || (
           isSignedIn()
           && request.auth.uid in resource.data.vendorIds
-          && affectedKeysOnly(['status', 'updatedAt'])
-          && request.resource.data.status in
-            ['Pending', 'Confirmed', 'Packed', 'Shipped', 'Out For Delivery', 'Delivered']
+          // Sellers update status together with shipping/tracking
+          // details in one save — all of these must be allowed together,
+          // not just status, or every save touching tracking info fails.
+          && affectedKeysOnly([
+            'status', 'updatedAt', 'trackingNumber', 'courierPartner',
+            'dispatchDate', 'expectedDelivery', 'sellerNotes', 'paymentStatus'
+          ])
+          && (
+            unchanged('status')
+            || isLegalOrderStatusTransition(resource.data.status, request.resource.data.status)
+          )
+          // A seller may only ever move paymentStatus to 'Paid', and only
+          // in the same write that marks the order Delivered — covers
+          // COD collection on delivery, never lets them touch it otherwise.
+          && (
+            unchanged('paymentStatus')
+            || (
+              request.resource.data.paymentStatus == 'Paid'
+              && request.resource.data.status == 'Delivered'
+            )
+          )
         );
 
       allow delete: if isAdmin();

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
-import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp} from "firebase/firestore";
+import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp,increment} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import ShippingLabel from "@/components/ShippingLabel";
@@ -12,6 +12,18 @@ import generateInvoicePDF from "@/components/InvoicePDF";
 import Invoice from "@/components/invoice/Invoice";
 
 import { useRef } from "react";
+
+// Mirrors isLegalOrderStatusTransition in firestore.rules — used here
+// only to keep the dropdown from offering a move the rule would reject.
+const NEXT_STATUSES: Record<string, string[]> = {
+  Pending: ["Confirmed", "Cancelled"],
+  Confirmed: ["Packed", "Cancelled"],
+  Packed: ["Shipped", "Cancelled"],
+  Shipped: ["Out For Delivery"],
+  "Out For Delivery": ["Delivered"],
+  Delivered: [],
+  Cancelled: [],
+};
 
 export default function SellerOrderDetailsPage(){
 
@@ -147,15 +159,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
     try{ setSaving(true);
 
-      await updateDoc(
-
-        doc(
-          db,
-          "orders",
-          id
-        ),
-
-        {
+      const payload: any = {
 
           status,
 
@@ -172,9 +176,44 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
           updatedAt:
             serverTimestamp()
 
-        }
+      };
+
+      // COD collects payment on delivery — mark it paid in the same
+      // write, matching what the Firestore rule allows a seller to do.
+      if (
+        status === "Delivered" &&
+        order.paymentMethod !== "ONLINE" &&
+        order.paymentStatus !== "Paid"
+      ) {
+        payload.paymentStatus = "Paid";
+      }
+
+      await updateDoc(
+
+        doc(
+          db,
+          "orders",
+          id
+        ),
+
+        payload
 
       );
+
+      if (status === "Cancelled" && order.status !== "Cancelled") {
+        // Restore what checkout decremented — best-effort per item so
+        // one deleted product doesn't block the rest.
+        for (const item of order.items || []) {
+          try {
+            await updateDoc(doc(db, "products", item.id), {
+              stock: increment(item.qty || 0),
+              sales: increment(-(item.qty || 0)),
+            });
+          } catch (stockError) {
+            console.error("Failed to restore stock for", item.id, stockError);
+          }
+        }
+      }
 
       await addDoc(
 
@@ -190,6 +229,9 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
   message:
     `Your order ${id.slice(0,8)} is now ${status}`,
+
+  userId:
+    order.userId,
 
   userEmail:
     order.userEmail,
@@ -916,56 +958,34 @@ finally{ setSaving(false);} };
 
                 }
 
+                disabled={(NEXT_STATUSES[order.status] || []).length === 0}
+
                 className="
                   w-full
                   border
                   rounded-xl
                   p-3
+                  disabled:bg-gray-100
+                  disabled:cursor-not-allowed
                 "
 
               >
 
-                <option>
+                <option value={order.status}>
 
-                  Pending
-
-                </option>
-
-                <option>
-
-                  Confirmed
+                  {order.status}
 
                 </option>
 
-                <option>
+                {(NEXT_STATUSES[order.status] || []).map((next) => (
 
-                  Packed
+                  <option key={next} value={next}>
 
-                </option>
+                    {next}
 
-                <option>
+                  </option>
 
-                  Shipped
-
-                </option>
-
-                <option>
-
-                  Out For Delivery
-
-                </option>
-
-                <option>
-
-                  Delivered
-
-                </option>
-
-                <option>
-
-                  Cancelled
-
-                </option>
+                ))}
 
               </select>
 

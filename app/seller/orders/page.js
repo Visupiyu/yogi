@@ -11,9 +11,22 @@ import {
   updateDoc,
   addDoc,
   serverTimestamp,
+  increment,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+
+// Mirrors isLegalOrderStatusTransition in firestore.rules — used here
+// only to keep the dropdown from offering a move the rule would reject.
+const NEXT_STATUSES = {
+  Pending: ["Confirmed", "Cancelled"],
+  Confirmed: ["Packed", "Cancelled"],
+  Packed: ["Shipped", "Cancelled"],
+  Shipped: ["Out For Delivery"],
+  "Out For Delivery": ["Delivered"],
+  Delivered: [],
+  Cancelled: [],
+};
 
 export default function SellerOrdersPage() {
   const router = useRouter();
@@ -69,12 +82,39 @@ export default function SellerOrdersPage() {
 
   const updateStatus = async (orderId, newStatus) => {
     try {
-      await updateDoc(doc(db, "orders", orderId), {
+      const currentOrder = orders.find((order) => order.id === orderId);
+
+      const payload = {
         status: newStatus,
         updatedAt: serverTimestamp(),
-      });
+      };
 
-      const currentOrder = orders.find((order) => order.id === orderId);
+      // COD collects payment on delivery — mark it paid in the same
+      // write, matching what the Firestore rule allows a seller to do.
+      if (
+        newStatus === "Delivered" &&
+        currentOrder?.paymentMethod !== "ONLINE" &&
+        currentOrder?.paymentStatus !== "Paid"
+      ) {
+        payload.paymentStatus = "Paid";
+      }
+
+      await updateDoc(doc(db, "orders", orderId), payload);
+
+      if (newStatus === "Cancelled" && currentOrder?.status !== "Cancelled") {
+        // Restore what checkout decremented — best-effort per item so one
+        // deleted product doesn't block the rest.
+        for (const item of currentOrder?.items || []) {
+          try {
+            await updateDoc(doc(db, "products", item.id), {
+              stock: increment(item.qty || 0),
+              sales: increment(-(item.qty || 0)),
+            });
+          } catch (stockError) {
+            console.error("Failed to restore stock for", item.id, stockError);
+          }
+        }
+      }
 
       if (currentOrder?.userId) {
         await addDoc(collection(db, "notifications"), {
@@ -225,28 +265,33 @@ export default function SellerOrdersPage() {
                   </span>
                 </p>
 
-                <select
-                  value={order.status}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (
-                      value === "Delivered" &&
-                      !confirm("Mark this order as Delivered?")
-                    ) {
-                      return;
-                    }
-                    updateStatus(order.id, value);
-                  }}
-                  className="border p-2 rounded-lg"
-                >
-                  <option>Pending</option>
-                  <option>Confirmed</option>
-                  <option>Packed</option>
-                  <option>Shipped</option>
-                  <option>Out For Delivery</option>
-                  <option>Delivered</option>
-                  <option>Cancelled</option>
-                </select>
+                {NEXT_STATUSES[order.status]?.length > 0 ? (
+                  <select
+                    value={order.status}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (
+                        value === "Delivered" &&
+                        !confirm("Mark this order as Delivered?")
+                      ) {
+                        return;
+                      }
+                      updateStatus(order.id, value);
+                    }}
+                    className="border p-2 rounded-lg"
+                  >
+                    <option value={order.status}>{order.status}</option>
+                    {NEXT_STATUSES[order.status].map((next) => (
+                      <option key={next} value={next}>
+                        {next}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    No further status changes available.
+                  </p>
+                )}
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">

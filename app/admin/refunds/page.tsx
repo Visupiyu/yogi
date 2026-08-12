@@ -8,6 +8,7 @@ import {
   updateDoc,
   addDoc,
   doc,
+  increment,
   Timestamp,
 } from "firebase/firestore";
 
@@ -90,37 +91,47 @@ export default function AdminRefundsPage() {
 
         );
 
-        await addDoc(
-
-  collection(
-    db,
-    "notifications"
-  ),
-
-  {
-
-    title:
-      "Refund Status Updated",
-
-    message:
-
-      `Refund ${id} marked as ${status}`,
-
-    type:
-      "refund",
-
-    read:false,
-
-    createdAt:
-      new Date(),
-
-  }
-
-);
-
-const refund:any = refunds.find(
+        const refund:any = refunds.find(
   (r:any)=>r.id===id
 );
+
+if (refund?.userId) {
+
+  await addDoc(
+
+    collection(
+      db,
+      "notifications"
+    ),
+
+    {
+
+      title:
+        "Refund Status Updated",
+
+      message:
+
+        `Your refund request is now ${status}.`,
+
+      userId:
+        refund.userId,
+
+      role:
+        "customer",
+
+      type:
+        "refund",
+
+      read:false,
+
+      createdAt:
+        new Date(),
+
+    }
+
+  );
+
+}
 
 if(
   status==="Refunded" &&
@@ -151,6 +162,17 @@ if(
     }
 
   );
+
+  // The ledger entry alone doesn't move any real balance — credit the
+  // customer's actual spendable rewardPoints too, not just log history.
+  if (refund.userId) {
+    await updateDoc(
+      doc(db, "users", refund.userId),
+      {
+        rewardPoints: increment(refund.refundAmount || 0),
+      }
+    );
+  }
 
 }
         setRefunds(

@@ -8,9 +8,13 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 export default function ReturnsPage() {
+
+  const router = useRouter();
 
   const [orderId,setOrderId] =
   useState("");
@@ -53,16 +57,17 @@ const [comments,setComments] =
 
       }
 
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        alert("Please login first.");
+        router.push("/login");
+        return;
+      }
+
       try{
 
         setLoading(true);
-
-        const user =
-          JSON.parse(
-            localStorage.getItem(
-              "user"
-            ) || "{}"
-          );
 
         await addDoc(
 
@@ -75,11 +80,14 @@ const [comments,setComments] =
 
   orderId,
 
+  userId:
+    currentUser.uid,
+
   customerName:
-    user.name || "Customer",
+    currentUser.displayName || "Customer",
 
   userEmail:
-    user.email || "",
+    currentUser.email || "",
 
   reason,
 
@@ -118,7 +126,10 @@ const [comments,setComments] =
       "Refund Request",
 
     message:
-      `${user.name || "Customer"} requested a refund`,
+      `${currentUser.displayName || "Customer"} requested a refund`,
+
+    role:
+      "admin",
 
     type:
       "refund",
@@ -130,7 +141,7 @@ const [comments,setComments] =
 
   }
 
-);      
+);
 
         alert(
           "Return request submitted successfully"
@@ -154,7 +165,7 @@ const [comments,setComments] =
 
     };
 
-    
+
 
   return(
 
@@ -235,87 +246,6 @@ const [comments,setComments] =
               rounded-xl
             "
           >
-            <div className="
-  mb-6
-">
-
-  <label className="
-    block
-    mb-2
-    font-semibold
-  ">
-    Refund Method
-  </label>
-
-  <select
-
-    value={refundMethod}
-
-    onChange={(e)=>
-      setRefundMethod(
-        e.target.value
-      )
-    }
-
-    className="
-      w-full
-      border
-      p-3
-      rounded-xl
-    "
-  >
-    <div className="
-  mb-6
-">
-
-  <label className="
-    block
-    mb-2
-    font-semibold
-  ">
-    Additional Comments
-  </label>
-
-  <textarea
-
-    value={comments}
-
-    onChange={(e)=>
-      setComments(
-        e.target.value
-      )
-    }
-
-    rows={4}
-
-    placeholder="
-    Describe the issue..."
-
-    className="
-      w-full
-      border
-      p-3
-      rounded-xl
-    "
-  />
-
-</div>
-
-    <option>
-      Original Payment
-    </option>
-
-    <option>
-      Wallet
-    </option>
-
-    <option>
-      Bank Transfer
-    </option>
-
-  </select>
-
-</div>
 
             <option value="">
               Choose Reason
@@ -342,6 +272,89 @@ const [comments,setComments] =
             </option>
 
           </select>
+
+        </div>
+
+        <div className="
+          mb-6
+        ">
+
+          <label className="
+            block
+            mb-2
+            font-semibold
+          ">
+            Refund Method
+          </label>
+
+          <select
+
+            value={refundMethod}
+
+            onChange={(e)=>
+              setRefundMethod(
+                e.target.value
+              )
+            }
+
+            className="
+              w-full
+              border
+              p-3
+              rounded-xl
+            "
+          >
+
+            <option>
+              Original Payment
+            </option>
+
+            <option>
+              Wallet
+            </option>
+
+            <option>
+              Bank Transfer
+            </option>
+
+          </select>
+
+        </div>
+
+        <div className="
+          mb-6
+        ">
+
+          <label className="
+            block
+            mb-2
+            font-semibold
+          ">
+            Additional Comments
+          </label>
+
+          <textarea
+
+            value={comments}
+
+            onChange={(e)=>
+              setComments(
+                e.target.value
+              )
+            }
+
+            rows={4}
+
+            placeholder="
+            Describe the issue..."
+
+            className="
+              w-full
+              border
+              p-3
+              rounded-xl
+            "
+          />
 
         </div>
 

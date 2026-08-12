@@ -8,6 +8,7 @@ import {
   where,
   updateDoc,
   doc,
+  increment,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -102,12 +103,29 @@ export default function OrdersPage() {
     )
       return;
     try {
+      const order = orders.find((o) => o.id === id);
+
       await updateDoc(
         doc(db, "orders", id),
         {
           status: "Cancelled",
         }
       );
+
+      // Checkout decremented stock/incremented sales for these items —
+      // restore them now that the order won't be fulfilled. Best-effort
+      // per item so one deleted product doesn't block the rest.
+      for (const item of order?.items || []) {
+        try {
+          await updateDoc(doc(db, "products", item.id), {
+            stock: increment(item.qty || 0),
+            sales: increment(-(item.qty || 0)),
+          });
+        } catch (stockError) {
+          console.error("Failed to restore stock for", item.id, stockError);
+        }
+      }
+
       setOrders((prev) =>
         prev.map((o) =>
           o.id === id

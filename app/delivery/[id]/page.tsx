@@ -220,6 +220,9 @@ if (proofImage) {
     message:
       `Your order ${id.slice(0,8)} is now ${status}.`,
 
+    userId:
+      order.userId,
+
     userEmail:
       order.userEmail,
 
