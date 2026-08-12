@@ -1,10 +1,14 @@
 "use client";
 import { useEffect,useState } from "react";
+import { useRouter } from "next/navigation";
 import {collection,   getDocs,   addDoc,   query,   where,   serverTimestamp,} from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function SellerWalletPage() {
+
+  const router = useRouter();
 
   const [walletBalance, setWalletBalance] = useState(0);
 
@@ -20,24 +24,41 @@ export default function SellerWalletPage() {
 
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
 
+  const [vendorEmail, setVendorEmail] = useState("");
+
+  const [businessName, setBusinessName] = useState("");
+
   useEffect(() => {
 
-    loadWallet();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
 
-  }, []);
+      if (!user) {
+        router.push("/vendor-login");
+        return;
+      }
+
+      setVendorEmail(user.email || "");
+
+      const vendorSnap = await getDocs(
+        query(collection(db, "vendors"), where("uid", "==", user.uid))
+      );
+
+      if (!vendorSnap.empty) {
+        setBusinessName(vendorSnap.docs[0].data().businessName || "");
+      }
+
+      loadWallet(user.uid, user.email || "");
+
+    });
+
+    return () => unsubscribe();
+
+  }, [router]);
 
 const loadWallet =
-async()=>{
+async(vendorUid: string, vendorEmailArg: string)=>{
 
   try{
-
-    const vendor = JSON.parse(
-
-      localStorage.getItem(
-        "vendor"
-      ) || "{}"
-
-    );
 
     // Live earnings from this seller's orders — vendor.pendingPayout on
     // the vendors doc is never actually written by any admin/order flow,
@@ -46,7 +67,7 @@ async()=>{
 
       query(
         collection(db, "orders"),
-        where("vendorIds", "array-contains", vendor.uid)
+        where("vendorIds", "array-contains", vendorUid)
       )
 
     );
@@ -60,7 +81,7 @@ async()=>{
       if (order.status === "Cancelled") return;
 
       const hasVendorItems = order.items?.some(
-        (item:any) => item.vendorId === vendor.uid
+        (item:any) => item.vendorId === vendorUid
       );
 
       if (hasVendorItems) {
@@ -79,7 +100,7 @@ async()=>{
       where(
         "vendorEmail",
         "==",
-        vendor.email
+        vendorEmailArg
       )
 
     );
@@ -94,9 +115,9 @@ async()=>{
 
         items.push({
 
-          id:docSnap.id,
-
           ...docSnap.data(),
+
+          id:docSnap.id,
 
         });
 
@@ -193,14 +214,6 @@ const requestWithdrawal =
 async()=>{
   try{ setSubmitting(true);
 
-    const vendor = JSON.parse(
-
-      localStorage.getItem(
-        "vendor"
-      ) || "{}"
-
-    );
-
     if(
 
       Number(amount) <= 0
@@ -240,10 +253,10 @@ async()=>{
       {
 
         vendorEmail:
-          vendor.email,
+          vendorEmail,
 
         vendorName:
-          vendor.businessName,
+          businessName,
 
         amount:
           Number(amount),
@@ -271,7 +284,7 @@ async()=>{
       "Withdrawal Request",
 
     message:
-      `${vendor.businessName}
+      `${businessName}
        requested ₹${amount}`,
 
     type:
@@ -292,7 +305,9 @@ async()=>{
 
     setAmount("");
 
-    loadWallet();
+    if (auth.currentUser) {
+      loadWallet(auth.currentUser.uid, vendorEmail);
+    }
 
  }catch(error){
 

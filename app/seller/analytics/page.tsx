@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   PieChart,
   Pie,
@@ -22,25 +24,41 @@ import {
 const COLORS = ["#16a34a", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6"];
 
 export default function SellerAnalyticsPage() {
+  const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
-    loadAnalytics();
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
 
-  const loadAnalytics = async () => {
+      if (!user) {
+        router.push("/vendor-login");
+        return;
+      }
+
+      loadAnalytics(user.uid);
+
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  const loadAnalytics = async (vendorUid: string) => {
     try {
-      const vendor = JSON.parse(localStorage.getItem("vendor") || "{}");
 
       // PRODUCTS (scoped to this vendor)
       const productSnap = await getDocs(collection(db, "products"));
       const productList: any[] = [];
+      const myProductIds = new Set<string>();
       productSnap.forEach((doc) => {
         const data: any = { ...doc.data(), id: doc.id };
-        if (data.vendorId === vendor.uid) productList.push(data);
+        if (data.vendorId === vendorUid) {
+          productList.push(data);
+          myProductIds.add(doc.id);
+        }
       });
       setProducts(productList);
 
@@ -50,19 +68,20 @@ export default function SellerAnalyticsPage() {
       orderSnap.forEach((doc) => {
         const data: any = doc.data();
         const myItems =
-          data.items?.filter((item: any) => item.vendorId === vendor.uid) ||
+          data.items?.filter((item: any) => item.vendorId === vendorUid) ||
           [];
         if (myItems.length) orderList.push({ ...data, myItems });
       });
       setOrders(orderList);
 
-      // REVIEWS
-      // NOTE: not scoped to this vendor — this loads ALL reviews, so
-      // Average Rating / Total Reviews reflect the whole marketplace.
-      // Filter by the vendor's product ids once the review schema is known.
+      // REVIEWS — scoped to this seller's own products only, so Average
+      // Rating / Total Reviews reflect this seller, not the marketplace.
       const reviewSnap = await getDocs(collection(db, "productReviews"));
       const reviewList: any[] = [];
-      reviewSnap.forEach((doc) => reviewList.push(doc.data()));
+      reviewSnap.forEach((doc) => {
+        const data: any = doc.data();
+        if (myProductIds.has(data.productId)) reviewList.push(data);
+      });
       setReviews(reviewList);
     } catch (error) {
       console.error(error);
@@ -153,22 +172,30 @@ export default function SellerAnalyticsPage() {
     { name: "Out of Stock", value: products.filter((p: any) => Number(p.stock || 0) === 0).length },
   ];
 
-  // NOTE: placeholder — real monthly buckets require grouping orders by
-  // createdAt. Currently all revenue is attributed to June.
-  const monthlyRevenue = [
-    { month: "Jan", revenue: 0 },
-    { month: "Feb", revenue: 0 },
-    { month: "Mar", revenue: 0 },
-    { month: "Apr", revenue: 0 },
-    { month: "May", revenue: 0 },
-    { month: "Jun", revenue: 0 },
-    { month: "Jly", revenue: 0 },
-    { month: "Aug", revenue: 0 },
-    { month: "Sep", revenue: 0 },
-    { month: "Oct", revenue: 0 },
-    { month: "Nov", revenue: 0 },
-    { month: "Dec", revenue: revenue },
+  const MONTH_LABELS = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jly", "Aug", "Sep", "Oct", "Nov", "Dec",
   ];
+
+  const monthlyRevenueTotals = new Array(12).fill(0);
+
+  orders.forEach((order: any) => {
+    const seconds = order.createdAt?.seconds;
+    if (!seconds) return;
+
+    const monthIndex = new Date(seconds * 1000).getMonth();
+    const orderRevenue = order.myItems.reduce(
+      (s: any, item: any) => s + item.price * item.qty,
+      0
+    );
+
+    monthlyRevenueTotals[monthIndex] += orderRevenue;
+  });
+
+  const monthlyRevenue = MONTH_LABELS.map((month, index) => ({
+    month,
+    revenue: monthlyRevenueTotals[index],
+  }));
 
   if (loading) {
     return <div className="p-10 text-center">Loading Analytics...</div>;

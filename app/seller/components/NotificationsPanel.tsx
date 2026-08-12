@@ -63,8 +63,8 @@ export default function NotificationsPanel() {
         snapshot.forEach((docSnap) => {
 
           items.push({
-            id: docSnap.id,
             ...docSnap.data(),
+            id: docSnap.id,
           });
 
         });

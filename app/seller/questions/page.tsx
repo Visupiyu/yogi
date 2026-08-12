@@ -4,6 +4,7 @@ import {
   useEffect,
   useState
 } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   collection,
@@ -14,10 +15,13 @@ import {
   where
 } from "firebase/firestore";
 
-import { db }
+import { auth, db }
 from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function SellerQuestionsPage(){
+
+  const router = useRouter();
 
   const [questions,
   setQuestions] =
@@ -27,19 +31,30 @@ export default function SellerQuestionsPage(){
   setLoading] =
   useState(true);
 
+  const [vendorUid, setVendorUid] =
+  useState("");
+
   useEffect(()=>{
 
-    loadQuestions();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
 
-  },[]);
+      if (!user) {
+        router.push("/vendor-login");
+        return;
+      }
 
- const loadQuestions = async () => {
+      setVendorUid(user.uid);
+      loadQuestions(user.uid);
+
+    });
+
+    return () => unsubscribe();
+
+  },[router]);
+
+ const loadQuestions = async (vendorUid: string) => {
 
   try {
-
-    const vendor = JSON.parse(
-      localStorage.getItem("vendor") || "{}"
-    );
 
     const snapshot = await getDocs(
 
@@ -50,7 +65,7 @@ export default function SellerQuestionsPage(){
         where(
           "vendorId",
           "==",
-          vendor.uid
+          vendorUid
         )
 
       )
@@ -63,9 +78,9 @@ export default function SellerQuestionsPage(){
 
       data.push({
 
-        id: docSnap.id,
-
         ...docSnap.data(),
+
+        id: docSnap.id,
 
       });
 
@@ -115,7 +130,7 @@ export default function SellerQuestionsPage(){
         "Answer Saved"
       );
 
-      loadQuestions();
+      loadQuestions(vendorUid);
 
     }catch(error){
 

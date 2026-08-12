@@ -1,13 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   collection,
-  getDocs
+  getDocs,
+  query,
+  where
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 import * as XLSX from "xlsx";
 
@@ -17,6 +21,8 @@ import autoTable from "jspdf-autotable";
 
 export default function SellerReportsPage(){
 
+  const router = useRouter();
+
   const [orders,setOrders] =
     useState<any[]>([]);
 
@@ -25,29 +31,34 @@ export default function SellerReportsPage(){
 
   useEffect(()=>{
 
-    loadOrders();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
 
-  },[]);
+      if (!user) {
+        router.push("/vendor-login");
+        return;
+      }
+
+      loadOrders(user.uid);
+
+    });
+
+    return () => unsubscribe();
+
+  },[router]);
 
   const loadOrders =
-  async()=>{
+  async(vendorUid: string)=>{
 
     try{
 
-      const vendor = JSON.parse(
-
-        localStorage.getItem(
-          "vendor"
-        ) || "{}"
-
-      );
-
+      // Orders are Firestore-rules-scoped to vendorIds containing the
+      // signed-in seller's auth uid — a full collection scan is denied.
       const snapshot =
         await getDocs(
 
-          collection(
-            db,
-            "orders"
+          query(
+            collection(db, "orders"),
+            where("vendorIds", "array-contains", vendorUid)
           )
 
         );
@@ -66,7 +77,7 @@ export default function SellerReportsPage(){
             (item:any)=>
 
               item.vendorId ===
-              vendor.uid
+              vendorUid
 
           ) || [];
 

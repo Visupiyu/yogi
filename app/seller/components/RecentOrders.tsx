@@ -44,8 +44,8 @@ export default function RecentOrders() {
         snapshot.forEach((docSnap) => {
 
           const order = {
-            id: docSnap.id,
             ...docSnap.data(),
+            id: docSnap.id,
           };
 
           sellerOrders.push(order);

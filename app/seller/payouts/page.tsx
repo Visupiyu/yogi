@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   collection,
@@ -9,9 +10,12 @@ import {
   where,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function SellerPayoutsPage() {
+
+  const router = useRouter();
 
   const [sales,setSales] =
     useState(0);
@@ -27,21 +31,25 @@ export default function SellerPayoutsPage() {
 
   useEffect(()=>{
 
-    loadPayouts();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
 
-  },[]);
+      if (!user) {
+        router.push("/vendor-login");
+        return;
+      }
+
+      loadPayouts(user.uid, user.email || "");
+
+    });
+
+    return () => unsubscribe();
+
+  },[router]);
 
   const loadPayouts =
-    async()=>{
+    async(vendorUid: string, vendorEmail: string)=>{
 
       try{
-
-        const vendor =
-          JSON.parse(
-            localStorage.getItem(
-              "vendor"
-            ) || "{}"
-          );
 
         // Orders are Firestore-rules-scoped to vendorIds containing the
         // signed-in seller's auth uid — a full collection scan is both
@@ -50,7 +58,7 @@ export default function SellerPayoutsPage() {
           await getDocs(
             query(
               collection(db, "orders"),
-              where("vendorIds", "array-contains", vendor.uid)
+              where("vendorIds", "array-contains", vendorUid)
             )
           );
 
@@ -72,7 +80,7 @@ export default function SellerPayoutsPage() {
                 // order items store the seller's auth uid, not the
                 // vendors-collection document id
                 item.vendorId ===
-                vendor.uid
+                vendorUid
 
             ) || [];
 
@@ -110,7 +118,7 @@ export default function SellerPayoutsPage() {
           await getDocs(
             query(
               collection(db, "withdrawals"),
-              where("vendorEmail", "==", vendor.email)
+              where("vendorEmail", "==", vendorEmail)
             )
           );
 

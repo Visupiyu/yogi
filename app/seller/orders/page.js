@@ -42,7 +42,7 @@ export default function SellerOrdersPage() {
         const sellerOrders = [];
 
         snapshot.forEach((docSnap) => {
-          const order = { id: docSnap.id, ...docSnap.data() };
+          const order = { ...docSnap.data(), id: docSnap.id };
           const myItems = (order.items || []).filter(
             (item) => item.vendorId === vendorId
           );

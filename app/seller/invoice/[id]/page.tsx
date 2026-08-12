@@ -53,9 +53,9 @@ export default function SellerInvoicePage() {
 
           const data: any = {
 
-            id: snap.id,
-
             ...snap.data(),
+
+            id: snap.id,
 
           };
 

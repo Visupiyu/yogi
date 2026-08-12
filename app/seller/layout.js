@@ -34,7 +34,6 @@ const SELLER_ROUTE_SEGMENTS = new Set([
   "edit",
   "inventory",
   "invoice",
-  "messages",
   "notifications",
   "orders",
   "payouts",

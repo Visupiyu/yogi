@@ -45,7 +45,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
     return () => unsubscribe();
 
-  },[]);
+  },[router]);
 
   const loadOrder = async(vendorUid: string)=>{
     try{
@@ -62,9 +62,9 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
         const data:any={
 
-          id:snap.id,
+          ...snap.data(),
 
-          ...snap.data()
+          id:snap.id,
 
         };
 

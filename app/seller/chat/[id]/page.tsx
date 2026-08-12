@@ -7,7 +7,8 @@ import {
 } from "react";
 
 import {
-  useParams
+  useParams,
+  useRouter
 } from "next/navigation";
 
 import {
@@ -25,11 +26,18 @@ import {
 } from "firebase/firestore";
 import Image from "next/image";
 
-import { db } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
 
 export default function SellerChatRoomPage(){
 
  const params = useParams();
+ const router = useRouter();
 
 const id = params.id as string;
 
@@ -40,6 +48,8 @@ const id = params.id as string;
     useState("");
     const [imageFile,setImageFile] =
   useState<File | null>(null);
+    const [preview,setPreview] =
+  useState("");
 
   const [messages,setMessages]=
     useState<any[]>([]);
@@ -47,8 +57,26 @@ const id = params.id as string;
 useState<any>(null);
     const [sending,setSending]=
 useState(false);
+    const [sellerName,setSellerName] =
+useState("Seller");
+
+  const clearImage = () => {
+    setImageFile(null);
+    setPreview("");
+  };
 
   useEffect(()=>{
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+
+      if (!user) {
+        router.push("/vendor-login");
+        return;
+      }
+
+      setSellerName(user.displayName || "Seller");
+
+    });
 
     updateDoc(
 
@@ -80,8 +108,8 @@ const loadChat = async () => {
   if (snap.exists()) {
 
     setChat({
-      id: snap.id,
       ...snap.data(),
+      id: snap.id,
     });
 
   }
@@ -104,9 +132,9 @@ loadChat();
 
   list.push({
 
-    id: docSnap.id,
-
     ...docSnap.data(),
+
+    id: docSnap.id,
 
   });
 
@@ -128,9 +156,27 @@ loadChat();
 
       );
 
-    return()=>unsubscribe();
+    return()=>{
+      unsubscribeAuth();
+      unsubscribe();
+    };
 
-  },[id]);
+  },[id, router]);
+
+  const uploadImage = async () => {
+
+    if (!imageFile) return "";
+
+    const storageRef = ref(
+      storage,
+      `chat/${Date.now()}-${imageFile.name}`
+    );
+
+    await uploadBytes(storageRef, imageFile);
+
+    return await getDownloadURL(storageRef);
+
+  };
 
   const sendMessage = async () => {
 
@@ -144,13 +190,9 @@ loadChat();
 
   try {
 
-    const vendor=JSON.parse(
-
-      localStorage.getItem(
-        "vendor"
-      ) || "{}"
-
-    );
+    const imageUrl = imageFile
+      ? await uploadImage()
+      : "";
 
     await addDoc(
 
@@ -166,13 +208,11 @@ loadChat();
         sender:"seller",
 
         senderName:
-          vendor.businessName ||
-
-          vendor.name ||
-
-          "Seller",
+          sellerName,
 
         text:message,
+
+        image:imageUrl,
 
         createdAt:
           serverTimestamp()
@@ -191,10 +231,10 @@ loadChat();
   }
 );
 
-    
+
 
    setMessage("");
-setImageFile(null);
+clearImage();
 
 } finally {
 
@@ -375,9 +415,31 @@ setImageFile(null);
         bg-white
         border-t
         p-4
-        flex
-        gap-4
       ">
+
+        {preview && (
+
+          <div className="mb-3 w-20 relative">
+
+            <img
+              src={preview}
+              alt=""
+              className="w-20 h-20 rounded-xl object-cover"
+            />
+
+            <button
+              type="button"
+              onClick={clearImage}
+              className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6"
+            >
+              ×
+            </button>
+
+          </div>
+
+        )}
+
+        <div className="flex gap-4">
 
         <input
   value={message}
@@ -401,6 +463,28 @@ setImageFile(null);
 
         />
 
+        <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 px-4 py-3 rounded-xl">
+
+          📷
+
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+
+              const file = e.target.files?.[0];
+
+              if (file) {
+                setImageFile(file);
+                setPreview(URL.createObjectURL(file));
+              }
+
+            }}
+          />
+
+        </label>
+
         <button
   onClick={sendMessage}
   disabled={sending}
@@ -415,6 +499,8 @@ setImageFile(null);
 >
   {sending ? "Sending..." : "Send"}
 </button>
+
+        </div>
 
       </div>
 

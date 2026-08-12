@@ -8,17 +8,21 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 
+import { useRouter } from "next/navigation";
+
 import {
   collection,
   getDocs,
-  orderBy,
   query,
    where
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function SellerChatPage(){
+
+  const router = useRouter();
 
   const [loading,setLoading] =
     useState(true);
@@ -31,40 +35,34 @@ export default function SellerChatPage(){
 
   useEffect(()=>{
 
-    loadChats();
+    // Live auth, not a cached localStorage snapshot — a stale/cleared
+    // "vendor" key would otherwise silently show an empty chat list.
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
 
-  },[]);
+      if (!user) {
+        router.push("/vendor-login");
+        return;
+      }
+
+      loadChats(user.uid);
+
+    });
+
+    return () => unsubscribe();
+
+  },[router]);
 
   const loadChats =
-  async()=>{
+  async(sellerUid: string)=>{
 
     try{
-
-    const vendor = JSON.parse(
-  localStorage.getItem("vendor") || "{}"
-);
-
-console.log("Vendor Object:", vendor);
-console.log("Vendor UID:", vendor.uid);
-
- if (!vendor?.uid) {
-
-  console.error("Vendor UID not found");
-
-  setLoading(false);
-
-  return;
-
-}
 
 const snapshot = await getDocs(
   query(
     collection(db, "chats"),
-    where("sellerId", "==", vendor.uid)
+    where("sellerId", "==", sellerUid)
   )
 );
-
-console.log("Chats Found:", snapshot.size);
 
       const list:any[]=[];
 
@@ -72,13 +70,22 @@ console.log("Chats Found:", snapshot.size);
 
   list.push({
 
-    id: docSnap.id,
-
     ...docSnap.data(),
+
+    id: docSnap.id,
 
   });
 
 });
+
+      // Sorted here instead of an orderBy() in the query, since that
+      // would need a composite Firestore index that isn't deployed.
+      list.sort(
+        (a, b) =>
+          (b.lastMessageAt?.seconds || 0) -
+          (a.lastMessageAt?.seconds || 0)
+      );
+
       setChats(list);
 
     }catch(error){

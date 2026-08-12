@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   collection,
@@ -13,7 +14,8 @@ import {
   doc,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 type Notification = {
   id: string;
@@ -28,6 +30,8 @@ type Notification = {
 
 export default function SellerNotificationsPage() {
 
+  const router = useRouter();
+
   const [notifications, setNotifications] =
     useState<Notification[]>([]);
 
@@ -36,55 +40,63 @@ export default function SellerNotificationsPage() {
 
  useEffect(() => {
 
-  const vendor = JSON.parse(
-    localStorage.getItem("vendor") || "{}"
-  );
+  let unsubscribeSnapshot: (() => void) | undefined;
 
-  if (!vendor.uid) return;
+  const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
 
-  const q = query(
+    if (!user) {
+      router.push("/vendor-login");
+      return;
+    }
 
-    collection(db, "notifications"),
+    const q = query(
 
-    where("userId", "==", vendor.uid),
+      collection(db, "notifications"),
 
-    where("role", "==", "seller"),
+      where("userId", "==", user.uid),
 
-    orderBy("createdAt", "desc")
+      where("role", "==", "seller"),
 
-  );
+      orderBy("createdAt", "desc")
 
-  const unsubscribe = onSnapshot(
+    );
 
-    q,
+    unsubscribeSnapshot = onSnapshot(
 
-    (snapshot) => {
+      q,
 
-      const items: Notification[] = [];
+      (snapshot) => {
 
-      snapshot.forEach((docSnap) => {
+        const items: Notification[] = [];
 
-        items.push({
+        snapshot.forEach((docSnap) => {
 
-          id: docSnap.id,
+          items.push({
 
-          ...(docSnap.data() as Omit<Notification, "id">),
+            ...(docSnap.data() as Omit<Notification, "id">),
+
+            id: docSnap.id,
+
+          });
 
         });
 
-      });
+        setNotifications(items);
 
-      setNotifications(items);
+        setLoading(false);
 
-      setLoading(false);
+      }
 
-    }
+    );
 
-  );
+  });
 
-  return () => unsubscribe();
+  return () => {
+    unsubscribeAuth();
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+  };
 
-}, []);
+}, [router]);
 
    
   const markAsRead = async (id: string) => {

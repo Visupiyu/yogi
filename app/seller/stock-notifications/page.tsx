@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   collection,
@@ -11,7 +12,8 @@ import {
   doc,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 type StockNotification = {
   id: string;
@@ -24,6 +26,8 @@ type StockNotification = {
 };
 
 export default function SellerStockNotificationsPage() {
+  const router = useRouter();
+
   const [requests, setRequests] = useState<
     StockNotification[]
   >([]);
@@ -31,42 +35,48 @@ export default function SellerStockNotificationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const vendor = JSON.parse(
-      localStorage.getItem("vendor") || "{}"
-    );
 
-    if (!vendor.uid) {
-      setLoading(false);
-      return;
-    }
+    let unsubscribeSnapshot: (() => void) | undefined;
 
-    const q = query(
-      collection(db, "stockNotifications"),
-      where("vendorId", "==", vendor.uid)
-    );
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data: StockNotification[] = [];
-
-        snapshot.forEach((docSnap) => {
-          data.push({
-            id: docSnap.id,
-            ...(docSnap.data() as Omit<
-              StockNotification,
-              "id"
-            >),
-          });
-        });
-
-        setRequests(data);
-        setLoading(false);
+      if (!user) {
+        router.push("/vendor-login");
+        return;
       }
-    );
 
-    return () => unsubscribe();
-  }, []);
+      const q = query(
+        collection(db, "stockNotifications"),
+        where("vendorId", "==", user.uid)
+      );
+
+      unsubscribeSnapshot = onSnapshot(
+        q,
+        (snapshot) => {
+          const data: StockNotification[] = [];
+
+          snapshot.forEach((docSnap) => {
+            data.push({
+              ...(docSnap.data() as Omit<
+                StockNotification,
+                "id"
+              >),
+              id: docSnap.id,
+            });
+          });
+
+          setRequests(data);
+          setLoading(false);
+        }
+      );
+
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
+  }, [router]);
 
   const groupedProducts = useMemo(() => {
     const groups: Record<
