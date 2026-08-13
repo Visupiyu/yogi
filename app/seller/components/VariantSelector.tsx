@@ -71,7 +71,13 @@ export default function VariantSelector({
     const defaultValues =
       field?.values || [];
 
-    if (fieldName === "Color") {
+    // Some categories (e.g. Beauty) use "Shade" instead of "Color" — both
+    // draw from the same custom-values list so a shade added under one
+    // label is recognized under the other too.
+    if (
+      fieldName === "Color" ||
+      fieldName === "Shade"
+    ) {
       return [
         ...defaultValues,
         ...customColors,
@@ -89,29 +95,31 @@ export default function VariantSelector({
   };
 
   // ==========================================
-  // Add custom color
+  // Add custom Color / Shade
   // ==========================================
 
   const addColor = () => {
     const color = newColor.trim();
 
     if (!color) {
-      alert("Please enter a color.");
+      alert("Please enter a color or shade.");
       return;
     }
 
-    const existingDefaultColors =
-      getFieldValues("Color");
+    const existingValues = [
+      ...getFieldValues("Color"),
+      ...getFieldValues("Shade"),
+    ];
 
     const alreadyExists =
-      existingDefaultColors.some(
+      existingValues.some(
         (item) =>
           item.toLowerCase() ===
           color.toLowerCase()
       );
 
     if (alreadyExists) {
-      alert("This color already exists.");
+      alert("This color/shade already exists.");
       return;
     }
 
@@ -119,6 +127,29 @@ export default function VariantSelector({
       ...previous,
       color,
     ]);
+
+    // Immediately select the newly added value under whichever of
+    // Color/Shade this category actually uses, so the seller doesn't
+    // have to re-pick what they just typed.
+    const shadeField = fields.find(
+      (field) => field.name === "Shade"
+    );
+
+    const colorField = fields.find(
+      (field) => field.name === "Color"
+    );
+
+    if (shadeField) {
+      setSelectedValues((previous) => ({
+        ...previous,
+        Shade: color,
+      }));
+    } else if (colorField) {
+      setSelectedValues((previous) => ({
+        ...previous,
+        Color: color,
+      }));
+    }
 
     setNewColor("");
   };
@@ -154,6 +185,12 @@ export default function VariantSelector({
       ...previous,
       size,
     ]);
+
+    // Immediately select the newly added size, same as addColor above.
+    setSelectedValues((previous) => ({
+      ...previous,
+      Size: size,
+    }));
 
     setNewSize("");
   };
@@ -318,6 +355,10 @@ export default function VariantSelector({
                 field.name
               );
 
+            const isColorField =
+              field.name === "Color" ||
+              field.name === "Shade";
+
             return (
               <div
                 key={field.name}
@@ -357,9 +398,9 @@ export default function VariantSelector({
                   </option>
 
                   {values.map(
-                    (option) => (
+                    (option, index) => (
                       <option
-                        key={option}
+                        key={`${field.name}-${option}-${index}`}
                         value={option}
                       >
                         {option}
@@ -370,11 +411,10 @@ export default function VariantSelector({
                 </select>
 
                 {/* ====================== */}
-                {/* ADD COLOR */}
+                {/* ADD COLOR / SHADE */}
                 {/* ====================== */}
 
-                {field.name ===
-                  "Color" && (
+                {isColorField && (
                   <div className="mt-3 flex gap-2">
 
                     <input
@@ -385,7 +425,11 @@ export default function VariantSelector({
                           e.target.value
                         )
                       }
-                      placeholder="Enter custom color"
+                      placeholder={
+                        field.name === "Shade"
+                          ? "Enter custom shade"
+                          : "Enter custom color"
+                      }
                       className="
                         flex-1
                         rounded-lg
@@ -411,7 +455,10 @@ export default function VariantSelector({
                         hover:bg-blue-50
                       "
                     >
-                      + Add Color
+                      + Add{" "}
+                      {field.name === "Shade"
+                        ? "Shade"
+                        : "Color"}
                     </button>
 
                   </div>

@@ -1,12 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { createUserWithEmailAndPassword,  signOut, } from "firebase/auth";
-import { collection, addDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { auth, db, storage } from "@/lib/firebase";
-import Image from "next/image";
 import Link from "next/link";
+import {
+  useMemo,
+  useState,
+  type ChangeEvent,
+} from "react";
+
+import {
+  createUserWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+
+import {
+  addDoc,
+  collection,
+  doc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
+
+import {
+  getDownloadURL,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
+
+import { auth, db, storage } from "@/lib/firebase";
 
 const citiesByState = {
   Gujarat: ["Ahmedabad", "Surat", "Vadodara", "Rajkot"],
@@ -16,11 +36,35 @@ const citiesByState = {
   Karnataka: ["Bengaluru", "Mysuru", "Hubli"],
 };
 
+type FormDataType = {
+  fullName: string;
+  email: string;
+  password: string;
+  businessPhone: string;
+  businessName: string;
+  gstNumber: string;
+  businessType: string;
+  street: string;
+  unit: string;
+  zipCode: string;
+  city: string;
+  state: string;
+  accountHolder: string;
+  bankName: string;
+  accountNumber: string;
+  ifsc: string;
+  panNumber: string;
+  aadhaarNumber: string;
+  agreed: boolean;
+};
+
+type StepStatus = "completed" | "current" | "pending";
+
 export default function VendorRegisterPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataType>({
     fullName: "",
     email: "",
     password: "",
@@ -42,17 +86,25 @@ export default function VendorRegisterPage() {
     agreed: false,
   });
 
-  // KYC document files
   const [gstDoc, setGstDoc] = useState<File | null>(null);
   const [aadhaarDoc, setAadhaarDoc] = useState<File | null>(null);
   const [chequeDoc, setChequeDoc] = useState<File | null>(null);
 
-  const handleChange = (e: any) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
+  const handleChange = (
+    e: ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
+    const { name, value, type } = e.target;
+
+    const checked =
+      type === "checkbox" &&
+      (e.target as HTMLInputElement).checked;
+
+    setFormData((previous) => ({
+      ...previous,
       [name]: type === "checkbox" ? checked : value,
-    });
+    }));
   };
 
   const uploadKyc = async (
@@ -61,12 +113,121 @@ export default function VendorRegisterPage() {
     label: string
   ): Promise<string> => {
     if (!file) return "";
+
     const storageRef = ref(
       storage,
       `vendor-kyc/${uid}/${label}-${Date.now()}-${file.name}`
     );
+
     await uploadBytes(storageRef, file);
+
     return await getDownloadURL(storageRef);
+  };
+
+  const progress = useMemo(() => {
+    let completed = 0;
+
+    if (
+      formData.fullName &&
+      formData.email &&
+      formData.password &&
+      formData.businessPhone
+    ) {
+      completed += 1;
+    }
+
+    if (
+      formData.businessName &&
+      formData.businessType &&
+      formData.panNumber
+    ) {
+      completed += 1;
+    }
+
+    if (
+      formData.street &&
+      formData.zipCode &&
+      formData.state &&
+      formData.city
+    ) {
+      completed += 1;
+    }
+
+    if (
+      formData.accountHolder &&
+      formData.bankName &&
+      formData.accountNumber &&
+      formData.ifsc
+    ) {
+      completed += 1;
+    }
+
+    if (aadhaarDoc && chequeDoc) {
+      completed += 1;
+    }
+
+    if (formData.agreed) {
+      completed += 1;
+    }
+
+    return Math.round((completed / 6) * 100);
+  }, [formData, aadhaarDoc, chequeDoc]);
+
+  const getStepStatus = (
+    index: number
+  ): StepStatus => {
+    const statuses: StepStatus[] = [
+      formData.fullName &&
+      formData.email &&
+      formData.password &&
+      formData.businessPhone
+        ? "completed"
+        : "current",
+
+      formData.businessName &&
+      formData.businessType &&
+      formData.panNumber
+        ? "completed"
+        : "pending",
+
+      formData.street &&
+      formData.zipCode &&
+      formData.state &&
+      formData.city
+        ? "completed"
+        : "pending",
+
+      formData.accountHolder &&
+      formData.bankName &&
+      formData.accountNumber &&
+      formData.ifsc
+        ? "completed"
+        : "pending",
+
+      aadhaarDoc && chequeDoc
+        ? "completed"
+        : "pending",
+
+      formData.agreed
+        ? "completed"
+        : "pending",
+    ];
+
+    if (
+      statuses[index] === "completed"
+    ) {
+      return "completed";
+    }
+
+    const firstPending = statuses.findIndex(
+      (item) => item !== "completed"
+    );
+
+    if (index === firstPending) {
+      return "current";
+    }
+
+    return "pending";
   };
 
   const registerVendor = async () => {
@@ -85,113 +246,203 @@ export default function VendorRegisterPage() {
       !formData.accountNumber ||
       !formData.ifsc
     ) {
-      alert("Please fill all required fields");
+      alert(
+        "Please complete all required seller details."
+      );
       return;
     }
 
     if (formData.password.length < 6) {
-      alert("Password must be at least 6 characters");
+      alert(
+        "Password must be at least 6 characters."
+      );
       return;
     }
 
-   if (!/^\d{10}$/.test(formData.businessPhone)) {
-  alert("Enter valid 10 digit phone number");
-  return;
-}
+    if (
+      !/^\d{10}$/.test(
+        formData.businessPhone
+      )
+    ) {
+      alert(
+        "Enter a valid 10 digit phone number."
+      );
+      return;
+    }
 
-// Aadhaar Validation
-if (
-  formData.aadhaarNumber &&
-  !/^\d{12}$/.test(formData.aadhaarNumber)
-) {
-  alert("Enter a valid 12-digit Aadhaar Number");
-  return;
-}
+    if (
+      formData.zipCode &&
+      !/^\d{6}$/.test(formData.zipCode)
+    ) {
+      alert(
+        "Enter a valid 6 digit PIN code."
+      );
+      return;
+    }
 
-// PAN Validation
-if (
-  formData.panNumber &&
-  !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber)
-) {
-  alert("Invalid PAN Number");
-  return;
-}
+    if (
+      formData.aadhaarNumber &&
+      !/^\d{12}$/.test(
+        formData.aadhaarNumber
+      )
+    ) {
+      alert(
+        "Enter a valid 12 digit Aadhaar number."
+      );
+      return;
+    }
 
-// IFSC Validation
-if (
-  !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.ifsc)
-) {
-  alert("Invalid IFSC Code");
-  return;
-}
+    if (
+      formData.panNumber &&
+      !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(
+        formData.panNumber
+      )
+    ) {
+      alert("Enter a valid PAN number.");
+      return;
+    }
 
-if (!aadhaarDoc || !chequeDoc) {
-  alert(
-    "Please upload your Aadhaar Card and Cancelled Cheque for KYC verification"
-  );
-  return;
-}
+    if (
+      !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(
+        formData.ifsc
+      )
+    ) {
+      alert("Enter a valid IFSC code.");
+      return;
+    }
+
+    if (!aadhaarDoc || !chequeDoc) {
+      alert(
+        "Please upload your Aadhaar Card and Cancelled Cheque for KYC verification."
+      );
+      return;
+    }
 
     if (!formData.agreed) {
-      alert("Please accept Terms & Conditions");
+      alert(
+        "Please accept the YOMICO Seller Agreement and Terms."
+      );
       return;
     }
 
     try {
       setLoading(true);
 
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email.trim().toLowerCase(),
-        formData.password.trim()
-      );
+      const userCredential =
+        await createUserWithEmailAndPassword(
+          auth,
+          formData.email.trim().toLowerCase(),
+          formData.password.trim()
+        );
 
       const uid = userCredential.user.uid;
 
-      // Upload KYC documents to Storage
-      const gstDocUrl = await uploadKyc(uid, gstDoc, "gst");
-      const aadhaarDocUrl = await uploadKyc(uid, aadhaarDoc, "aadhaar");
-      const chequeDocUrl = await uploadKyc(uid, chequeDoc, "cheque");
-
-      await addDoc(collection(db, "vendors"), {
+      const gstDocUrl = await uploadKyc(
         uid,
-        fullName: formData.fullName,
-        email: formData.email.trim().toLowerCase(),
-        businessPhone: formData.businessPhone,
-        businessName: formData.businessName,
-        gstNumber: formData.gstNumber,
-        businessType: formData.businessType,
-        street: formData.street,
-        unit: formData.unit,
-        zipCode: formData.zipCode,
-        city: formData.city,
-        state: formData.state,
-        accountHolder: formData.accountHolder,
-        bankName: formData.bankName,
-        accountNumber: formData.accountNumber,
-        ifsc: formData.ifsc,
-        panNumber: formData.panNumber,
-        aadhaarNumber: formData.aadhaarNumber,
+        gstDoc,
+        "gst"
+      );
 
-        // KYC document URLs
-        gstDocUrl,
-        aadhaarDocUrl,
-        chequeDocUrl,
-        kycStatus: "Pending",
+      const aadhaarDocUrl =
+        await uploadKyc(
+          uid,
+          aadhaarDoc,
+          "aadhaar"
+        );
 
-        agreed: formData.agreed,
-        storeLogo: "",
-        storeBanner: "",
-        rating: 0,
-        totalProducts: 0,
-        status: "Pending",
-        commissionRate: 10,
-        totalSales: 0,
-        totalOrders: 0,
-        totalRevenue: 0,
-        pendingPayout: 0,
-        createdAt: serverTimestamp(),
-      });
+      const chequeDocUrl =
+        await uploadKyc(
+          uid,
+          chequeDoc,
+          "cheque"
+        );
+
+      await addDoc(
+        collection(db, "vendors"),
+        {
+          uid,
+
+          fullName:
+            formData.fullName,
+
+          email:
+            formData.email
+              .trim()
+              .toLowerCase(),
+
+          businessPhone:
+            formData.businessPhone,
+
+          businessName:
+            formData.businessName,
+
+          gstNumber:
+            formData.gstNumber,
+
+          businessType:
+            formData.businessType,
+
+          street:
+            formData.street,
+
+          unit:
+            formData.unit,
+
+          zipCode:
+            formData.zipCode,
+
+          city:
+            formData.city,
+
+          state:
+            formData.state,
+
+          accountHolder:
+            formData.accountHolder,
+
+          bankName:
+            formData.bankName,
+
+          accountNumber:
+            formData.accountNumber,
+
+          ifsc:
+            formData.ifsc,
+
+          panNumber:
+            formData.panNumber,
+
+          aadhaarNumber:
+            formData.aadhaarNumber,
+
+          gstDocUrl,
+          aadhaarDocUrl,
+          chequeDocUrl,
+
+          kycStatus: "Pending",
+
+          agreed:
+            formData.agreed,
+
+          storeLogo: "",
+          storeBanner: "",
+
+          rating: 0,
+          totalProducts: 0,
+
+          status: "Pending",
+
+          commissionRate: 10,
+
+          totalSales: 0,
+          totalOrders: 0,
+          totalRevenue: 0,
+          pendingPayout: 0,
+
+          createdAt:
+            serverTimestamp(),
+        }
+      );
 
       // Public-safe mirror for storefront pages — vendors/ holds banking &
       // KYC PII and is locked to owner/admin only, so store/seller pages
@@ -215,536 +466,1305 @@ if (!aadhaarDoc || !chequeDoc) {
         createdAt: serverTimestamp(),
       });
 
-      await addDoc(collection(db, "notifications"), {
-        title: "New Vendor Registration",
-        message: `${formData.businessName} registered as a vendor`,
-        type: "vendor",
-        read: false,
-        createdAt: serverTimestamp(),
-      });
+      await addDoc(
+        collection(db, "notifications"),
+        {
+          title:
+            "New Vendor Registration",
+
+          message:
+            `${formData.businessName} registered as a vendor`,
+
+          role: "admin",
+
+          type: "vendor",
+
+          read: false,
+
+          createdAt:
+            serverTimestamp(),
+        }
+      );
 
       await signOut(auth);
-      alert(
-  "Vendor Registration Submitted.\n\nYour account is awaiting admin approval.");
-   window.location.replace("/vendor-login");
 
+      alert(
+        "Vendor Registration Submitted.\n\nYour account is awaiting YOMICO admin approval."
+      );
+
+      window.location.replace(
+        "/vendor-login"
+      );
     } catch (err: any) {
-      if (err.code === "auth/email-already-in-use") {
-        alert("Email already registered");
+      console.error(
+        "Vendor registration error:",
+        err
+      );
+
+      if (
+        err.code ===
+        "auth/email-already-in-use"
+      ) {
+        alert(
+          "This email is already registered."
+        );
       } else {
-        alert(err.message);
+        alert(
+          err.message ||
+            "Unable to complete registration."
+        );
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const fileLabel = (file: File | null) =>
-    file ? file.name : "No file chosen";
+  const stateCities =
+    formData.state
+      ? citiesByState[
+          formData.state as keyof typeof citiesByState
+        ] || []
+      : [];
 
-  const sections = [
+  const stepItems = [
     {
-      label: "Account",
-      icon: "👤",
-      done: !!(
-        formData.fullName &&
-        formData.email &&
-        formData.password.length >= 6 &&
-        /^\d{10}$/.test(formData.businessPhone)
-      ),
+      title: "Account Details",
+      subtitle:
+        "Mobile, email & password",
     },
     {
-      label: "Business",
-      icon: "🏬",
-      done: !!formData.businessName,
+      title: "Business Verification",
+      subtitle:
+        "Business, PAN & GST",
     },
     {
-      label: "Address",
-      icon: "📍",
-      done: !!(
-        formData.street &&
-        formData.zipCode &&
-        formData.city &&
-        formData.state
-      ),
+      title: "Store & Pickup",
+      subtitle:
+        "Address & location",
     },
     {
-      label: "Bank",
-      icon: "🏦",
-      done: !!(
-        formData.accountHolder &&
-        formData.bankName &&
-        formData.accountNumber &&
-        formData.ifsc
-      ),
+      title: "Bank & Payout",
+      subtitle:
+        "Settlement details",
     },
     {
-      label: "Documents",
-      icon: "📄",
-      done: !!(aadhaarDoc && chequeDoc),
+      title: "KYC Documents",
+      subtitle:
+        "Identity & bank proof",
     },
     {
-      label: "Review",
-      icon: "✅",
-      done: formData.agreed,
+      title: "Agreement",
+      subtitle:
+        "Terms & submission",
     },
   ];
 
-  const completedCount = sections.filter((section) => section.done).length;
-
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
+    <main className="min-h-screen bg-slate-50 text-slate-900">
 
-      {/* HERO */}
-      <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white">
-        <div className="max-w-5xl mx-auto px-6 py-12">
+      {/* =====================================================
+          TOP SAFFRON HEADER
+      ====================================================== */}
 
-          <Link href="/sell" className="text-sm text-white/80 hover:text-white hover:underline">
-            ← Sell on YOMICO
-          </Link>
+      <header className="bg-gradient-to-r from-orange-500 via-orange-500 to-amber-500 text-white">
 
-          <div className="mt-4 flex items-center gap-5">
-            <Image
-              src="/logo.png"
-              alt="YOMICO"
-              width={90}
-              height={90}
-              className="h-16 w-16 md:h-20 md:w-20 object-contain rounded-2xl bg-white p-2"
-            />
+        <div className="max-w-7xl mx-auto px-5 sm:px-8">
 
-            <div>
-              <p className="text-sm uppercase tracking-widest opacity-80">
-                YOMICO Seller Portal
-              </p>
-              <h1 className="text-3xl md:text-4xl font-bold">
-                Become a Vendor
-              </h1>
-            </div>
-          </div>
+          <div className="h-20 flex items-center justify-between">
 
-          <p className="mt-4 max-w-xl opacity-90">
-            Fill in your business, address, bank and KYC details below.
-            Your application will be reviewed by the YOMICO team before
-            you can start selling.
-          </p>
+            <Link
+              href="/"
+              className="font-extrabold tracking-wide text-lg"
+            >
+              YOMICO
+            </Link>
 
-        </div>
-      </div>
+            <div className="flex items-center gap-5">
 
-      {/* PROGRESS STEPPER */}
-      <div className="max-w-5xl mx-auto px-6 -mt-8">
-        <div className="bg-white rounded-2xl shadow-lg p-5">
-
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-semibold text-gray-700">
-              Application progress
-            </span>
-            <span className="text-sm font-semibold text-green-600">
-              {completedCount} of {sections.length} sections complete
-            </span>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {sections.map((section) => (
-              <span
-                key={section.label}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium ${
-                  section.done
-                    ? "bg-green-50 text-green-700"
-                    : "bg-gray-100 text-gray-500"
-                }`}
+              <Link
+                href="/seller-kit"
+                target="_blank"
+                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 border border-white/30 hover:bg-white/25 transition"
               >
-                <span>{section.icon}</span>
-                {section.done ? "✓" : "○"} {section.label}
-              </span>
-            ))}
+                📘 Seller Kit
+              </Link>
+
+              <Link
+                href="/"
+                className="font-semibold hover:underline"
+              >
+                ← Back to YOMICO
+              </Link>
+
+            </div>
+
           </div>
 
         </div>
-      </div>
 
-      <div className="max-w-5xl mx-auto px-6 mt-8 space-y-6">
+      </header>
 
-        {/* BASIC */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg">
-              👤
-            </div>
-            <h2 className="text-2xl font-bold">Account Details</h2>
-          </div>
+      {/* =====================================================
+          SELLER HERO
+      ====================================================== */}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <input
-              type="text"
-              name="fullName"
-              placeholder="Full Name"
-              value={formData.fullName}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-              type="email"
-               autoComplete="email"
-              name="email"
-              placeholder="Business Email"
-              value={formData.email}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-              type={showPassword ? "text" : "password"}
-               autoComplete="new-password"
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-             type="tel"name="businessPhone"
-             inputMode="numeric"
-             maxLength={10}
-             autoComplete="tel"
-              placeholder="Business Phone"
-              value={formData.businessPhone}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showPassword}
-                onChange={() => setShowPassword(!showPassword)}
-              />
-              Show Password
-            </label>
-          </div>
+      <section className="relative overflow-hidden bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 text-white">
+
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute -top-24 -left-20 w-80 h-80 rounded-full bg-white blur-3xl" />
+          <div className="absolute -bottom-40 right-0 w-96 h-96 rounded-full bg-blue-300 blur-3xl" />
         </div>
 
-        {/* BUSINESS */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-lg">
-              🏬
+        <div className="relative max-w-7xl mx-auto px-5 sm:px-8 py-12">
+
+          <div className="max-w-4xl">
+
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 border border-white/20 text-sm font-semibold mb-5">
+              YOMICO SELLER PORTAL
             </div>
-            <h2 className="text-2xl font-bold">Business Details</h2>
+
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight">
+              Become a YOMICO Seller
+            </h1>
+
+            <p className="mt-4 text-lg md:text-xl text-white/85 max-w-2xl">
+              Build your online business, reach customers,
+              manage products and grow with YOMICO.
+            </p>
+
+            <div className="mt-7 flex flex-wrap gap-3">
+
+              <Link
+                href="/seller-kit"
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-xl bg-white text-blue-700 px-5 py-3 font-bold shadow-lg hover:-translate-y-0.5 transition"
+              >
+                📘 Open YOMICO Seller Kit
+              </Link>
+
+              <Link
+                href="/vendor-login"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/40 bg-white/10 px-5 py-3 font-bold hover:bg-white/20 transition"
+              >
+                Already a Seller? Login
+              </Link>
+
+            </div>
+
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <input
-              type="text"
-              name="businessName"
-              placeholder="Business Name"
-              value={formData.businessName}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-              type="text"
-              name="gstNumber"
-              placeholder="GST Number (Optional)"
-              value={formData.gstNumber}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-           <input
-  type="text"
-  placeholder="PAN Number"
-  name="panNumber"
-  value={formData.panNumber}
-  onChange={(e) =>
-    setFormData({
-      ...formData,
-      panNumber: e.target.value.toUpperCase(),
-    })
-  }
-  className="w-full border p-4 rounded-2xl"
-/>
-            <input
-              type="text"
-              placeholder="Aadhaar Number"
-              name="aadhaarNumber"
-              value={formData.aadhaarNumber}
-              onChange={handleChange}
-              className="w-full border p-4 rounded-2xl"
-            />
-            <select
-              name="businessType"
-              value={formData.businessType}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
+        </div>
+
+      </section>
+
+      {/* =====================================================
+          MAIN ONBOARDING AREA
+      ====================================================== */}
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <div className="grid grid-cols-1 lg:grid-cols-[290px_minmax(0,1fr)] gap-8">
+
+          {/* =================================================
+              LEFT PROGRESS PANEL
+          ================================================== */}
+
+          <aside className="lg:sticky lg:top-6 self-start">
+
+            <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+
+              <div className="p-5 bg-gradient-to-br from-orange-50 to-amber-50 border-b border-orange-100">
+
+                <div className="flex items-center justify-between mb-3">
+
+                  <span className="text-sm font-bold text-slate-800">
+                    Your onboarding
+                  </span>
+
+                  <span className="text-sm font-black text-orange-600">
+                    {progress}%
+                  </span>
+
+                </div>
+
+                <div className="h-2.5 rounded-full bg-white border border-orange-200 overflow-hidden">
+
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-500"
+                    style={{
+                      width: `${progress}%`,
+                    }}
+                  />
+
+                </div>
+
+                <p className="text-xs text-slate-500 mt-3">
+                  Complete your seller profile to submit
+                  your application.
+                </p>
+
+              </div>
+
+              <div className="p-4">
+
+                <div className="space-y-1">
+
+                  {stepItems.map(
+                    (step, index) => {
+
+                      const status =
+                        getStepStatus(index);
+
+                      return (
+                        <a
+                          key={step.title}
+                          href={`#step-${index + 1}`}
+                          className={`group flex gap-3 p-3 rounded-2xl transition ${
+                            status === "current"
+                              ? "bg-blue-50"
+                              : "hover:bg-slate-50"
+                          }`}
+                        >
+
+                          <div
+                            className={`mt-0.5 w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-xs font-black ${
+                              status ===
+                              "completed"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : status ===
+                                  "current"
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-100 text-slate-400"
+                            }`}
+                          >
+                            {status ===
+                            "completed"
+                              ? "✓"
+                              : index + 1}
+                          </div>
+
+                          <div className="min-w-0">
+
+                            <p
+                              className={`text-sm font-bold ${
+                                status ===
+                                "current"
+                                  ? "text-blue-700"
+                                  : "text-slate-800"
+                              }`}
+                            >
+                              {step.title}
+                            </p>
+
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {step.subtitle}
+                            </p>
+
+                          </div>
+
+                        </a>
+                      );
+                    }
+                  )}
+
+                </div>
+
+                <div className="mt-5 pt-5 border-t border-slate-100">
+
+                  <Link
+                    href="/seller-kit"
+                    target="_blank"
+                    className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 hover:bg-blue-100 transition"
+                  >
+
+                    <div>
+                      <p className="text-sm font-bold text-blue-800">
+                        📘 YOMICO Seller Kit
+                      </p>
+
+                      <p className="text-xs text-blue-600 mt-1">
+                        Read before registering
+                      </p>
+                    </div>
+
+                    <span className="text-blue-600">
+                      ↗
+                    </span>
+
+                  </Link>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </aside>
+
+          {/* =================================================
+              FORM
+          ================================================== */}
+
+          <div className="space-y-7">
+
+            {/* =============================================
+                STEP 1
+            ============================================== */}
+
+            <section
+              id="step-1"
+              className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 scroll-mt-6"
             >
-              <option>Sole Proprietorship</option>
-              <option>Partnership</option>
-              <option>Private Limited</option>
-              <option>LLP</option>
-              <option>Other</option>
-            </select>
-          </div>
-        </div>
 
-        {/* ADDRESS */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100 text-lg">
-              📍
-            </div>
-            <h2 className="text-2xl font-bold">Business Address</h2>
-          </div>
+              <SectionHeader
+                number="01"
+                title="Account Details"
+                description="Create the account you will use to manage your YOMICO seller business."
+              />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <input
-              type="text"
-              name="street"
-              placeholder="Street Address"
-              value={formData.street}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-              type="text"
-              name="unit"
-              placeholder="Unit / Floor"
-              value={formData.unit}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-              type="text"
-              name="zipCode" inputMode="numeric"maxLength={6}autoComplete="postal-code"
-              placeholder="ZIP Code"
-              value={formData.zipCode}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <select
-              name="state"
-              value={formData.state}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                <InputField
+                  label="Full Name"
+                  required
+                  name="fullName"
+                  placeholder="Enter your full name"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  label="Business Email"
+                  required
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  placeholder="Enter business email"
+                  value={formData.email}
+                  onChange={handleChange}
+                />
+
+                <div>
+
+                  <label className="block text-sm font-bold text-slate-700 mb-2">
+                    Password <span className="text-red-500">*</span>
+                  </label>
+
+                  <div className="relative">
+
+                    <input
+                      type={
+                        showPassword
+                          ? "text"
+                          : "password"
+                      }
+                      name="password"
+                      autoComplete="new-password"
+                      placeholder="Create a password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 pr-24 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowPassword(
+                          (value) => !value
+                        )
+                      }
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-blue-600"
+                    >
+                      {showPassword
+                        ? "Hide"
+                        : "Show"}
+                    </button>
+
+                  </div>
+
+                  <p className="text-xs text-slate-400 mt-2">
+                    Minimum 6 characters.
+                  </p>
+
+                </div>
+
+                <InputField
+                  label="Business Phone"
+                  required
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  autoComplete="tel"
+                  name="businessPhone"
+                  placeholder="10 digit mobile number"
+                  value={formData.businessPhone}
+                  onChange={handleChange}
+                />
+
+              </div>
+
+              <InfoBox>
+                Your mobile number and email will be used
+                for important account communication and
+                seller updates.
+              </InfoBox>
+
+            </section>
+
+            {/* =============================================
+                STEP 2
+            ============================================== */}
+
+            <section
+              id="step-2"
+              className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 scroll-mt-6"
             >
-              <option value="">Select State</option>
-              <option value="Gujarat">Gujarat</option>
-              <option value="Maharashtra">Maharashtra</option>
-              <option value="Rajasthan">Rajasthan</option>
-              <option value="Delhi">Delhi</option>
-              <option value="Karnataka">Karnataka</option>
-            </select>
-            <select
-              name="city"
-              value={formData.city}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
+
+              <SectionHeader
+                number="02"
+                title="Business Verification"
+                description="Tell us about the business you want to operate on YOMICO."
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                <InputField
+                  label="Business / Trade Name"
+                  required
+                  name="businessName"
+                  placeholder="Enter business name"
+                  value={formData.businessName}
+                  onChange={handleChange}
+                />
+
+                <SelectField
+                  label="Business Type"
+                  name="businessType"
+                  value={formData.businessType}
+                  onChange={handleChange}
+                  options={[
+                    "Sole Proprietorship",
+                    "Partnership",
+                    "Private Limited",
+                    "LLP",
+                    "Other",
+                  ]}
+                />
+
+                <InputField
+                  label="PAN Number"
+                  name="panNumber"
+                  placeholder="ABCDE1234F"
+                  value={formData.panNumber}
+                  onChange={(e) =>
+                    setFormData(
+                      (previous) => ({
+                        ...previous,
+                        panNumber:
+                          e.target.value.toUpperCase(),
+                      })
+                    )
+                  }
+                />
+
+                <InputField
+                  label="GSTIN"
+                  name="gstNumber"
+                  placeholder="GST number where applicable"
+                  value={formData.gstNumber}
+                  onChange={(e) =>
+                    setFormData(
+                      (previous) => ({
+                        ...previous,
+                        gstNumber:
+                          e.target.value.toUpperCase(),
+                      })
+                    )
+                  }
+                />
+
+                <InputField
+                  label="Aadhaar Number"
+                  name="aadhaarNumber"
+                  inputMode="numeric"
+                  maxLength={12}
+                  placeholder="12 digit Aadhaar number"
+                  value={formData.aadhaarNumber}
+                  onChange={handleChange}
+                />
+
+              </div>
+
+              <InfoBox>
+                Enter your legal/business information
+                exactly as it appears on your supporting
+                documents.
+              </InfoBox>
+
+            </section>
+
+            {/* =============================================
+                STEP 3
+            ============================================== */}
+
+            <section
+              id="step-3"
+              className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 scroll-mt-6"
             >
-              <option value="">Select City</option>
-              {(
-                citiesByState[
-                  formData.state as keyof typeof citiesByState
-                ] || []
-              ).map((city) => (
-                <option key={city} value={city}>
-                  {city}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
 
-        {/* BANK */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-100 text-lg">
-              🏦
-            </div>
-            <h2 className="text-2xl font-bold">Bank Details</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <input
-              type="text"
-              name="accountHolder"
-              placeholder="Account Holder"
-              value={formData.accountHolder}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-              type="text"
-              name="bankName"
-              placeholder="Bank Name"
-              value={formData.bankName}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-              type="text"
-              name="accountNumber"
-              placeholder="Account Number"
-              value={formData.accountNumber}
-              onChange={handleChange}
-              className="p-4 border rounded-2xl"
-            />
-            <input
-              type="text"
-              name="ifsc"
-              placeholder="IFSC Code"
-              value={formData.ifsc}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  ifsc: e.target.value.toUpperCase(),
-                })
-              }
-              className="p-4 border rounded-2xl"
-            />
-          </div>
-        </div>
-
-        {/* KYC DOCUMENTS */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-lg">
-              📄
-            </div>
-            <h2 className="text-2xl font-bold">KYC Documents</h2>
-          </div>
-          <p className="text-gray-500 mb-6">
-            Upload clear images or PDFs. These are reviewed before approval.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* GST Certificate */}
-            <div className="border rounded-2xl p-5">
-              <label className="block font-semibold mb-2">
-                GST Certificate{" "}
-                <span className="text-gray-400 font-normal">(Optional)</span>
-              </label>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(e) => setGstDoc(e.target.files?.[0] || null)}
-                className="w-full text-sm"
+              <SectionHeader
+                number="03"
+                title="Store & Pickup Details"
+                description="Tell YOMICO where your business operates and where orders will be prepared for pickup."
               />
-              <p className="text-xs text-gray-500 mt-2 truncate">
-                {fileLabel(gstDoc)}
-              </p>
-            </div>
 
-            {/* Aadhaar Card */}
-            <div className="border rounded-2xl p-5">
-              <label className="block font-semibold mb-2">
-                Aadhaar Card <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(e) => setAadhaarDoc(e.target.files?.[0] || null)}
-                className="w-full text-sm"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                <InputField
+                  label="Street Address"
+                  required
+                  name="street"
+                  placeholder="House / building / street"
+                  value={formData.street}
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  label="Unit / Floor"
+                  name="unit"
+                  placeholder="Unit, shop or floor"
+                  value={formData.unit}
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  label="PIN Code"
+                  required
+                  name="zipCode"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="postal-code"
+                  placeholder="6 digit PIN code"
+                  value={formData.zipCode}
+                  onChange={handleChange}
+                />
+
+                <SelectField
+                  label="State"
+                  required
+                  name="state"
+                  value={formData.state}
+                  onChange={(e) => {
+                    setFormData(
+                      (previous) => ({
+                        ...previous,
+                        state:
+                          e.target.value,
+                        city: "",
+                      })
+                    );
+                  }}
+                  options={[
+                    "Gujarat",
+                    "Maharashtra",
+                    "Rajasthan",
+                    "Delhi",
+                    "Karnataka",
+                  ]}
+                  placeholder="Select State"
+                />
+
+                <SelectField
+                  label="City"
+                  required
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  disabled={!formData.state}
+                  options={stateCities}
+                  placeholder={
+                    formData.state
+                      ? "Select City"
+                      : "Select State First"
+                  }
+                />
+
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+
+                <p className="font-bold text-slate-800">
+                  📍 Pickup Address
+                </p>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  This address will be used as your
+                  business/pickup location during seller
+                  operations.
+                </p>
+
+                {formData.street &&
+                  formData.city &&
+                  formData.state && (
+                    <div className="mt-4 rounded-xl bg-white border border-slate-200 p-4 text-sm">
+                      <span className="font-semibold">
+                        Current address:
+                      </span>{" "}
+                      {formData.street},{" "}
+                      {formData.unit
+                        ? `${formData.unit}, `
+                        : ""}
+                      {formData.city},{" "}
+                      {formData.state} -{" "}
+                      {formData.zipCode}
+                    </div>
+                  )}
+
+              </div>
+
+            </section>
+
+            {/* =============================================
+                STEP 4
+            ============================================== */}
+
+            <section
+              id="step-4"
+              className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 scroll-mt-6"
+            >
+
+              <SectionHeader
+                number="04"
+                title="Bank & Payout Details"
+                description="Provide the account where eligible seller settlements and withdrawals can be processed."
               />
-              <p className="text-xs text-gray-500 mt-2 truncate">
-                {fileLabel(aadhaarDoc)}
-              </p>
-            </div>
 
-            {/* Cancelled Cheque */}
-            <div className="border rounded-2xl p-5">
-              <label className="block font-semibold mb-2">
-                Cancelled Cheque <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(e) => setChequeDoc(e.target.files?.[0] || null)}
-                className="w-full text-sm"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                <InputField
+                  label="Account Holder Name"
+                  required
+                  name="accountHolder"
+                  placeholder="Name as per bank account"
+                  value={formData.accountHolder}
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  label="Bank Name"
+                  required
+                  name="bankName"
+                  placeholder="Enter bank name"
+                  value={formData.bankName}
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  label="Account Number"
+                  required
+                  name="accountNumber"
+                  inputMode="numeric"
+                  placeholder="Enter account number"
+                  value={formData.accountNumber}
+                  onChange={handleChange}
+                />
+
+                <InputField
+                  label="IFSC Code"
+                  required
+                  name="ifsc"
+                  placeholder="ABCD0123456"
+                  value={formData.ifsc}
+                  onChange={(e) =>
+                    setFormData(
+                      (previous) => ({
+                        ...previous,
+                        ifsc:
+                          e.target.value.toUpperCase(),
+                      })
+                    )
+                  }
+                />
+
+              </div>
+
+              <div className="mt-6 flex gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+
+                <span className="text-xl">
+                  🔐
+                </span>
+
+                <div>
+                  <p className="font-bold text-blue-900">
+                    Your banking information is sensitive
+                  </p>
+
+                  <p className="text-sm text-blue-700 mt-1">
+                    Make sure the account holder name
+                    matches your supporting bank document.
+                  </p>
+                </div>
+
+              </div>
+
+            </section>
+
+            {/* =============================================
+                STEP 5
+            ============================================== */}
+
+            <section
+              id="step-5"
+              className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 scroll-mt-6"
+            >
+
+              <SectionHeader
+                number="05"
+                title="KYC Documents"
+                description="Upload clear and readable supporting documents for verification."
               />
-              <p className="text-xs text-gray-500 mt-2 truncate">
-                {fileLabel(chequeDoc)}
-              </p>
-            </div>
-          </div>
-        </div>
 
-        {/* REVIEW & SUBMIT */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-lg">
-              ✅
-            </div>
-            <h2 className="text-2xl font-bold">Review &amp; Submit</h2>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
-          <div className="bg-gray-50 p-6 rounded-2xl mb-6">
-            <label className="flex items-start gap-3 text-lg font-medium">
-              <input
-                type="checkbox"
-                name="agreed"
-                checked={formData.agreed}
-                onChange={handleChange}
-                className="w-5 h-5 mt-1"
+                <FileUploadCard
+                  title="GST Certificate"
+                  optional
+                  file={gstDoc}
+                  onChange={(file) =>
+                    setGstDoc(file)
+                  }
+                />
+
+                <FileUploadCard
+                  title="Aadhaar Card"
+                  required
+                  file={aadhaarDoc}
+                  onChange={(file) =>
+                    setAadhaarDoc(file)
+                  }
+                />
+
+                <FileUploadCard
+                  title="Cancelled Cheque"
+                  required
+                  file={chequeDoc}
+                  onChange={(file) =>
+                    setChequeDoc(file)
+                  }
+                />
+
+              </div>
+
+              <InfoBox>
+                Accepted formats: JPG, PNG and PDF.
+                Upload clear documents. Verification may
+                fail if details do not match.
+              </InfoBox>
+
+            </section>
+
+            {/* =============================================
+                STEP 6
+            ============================================== */}
+
+            <section
+              id="step-6"
+              className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8 scroll-mt-6"
+            >
+
+              <SectionHeader
+                number="06"
+                title="Agreement & Submission"
+                description="Review the seller information and accept the YOMICO seller terms before submitting."
               />
-              <span>
-                I agree to the{" "}
-                <a
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+
+                <Link
+                  href="/seller-kit"
+                  target="_blank"
+                  className="group rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-5 hover:-translate-y-1 hover:shadow-md transition"
+                >
+
+                  <div className="flex items-start justify-between">
+
+                    <div>
+                      <div className="text-2xl mb-2">
+                        📘
+                      </div>
+
+                      <h3 className="font-black text-blue-900">
+                        YOMICO Seller Kit
+                      </h3>
+
+                      <p className="text-sm text-blue-700 mt-1">
+                        Read the seller onboarding guide
+                        before submitting.
+                      </p>
+                    </div>
+
+                    <span className="text-blue-600">
+                      ↗
+                    </span>
+
+                  </div>
+
+                </Link>
+
+                <Link
                   href="/seller-agreement"
                   target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+                  className="group rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 hover:-translate-y-1 hover:shadow-md transition"
                 >
-                  Seller Agreement
-                </a>
-                ,{" "}
-                <a
-                  href="/terms"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
+
+                  <div className="flex items-start justify-between">
+
+                    <div>
+                      <div className="text-2xl mb-2">
+                        📄
+                      </div>
+
+                      <h3 className="font-black text-emerald-900">
+                        Seller Agreement
+                      </h3>
+
+                      <p className="text-sm text-emerald-700 mt-1">
+                        Review the current seller agreement.
+                      </p>
+                    </div>
+
+                    <span className="text-emerald-600">
+                      ↗
+                    </span>
+
+                  </div>
+
+                </Link>
+
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 border border-slate-200 p-5">
+
+                <label className="flex items-start gap-3 cursor-pointer">
+
+                  <input
+                    type="checkbox"
+                    name="agreed"
+                    checked={formData.agreed}
+                    onChange={handleChange}
+                    className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+
+                  <span className="text-sm text-slate-700 leading-6">
+                    I confirm that the information provided
+                    by me is accurate and I agree to the
+                    applicable YOMICO Seller Agreement,
+                    Terms & Conditions and seller policies.
+                  </span>
+
+                </label>
+
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+
+                <div className="flex gap-3">
+
+                  <span className="text-xl">
+                    ⚡
+                  </span>
+
+                  <div>
+
+                    <p className="font-bold text-amber-900">
+                      What happens after submission?
+                    </p>
+
+                    <p className="text-sm text-amber-800 mt-1 leading-6">
+                      Your seller account and submitted
+                      KYC information will enter the YOMICO
+                      verification process. Your account
+                      remains pending until the required
+                      approval is completed.
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              <button
+                type="button"
+                onClick={registerVendor}
+                disabled={loading}
+                className={`mt-7 w-full rounded-2xl py-4 text-lg font-black text-white shadow-lg transition ${
+                  loading
+                    ? "bg-slate-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:-translate-y-0.5 hover:shadow-xl"
+                }`}
+              >
+                {loading
+                  ? "Submitting Seller Application..."
+                  : "Submit Seller Application →"}
+              </button>
+
+              <p className="text-center text-sm text-slate-500 mt-5">
+
+                Already a YOMICO seller?{" "}
+
+                <Link
+                  href="/vendor-login"
+                  className="font-bold text-blue-600 hover:underline"
                 >
-                  Terms of Use
-                </a>
-                {" "}and{" "}
-                <a
-                  href="/privacy-policy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  Privacy Policy
-                </a>
-              </span>
-            </label>
+                  Login to Seller Portal
+                </Link>
+
+              </p>
+
+            </section>
+
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 mb-6">
-            <p className="text-green-700 text-sm">
-              Your application will be reviewed by the YOMICO team before approval.
-            </p>
+        </div>
+
+      </section>
+
+      {/* =====================================================
+          FOOTER
+      ====================================================== */}
+
+      <footer className="border-t border-slate-200 bg-white">
+
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8">
+
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+
+            <div>
+
+              <p className="font-black text-slate-900">
+                YOMICO Seller Portal
+              </p>
+
+              <p className="text-sm text-slate-500 mt-1">
+                Build your business. Sell with confidence.
+              </p>
+
+            </div>
+
+            <div className="flex gap-5 text-sm">
+
+              <Link
+                href="/seller-kit"
+                target="_blank"
+                className="text-blue-600 font-semibold hover:underline"
+              >
+                Seller Kit
+              </Link>
+
+              <Link
+                href="/seller-agreement"
+                className="text-slate-600 hover:text-blue-600"
+              >
+                Seller Agreement
+              </Link>
+
+              <Link
+                href="/vendor-login"
+                className="text-slate-600 hover:text-blue-600"
+              >
+                Seller Login
+              </Link>
+
+            </div>
+
           </div>
 
-          <button
-            onClick={registerVendor}
-            disabled={loading}
-            className={`w-full text-white py-5 rounded-2xl text-xl font-bold ${
-              loading
-                ? "bg-gray-400"
-                : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500"
-            }`}
-          >
-            {loading ? "Submitting..." : "Register As Vendor"}
-          </button>
+        </div>
 
-          <p className="text-center mt-6 text-gray-600">
-            Already a seller?{" "}
-            <a
-              href="/vendor-login"
-              className="text-blue-600 font-semibold hover:underline"
-            >
-              Login here
-            </a>
+      </footer>
+
+    </main>
+  );
+}
+
+/* ============================================================
+   REUSABLE COMPONENTS
+============================================================ */
+
+function SectionHeader({
+  number,
+  title,
+  description,
+}: {
+  number: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mb-7">
+
+      <div className="flex items-start gap-4">
+
+        <div className="w-11 h-11 shrink-0 rounded-2xl bg-gradient-to-br from-blue-600 to-teal-500 text-white flex items-center justify-center font-black shadow-md">
+          {number}
+        </div>
+
+        <div>
+
+          <h2 className="text-2xl md:text-3xl font-black text-slate-900">
+            {title}
+          </h2>
+
+          <p className="text-sm md:text-base text-slate-500 mt-1 max-w-2xl">
+            {description}
           </p>
+
         </div>
 
       </div>
+
+      <div className="mt-6 h-px bg-slate-100" />
+
+    </div>
+  );
+}
+
+function InputField({
+  label,
+  required,
+  name,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  inputMode,
+  maxLength,
+  autoComplete,
+}: {
+  label: string;
+  required?: boolean;
+  name: string;
+  value: string;
+  onChange: (
+    e: ChangeEvent<HTMLInputElement>
+  ) => void;
+  placeholder?: string;
+  type?: string;
+  inputMode?:
+    | "none"
+    | "text"
+    | "tel"
+    | "url"
+    | "email"
+    | "numeric"
+    | "decimal"
+    | "search";
+  maxLength?: number;
+  autoComplete?: string;
+}) {
+  return (
+    <div>
+
+      <label className="block text-sm font-bold text-slate-700 mb-2">
+        {label}{" "}
+        {required && (
+          <span className="text-red-500">
+            *
+          </span>
+        )}
+      </label>
+
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        maxLength={maxLength}
+        autoComplete={autoComplete}
+        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      />
+
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  required,
+  name,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+}: {
+  label: string;
+  required?: boolean;
+  name: string;
+  value: string;
+  onChange: (
+    e: ChangeEvent<HTMLSelectElement>
+  ) => void;
+  options: string[];
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+
+      <label className="block text-sm font-bold text-slate-700 mb-2">
+        {label}{" "}
+        {required && (
+          <span className="text-red-500">
+            *
+          </span>
+        )}
+      </label>
+
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
+      >
+
+        {placeholder && (
+          <option value="">
+            {placeholder}
+          </option>
+        )}
+
+        {options.map((option) => (
+          <option
+            key={option}
+            value={option}
+          >
+            {option}
+          </option>
+        ))}
+
+      </select>
+
+    </div>
+  );
+}
+
+function FileUploadCard({
+  title,
+  required,
+  optional,
+  file,
+  onChange,
+}: {
+  title: string;
+  required?: boolean;
+  optional?: boolean;
+  file: File | null;
+  onChange: (
+    file: File | null
+  ) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 hover:border-blue-200 transition">
+
+      <div className="flex items-start justify-between gap-3 mb-4">
+
+        <div>
+
+          <h3 className="font-bold text-slate-800">
+            {title}
+          </h3>
+
+          {required && (
+            <p className="text-xs text-red-500 mt-1">
+              Required
+            </p>
+          )}
+
+          {optional && (
+            <p className="text-xs text-slate-400 mt-1">
+              Optional
+            </p>
+          )}
+
+        </div>
+
+        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+          📄
+        </div>
+
+      </div>
+
+      <label className="flex items-center justify-center w-full min-h-28 rounded-xl border-2 border-dashed border-slate-300 bg-white cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition">
+
+        <div className="text-center px-4">
+
+          <div className="text-2xl">
+            ⬆
+          </div>
+
+          <p className="text-sm font-bold text-slate-700 mt-1">
+            Choose document
+          </p>
+
+          <p className="text-xs text-slate-400 mt-1">
+            JPG, PNG or PDF
+          </p>
+
+        </div>
+
+        <input
+          type="file"
+          accept="image/*,application/pdf"
+          className="hidden"
+          onChange={(e) =>
+            onChange(
+              e.target.files?.[0] ||
+                null
+            )
+          }
+        />
+
+      </label>
+
+      <div className="mt-3 rounded-lg bg-white border border-slate-200 px-3 py-2">
+
+        <p className="text-xs text-slate-500 truncate">
+          {file
+            ? `✓ ${file.name}`
+            : "No file chosen"}
+        </p>
+
+      </div>
+
+    </div>
+  );
+}
+
+function InfoBox({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 px-5 py-4">
+
+      <div className="flex gap-3">
+
+        <span className="text-blue-600">
+          ℹ
+        </span>
+
+        <p className="text-sm text-blue-800 leading-6">
+          {children}
+        </p>
+
+      </div>
+
     </div>
   );
 }

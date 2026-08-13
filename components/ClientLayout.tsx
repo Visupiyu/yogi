@@ -12,6 +12,9 @@ const HIDE_CHROME_PREFIXES = [
   "/admin",
   "/invoice",
   "/delivery",
+  // Has its own full saffron header + hero built into the page — the
+  // shared MinimalHeader would stack a second, redundant bar above it.
+  "/vendor-register",
 ];
 
 // Vendor/delivery-partner auth pages hide the customer navbar (its Login
@@ -19,7 +22,6 @@ const HIDE_CHROME_PREFIXES = [
 // still get a minimal branded header instead of no header at all.
 const MINIMAL_HEADER_PREFIXES = [
   "/vendor-login",
-  "/vendor-register",
   "/vendor-forgot-password",
   "/sell",
   "/delivery-login",
