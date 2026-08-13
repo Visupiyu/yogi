@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 import {
   PieChart,
   Pie,
@@ -62,15 +63,45 @@ export default function SellerAnalyticsPage() {
       });
       setProducts(productList);
 
-      // ORDERS (only those containing this vendor's items)
-      const orderSnap = await getDocs(collection(db, "orders"));
+      // ORDERS — was an unscoped, whole-collection read. firestore.rules
+      // only allows a non-admin to read an order if they're the owner or
+      // named in vendorIds, so an unfiltered scan was rejected outright
+      // (permission-denied) for every seller, silently swallowed by the
+      // catch below — this page showed confident-looking zeros for
+      // everyone, always.
+      const orderSnap = await getDocs(
+        query(
+          collection(db, "orders"),
+          where("vendorIds", "array-contains", vendorUid)
+        )
+      );
       const orderList: any[] = [];
       orderSnap.forEach((doc) => {
         const data: any = doc.data();
+
+        // Cancelled orders were counted into Revenue/Commission/Net
+        // Earnings here (Wallet and Admin Analytics both exclude them).
+        if (data.status === "Cancelled") return;
+
         const myItems =
           data.items?.filter((item: any) => item.vendorId === vendorUid) ||
           [];
-        if (myItems.length) orderList.push({ ...data, myItems });
+        if (myItems.length === 0) return;
+
+        // order.commission/sellerEarning are whole-order, whole-cart
+        // figures — crediting them straight to one vendor in a
+        // multi-vendor order overstates their share, and a flat 10% of
+        // raw price*qty (the previous approach here) ignores this
+        // vendor's proportional cut of any coupon/reward discount.
+        // computeVendorShare is the same helper Wallet already uses.
+        const share = computeVendorShare(data, vendorUid) || {
+          vendorRawSubtotal: 0,
+          vendorNetSubtotal: 0,
+          vendorCommission: 0,
+          vendorEarning: 0,
+        };
+
+        orderList.push({ ...data, myItems, share });
       });
       setOrders(orderList);
 
@@ -91,12 +122,7 @@ export default function SellerAnalyticsPage() {
   };
 
   const revenue = orders.reduce(
-    (sum, order) =>
-      sum +
-      order.myItems.reduce(
-        (s: any, item: any) => s + item.price * item.qty,
-        0
-      ),
+    (sum, order) => sum + order.share.vendorRawSubtotal,
     0
   );
 
@@ -143,20 +169,14 @@ export default function SellerAnalyticsPage() {
     (product: any) => Number(product.stock || 0) <= 5
   ).length;
 
-  const totalCommission = Math.round(revenue * 0.1);
-  const netEarnings = revenue - totalCommission;
-
-  const deliveredOrders = orders.filter(
-    (order: any) => order.status === "Delivered"
-  ).length;
-
-  const returnedOrders = orders.filter(
-    (order: any) => order.status === "Refunded"
-  ).length;
-
-  const returnRate = deliveredOrders
-    ? ((returnedOrders * 100) / deliveredOrders).toFixed(1)
-    : "0";
+  const totalCommission = orders.reduce(
+    (sum, order) => sum + order.share.vendorCommission,
+    0
+  );
+  const netEarnings = orders.reduce(
+    (sum, order) => sum + order.share.vendorEarning,
+    0
+  );
 
   const orderStatusData = [
     { name: "Pending", value: orders.filter((o: any) => o.status === "Pending").length },
@@ -178,18 +198,20 @@ export default function SellerAnalyticsPage() {
   ];
 
   const monthlyRevenueTotals = new Array(12).fill(0);
+  const currentYear = new Date().getFullYear();
 
   orders.forEach((order: any) => {
     const seconds = order.createdAt?.seconds;
     if (!seconds) return;
 
-    const monthIndex = new Date(seconds * 1000).getMonth();
-    const orderRevenue = order.myItems.reduce(
-      (s: any, item: any) => s + item.price * item.qty,
-      0
-    );
+    const orderDate = new Date(seconds * 1000);
+    // Bucketing by month alone (no year) silently merged e.g. Jan 2025
+    // and Jan 2026 revenue into the same bar once the store has more
+    // than a year of history. Scoping to the current year keeps this a
+    // real "this year's monthly trend" chart instead.
+    if (orderDate.getFullYear() !== currentYear) return;
 
-    monthlyRevenueTotals[monthIndex] += orderRevenue;
+    monthlyRevenueTotals[orderDate.getMonth()] += order.share.vendorRawSubtotal;
   });
 
   const monthlyRevenue = MONTH_LABELS.map((month, index) => ({
@@ -304,10 +326,6 @@ export default function SellerAnalyticsPage() {
               <div className="flex justify-between border-b pb-3">
                 <span>⭐ Rating</span>
                 <strong>{averageRating}</strong>
-              </div>
-              <div className="flex justify-between border-b pb-3">
-                <span>📉 Return Rate</span>
-                <strong>{returnRate}%</strong>
               </div>
               <div className="flex justify-between border-b pb-3">
                 <span>📦 Low Stock</span>

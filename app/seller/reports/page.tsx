@@ -257,8 +257,11 @@ data.sort(
     );
 
   };
+// Cancelled orders stay visible in the report table (so a seller can
+// still see what was cancelled), but shouldn't count toward revenue —
+// matches the exclusion Wallet and Admin Analytics both already apply.
 const totalRevenue = orders.reduce(
-  (sum, order) => sum + order.amount,
+  (sum, order) => sum + (order.status === "Cancelled" ? 0 : order.amount),
   0
 );
   if(loading){

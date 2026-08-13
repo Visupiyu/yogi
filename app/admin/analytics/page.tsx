@@ -74,11 +74,20 @@ export default function AdminAnalyticsPage() {
     value,
   }));
 
-  // Revenue by category (from order items)
+  // Revenue by category (from order items) — order line items are just
+  // persisted cart items and never carry a `category` field (checked
+  // lib/cart.ts and checkout's write site), so `item.category` was always
+  // undefined and every order fell into "Other." Resolve the real
+  // category from the products already loaded above instead.
+  const categoryById: Record<string, string> = {};
+  products.forEach((p) => {
+    categoryById[p.id] = p.category || "Other";
+  });
+
   const categoryRevenue: Record<string, number> = {};
   validOrders.forEach((o) => {
     (o.items || []).forEach((item: any) => {
-      const cat = item.category || "Other";
+      const cat = categoryById[item.id] || "Other";
       categoryRevenue[cat] =
         (categoryRevenue[cat] || 0) + (item.price || 0) * (item.qty || 0);
     });
@@ -88,8 +97,11 @@ export default function AdminAnalyticsPage() {
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
-  // Top products by units sold
+  // Top products by units sold — was including deactivated/unapproved
+  // products (no `active` filter), so a blocked listing with high
+  // historical sales could still surface here.
   const topProducts = [...products]
+    .filter((p: any) => p.active !== false)
     .sort((a, b) => (b.sales || 0) - (a.sales || 0))
     .slice(0, 5);
 
