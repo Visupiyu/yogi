@@ -3,10 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import Link from "next/link";
+import Image from "next/image";
+
+type ProductCard = {
+  id: string;
+  title: string;
+  image: string;
+  price: number;
+};
 
 type ChatMessage = {
   role: "user" | "model";
   text: string;
+  products?: ProductCard[];
 };
 
 type AIChatWidgetProps = {
@@ -66,7 +76,7 @@ export default function AIChatWidget({
         },
         body: JSON.stringify({
           message: trimmed,
-          history: messages,
+          history: messages.map((m) => ({ role: m.role, text: m.text })),
         }),
       });
 
@@ -76,7 +86,14 @@ export default function AIChatWidget({
         throw new Error(data?.error || "Failed to get a response.");
       }
 
-      setMessages([...nextMessages, { role: "model", text: data.reply || "" }]);
+      setMessages([
+        ...nextMessages,
+        {
+          role: "model",
+          text: data.reply || "",
+          products: Array.isArray(data.products) ? data.products : undefined,
+        },
+      ]);
     } catch (err) {
       console.error(err);
       const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
@@ -104,7 +121,7 @@ export default function AIChatWidget({
         )}
 
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+          <div key={i} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div
               className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm whitespace-pre-line ${
                 m.role === "user"
@@ -114,6 +131,38 @@ export default function AIChatWidget({
             >
               {m.text}
             </div>
+
+            {m.products && m.products.length > 0 && (
+              <div className="mt-2 max-w-[95%] w-full overflow-x-auto">
+                <div className="flex gap-3 pb-1">
+                  {m.products.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/product/${p.id}`}
+                      className="shrink-0 w-36 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden"
+                    >
+                      <div className="relative w-full h-24 bg-gray-50">
+                        <Image
+                          src={p.image || "/no-image.png"}
+                          alt={p.title}
+                          fill
+                          className="object-contain p-2"
+                          sizes="144px"
+                        />
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs font-medium text-gray-800 line-clamp-2 min-h-[2rem]">
+                          {p.title}
+                        </p>
+                        <p className="text-sm font-bold text-indigo-700 mt-1">
+                          ₹{p.price.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ))}
 

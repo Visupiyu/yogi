@@ -126,6 +126,22 @@ export type ToolChatRequest = {
   executeTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
 };
 
+// A record of every tool call that succeeded during the loop — kept
+// generic (no product/order-specific shape) since this module is
+// shared by all three AI roles. Callers (the chat API routes) know
+// their own tools' output shapes and can pick out whatever's useful
+// to surface structurally to the UI (e.g. product cards).
+export type ToolCallRecord = {
+  name: string;
+  args: Record<string, unknown>;
+  output: unknown;
+};
+
+export type ToolChatResult = {
+  text: string;
+  toolCalls: ToolCallRecord[];
+};
+
 const MAX_TOOL_ROUNDS = 5;
 
 export async function chatWithTools({
@@ -134,7 +150,7 @@ export async function chatWithTools({
   message,
   tools,
   executeTool,
-}: ToolChatRequest): Promise<string> {
+}: ToolChatRequest): Promise<ToolChatResult> {
   const contents: Content[] = [
     ...history.map((turn) => ({
       role: turn.role,
@@ -147,6 +163,8 @@ export async function chatWithTools({
     systemInstruction: systemPrompt,
     tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
   };
+
+  const toolCalls: ToolCallRecord[] = [];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const response = await getClient().models.generateContent({
@@ -162,7 +180,7 @@ export async function chatWithTools({
       if (!text) {
         throw new Error("AI returned an empty response.");
       }
-      return text;
+      return { text, toolCalls };
     }
 
     // Use the raw parts from the response rather than rebuilding them
@@ -184,8 +202,10 @@ export async function chatWithTools({
       const name = call.name ?? "";
       let response: Record<string, unknown>;
       try {
-        const output = await executeTool(name, call.args ?? {});
+        const args = call.args ?? {};
+        const output = await executeTool(name, args);
         console.log(`AI Engine: tool ${name} round ${round + 1} ->`, JSON.stringify(output).slice(0, 500));
+        toolCalls.push({ name, args, output });
         response = { output };
       } catch (error) {
         const message = error instanceof Error ? error.message : "Tool execution failed.";

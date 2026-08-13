@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       isAdmin: user.isAdmin,
     });
 
-    const reply = await chatWithTools({
+    const result = await chatWithTools({
       systemPrompt: SYSTEM_PROMPT,
       history,
       message,
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       executeTool,
     });
 
-    return NextResponse.json({ reply });
+    return NextResponse.json({ reply: result.text });
   } catch (error) {
     console.error("Seller AI chat error:", error);
     const message = error instanceof Error ? error.message : "Failed to get a response.";

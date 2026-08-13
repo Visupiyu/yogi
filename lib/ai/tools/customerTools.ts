@@ -6,6 +6,11 @@ function summarizeProduct(id: string, data: DocumentData) {
   return {
     id,
     title: data.title || data.name || "",
+    image:
+      data.thumbnail ||
+      data.image ||
+      (Array.isArray(data.images) ? data.images[0] : "") ||
+      "",
     price:
       typeof data.sellingPrice === "number"
         ? data.sellingPrice
@@ -99,6 +104,11 @@ const getProduct: ToolDefinition = {
     return {
       id: snap.id,
       title: data.title || data.name || "",
+      image:
+        data.thumbnail ||
+        data.image ||
+        (Array.isArray(data.images) ? data.images[0] : "") ||
+        "",
       description: data.description || "",
       price: typeof data.sellingPrice === "number" ? data.sellingPrice : Number(data.price || 0),
       mrp: data.mrp,
