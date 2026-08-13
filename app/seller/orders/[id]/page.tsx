@@ -9,6 +9,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import ShippingLabel from "@/components/ShippingLabel";
 import Invoice from "@/components/invoice/Invoice";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 
 import { useRef } from "react";
 
@@ -305,12 +306,24 @@ finally{ setSaving(false);} };
   const vendorOrderItems = (order.items || []).filter(
     (item: any) => item.vendorId === vendorUid
   );
-  const vendorOrderSubtotal = vendorOrderItems.reduce(
-    (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-    0
-  );
-  const vendorOrderCommission = Math.round(vendorOrderSubtotal * 0.1);
-  const vendorOrderEarning = vendorOrderSubtotal - vendorOrderCommission;
+  const vendorShare = computeVendorShare(order, vendorUid);
+  const vendorOrderSubtotal = vendorShare?.vendorRawSubtotal || 0;
+  const vendorOrderCommission = vendorShare?.vendorCommission || 0;
+  const vendorOrderEarning = vendorShare?.vendorEarning || 0;
+
+  // The hidden invoice embed below must only show this seller's own
+  // items/total, same as app/seller/invoice/[id]/page.tsx already does —
+  // the full `order` object holds every vendor's items and one combined
+  // whole-order total.
+  const sellerInvoiceOrder = {
+    ...order,
+    items: vendorOrderItems,
+    finalTotal: vendorOrderSubtotal,
+    commission: vendorOrderCommission,
+    sellerEarning: vendorOrderEarning,
+    shippingCharge: 0,
+    discount: 0,
+  };
 
   return(
 
@@ -1475,7 +1488,7 @@ finally{ setSaving(false);} };
 
   <div ref={invoiceRef}>
     <Invoice
-  order={order}
+  order={sellerInvoiceOrder}
   type="seller"
 />
   </div>

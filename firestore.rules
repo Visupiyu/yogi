@@ -89,9 +89,16 @@ rules_version = '2';
 //   so answering is restricted to admin until the app is fixed to denormalize
 //   vendorId at write time.
 //
-// Collection: adminUsers, vendor_payouts   Doc ID: auto-id
+// Collection: adminUsers   Doc ID: auto-id
 //   Admin-only in every direction. No legitimate client write/read path
-//   exists for these outside the admin console today.
+//   exists for this outside the admin console today.
+//
+// Collection: vendor_payouts   Doc ID: auto-id
+//   {vendorId(=uid), vendorName, amount, status:"Paid", createdAt}. Admin
+//   records a direct settlement here (app/admin/payouts) separately from
+//   a seller's own withdrawal request (withdrawals collection below) —
+//   both ledgers count toward "already paid" wherever earnings are
+//   computed. Write: admin only. Read: admin, or the vendor themselves.
 //
 // Collection: deliveryPartners      Doc ID: auto-id
 //   name, phone, email, uid(string, set once admin provisions a login via
@@ -661,7 +668,11 @@ service cloud.firestore {
     }
 
     match /vendor_payouts/{docId} {
-      allow read, write: if isAdmin();
+      // A vendor needs to see admin-settled payouts against their own
+      // account so their wallet balance reflects money already paid this
+      // way, not just money paid via their own withdrawal requests.
+      allow read: if isAdmin() || isOwnerUid(resource.data.vendorId);
+      allow write: if isAdmin();
     }
 
     match /deliveryPartners/{docId} {

@@ -5,6 +5,7 @@ import {collection,   getDocs,   addDoc,   query,   where,   serverTimestamp,} f
 
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 
 export default function SellerWalletPage() {
 
@@ -80,20 +81,9 @@ async(vendorUid: string, vendorEmailArg: string)=>{
 
       if (order.status === "Cancelled") return;
 
-      const vendorItems = order.items?.filter(
-        (item:any) => item.vendorId === vendorUid
-      ) || [];
-
-      if (vendorItems.length > 0) {
-        // order.sellerEarning is a whole-order figure — in a multi-vendor
-        // order it would credit this vendor the full order's earnings.
-        // Derive their own share from just their line items instead.
-        const vendorSubtotal = vendorItems.reduce(
-          (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-          0
-        );
-        const vendorCommission = Math.round(vendorSubtotal * 0.1);
-        totalEarnings += vendorSubtotal - vendorCommission;
+      const share = computeVendorShare(order, vendorUid);
+      if (share) {
+        totalEarnings += share.vendorEarning;
       }
 
     });
@@ -163,7 +153,7 @@ items.sort(
 
     );
 
-const withdrawn =
+const withdrawnViaRequests =
 
   items
 
@@ -186,6 +176,25 @@ const withdrawn =
       0
 
     );
+
+// Admin can also settle a seller directly (app/admin/payouts) without
+// going through a withdrawal request at all — that ledger is a
+// separate collection this page didn't used to check, so money paid
+// that way still showed as "available" here and could be requested
+// again.
+const payoutsSnapshot = await getDocs(
+  query(
+    collection(db, "vendor_payouts"),
+    where("vendorId", "==", vendorUid)
+  )
+);
+
+let withdrawnViaAdminPayouts = 0;
+payoutsSnapshot.forEach((docSnap) => {
+  withdrawnViaAdminPayouts += Number(docSnap.data().amount || 0);
+});
+
+const withdrawn = withdrawnViaRequests + withdrawnViaAdminPayouts;
 
 setPendingAmount(
   pending
@@ -260,6 +269,9 @@ async()=>{
 
       {
 
+        vendorId:
+          auth.currentUser?.uid || "",
+
         vendorEmail:
           vendorEmail,
 
@@ -279,6 +291,10 @@ async()=>{
 
     );
 
+    // notifications requires `role` (and userId for non-admin roles) or
+    // the write is rejected by Firestore rules — this was missing both,
+    // so it threw here and silently skipped everything below it (the
+    // success alert, clearing the form, and reloading the wallet).
     await addDoc(
 
   collection(
@@ -294,6 +310,9 @@ async()=>{
     message:
       `${businessName}
        requested ₹${amount}`,
+
+    role:
+      "admin",
 
     type:
       "withdrawal",

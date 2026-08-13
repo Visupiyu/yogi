@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useVendor } from "@/hooks/useVendor";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 
 import SellerDashboard from "@/components/seller/SellerDashboard";
 import OnboardingChecklist from "./components/OnboardingChecklist";
@@ -79,20 +80,13 @@ export default function SellerPage() {
           ordersCount++;
           if (order.status === "Pending") pendingCount++;
 
-          // order.commission/sellerEarning are computed once for the WHOLE
-          // cart at checkout, not per vendor — in a multi-vendor order,
-          // reading them here would credit each vendor the full order's
-          // commission/earnings. Derive this vendor's own share from just
-          // their line items instead, at the same 10% rate checkout uses.
-          const vendorSubtotal = sellerItems.reduce(
-            (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-            0
-          );
-          const vendorCommission = Math.round(vendorSubtotal * 0.1);
+          const share = computeVendorShare(order, vendorId);
 
-          totalEarnings += vendorSubtotal;
-          totalCommission += vendorCommission;
-          totalNetEarnings += vendorSubtotal - vendorCommission;
+          if (share) {
+            totalEarnings += share.vendorRawSubtotal;
+            totalCommission += share.vendorCommission;
+            totalNetEarnings += share.vendorEarning;
+          }
         }
       });
 

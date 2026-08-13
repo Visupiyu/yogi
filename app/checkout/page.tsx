@@ -418,6 +418,10 @@ setAddress(userData.address || "");
       sellerEarning: orderSellerEarning,
       couponCode: couponApplied ? coupon : "",
       discount,
+      // Persisted so per-vendor earnings (wallet/payouts pages) can
+      // proportionally deduct redeemed reward points too, not just the
+      // coupon discount — this order's total was reduced by both.
+      rewardValue: redeemPoints ? rewardValue : 0,
       createdAt: Timestamp.now(),
     };
   };

@@ -12,6 +12,7 @@ import {
 
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 
 export default function SellerPayoutsPage() {
 
@@ -73,37 +74,18 @@ export default function SellerPayoutsPage() {
 
           if (order.status === "Cancelled") return;
 
-          const vendorItems =
-            order.items?.filter(
-              (item:any)=>
+          const share = computeVendorShare(order, vendorUid);
 
-                // order items store the seller's auth uid, not the
-                // vendors-collection document id
-                item.vendorId ===
-                vendorUid
-
-            ) || [];
-
-          if(vendorItems.length){
-
-            // order.finalTotal/commission/sellerEarning are whole-order
-            // figures computed once at checkout — in a multi-vendor order
-            // reading them here would credit this vendor the full order,
-            // not just their share. Derive from their own line items.
-            const vendorSubtotal = vendorItems.reduce(
-              (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-              0
-            );
-            const vendorCommission = Math.round(vendorSubtotal * 0.1);
+          if (share) {
 
             totalSales +=
-              vendorSubtotal;
+              share.vendorRawSubtotal;
 
             totalCommission +=
-              vendorCommission;
+              share.vendorCommission;
 
             totalNet +=
-              vendorSubtotal - vendorCommission;
+              share.vendorEarning;
 
           }
 
@@ -121,9 +103,6 @@ export default function SellerPayoutsPage() {
           totalNet
         );
 
-        // "Paid Payout" reflects withdrawal requests this seller can
-        // actually see the status of (the vendor_payouts admin ledger
-        // is admin-only and not readable here).
         const withdrawalsSnapshot =
           await getDocs(
             query(
@@ -142,6 +121,21 @@ export default function SellerPayoutsPage() {
             totalPaid += Number(withdrawal.amount || 0);
           }
 
+        });
+
+        // Admin can also settle a seller directly from app/admin/payouts,
+        // bypassing the withdrawal-request flow entirely — that ledger
+        // used to be invisible here, undercounting what's actually paid.
+        const payoutsSnapshot =
+          await getDocs(
+            query(
+              collection(db, "vendor_payouts"),
+              where("vendorId", "==", vendorUid)
+            )
+          );
+
+        payoutsSnapshot.forEach((doc) => {
+          totalPaid += Number(doc.data().amount || 0);
         });
 
         setPaidPayout(totalPaid);

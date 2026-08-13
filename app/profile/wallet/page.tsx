@@ -45,11 +45,16 @@ export default function WalletPage(){
 
       );
 
+      // walletTransactions doesn't exist anywhere in this app — nothing
+      // ever writes to it and there's no Firestore rule for it, so this
+      // page was permanently empty. Reward/referral/refund history is
+      // actually written to rewardTransactions (same collection the
+      // sibling analytics/rewards pages already read from).
       const q = query(
 
         collection(
           db,
-          "walletTransactions"
+          "rewardTransactions"
         ),
 
         where(
@@ -110,6 +115,8 @@ export default function WalletPage(){
 
         );
 
+  // rewardTransactions has no signed `amount` — a single `points` field,
+  // with "Redeemed" being the only type that reduces the balance.
   const totalEarned =
 
     transactions
@@ -118,7 +125,7 @@ export default function WalletPage(){
 
       (t:any)=>
 
-        t.amount>0
+        t.type!=="Redeemed"
 
     )
 
@@ -126,7 +133,7 @@ export default function WalletPage(){
 
       (sum:number,t:any)=>
 
-        sum+t.amount,
+        sum+Number(t.points||0),
 
       0
 
@@ -140,7 +147,7 @@ export default function WalletPage(){
 
       (t:any)=>
 
-        t.amount<0
+        t.type==="Redeemed"
 
     )
 
@@ -148,7 +155,7 @@ export default function WalletPage(){
 
       (sum:number,t:any)=>
 
-        sum+Math.abs(t.amount),
+        sum+Number(t.points||0),
 
       0
 
@@ -292,10 +299,10 @@ export default function WalletPage(){
 
           {[
             "All",
-            "Reward",
-            "Referral",
-            "Refund",
-            "Purchase"
+            "Earned",
+            "Redeemed",
+            "Referral Bonus",
+            "Refund"
           ].map(type=>(
 
             <button
@@ -363,13 +370,7 @@ export default function WalletPage(){
                 <th className="
                   text-left
                 ">
-                  Description
-                </th>
-
-                <th className="
-                  text-left
-                ">
-                  Amount
+                  Points
                 </th>
 
                 <th className="
@@ -404,31 +405,19 @@ export default function WalletPage(){
 
                   </td>
 
-                  <td>
-
-                    {item.description}
-
-                  </td>
-
                   <td className={
 
-                    item.amount>=0
+                    item.type==="Redeemed"
 
-                    ? "text-green-600 font-bold"
+                    ? "text-red-600 font-bold"
 
-                    : "text-red-600 font-bold"
+                    : "text-green-600 font-bold"
 
                   }>
 
-                    {item.amount>=0?"+":"-"}
+                    {item.type==="Redeemed"?"-":"+"}
 
-                    ₹
-
-                    {Math.abs(
-
-                      item.amount
-
-                    )}
+                    {Number(item.points||0)}
 
                   </td>
 

@@ -8,6 +8,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 
 export default function AdminPayoutsPage() {
   const [vendors, setVendors] = useState<any[]>([]);
@@ -20,11 +21,13 @@ export default function AdminPayoutsPage() {
 
   const loadPayouts = async () => {
     try {
-      const [vendorSnapshot, orderSnapshot, payoutSnapshot] = await Promise.all([
-        getDocs(collection(db, "vendors")),
-        getDocs(collection(db, "orders")),
-        getDocs(collection(db, "vendor_payouts")),
-      ]);
+      const [vendorSnapshot, orderSnapshot, payoutSnapshot, withdrawalSnapshot] =
+        await Promise.all([
+          getDocs(collection(db, "vendors")),
+          getDocs(collection(db, "orders")),
+          getDocs(collection(db, "vendor_payouts")),
+          getDocs(collection(db, "withdrawals")),
+        ]);
 
       // Sum already-paid amounts per vendor from the payouts ledger.
       // Keyed by the seller's auth uid — the same id order items use —
@@ -36,6 +39,28 @@ export default function AdminPayoutsPage() {
           paidByVendor[p.vendorId] =
             (paidByVendor[p.vendorId] || 0) + (p.amount || 0);
         }
+      });
+
+      // A seller can also get paid via their own withdrawal request
+      // (app/seller/wallet) instead of a direct admin settlement — that
+      // was a separate ledger this page never checked, so an already-paid
+      // withdrawal still showed as "Pending" here and risked being paid
+      // again via "Mark Paid" below. New withdrawal docs carry vendorId
+      // directly; older ones (pre-fix) only have vendorEmail, matched via
+      // the vendor list already being loaded.
+      const uidByEmail: Record<string, string> = {};
+      vendorSnapshot.forEach((docSnap) => {
+        const v: any = docSnap.data();
+        if (v.email && v.uid) uidByEmail[v.email] = v.uid;
+      });
+
+      withdrawalSnapshot.forEach((docSnap) => {
+        const w: any = docSnap.data();
+        if (w.status !== "Paid") return;
+        const vendorUid = w.vendorId || uidByEmail[w.vendorEmail];
+        if (!vendorUid) return;
+        paidByVendor[vendorUid] =
+          (paidByVendor[vendorUid] || 0) + (w.amount || 0);
       });
 
       const vendorData: any[] = [];
@@ -51,25 +76,12 @@ export default function AdminPayoutsPage() {
           const order: any = orderDoc.data();
           if (order.status === "Cancelled") return; // exclude cancelled
 
-          // order items are written with the seller's auth uid as
-          // vendorId, not the vendors-collection document id
-          const vendorItems =
-            order.items?.filter((item: any) => item.vendorId === vendor.uid) ||
-            [];
+          const share = computeVendorShare(order, vendor.uid);
 
-          if (vendorItems.length) {
-            // order.finalTotal/commission/sellerEarning are whole-order
-            // figures — in a multi-vendor order they'd credit this vendor
-            // the full order instead of just their own items.
-            const vendorSubtotal = vendorItems.reduce(
-              (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-              0
-            );
-            const vendorCommission = Math.round(vendorSubtotal * 0.1);
-
-            sales += vendorSubtotal;
-            commission += vendorCommission;
-            earnings += vendorSubtotal - vendorCommission;
+          if (share) {
+            sales += share.vendorRawSubtotal;
+            commission += share.vendorCommission;
+            earnings += share.vendorEarning;
           }
         });
 
