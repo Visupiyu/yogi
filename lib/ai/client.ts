@@ -165,9 +165,18 @@ export async function chatWithTools({
       return text;
     }
 
+    // Use the raw parts from the response rather than rebuilding them
+    // from response.functionCalls (a convenience getter that strips
+    // sibling Part fields) — Gemini 3's thinking models attach a
+    // thoughtSignature alongside each functionCall part and reject the
+    // next turn if it isn't echoed back unchanged.
+    const modelParts =
+      response.candidates?.[0]?.content?.parts ??
+      functionCalls.map((call) => ({ functionCall: call }));
+
     contents.push({
       role: "model",
-      parts: functionCalls.map((call) => ({ functionCall: call })),
+      parts: modelParts,
     });
 
     const responseParts = [];
