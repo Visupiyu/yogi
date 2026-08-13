@@ -55,6 +55,7 @@ export default function CategoryRow({ title, products }: any) {
               price={product.price}
               image={product.image}
               stock={product.stock}
+              vendorId={product.vendorId}
             />
           </div>
         ))}

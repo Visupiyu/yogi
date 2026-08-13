@@ -13,6 +13,7 @@ import {
   where,
   updateDoc,
   addDoc,
+  increment,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
@@ -86,15 +87,28 @@ export default function SignupPage() {
 
           if (!snapshot.empty) {
             const referrer = snapshot.docs[0];
-            const referrerData = referrer.data();
 
+            // Read-then-write on rewardPoints/totalReferrals let two
+            // near-simultaneous signups referring the same code race and
+            // drop one bonus — increment() is atomic on Firestore's side.
             await updateDoc(doc(db, "users", referrer.id), {
-              rewardPoints: Number(referrerData.rewardPoints || 0) + 100,
-              totalReferrals: Number(referrerData.totalReferrals || 0) + 1,
+              rewardPoints: increment(100),
+              totalReferrals: increment(1),
             });
 
             await updateDoc(doc(db, "users", result.user.uid), {
               rewardPoints: 50,
+            });
+
+            // The new user's own welcome bonus never got a ledger entry —
+            // it credited their balance but never showed up in their own
+            // points history on /profile/wallet.
+            await addDoc(collection(db, "rewardTransactions"), {
+              userId: result.user.uid,
+              userEmail: cleanEmail,
+              points: 50,
+              type: "Referral Bonus",
+              createdAt: new Date(),
             });
 
             await addDoc(collection(db, "rewardTransactions"), {

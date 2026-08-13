@@ -12,6 +12,7 @@ type Product = {
   price: number;
   image: string;
   stock: number;
+  vendorId?: string;
 };
 
 export default function FeaturedProducts() {
@@ -42,6 +43,7 @@ image:
   data.image ||
   "",
             stock: Number(data.stock || 0),
+            vendorId: data.vendorId,
           });
         });
 
@@ -100,6 +102,7 @@ image:
                 price={product.price}
                 image={product.image}
                 stock={product.stock}
+                vendorId={product.vendorId}
               />
             ))}
           </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import {
   collection,
@@ -14,30 +15,44 @@ import {
   where,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 
 export default function AddressesPage() {
+    const router = useRouter();
     const [addresses, setAddresses] = useState<any[]>([]);
 const [loading, setLoading] = useState(true);
-useEffect(() => {
-  loadAddresses();
-}, []);
+const [userEmail, setUserEmail] = useState("");
 
-async function loadAddresses() {
+// Was keyed off a stale localStorage snapshot with no login gate at
+// all — a signed-out visitor just silently saw "No Saved Addresses"
+// instead of being sent to log in.
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    setUserEmail(user.email || "");
+    loadAddresses(user.email || "");
+  });
+
+  return () => unsubscribe();
+}, [router]);
+
+async function loadAddresses(email?: string) {
   try {
 
-    const user = JSON.parse(
-      localStorage.getItem("user") || "{}"
-    );
+    const activeEmail = email || userEmail;
 
-    if (!user.email) {
+    if (!activeEmail) {
       setLoading(false);
       return;
     }
 
     const q = query(
       collection(db, "addresses"),
-      where("userEmail", "==", user.email)
+      where("userEmail", "==", activeEmail)
     );
 
     const snapshot = await getDocs(q);
@@ -97,13 +112,9 @@ async function setDefaultAddress(id: string) {
 
   try {
 
-    const user = JSON.parse(
-      localStorage.getItem("user") || "{}"
-    );
-
     const q = query(
       collection(db, "addresses"),
-      where("userEmail", "==", user.email)
+      where("userEmail", "==", userEmail)
     );
 
     const snapshot = await getDocs(q);
@@ -250,12 +261,6 @@ async function setDefaultAddress(id: string) {
   className="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-lg"
 >
   Delete
-</button>
-<button
-  onClick={() => setDefaultAddress(address.id)}
-  className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg"
->
-  Set Default
 </button>
 {!address.isDefault && (
   <button

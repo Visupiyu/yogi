@@ -128,12 +128,15 @@ export default function ProfilePage() {
  const logout = async () => {
   await signOut(auth);
   localStorage.removeItem("user");
-  // Cart is a plain device-wide localStorage key with no account scoping
-  // — on a shared device, the next person to log in would otherwise
-  // inherit (and could check out) whatever this account left in it.
+  // Cart and wishlist are plain device-wide localStorage keys with no
+  // account scoping — on a shared device, the next person to log in
+  // would otherwise inherit (and could check out, or see) whatever this
+  // account left in them.
   localStorage.removeItem("cart");
   localStorage.removeItem("checkoutItems");
+  localStorage.removeItem("wishlist");
   window.dispatchEvent(new Event("cartUpdated"));
+  window.dispatchEvent(new Event("wishlistUpdated"));
   router.push("/login");
 };
 
@@ -166,7 +169,7 @@ export default function ProfilePage() {
     { href: "/orders", icon: "📦", title: "My Orders", desc: "Track and manage your orders" },
     { href: "/wishlist", icon: "❤️", title: "Wishlist", desc: "Your saved favourite products" },
     { href: "/cart", icon: "🛒", title: "Cart", desc: "Review your shopping cart" },
-    { href: "/profile/rewards", icon: "🏆", title: "Rewards", desc: "Points & transaction history" },
+    { href: "/profile/wallet", icon: "🏆", title: "Rewards", desc: "Points & transaction history" },
     { href: "/profile/refunds", icon: "↩️", title: "My Refunds", desc: "Track returns & refund status" },
     { href: "/settings", icon: "⚙️", title: "Settings", desc: "Manage account preferences" },
   ];

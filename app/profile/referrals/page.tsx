@@ -5,29 +5,53 @@ import {
   useState
 } from "react";
 
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+
 export default function ReferralsPage(){
+
+  const router = useRouter();
 
   const [user,setUser] =
     useState<any>(null);
 
   useEffect(()=>{
 
-    const savedUser =
-      localStorage.getItem(
-        "user"
-      );
+    // referralCode/totalReferrals only ever existed in localStorage right
+    // after signup — any normal login only ever wrote {uid, email, name,
+    // photoURL} (app/login/page.tsx), so every returning customer saw a
+    // blank code and 0 referrals here even though the real numbers were
+    // sitting in Firestore the whole time.
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
 
-    if(savedUser){
+      if (!firebaseUser) {
+        router.push("/login");
+        return;
+      }
 
-      setUser(
-        JSON.parse(
-          savedUser
-        )
-      );
+      try {
 
-    }
+        const snap = await getDoc(doc(db, "users", firebaseUser.uid));
 
-  },[]);
+        if (snap.exists()) {
+          setUser({ ...snap.data(), email: firebaseUser.email });
+        } else {
+          setUser({ email: firebaseUser.email });
+        }
+
+      } catch (error) {
+
+        console.error(error);
+
+      }
+
+    });
+
+    return () => unsubscribe();
+
+  },[router]);
 
   const copyCode = ()=>{
 

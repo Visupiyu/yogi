@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { getAuth, sendPasswordResetEmail } from "firebase/auth";
+import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 export default function ForgotPasswordPage() {
@@ -29,14 +29,21 @@ export default function ForgotPasswordPage() {
       await sendPasswordResetEmail(auth, email);
 
       setMessage(
-        "Password reset email sent successfully. Please check your inbox."
+        "If an account exists for this email, a password reset link has been sent."
       );
 
       setEmail("");
     } catch (err: any) {
       switch (err.code) {
+        // Deliberately not distinguishing "no account found" from success
+        // here — confirming which emails are/aren't registered is an
+        // enumeration risk best avoided regardless of the Firebase
+        // project's own email-enumeration-protection setting.
         case "auth/user-not-found":
-          setError("No account found with this email.");
+          setMessage(
+            "If an account exists for this email, a password reset link has been sent."
+          );
+          setEmail("");
           break;
 
         case "auth/invalid-email":

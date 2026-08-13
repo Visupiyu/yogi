@@ -6,9 +6,9 @@ import { Heart, Star } from "lucide-react";
 
 import { motion } from "framer-motion";
 
-type Props = { id:string; name:string; price:number; image:string; stock:number; };
+type Props = { id:string; name:string; price:number; image:string; stock:number; vendorId?:string; };
 
-export default function ProductCard({ id, name, price, image, stock 
+export default function ProductCard({ id, name, price, image, stock, vendorId
 }:Props){
   const addToWishlist = ()=>{
 
@@ -30,7 +30,12 @@ export default function ProductCard({ id, name, price, image, stock
 
     }
 
-    wishlist.push({id, name, price, image, stock });
+    // vendorId is required to move this item into the cart later
+    // (app/wishlist/page.tsx's moveToCart reads it) — without it, an
+    // order created from a wishlisted-then-moved item would carry an
+    // undefined vendorId, corrupting the whole multi-vendor commission
+    // attribution downstream.
+    wishlist.push({id, name, price, image, stock, vendorId });
 
     localStorage.setItem(
 

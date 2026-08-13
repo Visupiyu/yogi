@@ -459,6 +459,7 @@ Secure Shopping
             price={product.price}
             image={product.image}
             stock={product.stock}
+            vendorId={product.vendorId}
           />
 
       ))}
@@ -511,6 +512,7 @@ Secure Shopping
             price={product.price}
             image={product.image}
             stock={product.stock}
+            vendorId={product.vendorId}
           />
      ))}
     </div>

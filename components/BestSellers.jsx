@@ -87,6 +87,7 @@ queryFn: fetchNewArrivals,
       ""
     }
     stock={product.stock ?? 0}
+    vendorId={product.vendorId}
   />
 ))}
     

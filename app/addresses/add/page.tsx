@@ -9,7 +9,7 @@ import {
   collection,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 
 export default function AddAddressPage() {
     const [form, setForm] = useState({
@@ -40,14 +40,19 @@ export default function AddAddressPage() {
 
   try {
 
-    const user = JSON.parse(
-      localStorage.getItem("user") || "{}"
-    );
+    // A stale/missing localStorage email here doesn't match
+    // request.auth.token.email, so firestore.rules rejects the write —
+    // read the live signed-in identity instead.
+    if (!auth.currentUser) {
+      alert("Please login first.");
+      router.push("/login");
+      return;
+    }
 
     await addDoc(
       collection(db, "addresses"),
       {
-        userEmail: user.email,
+        userEmail: auth.currentUser.email,
 
         fullName: form.fullName,
         phone: form.phone,

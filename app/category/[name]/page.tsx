@@ -17,6 +17,7 @@ type Product = {
   brand?: string;
   rating?: number;
   createdAt?: any;
+  vendorId?: string;
 };
 
 export default function CategoryPage() {
@@ -62,6 +63,7 @@ export default function CategoryPage() {
               brand: legacy.brand || "Other",
               rating: Number((docSnap.data() as any).rating || 0),
               createdAt: (docSnap.data() as any).createdAt,
+              vendorId: legacy.vendorId,
             });
           });
         }
@@ -245,6 +247,7 @@ export default function CategoryPage() {
                 price={product.price}
                 image={product.image}
                 stock={product.stock}
+                vendorId={product.vendorId}
               />
             ))}
           </div>

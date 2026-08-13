@@ -6,6 +6,8 @@ import {
 } from "react";
 
 import Link from "next/link";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function WishlistPage() {
 
@@ -24,6 +26,34 @@ export default function WishlistPage() {
       );
 
     setWishlist(storedWishlist);
+
+    // price/stock are snapshots from whenever each item was added —
+    // sometimes long ago, since nothing else ever refreshes them.
+    // Refresh here so a price change or restock actually shows up.
+    const refreshLiveData = async () => {
+      if (storedWishlist.length === 0) return;
+
+      try {
+        const updated = await Promise.all(
+          storedWishlist.map(async (item: any) => {
+            const snap = await getDoc(doc(db, "products", item.id));
+            return snap.exists()
+              ? {
+                  ...item,
+                  price: Number(snap.data().sellingPrice ?? snap.data().price ?? item.price),
+                  stock: Number(snap.data().stock ?? item.stock),
+                }
+              : item;
+          })
+        );
+
+        setWishlist(updated);
+      } catch (error) {
+        console.error("Failed to refresh wishlist:", error);
+      }
+    };
+
+    refreshLiveData();
 
   }, []);
 

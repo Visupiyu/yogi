@@ -1,8 +1,77 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 
 export default function SettingsPage() {
+  const router = useRouter();
+
+  const [stats, setStats] = useState({
+    orders: 0,
+    wishlist: 0,
+    addresses: 0,
+    reviews: 0,
+  });
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+
+      const wishlist = JSON.parse(
+        localStorage.getItem("wishlist") || "[]"
+      );
+
+      try {
+        const [ordersSnap, addressesSnap, reviewsSnap] = await Promise.all([
+          getDocs(
+            query(collection(db, "orders"), where("userEmail", "==", user.email))
+          ),
+          getDocs(
+            query(collection(db, "addresses"), where("userEmail", "==", user.email))
+          ),
+          getDocs(
+            query(collection(db, "productReviews"), where("userEmail", "==", user.email))
+          ),
+        ]);
+
+        setStats({
+          orders: ordersSnap.size,
+          wishlist: wishlist.length,
+          addresses: addressesSnap.size,
+          reviews: reviewsSnap.size,
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    });
+
+    return () => unsub();
+  }, []);
+
+  const logout = async () => {
+    if (!confirm("Logout from your account?")) return;
+
+    await signOut(auth);
+
+    localStorage.removeItem("user");
+    localStorage.removeItem("vendor");
+    localStorage.removeItem("admin");
+    // Both are plain device-wide localStorage keys with no account
+    // scoping — left uncleared, the next person to log in on a shared
+    // device would inherit this account's cart and saved products.
+    localStorage.removeItem("cart");
+    localStorage.removeItem("checkoutItems");
+    localStorage.removeItem("wishlist");
+    window.dispatchEvent(new Event("cartUpdated"));
+    window.dispatchEvent(new Event("wishlistUpdated"));
+
+    router.push("/login");
+  };
+
   return (
     <section className="min-h-screen bg-gray-100 py-10 px-4">
 
@@ -69,7 +138,7 @@ export default function SettingsPage() {
             <div className="text-4xl">📦</div>
 
             <h3 className="text-3xl font-bold mt-3">
-              0
+              {stats.orders}
             </h3>
 
             <p className="text-gray-500 mt-1">
@@ -81,7 +150,7 @@ export default function SettingsPage() {
             <div className="text-4xl">❤️</div>
 
             <h3 className="text-3xl font-bold mt-3">
-              0
+              {stats.wishlist}
             </h3>
 
             <p className="text-gray-500 mt-1">
@@ -93,7 +162,7 @@ export default function SettingsPage() {
             <div className="text-4xl">📍</div>
 
             <h3 className="text-3xl font-bold mt-3">
-              0
+              {stats.addresses}
             </h3>
 
             <p className="text-gray-500 mt-1">
@@ -105,7 +174,7 @@ export default function SettingsPage() {
             <div className="text-4xl">⭐</div>
 
             <h3 className="text-3xl font-bold mt-3">
-              0
+              {stats.reviews}
             </h3>
 
             <p className="text-gray-500 mt-1">
@@ -153,7 +222,7 @@ export default function SettingsPage() {
 {/* Edit Profile */}
 
 <Link
-  href="/profile/edit"
+  href="/profile"
   className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mb-4"
 >
   <div className="flex items-center gap-4">
@@ -642,19 +711,7 @@ export default function SettingsPage() {
   {/* Logout */}
 
   <button
-    onClick={() => {
-
-      if(confirm("Logout from your account?")){
-
-        localStorage.removeItem("user");
-        localStorage.removeItem("vendor");
-        localStorage.removeItem("admin");
-
-        window.location.href="/login";
-
-      }
-
-    }}
+    onClick={logout}
     className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition mb-4"
   >
     🚪 Logout
