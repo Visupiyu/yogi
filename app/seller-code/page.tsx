@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Seller Code of Conduct | YOMICO",
+  // Root layout's title template already appends " | YOMICO" — this was
+  // duplicating it.
+  title: "Seller Code of Conduct",
   description:
     "Read the YOMICO Seller Code of Conduct, including seller responsibilities, product standards, customer service expectations, and marketplace policies.",
 };

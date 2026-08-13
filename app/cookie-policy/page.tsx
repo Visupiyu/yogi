@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Cookie Policy | YOMICO",
+  // Root layout's title template already appends " | YOMICO" — this was
+  // duplicating it.
+  title: "Cookie Policy",
   description:
     "Learn how YOMICO uses cookies to improve security, functionality, and your shopping experience.",
 };

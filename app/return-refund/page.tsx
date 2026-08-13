@@ -1,6 +1,8 @@
 import Link from "next/link";
 export const metadata = {
-  title: "Return & Refund Policy | YOMICO",
+  // Root layout's title template already appends " | YOMICO" — this was
+  // duplicating it.
+  title: "Return & Refund Policy",
   description:
     "Read YOMICO's Return & Refund Policy, including eligibility, refunds, replacements, cancellations, and seller responsibilities.",
 };

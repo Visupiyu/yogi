@@ -2,7 +2,8 @@ import LegalPageLayout from "@/components/legal/LegalPageLayout";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Use | YOMICO",
+  // Root layout's title template already appends " | YOMICO".
+  title: "Terms of Use",
   description:
     "Read YOMICO's Terms of Use governing your access to and use of the marketplace.",
 };

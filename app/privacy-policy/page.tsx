@@ -2,7 +2,8 @@ import LegalPageLayout from "@/components/legal/LegalPageLayout";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | YOMICO",
+  // Root layout's title template already appends " | YOMICO".
+  title: "Privacy Policy",
   description:
     "Read YOMICO's Privacy Policy — how we collect, use and protect your personal information.",
 };

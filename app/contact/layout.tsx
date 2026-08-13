@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 // metadata directly — a sibling layout.tsx is the supported way to attach
 // it without touching the page's own code.
 export const metadata: Metadata = {
-  title: "Contact Us | YOMICO",
+  // Root layout's title template already appends " | YOMICO".
+  title: "Contact Us",
   description:
     "Get in touch with the YOMICO team for support, seller inquiries or general questions.",
 };

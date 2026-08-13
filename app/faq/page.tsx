@@ -1,6 +1,8 @@
 import Link from "next/link";
 export const metadata = {
-  title: "Frequently Asked Questions | YOMICO",
+  // Root layout's title template already appends " | YOMICO" — this was
+  // duplicating it (confirmed live: tab title read "... | YOMICO | YOMICO").
+  title: "Frequently Asked Questions",
   description:
     "Find answers to common questions about shopping, selling, payments, orders, and support on YOMICO.",
 };

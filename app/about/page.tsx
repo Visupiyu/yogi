@@ -2,7 +2,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "About Us | YOMICO",
+  // Root layout's title template already appends " | YOMICO" — don't
+  // duplicate it here.
+  title: "About Us",
   description:
     "Learn about YOMICO, India's multi-vendor marketplace connecting trusted sellers with customers across groceries, fashion, electronics, beauty and more.",
 };

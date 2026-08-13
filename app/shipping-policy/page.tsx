@@ -1,7 +1,9 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "Shipping Policy | YOMICO",
+  // Root layout's title template already appends " | YOMICO" — this was
+  // duplicating it (tab title read "Shipping Policy | YOMICO | YOMICO").
+  title: "Shipping Policy",
   description:
     "Learn about YOMICO's shipping process, delivery timelines, tracking, shipping charges, and customer support.",
 };

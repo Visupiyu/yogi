@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Cancellation Policy | YOMICO",
+  // Root layout's title template already appends " | YOMICO".
+  title: "Cancellation Policy",
   description:
     "Read YOMICO's order cancellation policy — when and how you can cancel an order placed on the marketplace.",
 };
