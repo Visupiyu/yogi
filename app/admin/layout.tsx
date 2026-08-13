@@ -23,6 +23,8 @@ const navItems = [
   { href: "/admin/delivery", label: "Delivery", icon: "🚚" },
   { href: "/admin/delivery-partners", label: "Delivery Partners", icon: "🛵" },
   { href: "/admin/notifications", label: "Notifications", icon: "🔔" },
+  { href: "/admin/support", label: "Support", icon: "🎫" },
+  { href: "/admin/reviews", label: "Reviews", icon: "⭐" },
 ];
 
 export default function AdminLayout({

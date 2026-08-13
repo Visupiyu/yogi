@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   collection,
@@ -7,9 +8,11 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 
 export default function SupportPage() {
+
+    const router = useRouter();
 
     const [subject,setSubject] =
   useState("");
@@ -26,19 +29,23 @@ const [loading,setLoading] =
   const createTicket =
 async()=>{
 
+  // Nothing here checked auth at all — a signed-out visitor got
+  // userEmail: "", which firestore.rules rejects (create requires
+  // userEmail == the signer's own token email), and the resulting
+  // exception was swallowed by the catch below with no alert and no
+  // redirect. Matches the same login-gate pattern already used for
+  // askQuestion/submitReview on the product page.
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    alert("Please login first.");
+    router.push("/login");
+    return;
+  }
+
   try{
 
     setLoading(true);
-
-    const user =
-
-      JSON.parse(
-
-        localStorage.getItem(
-          "user"
-        ) || "{}"
-
-      );
 
     await addDoc(
 
@@ -50,11 +57,14 @@ async()=>{
       {
 
         customerName:
-          user.name ||
+          currentUser.displayName ||
           "Customer",
 
+        userId:
+          currentUser.uid,
+
         userEmail:
-          user.email ||
+          currentUser.email ||
           "",
 
         subject,

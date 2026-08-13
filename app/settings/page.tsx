@@ -364,6 +364,33 @@ export default function SettingsPage() {
     <span className="text-2xl text-gray-400">›</span>
   </Link>
 
+  {/* Support Tickets */}
+
+  <Link
+    href="/profile/tickets"
+    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mt-4"
+  >
+    <div className="flex items-center gap-4">
+
+      <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-2xl">
+        🎫
+      </div>
+
+      <div>
+        <h3 className="font-semibold text-lg">
+          Support Tickets
+        </h3>
+
+        <p className="text-sm text-gray-500">
+          View your requests and replies
+        </p>
+      </div>
+
+    </div>
+
+    <span className="text-2xl text-gray-400">›</span>
+  </Link>
+
 </div>
 {/* ================= NOTIFICATIONS ================= */}
 

@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  serverTimestamp,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export default function AdminSupportPage() {
@@ -33,6 +40,27 @@ export default function AdminSupportPage() {
     }
   };
 
+  // Older tickets predate the userId field on the ticket doc — can't
+  // notify those, since notifications requires a userId for non-admin
+  // roles. Nothing else depends on this succeeding, so a failure here
+  // shouldn't block the status/reply update that already went through.
+  const notifyCustomer = async (ticket: any, message: string) => {
+    if (!ticket?.userId) return;
+    try {
+      await addDoc(collection(db, "notifications"), {
+        title: "Support Ticket Update",
+        message,
+        role: "customer",
+        userId: ticket.userId,
+        type: "support",
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const updateStatus = async (id: string, status: string) => {
     try {
       await updateDoc(doc(db, "tickets", id), { status });
@@ -40,6 +68,11 @@ export default function AdminSupportPage() {
         tickets.map((ticket) =>
           ticket.id === id ? { ...ticket, status } : ticket
         )
+      );
+      const ticket = tickets.find((t) => t.id === id);
+      notifyCustomer(
+        ticket,
+        `Your support ticket "${ticket?.subject || ""}" is now ${status}.`
       );
     } catch (error) {
       console.error(error);
@@ -61,6 +94,11 @@ export default function AdminSupportPage() {
         )
       );
       setReplies((prev) => ({ ...prev, [id]: "" }));
+      const ticket = tickets.find((t) => t.id === id);
+      notifyCustomer(
+        ticket,
+        `You have a new reply on your support ticket "${ticket?.subject || ""}".`
+      );
       alert("Reply saved.");
     } catch (error) {
       console.error(error);

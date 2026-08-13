@@ -116,7 +116,9 @@ export default function ProductPage() {
   const [question, setQuestion] = useState("");
   const [questions, setQuestions] = useState<ProductQuestion[]>([]);
  const [reviews, setReviews] = useState<ProductReview[]>([]);
-  const [rating, setRating] = useState(5);
+  // Defaulted to 5 before, so a customer who forgot to pick a rating
+  // and just typed a critical review would silently post a 5-star one.
+  const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [pinCode, setPinCode] = useState("");
 const [deliveryMessage, setDeliveryMessage] = useState("");
@@ -371,11 +373,32 @@ questionSnap.forEach((d) => {
       return;
     }
 
+    if (!rating) {
+      alert("Please select a rating");
+      return;
+    }
+
     if (!reviewText) {
       alert("Enter review");
       return;
     }
     try {
+      // Nothing previously stopped the same account from submitting
+      // unlimited reviews on one product, each one further skewing the
+      // aggregate rating written back onto the product doc below.
+      const existingReview = await getDocs(
+        query(
+          collection(db, "productReviews"),
+          where("productId", "==", product.id),
+          where("userEmail", "==", currentUser.email || "")
+        )
+      );
+
+      if (!existingReview.empty) {
+        alert("You've already reviewed this product.");
+        return;
+      }
+
       await addDoc(collection(db, "productReviews"), {
         productId: product.id,
         productName: product.name,
@@ -1732,6 +1755,7 @@ mt-5
                 onChange={(e) => setRating(Number(e.target.value))}
                 className="border p-3 rounded-2xl outline-none"
               >
+                <option value={0}>Select rating</option>
                 <option value={5}>★★★★★</option>
                 <option value={4}>★★★★</option>
                 <option value={3}>★★★</option>

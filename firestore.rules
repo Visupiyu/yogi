@@ -83,11 +83,12 @@ rules_version = '2';
 //   Read/delete: the named vendor or admin.
 //
 // Collection: productQuestions, productReviews   Doc ID: auto-id
-//   Public Q&A/review content on product pages. No vendorId is ever written
-//   on productQuestions (a pre-existing app bug — the seller "answer
-//   questions" feature's query already returns nothing against real data),
-//   so answering is restricted to admin until the app is fixed to denormalize
-//   vendorId at write time.
+//   Public Q&A/review content on product pages. productQuestions denormalizes
+//   vendorId at write time (app/product/[id]/page.tsx), so the owning vendor
+//   can answer directly once it's present — admin-only answering is now just
+//   the fallback for legacy pre-fix docs missing the field. productReviews
+//   has no purchase-verification or one-review-per-user enforcement (a real,
+//   known gap, not a rules oversight — flagged separately).
 //
 // Collection: adminUsers   Doc ID: auto-id
 //   Admin-only in every direction. No legitimate client write/read path

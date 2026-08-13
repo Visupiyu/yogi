@@ -469,6 +469,11 @@ export default function AdminPage() {
       <p className="font-bold mt-2">Vendor KYC</p>
     </Link>
 
+    <Link href="/admin/reviews" className="bg-yellow-50 p-6 rounded-xl text-center hover:shadow-lg">
+      ⭐
+      <p className="font-bold mt-2">Reviews</p>
+    </Link>
+
     <Link href="/admin/coupons" className="bg-emerald-50 p-6 rounded-xl text-center hover:shadow-lg">
       🎟️
       <p className="font-bold mt-2">Coupons</p>
