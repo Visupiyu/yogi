@@ -11,16 +11,18 @@ const HIDE_CHROME_PREFIXES = [
   "/seller",
   "/admin",
   "/invoice",
+  "/delivery",
 ];
 
-// Vendor auth pages hide the customer navbar (its Login button confuses
-// sellers trying to use the seller login form) but still get a minimal
-// branded header instead of no header at all.
+// Vendor/delivery-partner auth pages hide the customer navbar (its Login
+// button confuses sellers/partners trying to use their own login form) but
+// still get a minimal branded header instead of no header at all.
 const MINIMAL_HEADER_PREFIXES = [
   "/vendor-login",
   "/vendor-register",
   "/vendor-forgot-password",
   "/sell",
+  "/delivery-login",
 ];
 
 // Matches the prefix as a whole path segment, not a raw string prefix —

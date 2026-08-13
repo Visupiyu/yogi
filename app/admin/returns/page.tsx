@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { applyReturnStatusUpdate } from "@/lib/returns";
 
 export default function AdminReturnsPage() {
   const [returns, setReturns] = useState<any[]>([]);
@@ -33,7 +34,11 @@ export default function AdminReturnsPage() {
 
   const updateStatus = async (id: string, status: string) => {
     try {
-      await updateDoc(doc(db, "returns", id), { status });
+      const returnRecord = returns.find((r) => r.id === id);
+      // Shared with app/admin/refunds so marking a return "Refunded" here
+      // notifies the customer and credits reward points the same way it
+      // does on that page, instead of silently doing neither.
+      await applyReturnStatusUpdate(db, { ...returnRecord, id }, status);
       setReturns(
         returns.map((item) =>
           item.id === id ? { ...item, status } : item

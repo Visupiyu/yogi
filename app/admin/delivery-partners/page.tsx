@@ -10,7 +10,12 @@ import {
   updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import {
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut,
+} from "firebase/auth";
+import { db, getSecondaryAuth } from "@/lib/firebase";
 
 type DeliveryPartner = {
   id: string;
@@ -23,6 +28,7 @@ type DeliveryPartner = {
   assignedOrders?: number;
   serviceArea: string;
   status: string;
+  uid?: string;
 };
 
 export default function DeliveryPartnersPage() {
@@ -31,6 +37,7 @@ export default function DeliveryPartnersPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [vehicleType, setVehicleType] = useState("Bike");
   const [dailyCapacity, setDailyCapacity] = useState(20);
@@ -67,6 +74,7 @@ export default function DeliveryPartnersPage() {
     setName("");
     setPhone("");
     setEmail("");
+    setPassword("");
     setVehicleNumber("");
     setVehicleType("Bike");
     setDailyCapacity(20);
@@ -79,7 +87,34 @@ export default function DeliveryPartnersPage() {
       return;
     }
 
+    const editingPartner = editingId
+      ? partners.find((p) => p.id === editingId)
+      : null;
+    const needsAccount = !editingPartner?.uid;
+
+    if (needsAccount && password.length < 6) {
+      alert(
+        "Set a login password (min 6 characters) so this partner can sign in at /delivery-login."
+      );
+      return;
+    }
+
     try {
+      let uid = editingPartner?.uid;
+
+      if (needsAccount) {
+        // Creating the Auth account on the secondary app instance keeps
+        // the currently signed-in admin's own session untouched.
+        const secondaryAuth = getSecondaryAuth();
+        const cred = await createUserWithEmailAndPassword(
+          secondaryAuth,
+          email.trim().toLowerCase(),
+          password.trim()
+        );
+        uid = cred.user.uid;
+        await signOut(secondaryAuth);
+      }
+
       if (editingId) {
         await updateDoc(doc(db, "deliveryPartners", editingId), {
           name,
@@ -89,6 +124,7 @@ export default function DeliveryPartnersPage() {
           vehicleType,
           dailyCapacity,
           serviceArea,
+          ...(uid ? { uid } : {}),
         });
         clearForm();
         loadPartners();
@@ -103,12 +139,29 @@ export default function DeliveryPartnersPage() {
         vehicleType,
         dailyCapacity,
         serviceArea,
+        uid,
         status: "Active",
         createdAt: serverTimestamp(),
       });
       clearForm();
       loadPartners();
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === "auth/email-already-in-use") {
+        alert("This email already has a login account (partner, seller, or customer).");
+      } else {
+        alert(error.message || "Failed to save delivery partner.");
+      }
+      console.error(error);
+    }
+  };
+
+  const resetPartnerPassword = async (partner: DeliveryPartner) => {
+    if (!confirm(`Send a password reset email to ${partner.email}?`)) return;
+    try {
+      await sendPasswordResetEmail(getSecondaryAuth(), partner.email);
+      alert("Password reset email sent.");
+    } catch (error: any) {
+      alert(error.message || "Failed to send reset email.");
       console.error(error);
     }
   };
@@ -135,6 +188,7 @@ export default function DeliveryPartnersPage() {
     setName(partner.name);
     setPhone(partner.phone);
     setEmail(partner.email);
+    setPassword("");
     setVehicleNumber(partner.vehicleNumber);
     setVehicleType(partner.vehicleType || "Bike");
     setDailyCapacity(partner.dailyCapacity || 20);
@@ -161,6 +215,18 @@ export default function DeliveryPartnersPage() {
           <input placeholder="Partner Name" value={name} onChange={(e) => setName(e.target.value)} className="border rounded-xl p-3" />
           <input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border rounded-xl p-3" />
           <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="border rounded-xl p-3" />
+          <input
+            type="text"
+            placeholder={
+              editingId && partners.find((p) => p.id === editingId)?.uid
+                ? "Login already set up (use Reset Password below to change)"
+                : "Login Password (min 6 characters)"
+            }
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={!!(editingId && partners.find((p) => p.id === editingId)?.uid)}
+            className="border rounded-xl p-3 disabled:bg-gray-100 disabled:text-gray-400"
+          />
           <input placeholder="Vehicle Number" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} className="border rounded-xl p-3" />
           <select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} className="border rounded-xl p-3">
             <option>Bike</option>
@@ -212,12 +278,29 @@ export default function DeliveryPartnersPage() {
                   >
                     {partner.status}
                   </span>
+                  <span
+                    className={`inline-block mt-2 ml-2 px-3 py-1 rounded-full text-sm font-semibold ${
+                      partner.uid
+                        ? "bg-indigo-100 text-indigo-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {partner.uid ? "🔑 Login Enabled" : "No Login Yet"}
+                  </span>
                 </div>
 
                 <div className="flex flex-col gap-3 shrink-0">
                   <button onClick={() => editPartner(partner)} className="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-2 rounded-xl">
                     Edit
                   </button>
+                  {partner.uid && (
+                    <button
+                      onClick={() => resetPartnerPassword(partner)}
+                      className="bg-indigo-600 hover:bg-indigo-700 transition text-white px-5 py-2 rounded-xl"
+                    >
+                      Reset Password
+                    </button>
+                  )}
                   <button
                     onClick={() => togglePartnerStatus(partner.id, partner.status)}
                     className={`px-5 py-2 rounded-xl text-white transition ${

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import {
 
@@ -15,7 +15,8 @@ import {
 
 } from "firebase/firestore";
 
-import { db, storage } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db, storage } from "@/lib/firebase";
 import {
 
   ref,
@@ -28,9 +29,18 @@ import {
 
 import { toast } from "sonner";
 
+// Mirrors isLegalOrderStatusTransition in firestore.rules.
+const NEXT_STATUSES: Record<string, string[]> = {
+  Shipped: ["Out For Delivery"],
+  "Out For Delivery": ["Delivered", "Delivery Failed"],
+  "Delivery Failed": ["Out For Delivery"],
+  Delivered: [],
+};
+
 export default function DeliveryDetailsPage() {
 
   const params = useParams();
+  const router = useRouter();
 
   const id = params.id as string;
 
@@ -62,11 +72,31 @@ const [proofPreview, setProofPreview] =
 
   useEffect(() => {
 
-    loadOrder();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
 
-  }, []);
+      const sessionRaw = localStorage.getItem("deliveryPartner");
 
-  const loadOrder = async () => {
+      if (!user || !sessionRaw) {
+        router.replace("/delivery-login");
+        return;
+      }
+
+      const session = JSON.parse(sessionRaw);
+
+      if (session.uid !== user.uid) {
+        router.replace("/delivery-login");
+        return;
+      }
+
+      loadOrder(session.partnerId);
+
+    });
+
+    return () => unsubscribe();
+
+  }, [id, router]);
+
+  const loadOrder = async (sessionPartnerId: string) => {
 
     try {
 
@@ -85,6 +115,12 @@ const [proofPreview, setProofPreview] =
           ...snap.data(),
 
         };
+
+        if (data.deliveryPartnerId !== sessionPartnerId) {
+          toast.error("This delivery isn't assigned to you.");
+          router.replace("/delivery");
+          return;
+        }
 
         setOrder(data);
 
@@ -377,7 +413,6 @@ if (proofImage) {
   <div className="flex justify-between items-center gap-2">
 
     {[
-      "Assigned",
       "Packed",
       "Shipped",
       "Out For Delivery",
@@ -403,7 +438,6 @@ if (proofImage) {
 
             ${
               [
-                "Assigned",
                 "Packed",
                 "Shipped",
                 "Out For Delivery",
@@ -488,8 +522,6 @@ if (proofImage) {
 
             <select
 
-            
-
               value={status}
 
               onChange={(e)=>
@@ -502,33 +534,21 @@ if (proofImage) {
 
               }
 
-              className="w-full mt-2 border rounded-xl p-3"
+              disabled={!(NEXT_STATUSES[order.status]?.length > 0)}
+
+              className="w-full mt-2 border rounded-xl p-3 disabled:bg-gray-100"
 
             >
 
-              <option>
-
-                Shipped
-
+              <option value={order.status}>
+                {order.status} (current)
               </option>
 
-              <option>
-
-                Out For Delivery
-
-              </option>
-
-              <option>
-
-                Delivered
-
-              </option>
-
-              <option>
-
-                Delivery Failed
-
-              </option>
+              {(NEXT_STATUSES[order.status] || []).map((next) => (
+                <option key={next} value={next}>
+                  {next}
+                </option>
+              ))}
 
             </select>
 

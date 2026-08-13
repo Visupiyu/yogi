@@ -1,4 +1,4 @@
-import { initializeApp }
+import { initializeApp, getApps }
 from "firebase/app";
 
 import {
@@ -49,3 +49,15 @@ export const db = getFirestore(app);
 export const storage =
   getStorage(app);
   export { app };
+
+// A second, separately-named Firebase app instance sharing the same
+// public config. createUserWithEmailAndPassword() on the PRIMARY auth
+// instance would sign the browser in as the newly-created account,
+// kicking whatever admin is currently signed in out of their own
+// session — used only to provision delivery-partner login accounts from
+// the admin panel without disturbing the admin's session.
+export function getSecondaryAuth() {
+  const existing = getApps().find((a) => a.name === "Secondary");
+  const secondaryApp = existing || initializeApp(firebaseConfig, "Secondary");
+  return getAuth(secondaryApp);
+}

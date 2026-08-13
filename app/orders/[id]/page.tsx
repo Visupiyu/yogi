@@ -136,6 +136,10 @@ export default function OrderDetailsPage() {
         return 5;
       case "Delivered":
         return 6;
+      case "Delivery Failed":
+        // Same step as "Out For Delivery" — a failed attempt doesn't erase
+        // progress already made, it just doesn't advance past it.
+        return 5;
       default:
         return 1;
     }
@@ -239,7 +243,8 @@ export default function OrderDetailsPage() {
                   className={`font-semibold ${
                     order.status === "Delivered"
                       ? "text-green-600"
-                      : order.status === "Cancelled"
+                      : order.status === "Cancelled" ||
+                        order.status === "Delivery Failed"
                       ? "text-red-600"
                       : "text-blue-600"
                   }`}
@@ -258,6 +263,15 @@ export default function OrderDetailsPage() {
               ❌ Order Cancelled
             </h2>
             <p className="mt-3 text-gray-700">This order has been cancelled.</p>
+          </div>
+        ) : order.status === "Delivery Failed" ? (
+          <div className="mt-8 bg-orange-50 border border-orange-200 rounded-3xl p-8">
+            <h2 className="text-2xl font-bold text-orange-700">
+              ⚠️ Delivery Attempt Failed
+            </h2>
+            <p className="mt-3 text-gray-700">
+              We couldn&apos;t deliver your order. Our delivery partner will retry soon.
+            </p>
           </div>
         ) : (
           <div className="mt-8 bg-white rounded-3xl shadow border p-8">

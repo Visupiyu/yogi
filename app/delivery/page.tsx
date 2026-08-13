@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   collection,
   getDocs,
@@ -8,6 +9,7 @@ import {
   where,
   orderBy,
 } from "firebase/firestore";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 type Delivery = {
   id: string;
@@ -22,6 +24,9 @@ type Delivery = {
 };
 export default function DeliveryDashboardPage() {
 
+  const router = useRouter();
+  const [partnerId, setPartnerId] = useState("");
+  const [partnerName, setPartnerName] = useState("");
   const [deliveries, setDeliveries] =useState<Delivery[]>([]);
   const [loading, setLoading] =    useState(true);
   const [search, setSearch] =    useState("");
@@ -48,25 +53,53 @@ const deliveredDeliveries =
 
   useEffect(() => {
 
-    loadDeliveries();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const sessionRaw = localStorage.getItem("deliveryPartner");
 
-  }, []);
-
-  const loadDeliveries = async () => {
-
-    try { 
-      const user = auth.currentUser;
-
-      if (!user) { 
-        setLoading(false);
+      if (!user || !sessionRaw) {
+        router.replace("/delivery-login");
         return;
       }
+
+      const session = JSON.parse(sessionRaw);
+
+      if (session.uid !== user.uid) {
+        router.replace("/delivery-login");
+        return;
+      }
+
+      setPartnerId(session.partnerId);
+      setPartnerName(session.name || "");
+      loadDeliveries(session.partnerId);
+    });
+
+    return () => unsubscribe();
+
+  }, [router]);
+
+  const logout = async () => {
+    await signOut(auth);
+    localStorage.removeItem("deliveryPartner");
+    router.replace("/delivery-login");
+  };
+
+  const loadDeliveries = async (forPartnerId?: string) => {
+
+    const activePartnerId = forPartnerId || partnerId;
+
+    if (!activePartnerId) return;
+
+    try {
 
       const snapshot = await getDocs(
 
         query(
           collection(db, "orders"),
-          where("deliveryPartnerId", "==", user.uid),
+          // deliveryPartnerId stores the deliveryPartners collection's
+          // document id (set by app/admin/delivery), not this partner's
+          // Auth uid — filtering on user.uid here silently never matched
+          // any order, so no delivery partner could ever see their queue.
+          where("deliveryPartnerId", "==", activePartnerId),
           orderBy("createdAt", "desc")
         )
       );
@@ -165,14 +198,14 @@ const deliveredDeliveries =
 
           <p className="mt-2 opacity-90">
 
-            Assigned deliveries
+            {partnerName ? `Welcome, ${partnerName}` : "Assigned deliveries"}
 
           </p>
-          <div className="mt-5">
+          <div className="mt-5 flex gap-3">
 
   <button
 
-    onClick={loadDeliveries}
+    onClick={() => loadDeliveries()}
 
     className="
       bg-white
@@ -188,6 +221,13 @@ const deliveredDeliveries =
 
     🔄 Refresh Deliveries
 
+  </button>
+
+  <button
+    onClick={logout}
+    className="bg-white/20 text-white px-5 py-2 rounded-xl font-semibold hover:bg-white/30"
+  >
+    Logout
   </button>
 
 </div>
@@ -299,13 +339,17 @@ const deliveredDeliveries =
 
     <option>All</option>
 
-    <option>Pending</option>
+    <option>Confirmed</option>
 
-    <option>Assigned</option>
+    <option>Packed</option>
+
+    <option>Shipped</option>
 
     <option>Out For Delivery</option>
 
     <option>Delivered</option>
+
+    <option>Delivery Failed</option>
 
   </select>
 
@@ -449,10 +493,10 @@ mt-4
         : delivery.status === "Out For Delivery"
         ? "bg-blue-100 text-blue-700"
 
-        : delivery.status === "Assigned"
-        ? "bg-yellow-100 text-yellow-700"
+        : delivery.status === "Delivery Failed"
+        ? "bg-red-600 text-white"
 
-        : "bg-gray-100 text-gray-700"
+        : "bg-yellow-100 text-yellow-700"
     }
   `}
 >

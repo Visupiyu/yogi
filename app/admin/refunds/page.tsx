@@ -6,13 +6,11 @@ import {
   collection,
   getDocs,
   updateDoc,
-  addDoc,
   doc,
-  increment,
-  Timestamp,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import { applyReturnStatusUpdate } from "@/lib/returns";
 
 export default function AdminRefundsPage() {
 
@@ -77,104 +75,16 @@ export default function AdminRefundsPage() {
 
       try{
 
-        await updateDoc(
-
-          doc(
-            db,
-            "returns",
-            id
-          ),
-
-          {
-            status
-          }
-
+        const refund:any = refunds.find(
+          (r:any)=>r.id===id
         );
 
-        const refund:any = refunds.find(
-  (r:any)=>r.id===id
-);
+        // Shared with app/admin/returns so both admin surfaces that touch
+        // this same `returns` collection notify the customer and credit
+        // reward points identically on "Refunded", instead of only one of
+        // the two doing it depending which page an admin happened to use.
+        await applyReturnStatusUpdate(db, { ...refund, id }, status);
 
-if (refund?.userId) {
-
-  await addDoc(
-
-    collection(
-      db,
-      "notifications"
-    ),
-
-    {
-
-      title:
-        "Refund Status Updated",
-
-      message:
-
-        `Your refund request is now ${status}.`,
-
-      userId:
-        refund.userId,
-
-      role:
-        "customer",
-
-      type:
-        "refund",
-
-      read:false,
-
-      createdAt:
-        new Date(),
-
-    }
-
-  );
-
-}
-
-if(
-  status==="Refunded" &&
-  refund
-){
-
-  await addDoc(
-
-    collection(
-      db,
-      "rewardTransactions"
-    ),
-
-    {
-
-      userEmail:
-        refund.userEmail,
-
-      type:
-        "Refund",
-
-      points:
-        refund.refundAmount || 0,
-
-      createdAt:
-        Timestamp.now(),
-
-    }
-
-  );
-
-  // The ledger entry alone doesn't move any real balance — credit the
-  // customer's actual spendable rewardPoints too, not just log history.
-  if (refund.userId) {
-    await updateDoc(
-      doc(db, "users", refund.userId),
-      {
-        rewardPoints: increment(refund.refundAmount || 0),
-      }
-    );
-  }
-
-}
         setRefunds(
 
           refunds.map((item)=>

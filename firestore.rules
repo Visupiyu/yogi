@@ -19,10 +19,14 @@ rules_version = '2';
 //
 // Collection: orders               Doc ID: auto-id
 //   userId(string=uid, immutable), vendorIds(array<string=uid>), items(array),
-//   total(number), status(string), paymentStatus(string).
+//   total(number), status(string), paymentStatus(string),
+//   deliveryPartnerId(string, references a deliveryPartners doc id — not a
+//   uid).
 //   Create: the customer, for themselves. Read: owning customer, any vendor
 //   listed in vendorIds, or admin. Update: admin (any field), owning customer
-//   (cancel only, Pending->Cancelled), listed vendor (status only).
+//   (cancel only, Pending->Cancelled), listed vendor (status/tracking
+//   fields), the assigned delivery partner (status/notes/proof-of-delivery
+//   fields only, resolved via deliveryPartners/{deliveryPartnerId}.uid).
 //
 // Collection: vendors               Doc ID: auto-id (NOT the vendor's uid —
 //   several app call sites incorrectly assume doc-id==uid; ownership here is
@@ -85,9 +89,17 @@ rules_version = '2';
 //   so answering is restricted to admin until the app is fixed to denormalize
 //   vendorId at write time.
 //
-// Collection: adminUsers, vendor_payouts, deliveryPartners   Doc ID: auto-id
+// Collection: adminUsers, vendor_payouts   Doc ID: auto-id
 //   Admin-only in every direction. No legitimate client write/read path
 //   exists for these outside the admin console today.
+//
+// Collection: deliveryPartners      Doc ID: auto-id
+//   name, phone, email, uid(string, set once admin provisions a login via
+//   a secondary Firebase Auth app instance — see lib/firebase.ts), status
+//   ("Active"|"Inactive"). Write: admin only. Read: admin, or the partner
+//   themselves (resource.data.uid == request.auth.uid) — needed for their
+//   own login lookup and so orders' isAssignedDeliveryPartner() can
+//   resolve who is updating a delivery.
 //
 // ===============================================================
 
@@ -228,7 +240,17 @@ service cloud.firestore {
         || (from == 'Confirmed' && to in ['Packed', 'Cancelled'])
         || (from == 'Packed' && to in ['Shipped', 'Cancelled'])
         || (from == 'Shipped' && to == 'Out For Delivery')
-        || (from == 'Out For Delivery' && to == 'Delivered');
+        || (from == 'Out For Delivery' && to in ['Delivered', 'Delivery Failed'])
+        || (from == 'Delivery Failed' && to == 'Out For Delivery');
+    }
+
+    function isAssignedDeliveryPartner() {
+      // deliveryPartnerId stores the deliveryPartners doc id (not a uid) —
+      // look up that doc and confirm its uid is the caller's own.
+      return isSignedIn()
+        && resource.data.deliveryPartnerId is string
+        && resource.data.deliveryPartnerId != ''
+        && get(/databases/$(database)/documents/deliveryPartners/$(resource.data.deliveryPartnerId)).data.uid == request.auth.uid;
     }
 
     match /orders/{orderId} {
@@ -270,6 +292,17 @@ service cloud.firestore {
               request.resource.data.paymentStatus == 'Paid'
               && request.resource.data.status == 'Delivered'
             )
+          )
+        )
+        || (
+          // The delivery partner physically handling this order updates
+          // status/notes/proof of delivery, but never touches anything
+          // financial or ownership-related.
+          isAssignedDeliveryPartner()
+          && affectedKeysOnly(['status', 'deliveryNotes', 'proofImage', 'deliveredAt', 'updatedAt'])
+          && (
+            unchanged('status')
+            || isLegalOrderStatusTransition(resource.data.status, request.resource.data.status)
           )
         );
 
@@ -632,7 +665,12 @@ service cloud.firestore {
     }
 
     match /deliveryPartners/{docId} {
-      allow read, write: if isAdmin();
+      // A delivery partner needs to read their own doc to log in (looked
+      // up by email, authorized by the returned doc's own uid matching
+      // the caller) and so admin/delivery/isAssignedDeliveryPartner()'s
+      // get() lookup succeeds when it's the partner themselves reading.
+      allow read: if isAdmin() || isOwnerUid(resource.data.uid);
+      allow write: if isAdmin();
     }
 
     // ---------------------------------------------------------

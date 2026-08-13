@@ -8,7 +8,6 @@ import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp,increment} from "
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import ShippingLabel from "@/components/ShippingLabel";
-import generateInvoicePDF from "@/components/InvoicePDF";
 import Invoice from "@/components/invoice/Invoice";
 
 import { useRef } from "react";
