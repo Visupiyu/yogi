@@ -7,8 +7,10 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  query,
   updateDoc,
   serverTimestamp,
+  where,
 } from "firebase/firestore";
 import {
   createUserWithEmailAndPassword,
@@ -167,6 +169,33 @@ export default function DeliveryPartnersPage() {
   };
 
   const deletePartner = async (id: string) => {
+    // isAssignedDeliveryPartner() in firestore.rules authorizes a
+    // partner's own order updates by looking up this exact doc — once
+    // it's gone, any order still carrying this partner's id can no
+    // longer be updated by them, with no indication why. Block deletion
+    // while they still have anything in-flight instead of failing silently later.
+    try {
+      const assignedSnapshot = await getDocs(
+        query(collection(db, "orders"), where("deliveryPartnerId", "==", id))
+      );
+
+      const inFlight = assignedSnapshot.docs.filter(
+        (docSnap) =>
+          !["Delivered", "Cancelled"].includes(docSnap.data().status)
+      );
+
+      if (inFlight.length > 0) {
+        alert(
+          `Can't delete — this partner still has ${inFlight.length} order(s) in progress. Reassign or wait until they're delivered/cancelled first.`
+        );
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to check assigned orders. Please try again.");
+      return;
+    }
+
     if (!confirm("Delete this delivery partner?")) return;
     await deleteDoc(doc(db, "deliveryPartners", id));
     loadPartners();

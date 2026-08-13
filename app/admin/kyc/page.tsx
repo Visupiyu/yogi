@@ -88,9 +88,9 @@ setVendors(items);
                   <th className="text-left">GST</th>
                   <th className="text-left">PAN</th>
                   <th className="text-left">Aadhaar</th>
+                  <th className="text-left">Email</th>
                   <th className="text-left">KYC Status</th>
                   <th className="text-left">Action</th>
-                  <th className="text-left">Email</th>
                 </tr>
               </thead>
               <tbody>
@@ -108,7 +108,7 @@ setVendors(items);
                       <span
                         className={`px-3 py-1 rounded-full text-sm font-semibold ${
                           vendor.kycStatus === "Approved"
-                            ? "bg-green-100 text-white"
+                            ? "bg-green-100 text-green-700"
                             : vendor.kycStatus === "Rejected"
                             ? "bg-red-600 text-white"
                             : "bg-yellow-100 text-yellow-700"

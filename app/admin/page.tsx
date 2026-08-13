@@ -4,11 +4,9 @@ import { useEffect, useState } from "react";
 import {
   collection,
   getDocs,
-  addDoc,
   updateDoc,
   deleteDoc,
   doc,
-  setDoc,
   query,
   where,
 } from "firebase/firestore";
@@ -63,14 +61,6 @@ type Customer = {
   totalSpent?: number;
 };
 
-type Coupon = {
-  id: string;
-  code: string;
-  type: string;
-  value: number;
-  expiry: string;
-};
-
 const adminEmails = ["adminyogimart@gmail.com"];
 
 export default function AdminPage() {
@@ -82,12 +72,6 @@ export default function AdminPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [totalOrders, setTotalOrders] = useState(0);
   const [totalRevenue, setTotalRevenue] = useState(0);
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
-
-  const [couponCode, setCouponCode] = useState("");
-  const [couponType, setCouponType] = useState("percent");
-  const [couponValue, setCouponValue] = useState("");
-  const [couponExpiry, setCouponExpiry] = useState("");
 
   const [notifications, setNotifications] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -179,13 +163,6 @@ export default function AdminPage() {
     setVendorPayouts(Object.values(payouts));
     setCustomers(Object.values(customerMap));
 
-    const couponSnapshot = await getDocs(collection(db, "coupons"));
-    const couponItems: Coupon[] = [];
-    couponSnapshot.forEach((docItem) => {
-      couponItems.push({ id: docItem.id, ...docItem.data() } as Coupon);
-    });
-    setCoupons(couponItems);
-
     // Notifications
     const alerts: string[] = [];
     items.forEach((product) => {
@@ -254,36 +231,6 @@ export default function AdminPage() {
     loadProducts(vendors);
   };
 
-  const deleteCoupon = async (id: string) => {
-    await deleteDoc(doc(db, "coupons", id));
-    loadProducts(vendors);
-  };
-
-  const createCoupon = async () => {
-    if (!couponCode || !couponValue || !couponExpiry) {
-      alert("Fill all coupon fields");
-      return;
-    }
-
-    const today = new Date().toISOString().split("T")[0];
-    if (couponExpiry < today) {
-      alert("Coupon expiry invalid");
-      return;
-    }
-
-    await addDoc(collection(db, "coupons"), {
-      code: couponCode,
-      type: couponType,
-      value: Number(couponValue),
-      expiry: couponExpiry,
-    });
-
-    setCouponCode("");
-    setCouponValue("");
-    setCouponExpiry("");
-    loadProducts(vendors);
-  };
-
   const updateOrderStatus = async (id: string, status: string) => {
     try {
       await updateDoc(doc(db, "orders", id), { status });
@@ -291,22 +238,6 @@ export default function AdminPage() {
     } catch (error) {
       console.error(error);
     }
-  };
-
-  const markVendorPaid = async (
-    vendorId: string,
-    vendorName: string,
-    amount: number
-  ) => {
-    await setDoc(doc(db, "vendor_payouts", vendorId), {
-      vendorId,
-      vendorName,
-      amount,
-      status: "Paid",
-      createdAt: new Date(),
-      paidAt: new Date(),
-    });
-    alert("Vendor marked paid");
   };
 
   const loadUnreadNotifications = async () => {
@@ -329,8 +260,13 @@ export default function AdminPage() {
 
   const logout = async () => {
     await signOut(auth);
-    localStorage.removeItem("user");
-    router.push("/login");
+    // Wrong key ("user", the customer session) and wrong destination
+    // ("/login", the customer login) — left the real "admin" flag behind
+    // and briefly landed on the customer login page instead of
+    // /admin-login, though the layout's own auth listener eventually
+    // corrected it.
+    localStorage.removeItem("admin");
+    router.push("/admin-login");
   };
 
   if (loading) {
@@ -592,83 +528,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* COUPONS */}
-        <div className="bg-white rounded-2xl shadow p-8 mb-10">
-          <h2 className="text-3xl font-bold mb-8">🎟 Coupon Management</h2>
-          <p className="text-gray-500 mb-6">Create promotional offers for customers.</p>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <input
-              type="text"
-              placeholder="Coupon Code"
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value)}
-              className="border p-4 rounded-xl"
-            />
-            <select
-              value={couponType}
-              onChange={(e) => setCouponType(e.target.value)}
-              className="border p-4 rounded-xl"
-            >
-              <option value="percent">Percentage</option>
-              <option value="flat">Flat</option>
-            </select>
-            <input
-              type="number"
-              placeholder="Value"
-              value={couponValue}
-              onChange={(e) => setCouponValue(e.target.value)}
-              className="border p-4 rounded-xl"
-            />
-            <input
-              type="date"
-              value={couponExpiry}
-              onChange={(e) => setCouponExpiry(e.target.value)}
-              className="border p-4 rounded-xl"
-            />
-          </div>
-
-          <button
-            onClick={createCoupon}
-            className="bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-4 rounded-xl mb-10"
-          >
-            Create Coupon
-          </button>
-
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-4">Code</th>
-                  <th className="text-left py-4">Type</th>
-                  <th className="text-left py-4">Value</th>
-                  <th className="text-left py-4">Expiry</th>
-                  <th className="text-left py-4">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {coupons.map((coupon) => (
-                  <tr key={coupon.id} className="border-b">
-                    <td className="py-5">{coupon.code}</td>
-                    <td>{coupon.type}</td>
-                    <td>{coupon.value}</td>
-                    <td>{coupon.expiry}</td>
-                    <td>
-                      <button
-                        onClick={() => deleteCoupon(coupon.id)}
-                        className="bg-red-500 text-white px-5 py-2 rounded-lg"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-   </div>  
+   </div>
    <div className="text-center py-10 text-gray-500 border-t mt-10">
 Need Help?
 <Link
