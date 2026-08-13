@@ -1,16 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // firebase-admin's nested node_modules tree (grpc/protobuf/opentelemetry)
-  // trips a Turbopack bug on Windows when bundled ("failed to create
-  // junction point" / Cannot find module errors) — keep it (and its
-  // Google Cloud dependencies) external and required directly by Node at
-  // runtime instead of bundled.
-  serverExternalPackages: [
-    "firebase-admin",
-    "@google-cloud/firestore",
-    "google-gax",
-  ],
+  // Deliberately NOT using serverExternalPackages for firebase-admin:
+  // excluding it from webpack's bundle means Node's raw require() has to
+  // load its dependency chain directly, and jwks-rsa's require() of
+  // jose's ESM-only build then crashes production with ERR_REQUIRE_ESM.
+  // Letting webpack bundle it normally handles that CJS/ESM interop
+  // correctly (build script uses --webpack everywhere, so there's no
+  // Turbopack junction-point issue to work around either).
   images: {
     remotePatterns: [
       {
