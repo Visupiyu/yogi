@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
@@ -23,11 +24,17 @@ export default function SignupPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const signup = async () => {
     if (!name || !email || !phone || !password) {
       alert("Please fill all fields");
+      return;
+    }
+
+    if (!agreed) {
+      alert("Please agree to the Terms of Use and Privacy Policy");
       return;
     }
 
@@ -177,10 +184,38 @@ export default function SignupPage() {
           />
         </div>
 
+        <label className="mt-6 flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="mt-1 h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+          />
+          <span className="text-sm text-gray-600 leading-6">
+            I agree to YOMICO&apos;s{" "}
+            <Link
+              href="/terms"
+              target="_blank"
+              className="font-semibold text-blue-600 hover:underline"
+            >
+              Terms of Use
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/privacy-policy"
+              target="_blank"
+              className="font-semibold text-blue-600 hover:underline"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+
         <button
           onClick={signup}
           disabled={loading}
-          className="w-full bg-green-600 disabled:opacity-60 text-white py-4 rounded-xl mt-8 text-lg font-semibold"
+          className="w-full bg-green-600 disabled:opacity-60 text-white py-4 rounded-xl mt-6 text-lg font-semibold"
         >
           {loading ? "Creating..." : "Signup"}
         </button>
