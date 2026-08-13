@@ -6,6 +6,7 @@ export default function SellerAssistantPage(){
 
   const [productName,setProductName] =useState("");
   const [category,setCategory] =useState("");
+  const [generating,setGenerating] =useState(false);
   const [description,setDescription] =useState("");
   const [seoTitle,setSeoTitle] =useState("");
   const [tags,setTags] =useState("");
@@ -36,110 +37,51 @@ const copyText = (
 
 };
 
- const generateContent = ()=>{if(!productName){toast.error("Please enter a product name.");
+ // Previously just interpolated productName into fixed template
+ // strings — the same generic "Premium Quality / Fast Delivery" copy
+ // for every single product, AI in name only. Now calls the real
+ // YOMICO AI Engine (Seller AI layer) via app/api/ai/seller-assistant.
+ const generateContent = async ()=>{
+  if(!productName){
+    toast.error("Please enter a product name.");
     return;
   }
-  setDescription(
-    `${productName} is a premium quality ${category || "product"} designed for durability, excellent performance and everyday use. Carefully selected for customers looking for quality and value.`
-  );
 
-  setSeoTitle(`Buy ${productName} Online at Best Price | YOMICO`
-  );
+  setGenerating(true);
 
-  setTags(`${productName}, ${category}, Online Shopping, Best Price, YOMICO`
-  );
+  try {
+    const response = await fetch("/api/ai/seller-assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productName, category }),
+    });
 
-  setTips(["📈 Keep at least 20 units in stock.",
+    const data = await response.json();
 
-    "⭐ Encourage customers to leave reviews after delivery.",
+    if (!response.ok) {
+      throw new Error(data?.error || "Failed to generate content.");
+    }
 
-    "🏷️ Use attractive product images from multiple angles.",
+    setDescription(data.description || "");
+    setSeoTitle(data.seoTitle || "");
+    setTags(data.tags || "");
+    setTips(Array.isArray(data.tips) ? data.tips : []);
+    setSocialPost(data.socialPost || "");
+    setEmailContent(data.emailContent || "");
+    setOfferText(data.offerText || "");
+    setHindiDescription(data.hindiDescription || "");
+    setWhatsappMessage(data.whatsappMessage || "");
+    setGoogleHeadline(data.googleHeadline || "");
+    setBulletPoints(Array.isArray(data.bulletPoints) ? data.bulletPoints : []);
 
-    "🚚 Offer fast delivery for better conversions.",
-
-    "💰 Run discounts during weekends to increase sales.",
-
-    "🔥 Add 5–10 SEO keywords to improve search visibility."
-
-  ]);
-  setSocialPost(`🔥 ${productName} is now available on YOMICO!
-
-✨ Premium Quality
-🚚 Fast Delivery
-💰 Best Price
-
-Order today and enjoy a great shopping experience!
-
-#YOMICO #${productName.replace(/\s+/g,"")}`
-
-);
-
-setEmailContent(`Subject: Special Offer on ${productName}
-
-Dear Customer,
-
-We're excited to introduce our latest ${productName}.
-
-✔ Premium Quality
-✔ Affordable Price
-✔ Fast Delivery
-
-Visit YOMICO today and place your order.
-
-Thank you for shopping with us.
-
-Team YOMICO`
-
-);
-
-setOfferText(`🎉 Limited Time Offer!
-
-Buy ${productName} today and enjoy amazing savings only on YOMICO.
-
-Shop Now!`
-
-);
-
-setHindiDescription(
-
-`${productName} एक उच्च गुणवत्ता वाला ${category || "उत्पाद"} है जो बेहतर प्रदर्शन, टिकाऊ गुणवत्ता और उचित कीमत के साथ उपलब्ध है। केवल YOMICO पर खरीदें।`
-
-);
-
-setWhatsappMessage(
-
-`🛍️ ${productName}
-
-✨ Premium Quality
-🚚 Fast Delivery
-💰 Best Price
-
-Shop now on YOMICO!
-
-https://yomico.in`
-
-);
-
-setGoogleHeadline(
-
-`Buy ${productName} Online | Best Price | YOMICO`
-
-);
-
-setBulletPoints([
-
-  "Premium Quality",
-
-  "Affordable Price",
-
-  "Fast Delivery",
-
-  "Trusted Seller",
-
-  "Easy Returns"
-
-]);
-
+    toast.success("AI content generated.");
+  } catch (error) {
+    console.error(error);
+    const message = error instanceof Error ? error.message : "Failed to generate content. Please try again.";
+    toast.error(message);
+  } finally {
+    setGenerating(false);
+  }
 };
 
 
@@ -229,6 +171,8 @@ setBulletPoints([
               generateContent
             }
 
+            disabled={generating}
+
             className="
               mt-8
               bg-indigo-600
@@ -236,11 +180,12 @@ setBulletPoints([
               px-8
               py-3
               rounded-xl
+              disabled:opacity-60
             "
 
           >
 
-            Generate AI Content
+            {generating ? "Generating…" : "Generate AI Content"}
 
           </button>
 
