@@ -182,16 +182,18 @@ export async function chatWithTools({
     const responseParts = [];
     for (const call of functionCalls) {
       const name = call.name ?? "";
-      let result: unknown;
+      let response: Record<string, unknown>;
       try {
-        result = await executeTool(name, call.args ?? {});
+        const output = await executeTool(name, call.args ?? {});
+        console.log(`AI Engine: tool ${name} round ${round + 1} ->`, JSON.stringify(output).slice(0, 500));
+        response = { output };
       } catch (error) {
-        result = {
-          error: error instanceof Error ? error.message : "Tool execution failed.",
-        };
+        const message = error instanceof Error ? error.message : "Tool execution failed.";
+        console.error(`AI Engine: tool ${name} round ${round + 1} threw:`, error);
+        response = { error: message };
       }
       responseParts.push({
-        functionResponse: { name, response: { result } },
+        functionResponse: { id: call.id, name, response },
       });
     }
 
