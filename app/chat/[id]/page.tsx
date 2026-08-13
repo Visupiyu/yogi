@@ -16,8 +16,9 @@ import {
   updateDoc,
   where
 } from "firebase/firestore";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, auth } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function ChatRoomPage() {
   const params = useParams();
@@ -47,68 +48,73 @@ export default function ChatRoomPage() {
   };
 
  useEffect(() => {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  let unsubscribeSnapshot: (() => void) | undefined;
 
-  if (!user.email) {
-    router.push("/login");
-    return;
-  }
+  const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    if (!firebaseUser) {
+      router.push("/login");
+      return;
+    }
 
-  updateDoc(doc(db, "chats", id), {
-    customerUnread: 0,
-  }).catch(() => {});
+    updateDoc(doc(db, "chats", id), {
+      customerUnread: 0,
+    }).catch(() => {});
 
-  const q = query(
-    collection(db, "messages"),
-    where("chatId", "==", id),
-    orderBy("createdAt")
-  );
-  const loadChat = async () => {
+    const q = query(
+      collection(db, "messages"),
+      where("chatId", "==", id),
+      orderBy("createdAt")
+    );
+    const loadChat = async () => {
 
-  const snap = await getDoc(
-    doc(db, "chats", id)
-  );
+    const snap = await getDoc(
+      doc(db, "chats", id)
+    );
 
-  if (snap.exists()) {
+    if (snap.exists()) {
 
-    setChat({
-      id: snap.id,
-      ...snap.data(),
+      setChat({
+        id: snap.id,
+        ...snap.data(),
+      });
+
+    }
+
+  };
+
+  loadChat();
+  unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+
+    console.log("Message count:", snapshot.size);
+
+    const list: any[] = [];
+
+    snapshot.forEach((docSnap) => {
+
+      console.log("Message:", docSnap.data());
+
+      list.push({
+        id: docSnap.id,
+        ...docSnap.data(),
+      });
+
     });
 
-  }
+    setMessages(list);
 
-};
-
-loadChat();
-const unsubscribe = onSnapshot(q, (snapshot) => {
-
-  console.log("Message count:", snapshot.size);
-
-  const list: any[] = [];
-
-  snapshot.forEach((docSnap) => {
-
-    console.log("Message:", docSnap.data());
-
-    list.push({
-      id: docSnap.id,
-      ...docSnap.data(),
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({
+        behavior: "smooth",
+      });
     });
 
   });
-
-  setMessages(list);
-
-  requestAnimationFrame(() => {
-    bottomRef.current?.scrollIntoView({
-      behavior: "smooth",
-    });
   });
 
-});
-
-  return () => unsubscribe();
+  return () => {
+    unsubscribeAuth();
+    unsubscribeSnapshot?.();
+  };
 
 }, [id, router]);
 

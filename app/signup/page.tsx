@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import {
   doc,
   setDoc,
@@ -58,6 +58,13 @@ export default function SignupPage() {
         auth,
         cleanEmail,
         password
+      );
+
+      // Best-effort — a customer who never gets/clicks the email still
+      // gets a working account (verification is a reminder, not a
+      // login gate, for this role).
+      sendEmailVerification(result.user).catch((err) =>
+        console.error("Failed to send verification email:", err)
       );
 
       const myReferralCode =

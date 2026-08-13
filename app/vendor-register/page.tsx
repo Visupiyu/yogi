@@ -9,6 +9,7 @@ import {
 
 import {
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signOut,
 } from "firebase/auth";
 
@@ -336,6 +337,13 @@ export default function VendorRegisterPage() {
         );
 
       const uid = userCredential.user.uid;
+
+      // Best-effort — seller login enforces this later (blocking, since
+      // it's a business account), but don't let a flaky email send abort
+      // the whole registration.
+      sendEmailVerification(userCredential.user).catch((err) =>
+        console.error("Failed to send seller verification email:", err)
+      );
 
       const gstDocUrl = await uploadKyc(
         uid,

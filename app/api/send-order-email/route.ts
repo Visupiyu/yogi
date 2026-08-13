@@ -1,4 +1,6 @@
 import { Resend } from "resend";
+import { verifyRequestUser } from "@/lib/serverAuth";
+import { getAdminDb } from "@/lib/firebaseAdmin";
 
 const apiKey = process.env.RESEND_API_KEY;
 
@@ -23,12 +25,59 @@ export async function POST(
       );
     }
 
+    const requester = await verifyRequestUser(request);
+
+    if (!requester) {
+      return Response.json(
+        { success: false, error: "Please sign in to send this email." },
+        { status: 401 }
+      );
+    }
+
     const {
       customerName,
-      customerEmail,
       orderId,
       total,
     } = await request.json();
+
+    if (!orderId) {
+      return Response.json(
+        { success: false, error: "orderId is required" },
+        { status: 400 }
+      );
+    }
+
+    // Confirm this order actually belongs to the caller, and send to the
+    // order's own stored email rather than whatever the client claims —
+    // otherwise anyone could POST an arbitrary orderId/customerEmail pair
+    // and use this route to spam any inbox with a plausible-looking
+    // "order confirmation".
+    const orderSnap = await getAdminDb().collection("orders").doc(orderId).get();
+
+    if (!orderSnap.exists) {
+      return Response.json(
+        { success: false, error: "Order not found" },
+        { status: 404 }
+      );
+    }
+
+    const orderData = orderSnap.data();
+
+    if (orderData?.userId !== requester.uid) {
+      return Response.json(
+        { success: false, error: "Order not found" },
+        { status: 404 }
+      );
+    }
+
+    const customerEmail = orderData?.userEmail || requester.email;
+
+    if (!customerEmail) {
+      return Response.json(
+        { success: false, error: "No email on file for this order" },
+        { status: 400 }
+      );
+    }
 
     const result =
       await resend.emails.send({

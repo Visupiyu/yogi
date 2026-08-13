@@ -13,12 +13,16 @@ export type VerifiedUser = {
 // server-side and returns the account it belongs to, or rejects it.
 // Never trust a uid/role the client claims in the request body.
 //
-// Deliberately NOT using firebase-admin/auth's verifyIdToken() here: it
-// pulls in jwks-rsa -> jose v6 (ESM-only, no CJS build), which crashes
-// every route that imports it on Vercel with ERR_REQUIRE_ESM (Vercel's
-// runtime hard-disables require(ESM) regardless of Node version). This
-// REST call uses the same public Firebase Web API key already shipped
-// to the browser — not a secret, safe to use server-side too.
+// Shared by every server route that needs to know who's really calling
+// (AI Engine chat routes, checkout/payment routes) — do not re-implement
+// this per route.
+//
+// Deliberately NOT using firebase-admin/auth's verifyIdToken(): it pulls
+// in jwks-rsa -> jose v6 (ESM-only, no CJS build), which crashes on
+// Vercel with ERR_REQUIRE_ESM (Vercel's runtime hard-disables
+// require(ESM) regardless of Node version — confirmed in production).
+// This REST call uses the same public Firebase Web API key already
+// shipped to the browser — not a secret, safe to use server-side too.
 export async function verifyRequestUser(
   request: Request
 ): Promise<VerifiedUser | null> {
@@ -54,7 +58,7 @@ export async function verifyRequestUser(
       isAdmin: user.email === ADMIN_EMAIL,
     };
   } catch (error) {
-    console.error("AI Engine: ID token verification failed:", error);
+    console.error("verifyRequestUser: ID token verification failed:", error);
     return null;
   }
 }

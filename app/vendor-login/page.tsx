@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut, sendEmailVerification } from "firebase/auth";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
@@ -38,6 +38,17 @@ export default function VendorLoginPage() {
   email.trim().toLowerCase(),
   password.trim()
 );
+
+      if (!userCredential.user.emailVerified) {
+        await sendEmailVerification(userCredential.user);
+        await signOut(auth);
+        alert(
+          "Your seller account's email isn't verified yet. We just sent a verification link to " +
+            userCredential.user.email +
+            " — open it, then log in again here."
+        );
+        return;
+      }
 
       const vendorQuery = query(
         collection(db, "vendors"),

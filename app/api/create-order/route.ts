@@ -1,6 +1,7 @@
 import Razorpay from "razorpay";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { verifyRequestUser } from "@/lib/serverAuth";
 
 // Keep in sync with the free-shipping threshold used in
 // app/checkout/page.tsx and app/cart/page.tsx.
@@ -12,6 +13,15 @@ export async function POST(
 ){
 
   try{
+
+    const requester = await verifyRequestUser(req);
+
+    if (!requester) {
+      return Response.json(
+        { error: "Please sign in to place an order." },
+        { status: 401 }
+      );
+    }
 
     const body =
       await req.json();
@@ -119,10 +129,12 @@ export async function POST(
         "receipt_" +
         Math.random(),
 
-      // Retrievable during verification so payment amount can be
-      // cross-checked against what was actually ordered.
+      // Retrievable during verification so payment amount — and now the
+      // customer who initiated it — can be cross-checked against what
+      // was actually ordered.
       notes: {
         expectedAmount: String(finalAmount * 100),
+        verifiedUid: requester.uid,
       },
 
     };

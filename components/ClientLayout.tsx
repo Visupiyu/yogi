@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import MinimalHeader from "@/components/MinimalHeader";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import QueryProvider from "@/components/providers/QueryProvider";
+import EmailVerificationBanner from "@/components/EmailVerificationBanner";
 
 const HIDE_CHROME_PREFIXES = [
   "/seller",
@@ -56,6 +57,7 @@ export default function ClientLayout({
         <>
           <TopStrip />
           <Navbar />
+          <EmailVerificationBanner />
         </>
       )}
 

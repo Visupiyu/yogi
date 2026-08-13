@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { chatWithTools, type ChatTurn } from "@/lib/ai/client";
 import { adminTools } from "@/lib/ai/tools/adminTools";
 import { buildToolRegistry } from "@/lib/ai/tools/types";
-import { verifyRequestUser } from "@/lib/ai/serverAuth";
+import { verifyRequestUser } from "@/lib/serverAuth";
 
 const SYSTEM_PROMPT = `You are the YOMICO Admin Assistant, helping the marketplace admin understand sales, vendor performance, commission, and inventory across the whole platform. Use the available tools to look up real, authorized data — never invent figures. Keep answers concise and point out anything unusual you notice in the data (e.g. an unusually large single order, a vendor with unusually high refund/cancellation rates) when relevant. You are read-only: you cannot change prices, approve vendors, issue refunds, or modify orders — if asked to take such an action, explain that it must be done manually in the admin panel.`;
 

@@ -9,8 +9,8 @@ import {
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import Image from "next/image";
-
-const adminEmails = ["adminyogimart@gmail.com"];
+import Link from "next/link";
+import { ADMIN_EMAIL } from "@/lib/adminConfig";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -32,7 +32,7 @@ const result = await signInWithEmailAndPassword( auth, email.trim().toLowerCase(
 
 const userEmail = (result.user.email || "").toLowerCase();
 
-if (!adminEmails.includes(userEmail)) {
+if (userEmail !== ADMIN_EMAIL) {
   await signOut(auth);
   alert("Not Admin Account");
   return;
@@ -113,6 +113,10 @@ router.push("/admin");
           >
             {loading ? "Logging in..." : "Login"}
           </button>
+
+          <Link href="/admin-forgot-password" className="block text-center text-blue-600 hover:underline text-sm">
+            Forgot Password?
+          </Link>
         </div>
       </div>
     </div>

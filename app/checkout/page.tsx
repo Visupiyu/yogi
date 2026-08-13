@@ -298,12 +298,15 @@ setAddress(userData.address || "");
 
     // Confirmation email (best-effort)
     try {
+      const emailIdToken = await firebaseUser.getIdToken();
       await fetch("/api/send-order-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${emailIdToken}`,
+        },
         body: JSON.stringify({
           customerName: name,
-          customerEmail: firebaseUser.email,
           orderId,
           total: grandTotal,
         }),
@@ -515,7 +518,8 @@ setAddress(userData.address || "");
     // Must check login BEFORE opening Razorpay, not after payment succeeds
     // — otherwise a session that expires mid-checkout lets Razorpay
     // capture real money with no order ever created and no way back to it.
-    if (!auth.currentUser) {
+    const payingUser = auth.currentUser;
+    if (!payingUser) {
       alert("Please login again.");
       router.push("/login");
       return;
@@ -535,9 +539,14 @@ setAddress(userData.address || "");
       return;
     }
 
+    const idToken = await payingUser.getIdToken();
+
     const response = await fetch("/api/create-order", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
       // Send what's in the cart, not a pre-computed total — the amount
       // actually charged is calculated server-side from real product
       // prices, not trusted from the browser.
@@ -561,9 +570,14 @@ setAddress(userData.address || "");
       description: "Marketplace Payment",
       order_id: data.id,
       handler: async function (rzp: any) {
+        const verifyIdToken = await payingUser.getIdToken();
+
         const verifyResponse = await fetch("/api/verify-payments", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${verifyIdToken}`,
+          },
           body: JSON.stringify({
             razorpay_order_id: rzp.razorpay_order_id,
             razorpay_payment_id: rzp.razorpay_payment_id,

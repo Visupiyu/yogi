@@ -171,7 +171,16 @@ export default function DeliveryLoginPage() {
             {loading ? "Authenticating..." : "Login to Delivery Portal"}
           </button>
 
-          <p className="text-center mt-6 text-sm text-gray-500">
+          <p className="text-center mt-4 text-sm">
+            <Link
+              href="/delivery-forgot-password"
+              className="font-semibold text-blue-600 hover:underline"
+            >
+              Forgot Password?
+            </Link>
+          </p>
+
+          <p className="text-center mt-2 text-sm text-gray-500">
             Don&apos;t have login details?{" "}
             <Link
               href="/contact"

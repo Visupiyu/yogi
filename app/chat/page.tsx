@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 import Image from "next/image";
 
 export default function ChatPage() {
@@ -26,21 +27,19 @@ export default function ChatPage() {
 const [chats, setChats] = useState<Chat[]>([]);
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser?.email) {
+        router.push("/login");
+        return;
+      }
 
-    if (!user.email) {
-      router.push("/login");
-      return;
-    }
-
-    const loadChats = async () => {
       try {
         // Scoped to this customer on the server (needs a composite index on
         // customerEmail + lastMessageAt). Keeps other users' chats private.
         const snapshot = await getDocs(
           query(
             collection(db, "chats"),
-            where("customerEmail", "==", user.email),
+            where("customerEmail", "==", firebaseUser.email),
             orderBy("lastMessageAt", "desc")
           )
         );
@@ -52,13 +51,13 @@ const [chats, setChats] = useState<Chat[]>([]);
 
         setChats(list);
       } catch (error) {
-      console.error("Chat loading failed:", error);
+        console.error("Chat loading failed:", error);
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    loadChats();
+    return () => unsub();
   }, [router]);
 
   const filtered = chats.filter(

@@ -61,8 +61,6 @@ type Customer = {
   totalSpent?: number;
 };
 
-const adminEmails = ["adminyogimart@gmail.com"];
-
 export default function AdminPage() {
   const router = useRouter();
 
@@ -205,17 +203,11 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
+    // Admin identity is already gated by app/admin/layout.tsx (which this
+    // page always renders inside) — this listener is just here to trigger
+    // data loading once that guard confirms an admin session exists.
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-      if (!adminEmails.includes(user.email || "")) {
-        alert("Not Admin Account");
-        await signOut(auth);
-        router.push("/login");
-        return;
-      }
+      if (!user) return;
 
       const vendorList = await loadVendors();
       await loadProducts(vendorList);

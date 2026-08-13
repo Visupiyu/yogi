@@ -19,7 +19,10 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+      if (!user) {
+        router.push("/login");
+        return;
+      }
 
       const wishlist = JSON.parse(
         localStorage.getItem("wishlist") || "[]"
@@ -50,7 +53,7 @@ export default function SettingsPage() {
     });
 
     return () => unsub();
-  }, []);
+  }, [router]);
 
   const logout = async () => {
     if (!confirm("Logout from your account?")) return;

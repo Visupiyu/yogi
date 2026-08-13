@@ -1,11 +1,21 @@
 import crypto from "crypto";
 import Razorpay from "razorpay";
+import { verifyRequestUser } from "@/lib/serverAuth";
 
 export async function POST(
   req:Request
 ){
 
   try{
+
+    const requester = await verifyRequestUser(req);
+
+    if (!requester) {
+      return Response.json(
+        { success: false, message: "Please sign in to verify a payment." },
+        { status: 401 }
+      );
+    }
 
     const body =
       await req.json();
@@ -87,6 +97,17 @@ export async function POST(
       return Response.json({
         success: false,
         message: "Payment was not captured",
+      });
+    }
+
+    // create-order stamped the Razorpay order with the uid that started
+    // checkout — refuse to confirm someone else's payment for this order.
+    const verifiedUid = order.notes?.verifiedUid;
+
+    if (verifiedUid && verifiedUid !== requester.uid) {
+      return Response.json({
+        success: false,
+        message: "This payment does not belong to your account",
       });
     }
 

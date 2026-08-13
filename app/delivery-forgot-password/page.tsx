@@ -6,7 +6,7 @@ import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import Image from "next/image";
 
-export default function VendorForgotPasswordPage() {
+export default function DeliveryForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -19,7 +19,7 @@ export default function VendorForgotPasswordPage() {
     setError("");
 
     if (!email.trim()) {
-      setError("Please enter your registered vendor email.");
+      setError("Please enter your registered email.");
       return;
     }
 
@@ -29,18 +29,17 @@ export default function VendorForgotPasswordPage() {
       await sendPasswordResetEmail(auth, email.trim().toLowerCase());
 
       setMessage(
-        "If a vendor account exists for this email, a password reset link has been sent."
+        "If a delivery partner account exists for this email, a password reset link has been sent."
       );
-
       setEmail("");
-    } catch (err: any) {
-      switch (err.code) {
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      switch (code) {
         // Deliberately not distinguishing "no account found" from success
-        // — confirming which emails are/aren't registered is an
-        // enumeration risk, same reasoning as the customer reset flow.
+        // — same enumeration-avoidance reasoning as the other reset flows.
         case "auth/user-not-found":
           setMessage(
-            "If a vendor account exists for this email, a password reset link has been sent."
+            "If a delivery partner account exists for this email, a password reset link has been sent."
           );
           setEmail("");
           break;
@@ -59,16 +58,9 @@ export default function VendorForgotPasswordPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16">
-
-      {/* HERO */}
-      <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white">
+      <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
         <div className="max-w-5xl mx-auto px-6 py-12">
-
-          <Link href="/vendor-login" className="text-sm text-white/80 hover:text-white hover:underline">
-            ← Back to Vendor Login
-          </Link>
-
-          <div className="mt-4 flex items-center gap-5">
+          <div className="flex items-center gap-5">
             <Image
               src="/logo.png"
               alt="YOMICO"
@@ -79,36 +71,30 @@ export default function VendorForgotPasswordPage() {
 
             <div>
               <p className="text-sm uppercase tracking-widest opacity-80">
-                YOMICO Seller Portal
+                YOMICO Delivery Portal
               </p>
-              <h1 className="text-3xl md:text-4xl font-bold">
-                Forgot Password
-              </h1>
+              <h1 className="text-3xl md:text-4xl font-bold">Forgot Password</h1>
             </div>
           </div>
 
           <p className="mt-4 max-w-xl opacity-90">
-            Enter your registered vendor email to receive a password reset link.
+            Enter your registered email to receive a password reset link.
           </p>
-
         </div>
       </div>
 
-      {/* RESET FORM */}
       <div className="max-w-5xl mx-auto px-6 -mt-8">
         <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-lg p-8">
-
           <form onSubmit={handleReset} className="space-y-5">
-
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Business Email
+                Email Address
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
 
@@ -130,23 +116,21 @@ export default function VendorForgotPasswordPage() {
               className={`w-full py-4 rounded-xl text-white font-bold ${
                 loading
                   ? "bg-gray-400"
-                  : "bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500"
+                  : "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500"
               }`}
             >
               {loading ? "Sending Reset Link..." : "Send Reset Link"}
             </button>
 
             <Link
-              href="/vendor-login"
+              href="/delivery-login"
               className="block text-center text-blue-600 hover:underline"
             >
-              ← Back to Vendor Login
+              ← Back to Delivery Login
             </Link>
-
           </form>
         </div>
       </div>
-
     </div>
   );
 }
