@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
-import { collection, getDocs, limit, query } from "firebase/firestore";
+import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 type Product = {
@@ -22,7 +22,16 @@ export default function FeaturedProducts() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const q = query(collection(db, "products"), limit(8));
+        // Wasn't actually filtering by `featured` at all before — just
+        // "first 8 products in Firestore's default order," regardless of
+        // curation. Paired with a real admin toggle in app/admin/products
+        // to set the flag (it always defaulted false with no way to
+        // change it).
+        const q = query(
+          collection(db, "products"),
+          where("featured", "==", true),
+          limit(8)
+        );
         const snapshot = await getDocs(q);
 
         const items: Product[] = [];

@@ -189,6 +189,17 @@ service cloud.firestore {
         && request.resource.data.reviewCount == resource.data.reviewCount + 1;
     }
 
+    function isViewIncrement() {
+      // Any signed-in visitor loading a product page bumps its view
+      // count by exactly one — the only thing that made "Trending
+      // Products" (sorted by this field) meaningful, since nothing
+      // previously incremented it at all.
+      return isSignedIn()
+        && affectedKeysOnly(['views'])
+        && request.resource.data.views is number
+        && request.resource.data.views == resource.data.views + 1;
+    }
+
     function isStockRestoreUpdate() {
       // Cancelling an order (by the customer or the seller/admin) restores
       // the stock and reverses the sale count that checkout previously
@@ -222,7 +233,8 @@ service cloud.firestore {
         )
         || isCheckoutStockUpdate()
         || isReviewRatingUpdate()
-        || isStockRestoreUpdate();
+        || isStockRestoreUpdate()
+        || isViewIncrement();
 
       allow delete: if isAdmin() || isOwnerUid(resource.data.vendorId);
     }

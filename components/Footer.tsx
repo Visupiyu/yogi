@@ -51,8 +51,9 @@ export default function Footer() {
           <h3 className="text-lg font-bold mb-3">Help</h3>
           <ul className="space-y-3 text-gray-600">
             <li><Link href="/contact" className="hover:text-green-600 transition">Contact Us</Link></li>
+            <li><Link href="/faq" className="hover:text-green-600 transition">FAQ</Link></li>
             <li>
-  <Link href="/returns-refunds" className="hover:text-green-600 transition">
+  <Link href="/return-refund" className="hover:text-green-600 transition">
     Returns & Refunds
   </Link>
 </li>
@@ -62,7 +63,9 @@ export default function Footer() {
     Shipping Policy
   </Link>
 </li>
+            <li><Link href="/cancellation-policy" className="hover:text-green-600 transition">Cancellation Policy</Link></li>
             <li><Link href="/privacy-policy" className="hover:text-green-600 transition">Privacy Policy</Link></li>
+            <li><Link href="/cookie-policy" className="hover:text-green-600 transition">Cookie Policy</Link></li>
             <li><Link href="/terms" className="hover:text-green-600 transition">Terms &amp; Conditions</Link></li>
           </ul>
         </div>

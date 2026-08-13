@@ -21,7 +21,10 @@ export default function PromoBanner({
 
   link1 = "/category/Electronics",
 
-  link2 = "/offers",
+  // No dedicated offers/deals page exists anywhere in the app — /offers
+  // 404'd. /store is the same general "browse everything" destination
+  // already used for "View All" elsewhere on the homepage.
+  link2 = "/store",
 
 }) {
 

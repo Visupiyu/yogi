@@ -6,10 +6,13 @@ import { db } from "@/lib/firebase";
 import ProductCard from "./ProductCard";
 import { motion } from "framer-motion";
 
-async function fetchNewArrivals() {
+// Was sorting by createdAt (making this a second "New Arrivals" row
+// under a "Best Sellers" heading) even though `sales` is a real,
+// live-tracked field — checkout increments it on every purchase.
+async function fetchBestSellers() {
   const q = query(
     collection(db, "products"),
-    orderBy("createdAt", "desc"),
+    orderBy("sales", "desc"),
     limit(12)
   );
   const snapshot = await getDocs(q);
@@ -33,8 +36,8 @@ function ProductSkeleton() {
 
 export default function BestSellers() {
   const { data: products, isLoading, error } = useQuery({
-    queryKey: ["new-arrivals"],
-queryFn: fetchNewArrivals,
+    queryKey: ["best-sellers"],
+queryFn: fetchBestSellers,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -45,7 +48,7 @@ queryFn: fetchNewArrivals,
   <div>
 
      <h2 className="text-2xl md:text-2xl font-bold text-gray-900">
-     🆕 New Arrivals
+     🏆 Best Sellers
     </h2>
 
     </div>
@@ -55,7 +58,7 @@ queryFn: fetchNewArrivals,
       {error && <div className="text-center py-10 bg-red-50 rounded-2xl border border-red-200">
 
   <p className="text-red-600 font-semibold">
-   Failed to load new arrivals.
+   Failed to load best sellers.
   </p>
 
 </div>}
@@ -97,15 +100,15 @@ queryFn: fetchNewArrivals,
           <div className="text-center py-10 md:py-16">
 
   <div className="text-6xl mb-4">
-    🆕
+    🏆
   </div>
 
   <h3 className="text-2xl font-bold text-gray-800">
-   No New Arrivals Yet
+   No Best Sellers Yet
   </h3>
 
   <p className="text-gray-500 mt-2">
-    Newly added products will appear here automatically.
+    Top-selling products will appear here as orders come in.
   </p>
 
 </div>

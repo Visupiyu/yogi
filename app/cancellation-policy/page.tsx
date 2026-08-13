@@ -1,3 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Cancellation Policy | YOMICO",
+  description:
+    "Read YOMICO's order cancellation policy — when and how you can cancel an order placed on the marketplace.",
+};
+
 export default function CancellationPolicyPage() {
 
   return (

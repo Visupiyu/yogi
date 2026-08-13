@@ -1,4 +1,11 @@
 import LegalPageLayout from "@/components/legal/LegalPageLayout";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Use | YOMICO",
+  description:
+    "Read YOMICO's Terms of Use governing your access to and use of the marketplace.",
+};
 
 function Section({
   title,

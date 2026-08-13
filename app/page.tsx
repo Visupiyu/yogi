@@ -139,18 +139,13 @@ if (filteredData.length === 0) {
   viewAll="/category/Electronics"
 />
       <BestSellers />
-      <CollectionStrip
-  title="🎁 Raksha Bandhan Gifts"
-  category="Gifts"
-  viewAll="/category/Gifts"
-/>
+      {/* "Gifts" and "Home Essentials" CollectionStrips removed — neither
+          is a real category in lib/catalog/catalogTree.ts, so both
+          permanently rendered nothing to every visitor. Re-add once a
+          real category (or a proper seasonal-collection tagging
+          mechanism) exists to back them, rather than guessing a mapping. */}
 <PromoBanner />
       <RecommendedProducts />
-      <CollectionStrip
-  title="🌧️ Monsoon Essentials"
-  category="Home Essentials"
-  viewAll="/category/Home%20Essentials"
-/>
       <FeaturedProducts />
       <Footer />
     </main>

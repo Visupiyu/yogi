@@ -582,7 +582,7 @@ export default function VendorRegisterPage() {
             <div className="flex items-center gap-5">
 
               <Link
-                href="/seller-kit"
+                href="/sell"
                 target="_blank"
                 className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 border border-white/30 hover:bg-white/25 transition"
               >
@@ -635,7 +635,7 @@ export default function VendorRegisterPage() {
             <div className="mt-7 flex flex-wrap gap-3">
 
               <Link
-                href="/seller-kit"
+                href="/sell"
                 target="_blank"
                 className="inline-flex items-center gap-2 rounded-xl bg-white text-blue-700 px-5 py-3 font-bold shadow-lg hover:-translate-y-0.5 transition"
               >
@@ -772,7 +772,7 @@ export default function VendorRegisterPage() {
                 <div className="mt-5 pt-5 border-t border-slate-100">
 
                   <Link
-                    href="/seller-kit"
+                    href="/sell"
                     target="_blank"
                     className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 hover:bg-blue-100 transition"
                   >
@@ -1281,7 +1281,7 @@ export default function VendorRegisterPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
 
                 <Link
-                  href="/seller-kit"
+                  href="/sell"
                   target="_blank"
                   className="group rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-5 hover:-translate-y-1 hover:shadow-md transition"
                 >
@@ -1455,7 +1455,7 @@ export default function VendorRegisterPage() {
             <div className="flex gap-5 text-sm">
 
               <Link
-                href="/seller-kit"
+                href="/sell"
                 target="_blank"
                 className="text-blue-600 font-semibold hover:underline"
               >

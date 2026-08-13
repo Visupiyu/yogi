@@ -24,6 +24,7 @@ type Product = {
   stock: number;
   sales: number;
   status?: string;
+  featured?: boolean;
 };
 
 export default function AdminProductsPage() {
@@ -62,6 +63,7 @@ export default function AdminProductsPage() {
           // Real schema gates visibility via `active` (bool), not a status
           // string — derive the display label from that.
           status: data.active === false ? "Blocked" : "Active",
+          featured: data.featured === true,
         });
       });
       setProducts(items);
@@ -78,6 +80,25 @@ export default function AdminProductsPage() {
         active: product.status !== "Active",
       });
       toast.success("Product updated.");
+      loadProducts();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update product.");
+    }
+  };
+
+  // The homepage's "Featured Products" section filters on this field, but
+  // nothing anywhere ever set it to true — it always defaulted false at
+  // creation (app/seller/components/ProductForm.tsx) with no toggle
+  // anywhere in the app.
+  const toggleFeatured = async (product: Product) => {
+    try {
+      await updateDoc(doc(db, "products", product.id), {
+        featured: !product.featured,
+      });
+      toast.success(
+        product.featured ? "Removed from Featured." : "Marked as Featured."
+      );
       loadProducts();
     } catch (error) {
       console.error(error);
@@ -276,6 +297,17 @@ export default function AdminProductsPage() {
                     }`}
                   >
                     {product.status === "Active" ? "Block" : "Activate"}
+                  </button>
+
+                  <button
+                    onClick={() => toggleFeatured(product)}
+                    className={`flex-1 py-1.5 text-sm rounded-lg text-white transition ${
+                      product.featured
+                        ? "bg-purple-600 hover:bg-purple-700"
+                        : "bg-gray-500 hover:bg-gray-600"
+                    }`}
+                  >
+                    {product.featured ? "★ Featured" : "☆ Feature"}
                   </button>
 
                   <button

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc, updateDoc, collection, getDocs, query, where, addDoc, serverTimestamp,limit,} from "firebase/firestore";
+import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where, addDoc, serverTimestamp,limit,} from "firebase/firestore";
 import RecentlyViewed from "@/components/RecentlyViewed";
 import FrequentlyBoughtTogether from "@/components/FrequentlyBoughtTogether";
 import CustomersAlsoBought from "@/components/CustomersAlsoBought";
@@ -139,6 +139,19 @@ const [quantity, setQuantity] = useState(1);
          const fullProduct: Product = normalizeProduct(snap.id, productData);
 
 setProduct(fullProduct);
+
+// "Trending Products" on the homepage sorts by this field — nothing
+// ever incremented it before, so that ordering was permanently
+// frozen/meaningless. Best-effort and signed-in-only (matching
+// firestore.rules' isViewIncrement()); a failed/skipped count isn't
+// worth surfacing to the visitor.
+if (auth.currentUser) {
+  updateDoc(doc(db, "products", snap.id), {
+    views: increment(1),
+  }).catch((viewError) => {
+    console.error("Failed to record product view:", viewError);
+  });
+}
 
 // ⭐ Save Recently Viewed Product
 const viewed = JSON.parse(

@@ -1,4 +1,11 @@
  import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About Us | YOMICO",
+  description:
+    "Learn about YOMICO, India's multi-vendor marketplace connecting trusted sellers with customers across groceries, fashion, electronics, beauty and more.",
+};
 
 export default function AboutPage() {
 
