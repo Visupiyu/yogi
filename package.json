@@ -4,17 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
     "@google/genai": "^2.17.0",
+    "@opentelemetry/api": "^1.9.1",
     "@tanstack/react-query": "^5.100.14",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "file-saver": "^2.0.5",
     "firebase": "^12.13.0",
+    "firebase-admin": "^14.2.0",
     "framer-motion": "^12.40.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",

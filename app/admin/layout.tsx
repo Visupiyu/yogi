@@ -6,13 +6,11 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-
-// Stopgap admin check. Replace with a custom claim (token.admin === true)
-// when you set up admin claims — then this constant can go away.
-const ADMIN_EMAIL = "adminyogimart@gmail.com";
+import { ADMIN_EMAIL } from "@/lib/adminConfig";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: "📊" },
+  { href: "/admin/ai-assistant", label: "AI Assistant", icon: "🤖" },
   { href: "/admin/orders", label: "Orders", icon: "📦" },
   { href: "/admin/users", label: "Users", icon: "👥" },
   { href: "/admin/customers", label: "Customers", icon: "🧑" },

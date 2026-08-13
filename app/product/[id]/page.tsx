@@ -115,6 +115,9 @@ export default function ProductPage() {
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [question, setQuestion] = useState("");
   const [questions, setQuestions] = useState<ProductQuestion[]>([]);
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiAnswer, setAiAnswer] = useState("");
+  const [askingAI, setAskingAI] = useState(false);
  const [reviews, setReviews] = useState<ProductReview[]>([]);
   // Defaulted to 5 before, so a customer who forgot to pick a rating
   // and just typed a critical review would silently post a 5-star one.
@@ -374,6 +377,59 @@ questionSnap.forEach((d) => {
     } catch (error) {
       console.error(error);
       alert("Couldn't submit your question. Please try again.");
+    }
+  };
+
+  const askAI = async () => {
+    if (!product) return;
+
+    if (!aiQuestion.trim()) {
+      alert("Enter a question");
+      return;
+    }
+
+    setAskingAI(true);
+    setAiAnswer("");
+
+    try {
+      const specRecord = specifications.reduce<Record<string, string>>(
+        (acc, [label, value]) => {
+          if (value) acc[label] = value;
+          return acc;
+        },
+        {}
+      );
+
+      const response = await fetch("/api/ai/product-qa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question: aiQuestion,
+          productName: product.name,
+          description: product.description,
+          category: categoryDisplayName,
+          brand: product.brand,
+          price: product.price,
+          specifications: specRecord,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to answer question.");
+      }
+
+      setAiAnswer(data.answer || "");
+    } catch (error) {
+      console.error(error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Couldn't get an AI answer. Please try again.";
+      setAiAnswer(message);
+    } finally {
+      setAskingAI(false);
     }
   };
 
@@ -1566,6 +1622,55 @@ p-6
   currentProductId={product.id}
 />
       
+
+          {/* AI Q&A */}
+          <div
+            className="
+            mt-10
+            bg-gradient-to-r
+            from-indigo-50
+            to-violet-50
+            border
+            border-indigo-100
+            rounded-3xl
+            p-6
+            "
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-2xl">🤖</span>
+              <h2 className="text-2xl font-bold">Ask AI About This Product</h2>
+            </div>
+            <p className="text-gray-500 mb-5">
+              Get an instant answer based on this product&apos;s details.
+            </p>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={aiQuestion}
+                onChange={(e) => setAiQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") askAI();
+                }}
+                placeholder="e.g. Is this suitable for daily use?"
+                className="flex-1 border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              />
+              <button
+                onClick={askAI}
+                disabled={askingAI}
+                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-6 rounded-2xl font-semibold transition"
+              >
+                {askingAI ? "Asking…" : "Ask AI"}
+              </button>
+            </div>
+            {aiAnswer && (
+              <div className="bg-white border border-indigo-200 rounded-2xl p-5 mt-5">
+                <p className="font-semibold text-indigo-700 mb-2">
+                  ✨ AI Answer
+                </p>
+                <p className="text-gray-700 whitespace-pre-line">{aiAnswer}</p>
+              </div>
+            )}
+          </div>
 
           {/* QUESTIONS */}
           <div

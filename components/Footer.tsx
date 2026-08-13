@@ -43,6 +43,7 @@ export default function Footer() {
           <h3 className="text-base md:text-lg font-bold mb-3">Company</h3>
           <ul className="space-y-2 text-gray-600">
             <li><Link href="/about" className="hover:text-green-600 transition">About Us</Link></li>
+            <li><Link href="/assistant" className="hover:text-green-600 transition">🤖 AI Shopping Assistant</Link></li>
             </ul>
         </div>
 

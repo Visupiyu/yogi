@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -13,20 +17,18 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-
     "baseUrl": ".",
-
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     },
-
     "plugins": [
       {
         "name": "next"
       }
     ]
   },
-
   "include": [
     "next-env.d.ts",
     "**/*.ts",
@@ -35,9 +37,10 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     "app/search/page.jsx",
-    "app/seller/layout.js"
+    "app/seller/layout.js",
+    ".next-build/types/**/*.ts",
+    ".next-build/dev/types/**/*.ts"
   ],
-
   "exclude": [
     "node_modules"
   ]

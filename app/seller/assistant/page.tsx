@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import AIChatWidget from "@/components/ai/AIChatWidget";
 export default function SellerAssistantPage(){
 
   const [productName,setProductName] =useState("");
@@ -96,6 +97,20 @@ const copyText = (
             Generate product content instantly
           </p>
         </div>
+
+        <div className="mb-8">
+          <AIChatWidget
+            endpoint="/api/ai/seller/chat"
+            title="Seller Assistant"
+            subtitle="Ask about your sales, orders and inventory"
+            suggestedQuestions={[
+              "How are my sales this month?",
+              "Which of my products are low on stock?",
+              "What are my total earnings so far?",
+            ]}
+          />
+        </div>
+
         <div className="bg-white rounded-3xl shadow p-8 ">
           <div className="
             grid

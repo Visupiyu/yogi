@@ -11,7 +11,7 @@
 // NEXT_PUBLIC_ prefix) — this file must only ever be imported from
 // app/api/** route handlers, never from a "use client" component.
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type Content } from "@google/genai";
 
 let client: GoogleGenAI | null = null;
 
@@ -94,4 +94,100 @@ export async function generateJSON<T>({
   } catch {
     throw new Error("AI returned a response that wasn't valid JSON.");
   }
+}
+
+// ==========================================
+// Function calling (tool use)
+// ==========================================
+//
+// Shared by Customer AI / Seller AI / Admin AI chat assistants — each
+// role passes its own system prompt and its own scoped set of tools
+// (lib/ai/tools/**); Gemini decides which tool(s) to call, this runs
+// the actual tool function server-side, and feeds the result back until
+// Gemini produces a final answer. Gemini never touches Firestore
+// directly — see lib/ai/tools/** for the trusted, scoped implementations.
+
+export type ToolDeclaration = {
+  name: string;
+  description: string;
+  parameters: object;
+};
+
+export type ChatTurn = {
+  role: "user" | "model";
+  text: string;
+};
+
+export type ToolChatRequest = {
+  systemPrompt: string;
+  history: ChatTurn[];
+  message: string;
+  tools: ToolDeclaration[];
+  executeTool: (name: string, args: Record<string, unknown>) => Promise<unknown>;
+};
+
+const MAX_TOOL_ROUNDS = 5;
+
+export async function chatWithTools({
+  systemPrompt,
+  history,
+  message,
+  tools,
+  executeTool,
+}: ToolChatRequest): Promise<string> {
+  const contents: Content[] = [
+    ...history.map((turn) => ({
+      role: turn.role,
+      parts: [{ text: turn.text }],
+    })),
+    { role: "user", parts: [{ text: message }] },
+  ];
+
+  const config = {
+    systemInstruction: systemPrompt,
+    tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
+  };
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const response = await getClient().models.generateContent({
+      model: MODEL,
+      contents,
+      config,
+    });
+
+    const functionCalls = response.functionCalls;
+
+    if (!functionCalls || functionCalls.length === 0) {
+      const text = response.text;
+      if (!text) {
+        throw new Error("AI returned an empty response.");
+      }
+      return text;
+    }
+
+    contents.push({
+      role: "model",
+      parts: functionCalls.map((call) => ({ functionCall: call })),
+    });
+
+    const responseParts = [];
+    for (const call of functionCalls) {
+      const name = call.name ?? "";
+      let result: unknown;
+      try {
+        result = await executeTool(name, call.args ?? {});
+      } catch (error) {
+        result = {
+          error: error instanceof Error ? error.message : "Tool execution failed.",
+        };
+      }
+      responseParts.push({
+        functionResponse: { name, response: { result } },
+      });
+    }
+
+    contents.push({ role: "user" as const, parts: responseParts });
+  }
+
+  throw new Error("AI could not complete the request — too many tool calls.");
 }
