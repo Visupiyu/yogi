@@ -15,7 +15,7 @@ import {
 
 
 
-const firebaseConfig = {
+export const firebaseConfig = {
 
   apiKey:
     "AIzaSyC_RpmkFRJfWkcg6apFXufz5dz8NvT2P4Q",

@@ -6,10 +6,16 @@
 // entirely — see lib/ai/serverAuth.ts for the identity verification this
 // depends on.
 //
+// Deliberately never imports firebase-admin/auth: it pulls in jwks-rsa,
+// which depends on jose v6 (ESM-only, no CJS build at all). Vercel's
+// serverless runtime hard-disables require(ESM) regardless of Node
+// version, so importing firebase-admin/auth anywhere crashes every
+// route that touches this file with ERR_REQUIRE_ESM in production.
+// lib/ai/serverAuth.ts verifies ID tokens via Google's REST API instead.
+//
 // Never import this file from a "use client" component or any file
 // reachable from the browser bundle.
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 function getAdminApp(): App {
@@ -30,10 +36,6 @@ function getAdminApp(): App {
     { credential: cert(serviceAccount) },
     "yomico-admin"
   );
-}
-
-export function getAdminAuth() {
-  return getAuth(getAdminApp());
 }
 
 export function getAdminDb() {
