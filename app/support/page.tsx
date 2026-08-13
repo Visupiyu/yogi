@@ -76,6 +76,11 @@ async()=>{
 
     );
 
+    // notifications requires `role` (and userId for non-admin roles) or
+    // the write is rejected by Firestore rules — this was missing both,
+    // so it threw here and silently skipped the success alert and
+    // clearing the form below, even though the ticket itself had already
+    // saved successfully.
     await addDoc(
 
       collection(
@@ -90,6 +95,9 @@ async()=>{
 
         message:
           `${subject}`,
+
+        role:
+          "admin",
 
         type:
           "support",

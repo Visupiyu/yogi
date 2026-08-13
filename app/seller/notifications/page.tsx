@@ -9,6 +9,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   updateDoc,
   deleteDoc,
   doc,
@@ -57,7 +58,11 @@ export default function SellerNotificationsPage() {
 
       where("role", "==", "seller"),
 
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
+
+      // Unbounded before — kept loading this seller's entire notification
+      // history forever, growing slower and pricier over time.
+      limit(50)
 
     );
 

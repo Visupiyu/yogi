@@ -311,8 +311,15 @@ export default function AdminPage() {
 
   const loadUnreadNotifications = async () => {
     try {
+      // Missing the role scope /admin/notifications already uses — this
+      // counted every unread customer/seller notification in the whole
+      // marketplace too, not just admin's own.
       const snapshot = await getDocs(
-        query(collection(db, "notifications"), where("read", "==", false))
+        query(
+          collection(db, "notifications"),
+          where("role", "==", "admin"),
+          where("read", "==", false)
+        )
       );
       setUnreadCount(snapshot.size);
     } catch (error) {
@@ -544,10 +551,11 @@ export default function AdminPage() {
     <p className="text-gray-500 mb-6">Marketplace alerts and important activities.</p>
 
   </div>
-{/* NOTIFICATIONS */}
+{/* QUICK ALERTS — locally-computed, not the notifications collection
+    (that's the "System Notifications" card above) */}
 <div className="bg-white rounded-2xl shadow p-8 mb-10">
   <h2 className="text-3xl font-bold mb-8">
-    🔔 Notifications
+    ⚠️ Quick Alerts
   </h2>
 
   <div className="space-y-4">

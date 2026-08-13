@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 
 import {
   collection,
+  doc,
+  limit,
   onSnapshot,
   query,
+  updateDoc,
   where,
   orderBy,
 } from "firebase/firestore";
@@ -45,7 +48,11 @@ useEffect(() => {
 
     where("role", "==", "customer"),
 
-    orderBy("createdAt", "desc")
+    orderBy("createdAt", "desc"),
+
+    // Unbounded before — kept loading the customer's entire notification
+    // history forever, growing slower and pricier over time.
+    limit(50)
 
   );
 
@@ -79,27 +86,25 @@ useEffect(() => {
 
 }, []);
 
-  const markAllRead = () => {
+  // This only ever wrote to localStorage before — it looked like it
+  // worked (the "New" badges disappeared) but nothing was actually
+  // persisted, so the live NotificationBell dropdown and the next page
+  // load both still showed everything as unread.
+  const markAllRead = async () => {
 
-    const updated =
+    const unread = notifications.filter((n) => !n.read);
 
-      notifications.map((n) => ({
-
-        ...n,
-
-        read: true,
-
-      }));
-
-    setNotifications(updated);
-
-    localStorage.setItem(
-
-      "notifications",
-
-      JSON.stringify(updated)
-
+    await Promise.all(
+      unread.map((n) =>
+        updateDoc(doc(db, "notifications", n.id), { read: true })
+      )
     );
+
+  };
+
+  const markRead = async (id: string) => {
+
+    await updateDoc(doc(db, "notifications", id), { read: true });
 
   };
 
@@ -194,6 +199,10 @@ useEffect(() => {
 
                 key={item.id}
 
+                onClick={() =>
+                  !item.read && markRead(item.id)
+                }
+
                 className={`
                   rounded-3xl
                   shadow
@@ -202,7 +211,7 @@ useEffect(() => {
                   ${
                     item.read
                       ? "bg-white border-gray-300"
-                      : "bg-green-50 border-green-600"
+                      : "bg-green-50 border-green-600 cursor-pointer"
                   }
                 `}
 

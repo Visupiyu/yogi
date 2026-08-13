@@ -15,24 +15,6 @@ import { onAuthStateChanged } from "firebase/auth";
 
 import { auth, db } from "@/lib/firebase";
 
-const notifications = [
-  {
-    title: "Welcome to YOMICO Seller Portal",
-    message: "Your seller account is active and ready.",
-    type: "success",
-  },
-  {
-    title: "Complete Your Store Profile",
-    message: "Add your logo, banner and business details.",
-    type: "info",
-  },
-  {
-    title: "Inventory Reminder",
-    message: "Keep your stock updated to avoid cancelled orders.",
-    type: "warning",
-  },
-];
-
 export default function NotificationsPanel() {
 
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -49,9 +31,14 @@ export default function NotificationsPanel() {
 
       try {
 
+        // Missing the role scope every other seller notification query
+        // uses (app/seller/notifications) — matched only on userId, so
+        // it would show a customer's notifications here too if the same
+        // Auth uid ever ended up holding both roles.
         const q = query(
           collection(db, "notifications"),
           where("userId", "==", user.uid),
+          where("role", "==", "seller"),
           orderBy("createdAt", "desc"),
           limit(5)
         );
