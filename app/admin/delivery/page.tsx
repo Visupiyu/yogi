@@ -80,7 +80,7 @@ export default function AdminDeliveryPage() {
     }
   };
 
-  const assignedCount = deliveries.filter((d) => d.status === "Assigned").length;
+  const assignedCount = deliveries.filter((d) => !!d.deliveryPartnerId).length;
   const outForDeliveryCount = deliveries.filter(
     (d) => d.status === "Out For Delivery"
   ).length;
@@ -98,17 +98,24 @@ export default function AdminDeliveryPage() {
   (item.trackingNumber || "")
     .toLowerCase()
     .includes(search.toLowerCase());
-    const statusMatch = statusFilter === "All" || item.status === statusFilter;
+    const statusMatch =
+      statusFilter === "All" ||
+      (statusFilter === "Assigned"
+        ? !!item.deliveryPartnerId
+        : item.status === statusFilter);
     return searchMatch && statusMatch;
   });
 
   const assignPartner = async (orderId: string, partner: any) => {
     try {
+      // Assigning a partner is orthogonal to fulfillment status — writing
+      // "Assigned" into order.status overwrote the real Pending/Packed/
+      // Shipped/etc value, which the customer's tracking bar doesn't
+      // recognize and so visually reset back to step 1 ("Placed").
       await updateDoc(doc(db, "orders", orderId), {
         deliveryPartnerId: partner.id,
         deliveryPartnerName: partner.name,
         assignedAt: serverTimestamp(),
-        status: "Assigned",
       });
       loadDeliveries();
 
@@ -239,22 +246,27 @@ export default function AdminDeliveryPage() {
                       </h2>
                     </Link>
                     <p className="text-gray-500">Order #{order.id.slice(0, 8)}</p>
-                    <div className="mt-2">
+                    <div className="mt-2 flex gap-2 flex-wrap">
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
                           order.status === "Delivered"
                             ? "bg-green-100 text-green-700"
-                            : order.status === "Assigned"
-                            ? "bg-indigo-100 text-indigo-700"
                             : order.status === "Out For Delivery"
                             ? "bg-blue-100 text-blue-700"
                             : order.status === "Delivery Failed"
                              ? "bg-red-600 text-white"
+                            : order.status === "Cancelled"
+                            ? "bg-gray-200 text-gray-600"
                             : "bg-yellow-100 text-yellow-700"
                         }`}
                       >
                         {order.status}
                       </span>
+                      {order.deliveryPartnerId && (
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                          Partner Assigned
+                        </span>
+                      )}
                     </div>
                   </div>
 

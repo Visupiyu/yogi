@@ -73,7 +73,35 @@ export default function SellerInvoicePage() {
 
           }
 
-          setOrder(data);
+          // The order document holds every vendor's items and one
+          // whole-order total — a seller's invoice must only show their
+          // own items and their own share of the money, not the full
+          // multi-vendor order (same bug class already fixed in
+          // payouts/wallet/dashboard elsewhere this session).
+          const vendorItems = (data.items || []).filter(
+            (item: any) => item.vendorId === user.uid
+          );
+
+          const vendorSubtotal = vendorItems.reduce(
+            (sum: number, item: any) =>
+              sum + (item.price || 0) * (item.qty || 0),
+            0
+          );
+
+          const vendorCommission = Math.round(vendorSubtotal * 0.1);
+
+          setOrder({
+            ...data,
+            items: vendorItems,
+            finalTotal: vendorSubtotal,
+            commission: vendorCommission,
+            sellerEarning: vendorSubtotal - vendorCommission,
+            // Shipping/coupon discount aren't split per vendor anywhere
+            // in this app — showing the whole order's figures here would
+            // overstate this seller's own invoice.
+            shippingCharge: 0,
+            discount: 0,
+          });
 
         } catch (error) {
 
