@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { MapPin, Truck, Headphones, Smartphone } from "lucide-react";
+import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
 
 export default function TopStrip() {
   return (
@@ -13,7 +14,7 @@ export default function TopStrip() {
 
           <div className="flex items-center gap-2 font-medium">
             <Truck size={18} />
-            <span>🚚 Free Delivery on Orders Above ₹999</span>
+            <span>🚚 Free Delivery on Orders Above ₹{FREE_SHIPPING_THRESHOLD}</span>
           </div>
 {/* Divider */}
   <div className="hidden lg:block h-5 w-px bg-white/30" />

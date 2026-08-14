@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, updateDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { logAdminAction } from "@/lib/auditLog";
 
 export default function AdminKYCPage() {
   const [vendors, setVendors] = useState<any[]>([]);
@@ -41,11 +42,12 @@ setVendors(items);
 
   const updateKYC = async (id: string, status: string) => {
     try {
+      const previous = vendors.find((vendor) => vendor.id === id);
       await updateDoc(doc(db, "vendors", id), {
         kycStatus: status,
         status: status,
       });
-      const uid = vendors.find((vendor) => vendor.id === id)?.uid;
+      const uid = previous?.uid;
       if (uid) {
         await setDoc(
           doc(db, "vendors_public", uid),
@@ -53,6 +55,10 @@ setVendors(items);
           { merge: true }
         );
       }
+      await logAdminAction("kyc_status_change", id, {
+        oldStatus: previous?.kycStatus,
+        newStatus: status,
+      });
       setVendors(
         vendors.map((vendor) =>
           vendor.id === id

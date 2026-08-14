@@ -18,10 +18,10 @@ import {
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
-
-// Free shipping threshold — keep this in sync with TopStrip/cart.
-const FREE_SHIPPING_THRESHOLD = 999;
-const SHIPPING_FEE = 99;
+import {
+  FREE_SHIPPING_THRESHOLD,
+  STANDARD_SHIPPING_CHARGE as SHIPPING_FEE,
+} from "@/lib/shipping";
 
 export default function CheckoutPage() {
   const router = useRouter();

@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
+import { logAdminAction } from "@/lib/auditLog";
 
 type Order = {
   id: string;
@@ -82,7 +83,13 @@ setOrders(items);
 
   const updateStatus = async (orderId: string, status: string) => {
     try {
+      const previousStatus = orders.find((order) => order.id === orderId)?.status;
       await updateDoc(doc(db, "orders", orderId), { status });
+
+      await logAdminAction("order_status_change", orderId, {
+        oldStatus: previousStatus,
+        newStatus: status,
+      });
 
       // Admin notification (include role so it surfaces in the admin bell)
       await addDoc(collection(db, "notifications"), {

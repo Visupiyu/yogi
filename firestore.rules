@@ -101,6 +101,18 @@ rules_version = '2';
 //   both ledgers count toward "already paid" wherever earnings are
 //   computed. Write: admin only. Read: admin, or the vendor themselves.
 //
+// Collection: rateLimits            Doc ID: "create-order_{uid}"
+//   {windowStart(number, ms epoch), count(number)}. Written only via
+//   getAdminDb() (app/api/create-order/route.ts) — never by any client, so
+//   the default-deny fallback rule at the bottom of this file already
+//   covers it and no dedicated match block is needed.
+//
+// Collection: audit_logs            Doc ID: auto-id
+//   {actorUid, actorEmail, action(string), targetId(string), details(map),
+//   createdAt}. Written by lib/auditLog.ts after admin KYC/vendor-status/
+//   order-status/payout writes succeed. Append-only: no update or delete
+//   for anyone, admin included.
+//
 // Collection: deliveryPartners      Doc ID: auto-id
 //   name, phone, email, uid(string, set once admin provisions a login via
 //   a secondary Firebase Auth app instance — see lib/firebase.ts), status
@@ -134,6 +146,17 @@ service cloud.firestore {
 
     function isOwnerEmail(email) {
       return isSignedIn() && request.auth.token.email == email;
+    }
+
+    // users/{uid}.status is written by app/admin/customers/page.tsx's
+    // Block/Unblock toggle, but was never read anywhere else -- a blocked
+    // customer could still sign in and place orders. Most users never have
+    // this field set at all (signup doesn't write it), so .get() with a
+    // default is required -- direct dot-access on a genuinely absent field
+    // throws and would deny every order for every never-blocked customer.
+    function isNotBlocked() {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'Active') != 'Blocked';
     }
 
     function affectedKeysOnly(fields) {
@@ -280,7 +303,8 @@ service cloud.firestore {
 
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
-        && isValidOrder();
+        && isValidOrder()
+        && isNotBlocked();
 
       allow update: if isAdmin()
         || (
@@ -686,6 +710,14 @@ service cloud.firestore {
       // way, not just money paid via their own withdrawal requests.
       allow read: if isAdmin() || isOwnerUid(resource.data.vendorId);
       allow write: if isAdmin();
+    }
+
+    match /audit_logs/{docId} {
+      // Append-only trail of admin money/trust actions (KYC, vendor
+      // status, order status override, payouts). No update/delete for
+      // anyone, including admin — an editable log isn't an audit trail.
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
     }
 
     match /deliveryPartners/{docId} {

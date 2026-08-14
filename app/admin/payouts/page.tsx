@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { computeVendorShare } from "@/lib/vendorEarnings";
+import { logAdminAction } from "@/lib/auditLog";
 
 export default function AdminPayoutsPage() {
   const [vendors, setVendors] = useState<any[]>([]);
@@ -132,6 +133,10 @@ export default function AdminPayoutsPage() {
         amount: vendor.pendingPayout,
         status: "Paid",
         createdAt: serverTimestamp(),
+      });
+      await logAdminAction("vendor_payout", vendor.uid, {
+        vendorName: vendor.shopName,
+        amount: vendor.pendingPayout,
       });
       await loadPayouts(); // refresh from the ledger
     } catch (error) {

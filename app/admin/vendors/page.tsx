@@ -5,6 +5,7 @@ import Link from "next/link";
 import { collection, getDocs, updateDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
+import { logAdminAction } from "@/lib/auditLog";
 
 type Vendor = {
   id: string;
@@ -73,6 +74,10 @@ export default function AdminVendorsPage() {
           { merge: true }
         );
       }
+      await logAdminAction("vendor_status_change", vendor.id, {
+        oldStatus: vendor.status,
+        newStatus: status,
+      });
       toast.success(`Vendor ${status}.`);
       loadVendors();
     } catch (error) {

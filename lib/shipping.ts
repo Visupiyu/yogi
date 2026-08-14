@@ -32,7 +32,7 @@ export function calculateShipping(
 
   let shippingMethod: ShippingMethod = "Standard";
 
-  let estimatedDays = 5;
+  const estimatedDays = 5;
 
   if (subtotal >= FREE_SHIPPING_THRESHOLD) {
 

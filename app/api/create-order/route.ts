@@ -2,11 +2,42 @@ import Razorpay from "razorpay";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { verifyRequestUser } from "@/lib/serverAuth";
+import { getAdminDb } from "@/lib/firebaseAdmin";
+import {
+  FREE_SHIPPING_THRESHOLD,
+  STANDARD_SHIPPING_CHARGE as SHIPPING_FEE,
+} from "@/lib/shipping";
 
-// Keep in sync with the free-shipping threshold used in
-// app/checkout/page.tsx and app/cart/page.tsx.
-const FREE_SHIPPING_THRESHOLD = 999;
-const SHIPPING_FEE = 99;
+const ORDER_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const ORDER_RATE_LIMIT_MAX = 15;
+
+// Admin-SDK-only counter — never touched by any client, so the default-deny
+// Firestore rule already covers it and no rules change is needed. Bounds
+// how often one signed-in user can hit this route, the one server-side
+// chokepoint order creation actually passes through.
+async function isWithinOrderRateLimit(uid: string): Promise<boolean> {
+  const ref = getAdminDb().collection("rateLimits").doc(`create-order_${uid}`);
+  const now = Date.now();
+
+  return getAdminDb().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists
+      ? (snap.data() as { windowStart: number; count: number })
+      : null;
+
+    if (!data || now - data.windowStart > ORDER_RATE_LIMIT_WINDOW_MS) {
+      tx.set(ref, { windowStart: now, count: 1 });
+      return true;
+    }
+
+    if (data.count >= ORDER_RATE_LIMIT_MAX) {
+      return false;
+    }
+
+    tx.update(ref, { count: data.count + 1 });
+    return true;
+  });
+}
 
 export async function POST(
   req:Request
@@ -20,6 +51,13 @@ export async function POST(
       return Response.json(
         { error: "Please sign in to place an order." },
         { status: 401 }
+      );
+    }
+
+    if (!(await isWithinOrderRateLimit(requester.uid))) {
+      return Response.json(
+        { error: "Too many order attempts. Please wait a few minutes and try again." },
+        { status: 429 }
       );
     }
 

@@ -11,9 +11,10 @@ import {
   getCartTotal,
   clearCart,
 } from "@/lib/cart";
-
-const FREE_DELIVERY_THRESHOLD = 999; // keep in sync with TopStrip
-const SHIPPING_FEE = 99;
+import {
+  FREE_SHIPPING_THRESHOLD as FREE_DELIVERY_THRESHOLD,
+  STANDARD_SHIPPING_CHARGE as SHIPPING_FEE,
+} from "@/lib/shipping";
 
 export default function CartPage() {
   const [cart, setCart] = useState<any[]>([]);
