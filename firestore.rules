@@ -101,6 +101,15 @@ rules_version = '2';
 //   both ledgers count toward "already paid" wherever earnings are
 //   computed. Write: admin only. Read: admin, or the vendor themselves.
 //
+// Collection: settings              Doc ID: "global" (singleton)
+//   {freeShippingThreshold(number), standardShippingCharge(number),
+//   commissionEnabled(bool), commissionRate(number, 0-1, meaningful only
+//   when commissionEnabled), updatedAt, updatedBy}. Read: public (storefront
+//   displays shipping values to signed-out visitors). Write: admin only,
+//   via app/admin/settings. commissionRate is snapshotted onto each order
+//   at checkout (orders.commissionRate) — changing this doc never affects
+//   orders already placed; see lib/commission.ts / lib/vendorEarnings.ts.
+//
 // Collection: rateLimits            Doc ID: "create-order_{uid}"
 //   {windowStart(number, ms epoch), count(number)}. Written only via
 //   getAdminDb() (app/api/create-order/route.ts) — never by any client, so
@@ -709,6 +718,14 @@ service cloud.firestore {
       // account so their wallet balance reflects money already paid this
       // way, not just money paid via their own withdrawal requests.
       allow read: if isAdmin() || isOwnerUid(resource.data.vendorId);
+      allow write: if isAdmin();
+    }
+
+    match /settings/{docId} {
+      // Singleton config doc (settings/global) — freeShippingThreshold /
+      // standardShippingCharge. Public read: the storefront (TopStrip,
+      // cart) displays these to signed-out visitors too. Admin-only write.
+      allow read: if true;
       allow write: if isAdmin();
     }
 

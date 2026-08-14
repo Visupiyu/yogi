@@ -23,6 +23,7 @@ const navItems = [
   { href: "/admin/notifications", label: "Notifications", icon: "🔔" },
   { href: "/admin/support", label: "Support", icon: "🎫" },
   { href: "/admin/reviews", label: "Reviews", icon: "⭐" },
+  { href: "/admin/settings", label: "Settings", icon: "⚙️" },
 ];
 
 export default function AdminLayout({

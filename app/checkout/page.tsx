@@ -19,9 +19,11 @@ import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import {
-  FREE_SHIPPING_THRESHOLD,
-  STANDARD_SHIPPING_CHARGE as SHIPPING_FEE,
+  FREE_SHIPPING_THRESHOLD as DEFAULT_FREE_SHIPPING_THRESHOLD,
+  STANDARD_SHIPPING_CHARGE as DEFAULT_SHIPPING_FEE,
+  getShippingSettings,
 } from "@/lib/shipping";
+import { getEffectiveCommissionRate } from "@/lib/commission";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -39,8 +41,21 @@ export default function CheckoutPage() {
   const [couponApplied, setCouponApplied] = useState(false);
   const [redeemPoints, setRedeemPoints] = useState(false);
   const [availablePoints, setAvailablePoints] = useState(0);
+  const [FREE_SHIPPING_THRESHOLD, setFreeShippingThreshold] = useState(
+    DEFAULT_FREE_SHIPPING_THRESHOLD
+  );
+  const [SHIPPING_FEE, setShippingFee] = useState(DEFAULT_SHIPPING_FEE);
+  // Defaults to 0 (no commission) until the live setting loads — matches
+  // YOMICO's zero-commission launch policy; never guess a nonzero charge.
+  const [commissionRate, setCommissionRate] = useState(0);
 
   useEffect(() => {
+    getShippingSettings().then((settings) => {
+      setFreeShippingThreshold(settings.freeShippingThreshold);
+      setShippingFee(settings.standardShippingCharge);
+    });
+    getEffectiveCommissionRate().then(setCommissionRate);
+
     const storedItems = JSON.parse(
       localStorage.getItem("checkoutItems") || "[]"
     );
@@ -90,9 +105,10 @@ setAddress(userData.address || "");
     : 0;
 
   const grandTotal = Math.max(0, finalAmount + shipping - rewardValue);
-  const commission = Math.round(grandTotal * 0.1);
+  const commission = Math.round(grandTotal * commissionRate);
 
-  // Shipping + delivery date recompute whenever the amount changes.
+  // Shipping + delivery date recompute whenever the amount changes, or once
+  // the live settings values load in behind the defaults.
   useEffect(() => {
     setShipping(finalAmount > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE);
 
@@ -105,7 +121,7 @@ setAddress(userData.address || "");
     year: "numeric",
   })
 );
-  }, [finalAmount]);
+  }, [finalAmount, FREE_SHIPPING_THRESHOLD, SHIPPING_FEE]);
 
   const applyCoupon = async () => {
     if (couponApplied) {
@@ -398,8 +414,13 @@ setAddress(userData.address || "");
     verifiedAmount?: number
   ) => {
     const finalTotal = verifiedAmount ?? grandTotal;
+    // Same commissionRate either way — captured once when the page loaded,
+    // before payment method is chosen, so COD and Razorpay orders stamp
+    // the identical rate.
     const orderCommission =
-      verifiedAmount != null ? Math.round(verifiedAmount * 0.1) : commission;
+      verifiedAmount != null
+        ? Math.round(verifiedAmount * commissionRate)
+        : commission;
     const orderSellerEarning = finalTotal - orderCommission;
 
     return {
@@ -419,6 +440,7 @@ setAddress(userData.address || "");
       deliveryDate,
       commission: orderCommission,
       sellerEarning: orderSellerEarning,
+      commissionRate,
       couponCode: couponApplied ? coupon : "",
       discount,
       // Persisted so per-vendor earnings (wallet/payouts pages) can

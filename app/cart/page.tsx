@@ -12,15 +12,25 @@ import {
   clearCart,
 } from "@/lib/cart";
 import {
-  FREE_SHIPPING_THRESHOLD as FREE_DELIVERY_THRESHOLD,
-  STANDARD_SHIPPING_CHARGE as SHIPPING_FEE,
+  FREE_SHIPPING_THRESHOLD as DEFAULT_FREE_DELIVERY_THRESHOLD,
+  STANDARD_SHIPPING_CHARGE as DEFAULT_SHIPPING_FEE,
+  getShippingSettings,
 } from "@/lib/shipping";
 
 export default function CartPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [savedItems, setSavedItems] = useState<any[]>([]);
+  const [FREE_DELIVERY_THRESHOLD, setFreeDeliveryThreshold] = useState(
+    DEFAULT_FREE_DELIVERY_THRESHOLD
+  );
+  const [SHIPPING_FEE, setShippingFee] = useState(DEFAULT_SHIPPING_FEE);
 
  useEffect(() => {
+  getShippingSettings().then((settings) => {
+    setFreeDeliveryThreshold(settings.freeShippingThreshold);
+    setShippingFee(settings.standardShippingCharge);
+  });
+
   const items = getCartItems();
   setCart(items);
 

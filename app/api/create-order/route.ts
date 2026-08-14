@@ -3,10 +3,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
-import {
-  FREE_SHIPPING_THRESHOLD,
-  STANDARD_SHIPPING_CHARGE as SHIPPING_FEE,
-} from "@/lib/shipping";
+import { getShippingSettings } from "@/lib/shipping";
 
 const ORDER_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const ORDER_RATE_LIMIT_MAX = 15;
@@ -123,8 +120,11 @@ export async function POST(
       subtotal += price * qty;
     }
 
+    const { freeShippingThreshold, standardShippingCharge } =
+      await getShippingSettings();
+
     const shipping =
-      subtotal > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+      subtotal > freeShippingThreshold ? 0 : standardShippingCharge;
 
     const rawTotal = subtotal + shipping;
 

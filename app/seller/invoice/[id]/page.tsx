@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import Invoice from "@/components/invoice/Invoice";
+import { LEGACY_ORDER_COMMISSION_RATE } from "@/lib/commission";
 
 export default function SellerInvoicePage() {
 
@@ -88,7 +89,19 @@ export default function SellerInvoicePage() {
             0
           );
 
-          const vendorCommission = Math.round(vendorSubtotal * 0.1);
+          // Same fallback as computeVendorShare() in lib/vendorEarnings.ts —
+          // use the rate this specific order was actually placed under,
+          // not whatever the current admin setting happens to be. Orders
+          // predating this field fall back to the 10% they were actually
+          // charged, not YOMICO's current zero-commission launch default.
+          const commissionRate =
+            typeof data.commissionRate === "number" &&
+            data.commissionRate >= 0 &&
+            data.commissionRate <= 1
+              ? data.commissionRate
+              : LEGACY_ORDER_COMMISSION_RATE;
+
+          const vendorCommission = Math.round(vendorSubtotal * commissionRate);
 
           setOrder({
             ...data,

@@ -1,3 +1,5 @@
+import { LEGACY_ORDER_COMMISSION_RATE } from "@/lib/commission";
+
 type OrderItem = {
   vendorId?: string;
   price?: number;
@@ -9,6 +11,7 @@ type Order = {
   total?: number;
   discount?: number;
   rewardValue?: number;
+  commissionRate?: number;
 };
 
 export type VendorShare = {
@@ -17,8 +20,6 @@ export type VendorShare = {
   vendorCommission: number;
   vendorEarning: number;
 };
-
-const COMMISSION_RATE = 0.1;
 
 // order.commission/sellerEarning/discount are whole-order figures computed
 // once at checkout for the entire (possibly multi-vendor) cart — crediting
@@ -54,7 +55,20 @@ export function computeVendorShare(
     vendorRawSubtotal - vendorDiscountShare
   );
 
-  const vendorCommission = Math.round(vendorNetSubtotal * COMMISSION_RATE);
+  // Each order stamps the commission rate that was actually in effect when
+  // it was placed (see checkout's buildOrderData) — so a later admin rate
+  // change never retroactively recalculates an order already sold, paid,
+  // or invoiced. Orders from before this field existed fall back to the
+  // 10% they were implicitly always charged at — NOT to YOMICO's current
+  // zero-commission launch default, which only applies to new orders.
+  const rate =
+    typeof order.commissionRate === "number" &&
+    order.commissionRate >= 0 &&
+    order.commissionRate <= 1
+      ? order.commissionRate
+      : LEGACY_ORDER_COMMISSION_RATE;
+
+  const vendorCommission = Math.round(vendorNetSubtotal * rate);
   const vendorEarning = vendorNetSubtotal - vendorCommission;
 
   return {

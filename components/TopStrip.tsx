@@ -1,10 +1,21 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, Truck, Headphones, Smartphone } from "lucide-react";
-import { FREE_SHIPPING_THRESHOLD } from "@/lib/shipping";
+import { FREE_SHIPPING_THRESHOLD, getShippingSettings } from "@/lib/shipping";
 
 export default function TopStrip() {
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(
+    FREE_SHIPPING_THRESHOLD
+  );
+
+  useEffect(() => {
+    getShippingSettings().then((settings) =>
+      setFreeShippingThreshold(settings.freeShippingThreshold)
+    );
+  }, []);
+
   return (
     <div className="hidden md:block bg-gradient-to-r from-green-600 via-green-700 to-emerald-700 text-white text-sm">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4 overflow-x-auto whitespace-nowrap">
@@ -14,7 +25,7 @@ export default function TopStrip() {
 
           <div className="flex items-center gap-2 font-medium">
             <Truck size={18} />
-            <span>🚚 Free Delivery on Orders Above ₹{FREE_SHIPPING_THRESHOLD}</span>
+            <span>🚚 Free Delivery on Orders Above ₹{freeShippingThreshold}</span>
           </div>
 {/* Divider */}
   <div className="hidden lg:block h-5 w-px bg-white/30" />
