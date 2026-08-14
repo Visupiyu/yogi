@@ -164,6 +164,25 @@ export default function SellOnYomicoPage() {
         </div>
       </section>
 
+      {/* VENDOR LAUNCH BANNER — 0% commission launch offer. Links to
+          registration; commission % itself is controlled entirely by the
+          admin settings/commission system (app/admin/settings), not here. */}
+      <section className="mx-auto max-w-6xl px-6 py-8">
+        <Link
+          href="/vendor-register"
+          className="block overflow-hidden rounded-2xl shadow-md transition hover:shadow-lg"
+        >
+          <Image
+            src="/yomico-vendor-launch-15-august.png"
+            alt="YOMICO 0% commission vendor launch offer - Register today and start selling"
+            width={1536}
+            height={1024}
+            sizes="(max-width: 768px) 100vw, 1152px"
+            className="h-auto w-full"
+          />
+        </Link>
+      </section>
+
       {/* WHY SELL ON YOMICO */}
       <section className="mx-auto max-w-6xl px-6 py-16">
 
