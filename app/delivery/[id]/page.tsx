@@ -28,6 +28,14 @@ import {
 } from "firebase/storage";
 
 import { toast } from "sonner";
+import QRCode from "react-qr-code";
+import {
+  PAY_ON_DELIVERY_UPI,
+  getUpiSettings,
+  buildUpiPaymentUri,
+  type UpiSettings,
+} from "@/lib/upiPayment";
+import { confirmDeliveryPayment } from "@/lib/deliveryPayment";
 
 // Mirrors isLegalOrderStatusTransition in firestore.rules.
 const NEXT_STATUSES: Record<string, string[]> = {
@@ -68,7 +76,16 @@ const [enteredOtp, setEnteredOtp] =
 
 const [proofPreview, setProofPreview] =
   useState("");
-    
+
+  const [partnerName, setPartnerName] = useState("");
+  const [upiSettings, setUpiSettings] = useState<UpiSettings>({
+    upiEnabled: false,
+    upiVpa: "",
+    upiPayeeName: "YOMICO",
+  });
+  const [transactionId, setTransactionId] = useState("");
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+
 
   useEffect(() => {
 
@@ -88,7 +105,9 @@ const [proofPreview, setProofPreview] =
         return;
       }
 
+      setPartnerName(session.name || "");
       loadOrder(session.partnerId);
+      getUpiSettings().then(setUpiSettings);
 
     });
 
@@ -302,6 +321,25 @@ if (proofImage) {
 
   };
 
+  const submitPayment = async () => {
+    if (!transactionId.trim()) {
+      toast.error("Enter the UPI transaction/reference ID.");
+      return;
+    }
+
+    setSubmittingPayment(true);
+    try {
+      await confirmDeliveryPayment(id, transactionId.trim(), partnerName);
+      setOrder({ ...order, paymentStatus: "AwaitingVerification" });
+      toast.success("Payment submitted — awaiting admin verification.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to submit payment. Please try again.");
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
   if (loading) {
 
     return (
@@ -472,6 +510,82 @@ if (proofImage) {
   </div>
 
 </div>
+
+          {/* Pay on Delivery (UPI Only) — only for this exact payment
+              method, and only while there's still something to collect.
+              Never shown for ONLINE or historical COD orders. Amount is
+              never editable here: it's the server-verified paymentAmount
+              set at order creation. */}
+          {order.paymentMethod === PAY_ON_DELIVERY_UPI &&
+            ["Out For Delivery", "Delivered"].includes(order.status) && (
+              <div className="mb-8 border-2 border-green-200 rounded-2xl p-6 bg-green-50">
+                <h2 className="text-xl font-bold mb-1">
+                  YOMICO Pay on Delivery
+                </h2>
+                <p className="text-2xl font-bold text-green-700 mb-4">
+                  Amount to Pay: ₹{(order.paymentAmount || 0).toLocaleString("en-IN")}
+                </p>
+
+                {order.paymentStatus === "Paid" ? (
+                  <div className="bg-white rounded-xl p-4 font-semibold text-green-700">
+                    ✅ Payment Verified
+                  </div>
+                ) : order.paymentStatus === "AwaitingVerification" ? (
+                  <div className="bg-white rounded-xl p-4">
+                    <p className="font-semibold text-orange-600">
+                      Payment Submitted — Awaiting Verification
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Reference: {order.paymentTransactionId}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {upiSettings.upiEnabled && upiSettings.upiVpa ? (
+                      <div className="bg-white rounded-xl p-4 flex flex-col items-center mb-4">
+                        <QRCode
+                          value={buildUpiPaymentUri({
+                            vpa: upiSettings.upiVpa,
+                            payeeName: upiSettings.upiPayeeName,
+                            amount: order.paymentAmount || 0,
+                            orderId: order.id,
+                          })}
+                          size={180}
+                        />
+                        <p className="text-xs text-gray-500 mt-3">
+                          Customer scans with any UPI app
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-orange-600 mb-4">
+                        YOMICO's UPI ID isn't configured yet — ask the
+                        customer to pay ₹{(order.paymentAmount || 0).toLocaleString("en-IN")} to
+                        YOMICO's UPI account, then enter the reference
+                        below.
+                      </p>
+                    )}
+
+                    <label className="font-semibold block mb-1">
+                      Transaction / Reference ID
+                    </label>
+                    <input
+                      type="text"
+                      value={transactionId}
+                      onChange={(e) => setTransactionId(e.target.value)}
+                      placeholder="Enter the UPI transaction ID"
+                      className="w-full border rounded-xl p-3 mb-3"
+                    />
+                    <button
+                      onClick={submitPayment}
+                      disabled={submittingPayment}
+                      className="bg-green-600 text-white px-6 py-3 rounded-xl disabled:opacity-50 w-full font-semibold"
+                    >
+                      {submittingPayment ? "Submitting..." : "Submit Payment Reference"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
           <div>
 

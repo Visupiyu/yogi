@@ -15,7 +15,16 @@ import { onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
+import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 
+// Display-only — the underlying paymentStatus values themselves
+// (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
+// showing the internal "AwaitingVerification" wording to customers.
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  Pending: "Pending",
+  AwaitingVerification: "Awaiting Verification",
+  Paid: "Paid",
+};
 
 export default function OrderDetailsPage() {
   const router = useRouter();
@@ -216,7 +225,11 @@ export default function OrderDetailsPage() {
 
               <div className="flex justify-between">
                 <span>Method</span>
-                <span>{order.paymentMethod}</span>
+                <span>
+                  {order.paymentMethod === PAY_ON_DELIVERY_UPI
+                    ? "Pay on Delivery (UPI Only)"
+                    : order.paymentMethod}
+                </span>
               </div>
 
               <div className="flex justify-between">
@@ -228,9 +241,18 @@ export default function OrderDetailsPage() {
                       : "text-orange-600"
                   }`}
                 >
-                  {order.paymentStatus}
+                  {PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}
                 </span>
               </div>
+
+              {order.paymentMethod === PAY_ON_DELIVERY_UPI && (
+                <div className="flex justify-between">
+                  <span>Amount to Pay</span>
+                  <span className="font-bold text-green-700">
+                    ₹{(order.paymentAmount || 0).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between">
                 <span>Items</span>
@@ -383,7 +405,7 @@ export default function OrderDetailsPage() {
 
         {/* ACTION BUTTONS */}
         <Link
-  href={`/admin/invoice/${order.id}`}
+  href={`/invoice/${order.id}`}
   target="_blank"
   className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
 >

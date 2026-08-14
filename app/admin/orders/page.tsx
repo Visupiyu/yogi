@@ -9,9 +9,11 @@ import {
   addDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import Link from "next/link";
 import { logAdminAction } from "@/lib/auditLog";
+import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
+import { verifyDeliveryPayment } from "@/lib/deliveryPayment";
 
 type Order = {
   id: string;
@@ -28,6 +30,8 @@ type Order = {
   courierName?: string;
   trackingNumber?: string;
   expectedDelivery?: string;
+  paymentAmount?: number;
+  paymentTransactionId?: string;
 };
 
 export default function AdminOrdersPage() {
@@ -60,6 +64,8 @@ export default function AdminOrdersPage() {
           courierName: data.courierName || "",
           trackingNumber: data.trackingNumber || "",
           expectedDelivery: data.expectedDelivery || "",
+          paymentAmount: data.paymentAmount || 0,
+          paymentTransactionId: data.paymentTransactionId || "",
         });
       });
       // newest-ish: sort by original timestamp if present is lost after formatting,
@@ -131,6 +137,35 @@ setOrders(items);
   ) => {
     try {
       await updateDoc(doc(db, "orders", orderId), { [field]: value });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Only after independently checking YOMICO's own UPI/bank account —
+  // this is the one action that promotes AwaitingVerification -> Paid.
+  // Guarded here (only ever called when that's the current status) even
+  // though the underlying write is admin-unconditional like every other
+  // admin order capability in this file — see firestore.rules.
+  const verifyPayment = async (order: Order) => {
+    if (order.paymentStatus !== "AwaitingVerification") return;
+    if (
+      !confirm(
+        `Confirm ₹${(order.paymentAmount || 0).toLocaleString(
+          "en-IN"
+        )} was received in YOMICO's UPI account for this order?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await verifyDeliveryPayment(order.id, auth.currentUser?.email || "Admin");
+      setOrders(
+        orders.map((o) =>
+          o.id === order.id ? { ...o, paymentStatus: "Paid" } : o
+        )
+      );
     } catch (error) {
       console.error(error);
     }
@@ -210,12 +245,13 @@ const filtered = orders.filter(
                   <th className="text-left py-4">Tracking</th>
                   <th className="text-left py-4">Expected Delivery</th>
                   <th className="text-left py-4">Invoice</th>
+                  <th className="text-left py-4">POD Payment</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-10 text-gray-500">
+                    <td colSpan={10} className="text-center py-10 text-gray-500">
                       No Orders Found
                     </td>
                   </tr>
@@ -334,6 +370,32 @@ const filtered = orders.filter(
     </span>
   )}
 </td>
+                      <td>
+                        {order.paymentMethod !== PAY_ON_DELIVERY_UPI ? (
+                          "-"
+                        ) : order.paymentStatus === "Paid" ? (
+                          <span className="text-green-700 font-semibold">
+                            Payment Verified
+                          </span>
+                        ) : order.paymentStatus === "AwaitingVerification" ? (
+                          <div>
+                            <p className="text-xs text-gray-500">
+                              Ref: {order.paymentTransactionId}
+                            </p>
+                            <p className="text-xs text-gray-500 mb-1">
+                              ₹{(order.paymentAmount || 0).toLocaleString("en-IN")}
+                            </p>
+                            <button
+                              onClick={() => verifyPayment(order)}
+                              className="bg-green-600 hover:bg-green-700 transition text-white px-3 py-2 rounded-lg text-sm"
+                            >
+                              Verify Payment
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">Pending</span>
+                        )}
+                      </td>
                     </tr>
                   ))
                 )}

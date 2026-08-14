@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
 export default function LoginPage() {
@@ -30,6 +31,13 @@ export default function LoginPage() {
       );
 
       const firebaseUser = userCredential.user;
+
+      const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+      if (userSnap.exists() && userSnap.data().status === "Blocked") {
+        await signOut(auth);
+        alert("Your account has been blocked. Please contact support.");
+        return;
+      }
 
       // Clear any previous seller/admin session
       localStorage.removeItem("vendor");

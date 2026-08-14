@@ -2,6 +2,7 @@ export interface CartItem {
   id: string;
   name: string;
   price: number;
+  mrp?: number;
   image?: string;
   stock: number;
   qty: number;
@@ -48,6 +49,7 @@ export function addToCart(
       id: product.id,
       name: product.name ?? "",
       price: product.price ?? 0,
+      mrp: product.mrp,
       image: product.image,
       stock: product.stock ?? 0,
       qty: options.qty,

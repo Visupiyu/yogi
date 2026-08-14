@@ -35,10 +35,11 @@ function ProductSkeleton() {
 }
 
 export default function BestSellers() {
-  const { data: products, isLoading, error } = useQuery({
+  const { data: products, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["best-sellers"],
 queryFn: fetchBestSellers,
     staleTime: 1000 * 60 * 5,
+    retry: 2,
   });
 
   return (
@@ -60,6 +61,14 @@ queryFn: fetchBestSellers,
   <p className="text-red-600 font-semibold">
    Failed to load best sellers.
   </p>
+
+  <button
+    onClick={() => refetch()}
+    disabled={isFetching}
+    className="mt-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-2 rounded-xl font-semibold transition"
+  >
+    {isFetching ? "Retrying..." : "Retry"}
+  </button>
 
 </div>}
 

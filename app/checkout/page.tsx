@@ -24,13 +24,15 @@ import {
   getShippingSettings,
 } from "@/lib/shipping";
 import { getEffectiveCommissionRate } from "@/lib/commission";
+import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 
 // Business rule: pay-on-delivery orders are settled via UPI only at the
-// moment of delivery — cash is never accepted. This exact string is the
-// stored paymentMethod value; the seller-side "mark Paid on Delivered"
-// check (app/seller/orders/[id]/page.tsx) tests `!== "ONLINE"`, not an
-// exact match to this value, so it stays correct regardless of the label.
-const PAY_ON_DELIVERY_METHOD = "Pay on Delivery (UPI Only)";
+// moment of delivery — cash is never accepted. This is the stored
+// paymentMethod value (not the display label below, which is a separate
+// hardcoded string and unaffected by this); the seller-side "mark Paid on
+// Delivered" check (app/seller/orders/[id]/page.tsx) tests `!== "ONLINE"`,
+// not an exact match to this value, so it stays correct regardless.
+const PAY_ON_DELIVERY_METHOD = PAY_ON_DELIVERY_UPI;
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -418,7 +420,13 @@ setAddress(userData.address || "");
     // confirmed was captured (from verify-payments) — using it instead
     // of the client-computed grandTotal means the order record always
     // matches what was really charged, even if they somehow diverge.
-    verifiedAmount?: number
+    verifiedAmount?: number,
+    // For Pay on Delivery (UPI Only) orders: the exact amount
+    // app/api/create-order computed server-side from real product/
+    // shipping data. This — not anything client-computed — is what the
+    // delivery-partner UPI QR/deep-link will show and what admin verifies
+    // against; the browser never gets to declare it.
+    podPaymentAmount?: number
   ) => {
     const finalTotal = verifiedAmount ?? grandTotal;
     // Same commissionRate either way — captured once when the page loaded,
@@ -455,6 +463,7 @@ setAddress(userData.address || "");
       // coupon discount — this order's total was reduced by both.
       rewardValue: redeemPoints ? rewardValue : 0,
       createdAt: Timestamp.now(),
+      ...(podPaymentAmount != null ? { paymentAmount: podPaymentAmount } : {}),
     };
   };
 
@@ -515,8 +524,45 @@ setAddress(userData.address || "");
       return;
     }
 
+    // A blocked customer can still hold a live browser session from before
+    // they were blocked — Firestore rules already reject the order write
+    // itself, but checking here first avoids the confusing generic
+    // "Order Failed" that would otherwise be all they see.
+    const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+    if (userSnap.exists() && userSnap.data().status === "Blocked") {
+      alert("Your account has been blocked. Please contact support.");
+      return;
+    }
+
     setLoading(true);
     try {
+      // The exact amount the customer must pay by UPI at delivery is
+      // never trusted from this browser session — the same server-side
+      // pricing logic ONLINE orders already use (real product/stock/
+      // shipping lookups) computes it here too, before the order is ever
+      // written. See app/api/create-order/route.ts's computeVerifiedOrderAmount().
+      const idToken = await firebaseUser.getIdToken();
+      const amountResponse = await fetch("/api/create-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          items: items.map((item) => ({ id: item.id, qty: item.qty })),
+          discountAmount: discount + rewardValue,
+          paymentMethod: "PAY_ON_DELIVERY_UPI",
+        }),
+      });
+      const amountData = await amountResponse.json();
+
+      if (!amountResponse.ok || amountData.error || typeof amountData.paymentAmount !== "number") {
+        alert(amountData.error || "Couldn't confirm your order amount. Please try again.");
+        return;
+      }
+
+      const paymentAmount = amountData.paymentAmount;
+
       // Pay-on-Delivery hasn't captured any payment yet, so a failed
       // reservation can simply block the order — nothing to reconcile.
       const reservation = await reserveStock();
@@ -527,11 +573,23 @@ setAddress(userData.address || "");
 
       const orderRef = await addDoc(
         collection(db, "orders"),
-        buildOrderData(firebaseUser, "Pending")
+        // paymentAmount is also the server-verified amount here (it comes
+        // from the same computeVerifiedOrderAmount() call as ONLINE orders'
+        // verifiedAmount) — passing undefined previously meant finalTotal/
+        // commission/sellerEarning were derived from the client-computed
+        // grandTotal instead, so a stale cart price could make those
+        // bookkeeping fields disagree with the amount the customer is
+        // actually told to pay.
+        buildOrderData(firebaseUser, "Pending", paymentAmount, paymentAmount)
       );
       await applyPostOrderEffects(firebaseUser, orderRef.id, "Pending");
 
-      alert("Order Placed Successfully");
+      alert(
+        "🎉 Your Order is Confirmed!\n\n" +
+          "Payment: Pay on Delivery (UPI Only)\n" +
+          `Amount to Pay: ₹${paymentAmount.toLocaleString("en-IN")}\n\n` +
+          "Please pay the exact amount by UPI when your order arrives."
+      );
       window.location.href = "/orders";
     } catch (error) {
       console.error("Checkout Error:", error);
@@ -551,6 +609,16 @@ setAddress(userData.address || "");
     if (!payingUser) {
       alert("Please login again.");
       router.push("/login");
+      return;
+    }
+
+    // Same reasoning as the login check above: a blocked customer can
+    // still hold a live session, and Razorpay must never be opened for
+    // one — Firestore rules would reject the order write after payment
+    // already captured real money, with no order created to reconcile.
+    const payingUserSnap = await getDoc(doc(db, "users", payingUser.uid));
+    if (payingUserSnap.exists() && payingUserSnap.data().status === "Blocked") {
+      alert("Your account has been blocked. Please contact support.");
       return;
     }
 

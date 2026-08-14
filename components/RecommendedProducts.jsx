@@ -69,6 +69,8 @@ export default function RecommendedProducts() {
 
       staleTime: 1000 * 60 * 5,
 
+      retry: 2,
+
     })),
 
   });
@@ -76,6 +78,14 @@ export default function RecommendedProducts() {
   const loading = queries.some((q) => q.isLoading);
 
   const error = queries.some((q) => q.error);
+
+  const fetching = queries.some((q) => q.isFetching);
+
+  const retryFailed = () => {
+    queries.forEach((q) => {
+      if (q.error) q.refetch();
+    });
+  };
 
   if (loading) {
 
@@ -136,6 +146,14 @@ export default function RecommendedProducts() {
             Unable to load recommendations.
 
           </h2>
+
+          <button
+            onClick={retryFailed}
+            disabled={fetching}
+            className="mt-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-2 rounded-xl font-semibold transition"
+          >
+            {fetching ? "Retrying..." : "Retry"}
+          </button>
 
         </div>
 

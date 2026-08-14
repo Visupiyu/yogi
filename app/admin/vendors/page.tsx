@@ -66,7 +66,16 @@ export default function AdminVendorsPage() {
 
   const updateVendorStatus = async (vendor: Vendor, status: string) => {
     try {
-      await updateDoc(doc(db, "vendors", vendor.id), { status });
+      // Login (vendor-login/page.tsx) gates on kycStatus before status, and
+      // a vendor's kycStatus defaults to "Pending" at registration. Approving
+      // or rejecting here without also syncing kycStatus left vendors
+      // permanently unable to log in even after being "Approved" on this
+      // page — mirrors the sync admin/kyc/page.tsx's updateKYC already does.
+      const updates: Record<string, string> =
+        status === "Approved" || status === "Rejected"
+          ? { status, kycStatus: status }
+          : { status };
+      await updateDoc(doc(db, "vendors", vendor.id), updates);
       if (vendor.uid) {
         await setDoc(
           doc(db, "vendors_public", vendor.uid),

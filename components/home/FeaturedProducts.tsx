@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
@@ -18,29 +18,35 @@ type Product = {
 export default function FeaturedProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  // Tracked separately from an empty result — a genuinely empty
+  // (successful) fetch and a failed one used to look identical to the
+  // customer ("No Featured Products Found" either way), with no way to
+  // tell them apart or retry a real failure.
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        // Wasn't actually filtering by `featured` at all before — just
-        // "first 8 products in Firestore's default order," regardless of
-        // curation. Paired with a real admin toggle in app/admin/products
-        // to set the flag (it always defaulted false with no way to
-        // change it).
-        const q = query(
-          collection(db, "products"),
-          where("featured", "==", true),
-          limit(8)
-        );
-        const snapshot = await getDocs(q);
+  const fetchProducts = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      // Wasn't actually filtering by `featured` at all before — just
+      // "first 8 products in Firestore's default order," regardless of
+      // curation. Paired with a real admin toggle in app/admin/products
+      // to set the flag (it always defaulted false with no way to
+      // change it).
+      const q = query(
+        collection(db, "products"),
+        where("featured", "==", true),
+        limit(8)
+      );
+      const snapshot = await getDocs(q);
 
-        const items: Product[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          items.push({
-            id: doc.id,
-            name: data.title || data.name || "",
-          price: Number(
+      const items: Product[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        items.push({
+          id: doc.id,
+          name: data.title || data.name || "",
+        price: Number(
   data.sellingPrice ??
   data.price ??
   0
@@ -51,21 +57,23 @@ image:
   data.images?.[0] ||
   data.image ||
   "",
-            stock: Number(data.stock || 0),
-            vendorId: data.vendorId,
-          });
+          stock: Number(data.stock || 0),
+          vendorId: data.vendorId,
         });
+      });
 
-        setProducts(items);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProducts();
+      setProducts(items);
+    } catch (err) {
+      console.error(err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   return (
     <section className="py-2 px-2">
@@ -96,6 +104,18 @@ image:
                 </div>
               </div>
             ))}
+          </div>
+        ) : error ? (
+          <div className="text-center py-10 bg-red-50 rounded-2xl border border-red-200">
+            <p className="text-red-600 font-semibold">
+              Unable to load featured products.
+            </p>
+            <button
+              onClick={fetchProducts}
+              className="mt-4 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-semibold transition"
+            >
+              Retry
+            </button>
           </div>
         ) : products.length === 0 ? (
           <div className="text-center py-6 text-gray-500">

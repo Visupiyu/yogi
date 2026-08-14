@@ -5,23 +5,29 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 
 export default function FlashSale() {
-  const [targetTime] = useState(
-    new Date().getTime() + 1000 * 60 * 60 * 24
-  );
-
-  const calculateTimeLeft = () => {
-    const now = new Date().getTime();
-    const difference = Math.max(0, targetTime - now);
-    return {
-      hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-      minutes: Math.floor((difference / 1000 / 60) % 60),
-      seconds: Math.floor((difference / 1000) % 60),
-    };
-  };
-
-  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+  // targetTime is computed only inside useEffect (client-only), so the
+  // server-rendered HTML and React's first client render both show the
+  // same static 00:00:00 before it. Computing it from Date.now() in a
+  // useState initializer ran once at server-render time and again at
+  // client-hydration time, producing two different countdown values and
+  // a "Hydration failed" mismatch.
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
+    const targetTime = new Date().getTime() + 1000 * 60 * 60 * 24;
+
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime();
+      const difference = Math.max(0, targetTime - now);
+      return {
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+      };
+    };
+
+    setTimeLeft(calculateTimeLeft());
+
     const timer = setInterval(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);

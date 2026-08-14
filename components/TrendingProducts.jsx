@@ -44,10 +44,13 @@ export default function TrendingProducts() {
     data: products,
     isLoading,
     error,
+    refetch,
+    isFetching,
   } = useQuery({
     queryKey: ["trending-products"],
     queryFn: fetchTrendingProducts,
     staleTime: 1000 * 60 * 5,
+    retry: 2,
   });
 
   return (
@@ -98,6 +101,14 @@ export default function TrendingProducts() {
           <p className="text-red-500 text-sm mt-2">
             Please try again later.
           </p>
+
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="mt-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-2 rounded-xl font-semibold transition"
+          >
+            {isFetching ? "Retrying..." : "Retry"}
+          </button>
         </div>
       )}
 

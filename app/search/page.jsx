@@ -34,6 +34,7 @@ function SearchContent() {
   const [filtered, setFiltered] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [sort, setSort] = useState("");
   const [stockOnly, setStockOnly] = useState(false);
   const [category, setCategory] = useState("");
@@ -48,8 +49,11 @@ const [showQuickView, setShowQuickView] = useState(false);
 const [quickQty, setQuickQty] = useState(1);
 const [quickSize, setQuickSize] = useState("");
 const [quickColor, setQuickColor] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
   useEffect(() => {
     const fetchProducts = async () => {
+      setLoading(true);
+      setError(false);
       try {
         // Firestore has no server-side substring/full-text search, so this
         // still has to scan and filter client-side — the limit() just
@@ -71,15 +75,17 @@ const [quickColor, setQuickColor] = useState("");
           }
         });
         setProducts(items);
-      } catch (error) {
-        console.error(error);
+      } catch (err) {
+        console.error(err);
+        setError(true);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchProducts();
-  }, [query]);
+  }, [query, retryKey]);
 
   useEffect(() => {
 
@@ -256,6 +262,19 @@ if (minimumDiscount > 0) {
         {loading ? (
           <div className="text-center py-20 text-gray-500">
             Loading products…
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-12 text-center">
+            <h2 className="text-red-600 font-bold text-2xl mb-2">
+              Unable to load search results.
+            </h2>
+            <p className="text-red-500 text-sm mb-6">Please try again.</p>
+            <button
+              onClick={() => setRetryKey((k) => k + 1)}
+              className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-semibold transition"
+            >
+              Retry
+            </button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
@@ -649,6 +668,27 @@ Contact Support
   🛒 Add to Cart
 </button>
             <button
+              onClick={() => {
+                if (!quickViewProduct) return;
+                const wishlist = JSON.parse(
+                  localStorage.getItem("wishlist") || "[]"
+                );
+                if (wishlist.find((item) => item.id === quickViewProduct.id)) {
+                  alert("Already In Wishlist");
+                  return;
+                }
+                wishlist.push({
+                  id: quickViewProduct.id,
+                  name: quickViewProduct.name,
+                  price: quickViewProduct.price,
+                  image: quickViewProduct.image,
+                  stock: quickViewProduct.stock,
+                  vendorId: quickViewProduct.vendorId,
+                });
+                localStorage.setItem("wishlist", JSON.stringify(wishlist));
+                window.dispatchEvent(new Event("wishlistUpdated"));
+                alert("Added To Wishlist");
+              }}
               className="flex-1 bg-red-500 hover:bg-red-600 text-white py-3 rounded-xl font-semibold"
             >
               ❤️ Wishlist

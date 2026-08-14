@@ -43,62 +43,45 @@ const CATEGORY_ROWS = [
 ];
 
 async function loadProducts(): Promise<Product[]> {
-  try {
-    const snapshot = await getDocs(collection(db, "products"));
-    const items: Product[] = [];
-    snapshot.forEach((docSnap) => {
-      items.push(toLegacyProduct(docSnap.id, docSnap.data()));
-    });
-    return items;
-  } catch (err) {
-   if (process.env.NODE_ENV === "development") {
-  console.error(err);
-}
-    return [];
-  }
+  // Deliberately no try/catch here — swallowing the error and resolving
+  // with [] made a genuine Firestore failure (permission error, network
+  // failure, timeout) indistinguishable from "the catalog is empty",
+  // which surfaced as a misleading full-page "No Products Available"
+  // takeover with no error indication and no way to retry. Letting the
+  // rejection propagate is what makes useQuery's own isError/refetch work
+  // correctly below.
+  const snapshot = await getDocs(collection(db, "products"));
+  const items: Product[] = [];
+  snapshot.forEach((docSnap) => {
+    items.push(toLegacyProduct(docSnap.id, docSnap.data()));
+  });
+  return items;
 }
 
 export default function Home() {
   const {
     data: filteredData = [],
     isLoading,
-    error,
+    isError,
+    refetch,
+    isFetching,
   } = useQuery({
-  queryKey: ["products"],
-  queryFn: loadProducts,
-  staleTime: 1000 * 60 * 5,
-});
+    queryKey: ["products"],
+    queryFn: loadProducts,
+    staleTime: 1000 * 60 * 5,
+    // Explicit and modest, not TanStack's default of 3 — a permission or
+    // config error will never succeed no matter how many times it's
+    // retried, so burning through more attempts (each with a longer
+    // backoff) only delays the customer seeing an actual error+Retry.
+    retry: 2,
+  });
 
-  if (error) {
-    return <div className="p-10 text-center">Failed to load products</div>;
-  }
-
-  if (isLoading) {
-    return (
-      <main className="min-h-screen bg-slate-100 px-2 py-1">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {[...Array(10)].map((_, i) => (
-            <ProductSkeleton key={i} />
-          ))}
-        </div>
-      </main>
-    );
-  }
-if (filteredData.length === 0) {
-  return (
-    <main className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="text-center py-20">
-        <h2 className="text-3xl font-bold text-gray-800">
-          No Products Available
-        </h2>
-
-        <p className="mt-2 text-gray-600">
-          Products will appear here soon.
-        </p>
-      </div>
-    </main>
-  );
-}
+  // This data is used for exactly one thing below (the category-row
+  // shelves) — it used to gate the ENTIRE page (hero, nav, categories,
+  // every other section) via early returns here, so a slow, failed, or
+  // empty result for JUST the shelves took down the whole homepage even
+  // though every other section fetches its own data independently. Now
+  // scoped to only the section that actually needs it, further down.
   const byCategory = (name: string) => {
     const node = findNodeByName(name, catalogTree);
     if (!node) return [];
@@ -149,12 +132,39 @@ if (filteredData.length === 0) {
       <FeaturedCategories />
       <FlashSale />
 
-      {/* Category rows — only rendered when the category has products */}
-      {CATEGORY_ROWS.map(({ title, name }) => {
-        const products = byCategory(name);
-        if (products.length === 0) return null;
-        return <CategoryRow key={name} title={title} products={products} />;
-      })}
+      {/* Category rows — an independent section: its own loading/error/
+          empty states, never blocking the hero, categories, or any of
+          the other product sections below (each of which fetches its
+          own data and already handles its own state independently). */}
+      {isLoading ? (
+        <div className="max-w-7xl mx-auto px-2 py-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {[...Array(10)].map((_, i) => (
+            <ProductSkeleton key={i} />
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="max-w-7xl mx-auto px-2 py-10 text-center bg-red-50 rounded-3xl border border-red-200 my-4">
+          <p className="text-red-600 font-semibold">Unable to load products.</p>
+          <p className="text-red-500 text-sm mt-1">Please try again.</p>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="mt-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-2 rounded-xl font-semibold transition"
+          >
+            {isFetching ? "Retrying..." : "Retry"}
+          </button>
+        </div>
+      ) : CATEGORY_ROWS.every(({ name }) => byCategory(name).length === 0) ? (
+        <div className="max-w-7xl mx-auto px-2 py-10 text-center text-gray-500">
+          No products available right now.
+        </div>
+      ) : (
+        CATEGORY_ROWS.map(({ title, name }) => {
+          const products = byCategory(name);
+          if (products.length === 0) return null;
+          return <CategoryRow key={name} title={title} products={products} />;
+        })
+      )}
 
       <TrendingProducts />
       <CollectionStrip

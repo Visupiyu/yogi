@@ -21,12 +21,26 @@ rules_version = '2';
 //   userId(string=uid, immutable), vendorIds(array<string=uid>), items(array),
 //   total(number), status(string), paymentStatus(string),
 //   deliveryPartnerId(string, references a deliveryPartners doc id — not a
-//   uid).
+//   uid). Pay on Delivery (UPI Only) orders (paymentMethod ==
+//   'PAY_ON_DELIVERY_UPI') additionally carry: paymentAmount(number,
+//   server-verified at creation in app/api/create-order, never
+//   client-supplied); paymentTransactionId, paymentSubmittedAt,
+//   paymentConfirmedBy(uid), paymentConfirmedByName once the assigned
+//   delivery partner submits a claim (paymentStatus ->
+//   'AwaitingVerification', see isValidDeliveryPaymentSubmission() below);
+//   paymentVerifiedAt, paymentVerifiedBy(uid), paymentVerifiedByName once
+//   admin independently verifies it (paymentStatus -> 'Paid').
 //   Create: the customer, for themselves. Read: owning customer, any vendor
-//   listed in vendorIds, or admin. Update: admin (any field), owning customer
-//   (cancel only, Pending->Cancelled), listed vendor (status/tracking
-//   fields), the assigned delivery partner (status/notes/proof-of-delivery
-//   fields only, resolved via deliveryPartners/{deliveryPartnerId}.uid).
+//   listed in vendorIds, or admin. Update: admin (any field, including
+//   promoting AwaitingVerification -> Paid), owning customer (cancel only,
+//   Pending->Cancelled), listed vendor (status/tracking fields; may also
+//   self-mark paymentStatus Paid on Delivered, but only for legacy
+//   non-UPI orders — see isValidDeliveryPaymentSubmission() for the UPI
+//   path, which never lets a seller or delivery partner reach Paid
+//   directly), the assigned delivery partner (status/notes/
+//   proof-of-delivery fields, or — as a separate write — the payment-
+//   submission fields above; resolved via
+//   deliveryPartners/{deliveryPartnerId}.uid).
 //
 // Collection: vendors               Doc ID: auto-id (NOT the vendor's uid —
 //   several app call sites incorrectly assume doc-id==uid; ownership here is
@@ -104,10 +118,14 @@ rules_version = '2';
 // Collection: settings              Doc ID: "global" (singleton)
 //   {freeShippingThreshold(number), standardShippingCharge(number),
 //   commissionEnabled(bool), commissionRate(number, 0-1, meaningful only
-//   when commissionEnabled), updatedAt, updatedBy}. Read: public (storefront
-//   displays shipping values to signed-out visitors). Write: admin only,
-//   via app/admin/settings. commissionRate is snapshotted onto each order
-//   at checkout (orders.commissionRate) — changing this doc never affects
+//   when commissionEnabled), upiEnabled(bool), upiVpa(string, YOMICO's own
+//   UPI ID — never a real value until an admin sets one, never hardcoded
+//   in source), upiPayeeName(string), updatedAt, updatedBy}. Read: public
+//   (storefront displays shipping values to signed-out visitors; the UPI
+//   VPA is likewise not a secret — it's meant to be given to payers, same
+//   as a shop's printed QR). Write: admin only, via app/admin/settings.
+//   commissionRate is snapshotted onto each order at checkout
+//   (orders.commissionRate) — changing this doc never affects
 //   orders already placed; see lib/commission.ts / lib/vendorEarnings.ts.
 //
 // Collection: rateLimits            Doc ID: "create-order_{uid}"
@@ -119,8 +137,11 @@ rules_version = '2';
 // Collection: audit_logs            Doc ID: auto-id
 //   {actorUid, actorEmail, action(string), targetId(string), details(map),
 //   createdAt}. Written by lib/auditLog.ts after admin KYC/vendor-status/
-//   order-status/payout writes succeed. Append-only: no update or delete
-//   for anyone, admin included.
+//   order-status/payout writes succeed, or by a delivery partner
+//   confirming a Pay on Delivery (UPI Only) payment (action ==
+//   'delivery_payment_confirmed' — the one non-admin action type allowed
+//   to self-write here). Append-only: no update or delete for anyone,
+//   admin included.
 //
 // Collection: deliveryPartners      Doc ID: auto-id
 //   name, phone, email, uid(string, set once admin provisions a login via
@@ -305,10 +326,63 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/deliveryPartners/$(resource.data.deliveryPartnerId)).data.uid == request.auth.uid;
     }
 
+    // Pay on Delivery (UPI Only) payment state machine:
+    //   Pending -> AwaitingVerification -> Paid
+    // The delivery partner's submission (below) can only ever reach
+    // AwaitingVerification, never Paid directly — entering a transaction
+    // ID is a claim to be verified, not proof of payment. Only admin can
+    // promote AwaitingVerification -> Paid (see app/admin/orders — admin's
+    // existing unconditional isAdmin() branch above already covers that
+    // write; adding a second, narrower admin-only clause here would be
+    // inert, since the broader one already permits every case the
+    // narrower one would, so the amount/duplicate-verification guarantees
+    // for that step are enforced in application code (lib/deliveryPayment.ts's
+    // verifyDeliveryPayment(), which only ever sends the verification
+    // fields) plus the audit log, not by further restricting admin here —
+    // consistent with every other admin order capability in this file.
+    //
+    // The submission write itself is deliberately separate from the
+    // status-update clause below (never bundled with marking Delivered)
+    // so a status change alone can never imply payment was received.
+    // One-shot: the order must currently be Pending (rejects resubmission
+    // once AwaitingVerification or Paid), a transaction reference is
+    // mandatory, and — critically — the delivery partner cannot supply or
+    // change any amount at all; paymentAmount was already set server-side
+    // at order-creation time and stays outside this write's allowed field
+    // set entirely. Nothing outside the submission fields can move —
+    // price, total, items, vendorId, commission, paymentAmount, customer
+    // info, and deliveryPartnerId are all untouchable from this path.
+    function isValidDeliveryPaymentSubmission() {
+      return isAssignedDeliveryPartner()
+        && resource.data.paymentMethod == 'PAY_ON_DELIVERY_UPI'
+        && resource.data.status in ['Out For Delivery', 'Delivered']
+        && resource.data.paymentStatus == 'Pending'
+        && request.resource.data.paymentStatus == 'AwaitingVerification'
+        && request.resource.data.paymentTransactionId is string
+        && request.resource.data.paymentTransactionId.size() > 0
+        && request.resource.data.paymentConfirmedBy == request.auth.uid
+        && request.resource.data.paymentConfirmedByName is string
+        && affectedKeysOnly([
+          'paymentStatus', 'paymentTransactionId', 'paymentSubmittedAt',
+          'paymentConfirmedBy', 'paymentConfirmedByName', 'updatedAt'
+        ]);
+    }
+
     match /orders/{orderId} {
+      // isAssignedDeliveryPartner() added here as a genuine bug fix, not
+      // scope creep: app/delivery/[id]/page.tsx's loadOrder() has always
+      // called getDoc() on this exact path, but this rule never granted
+      // delivery partners read access at all — discovered via this
+      // session's own live rules test, confirmed pre-existing (this read
+      // rule was untouched by both Step 1 and Step 2 until now). Without
+      // it, the entire delivery-partner order page — not just the new
+      // payment section — silently fails to load for a real partner
+      // account, so leaving it broken would make Step 2's delivery-partner
+      // UI unreachable in production.
       allow read: if isAdmin()
         || isOwnerUid(resource.data.userId)
-        || (isSignedIn() && request.auth.uid in resource.data.vendorIds);
+        || (isSignedIn() && request.auth.uid in resource.data.vendorIds)
+        || isAssignedDeliveryPartner();
 
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
@@ -337,14 +411,20 @@ service cloud.firestore {
             || isLegalOrderStatusTransition(resource.data.status, request.resource.data.status)
           )
           // A seller may only ever move paymentStatus to 'Paid', and only
-          // in the same write that marks the order Delivered — covers
-          // Pay on Delivery (UPI Only) collection at delivery time, never
-          // lets them touch it otherwise.
+          // in the same write that marks the order Delivered — this
+          // self-mark-paid path is now reserved for legacy orders (the old
+          // paymentMethod == 'COD' cash flow, and admin-driven ONLINE
+          // reconciliation is handled elsewhere). New Pay on Delivery (UPI
+          // Only) orders are deliberately excluded here — their
+          // paymentStatus can only ever move via the assigned delivery
+          // partner's own confirmation write below, never automatically
+          // just because status became Delivered.
           && (
             unchanged('paymentStatus')
             || (
               request.resource.data.paymentStatus == 'Paid'
               && request.resource.data.status == 'Delivered'
+              && resource.data.paymentMethod != 'PAY_ON_DELIVERY_UPI'
             )
           )
         )
@@ -358,7 +438,8 @@ service cloud.firestore {
             unchanged('status')
             || isLegalOrderStatusTransition(resource.data.status, request.resource.data.status)
           )
-        );
+        )
+        || isValidDeliveryPaymentSubmission();
 
       allow delete: if isAdmin();
     }
@@ -410,8 +491,20 @@ service cloud.firestore {
     match /vendors_public/{uid} {
       allow read: if true;
 
+      // Unlike the update branch below, isValidPublicVendorProfile() alone
+      // doesn't pin status to 'Pending' here (it also validates the update
+      // path, where status is legitimately already 'Approved' etc. and
+      // required unchanged) — without this extra check, any signed-in
+      // user could self-create their own vendors_public doc as
+      // 'Approved' and appear in the storefront directory (app/store)
+      // with no vendor-register application or admin review at all.
       allow create: if isAdmin()
-        || (isOwnerUid(uid) && request.resource.data.uid == uid && isValidPublicVendorProfile());
+        || (
+          isOwnerUid(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.status == 'Pending'
+          && isValidPublicVendorProfile()
+        );
 
       allow update: if isAdmin()
         || (
@@ -434,20 +527,36 @@ service cloud.firestore {
     }
 
     function isReferralBonusUpdate() {
+      // Referral crediting is inherently cross-user: a NEW signup (a
+      // different uid) updates the REFERRER's doc — see
+      // app/signup/page.tsx's updateDoc(doc(db,'users', referrer.id),
+      // {rewardPoints: increment(100), totalReferrals: increment(1)}).
+      // Ownership can't be required here, so instead the exact
+      // business-rule delta is capped (+100 points, +1 referral per
+      // write) — previously any signed-in user could jump ANY other
+      // user's rewardPoints straight to an arbitrary higher number in
+      // one call, since only ">= previous value" was checked.
       return isSignedIn()
         && affectedKeysOnly(['rewardPoints', 'totalReferrals'])
         && request.resource.data.rewardPoints is number
         && request.resource.data.rewardPoints >= resource.data.rewardPoints
+        && request.resource.data.rewardPoints <= resource.data.rewardPoints + 100
         && request.resource.data.totalReferrals is number
-        && request.resource.data.totalReferrals >= resource.data.totalReferrals;
+        && request.resource.data.totalReferrals >= resource.data.totalReferrals
+        && request.resource.data.totalReferrals <= resource.data.totalReferrals + 1;
     }
 
-    function isRewardPointsCheckoutUpdate() {
+    function isRewardPointsCheckoutUpdate(userId) {
       // Checkout earns points on a purchase or spends them on a discount —
       // the exact delta can't be validated here without knowing the order,
       // but isolating it to only this field, always a non-negative number,
       // stops it being silently bundled into an unrelated profile write.
-      return isSignedIn()
+      // Unlike the referral bonus above, this is always the signed-in
+      // customer's own balance (app/checkout/page.tsx only ever targets
+      // doc(db,'users', firebaseUser.uid)), so ownership is required —
+      // previously this had no ownership check at all, letting any
+      // signed-in user rewrite (or zero out) any OTHER user's balance.
+      return isOwnerUid(userId)
         && affectedKeysOnly(['rewardPoints'])
         && request.resource.data.rewardPoints is number
         && request.resource.data.rewardPoints >= 0;
@@ -467,7 +576,7 @@ service cloud.firestore {
           && unchanged('rewardPoints')
         )
         || isReferralBonusUpdate()
-        || isRewardPointsCheckoutUpdate();
+        || isRewardPointsCheckoutUpdate(userId);
 
       allow delete: if isAdmin();
     }
@@ -732,9 +841,25 @@ service cloud.firestore {
 
     match /audit_logs/{docId} {
       // Append-only trail of admin money/trust actions (KYC, vendor
-      // status, order status override, payouts). No update/delete for
-      // anyone, including admin — an editable log isn't an audit trail.
-      allow read, create: if isAdmin();
+      // status, order status override, payouts) plus delivery-partner
+      // payment confirmations. No update/delete for anyone, including
+      // admin — an editable log isn't an audit trail.
+      //
+      // The delivery-partner branch is intentionally narrow: it only
+      // lets a signed-in caller self-attest their own uid on an entry of
+      // exactly this one action type. It is not the enforcement
+      // mechanism (the orders write itself is what's strictly gated by
+      // isValidDeliveryPaymentSubmission() above) — a forged entry here
+      // can't mark any order Paid on its own, so this stays a lightweight
+      // supplementary record rather than needing a full re-verification
+      // of the delivery-partner/order assignment.
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        || (
+          isSignedIn()
+          && request.resource.data.actorUid == request.auth.uid
+          && request.resource.data.action == 'delivery_payment_confirmed'
+        );
       allow update, delete: if false;
     }
 

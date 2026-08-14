@@ -178,12 +178,16 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
       };
 
-      // Pay on Delivery (UPI Only) collects payment on delivery — mark it
-      // paid in the same write, matching what the Firestore rule allows a
-      // seller to do.
+      // Legacy cash-COD orders collect payment on delivery — mark it paid
+      // in the same write, matching what the Firestore rule allows a
+      // seller to do. Pay on Delivery (UPI Only) orders are deliberately
+      // excluded: those can only move to Paid via the assigned delivery
+      // partner's own payment-confirmation write (with a UPI transaction
+      // reference), never automatically just because status is Delivered.
       if (
         status === "Delivered" &&
         order.paymentMethod !== "ONLINE" &&
+        order.paymentMethod !== "PAY_ON_DELIVERY_UPI" &&
         order.paymentStatus !== "Paid"
       ) {
         payload.paymentStatus = "Paid";

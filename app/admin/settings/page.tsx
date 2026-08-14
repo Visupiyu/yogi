@@ -27,6 +27,12 @@ export default function AdminSettingsPage() {
   // checkout, seller invoice) already expects. Only takes effect once
   // commissionEnabled is turned on.
   const [commissionRatePercent, setCommissionRatePercent] = useState(0);
+  // No real VPA is ever hardcoded — starts disabled/empty until an admin
+  // sets a real one here. Not a secret (a UPI VPA is meant to be given to
+  // payers), so this stays in the same publicly-readable settings doc.
+  const [upiEnabled, setUpiEnabled] = useState(false);
+  const [upiVpa, setUpiVpa] = useState("");
+  const [upiPayeeName, setUpiPayeeName] = useState("YOMICO");
 
   useEffect(() => {
     const load = async () => {
@@ -48,6 +54,11 @@ export default function AdminSettingsPage() {
           ) {
             setCommissionRatePercent(data.commissionRate * 100);
           }
+          setUpiEnabled(data.upiEnabled === true);
+          if (typeof data.upiVpa === "string") setUpiVpa(data.upiVpa);
+          if (typeof data.upiPayeeName === "string" && data.upiPayeeName) {
+            setUpiPayeeName(data.upiPayeeName);
+          }
         }
       } catch (error) {
         console.error(error);
@@ -68,6 +79,10 @@ export default function AdminSettingsPage() {
       toast.error("Commission rate must be between 0% and 100%.");
       return;
     }
+    if (upiEnabled && !upiVpa.trim()) {
+      toast.error("Enter a UPI VPA before enabling Pay on Delivery collection.");
+      return;
+    }
 
     const commissionRate = commissionRatePercent / 100;
 
@@ -80,6 +95,9 @@ export default function AdminSettingsPage() {
           standardShippingCharge,
           commissionEnabled,
           commissionRate,
+          upiEnabled,
+          upiVpa: upiVpa.trim(),
+          upiPayeeName: upiPayeeName.trim() || "YOMICO",
           updatedAt: serverTimestamp(),
           updatedBy: auth.currentUser?.email || "",
         },
@@ -90,6 +108,10 @@ export default function AdminSettingsPage() {
         standardShippingCharge,
         commissionEnabled,
         commissionRate,
+        upiEnabled,
+        upiPayeeName,
+        // The VPA itself isn't included — not a secret, but no reason to
+        // duplicate it into every settings-change audit entry either.
       });
       toast.success("Settings saved.");
     } catch (error) {
@@ -200,6 +222,61 @@ export default function AdminSettingsPage() {
                   Platform's cut of each seller's net sale, e.g. 10 means 10%.
                   Only applies once commission is enabled above.
                 </p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t">
+              <h2 className="text-lg font-semibold mb-1">
+                Pay on Delivery — UPI Collection
+              </h2>
+              <p className="text-sm text-gray-500 mb-4">
+                The account customers pay directly at delivery. Never the
+                delivery partner's own UPI — payment goes straight to
+                YOMICO, and the delivery partner only records the
+                transaction reference for admin to verify.
+              </p>
+
+              <label className="flex items-center gap-2 mb-4">
+                <input
+                  type="checkbox"
+                  checked={upiEnabled}
+                  onChange={(e) => setUpiEnabled(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm font-medium">
+                  Enable Pay on Delivery UPI collection
+                </span>
+              </label>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    YOMICO UPI VPA
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. yomico@upi"
+                    value={upiVpa}
+                    onChange={(e) => setUpiVpa(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Not set yet — no placeholder ID is used until you enter
+                    a real one.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Payee name shown to customers
+                  </label>
+                  <input
+                    type="text"
+                    value={upiPayeeName}
+                    onChange={(e) => setUpiPayeeName(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2"
+                  />
+                </div>
               </div>
             </div>
 
