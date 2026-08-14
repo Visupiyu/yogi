@@ -37,8 +37,12 @@ service firebase.storage {
 
     match /vendor-kyc/{uid}/{fileName} {
       allow read: if isSignedIn() && request.auth.uid == uid;
-      allow write: if isSignedIn() && request.auth.uid == uid
+      // request.resource is null on delete requests, so folding the size
+      // check into a single `write` rule made every delete evaluate to
+      // false (storage/unauthorized) even for the file's own owner.
+      allow create, update: if isSignedIn() && request.auth.uid == uid
         && request.resource.size < 10 * 1024 * 1024;
+      allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
     match /products/{fileName} {
