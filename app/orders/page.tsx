@@ -31,12 +31,15 @@ export default function OrdersPage() {
         }
         const fetchOrders = async () => {
           try {
+            // firestore.rules gates orders reads on resource.data.userId,
+            // not userEmail -- querying a different field than the rule
+            // checks makes Firestore reject the whole query.
             const q = query(
               collection(db, "orders"),
               where(
-                "userEmail",
+                "userId",
                 "==",
-                firebaseUser.email
+                firebaseUser.uid
               )
             );
             const snapshot =

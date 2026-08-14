@@ -47,8 +47,11 @@ export function useVendor(): UseVendorResult {
 
 setFirebaseUser(firebaseUser);
       try {
+        // firestore.rules gates vendors reads on resource.data.uid, not
+        // email -- querying on a field other than what the rule checks
+        // makes Firestore reject the whole query as unprovably safe.
         const snap = await getDocs(
-          query(collection(db, "vendors"), where("email", "==", firebaseUser.email))
+          query(collection(db, "vendors"), where("uid", "==", firebaseUser.uid))
         );
         if (snap.empty) {
           setVendor(null);

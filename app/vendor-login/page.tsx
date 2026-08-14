@@ -50,9 +50,14 @@ export default function VendorLoginPage() {
         return;
       }
 
+      // firestore.rules gates vendors reads on resource.data.uid, not
+      // email -- a query filtered on a different field than what the
+      // rule checks makes Firestore reject the whole query as unprovably
+      // safe ("Missing or insufficient permissions"), even for the
+      // vendor's own document.
       const vendorQuery = query(
         collection(db, "vendors"),
-        where("email", "==", userCredential.user.email)
+        where("uid", "==", userCredential.user.uid)
       );
 
       const snapshot = await getDocs(vendorQuery);

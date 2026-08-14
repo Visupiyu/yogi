@@ -30,8 +30,11 @@ export default function SettingsPage() {
 
       try {
         const [ordersSnap, addressesSnap, reviewsSnap] = await Promise.all([
+          // firestore.rules gates orders reads on resource.data.userId,
+          // not userEmail -- querying a different field than the rule
+          // checks makes Firestore reject the whole query.
           getDocs(
-            query(collection(db, "orders"), where("userEmail", "==", user.email))
+            query(collection(db, "orders"), where("userId", "==", user.uid))
           ),
           getDocs(
             query(collection(db, "addresses"), where("userEmail", "==", user.email))

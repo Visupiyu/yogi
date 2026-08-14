@@ -59,12 +59,15 @@ export default function ProfilePage() {
         console.error(error);
       }
 
-      // Load recent orders (sorted in code — no composite index needed)
+      // Load recent orders (sorted in code — no composite index needed).
+      // firestore.rules gates orders reads on resource.data.userId, not
+      // userEmail -- querying a different field makes Firestore reject
+      // the whole query.
       try {
         const snapshot = await getDocs(
           query(
             collection(db, "orders"),
-            where("userEmail", "==", firebaseUser.email)
+            where("userId", "==", firebaseUser.uid)
           )
         );
         const data: any[] = [];
