@@ -1319,7 +1319,7 @@ transition
 </div>
 
 <div className="bg-gray-50 rounded-xl p-3">
-  💳 UPI / Cards / COD
+  💳 UPI / Cards / Pay on Delivery
 </div>
 
 <div className="bg-gray-50 rounded-xl p-3">

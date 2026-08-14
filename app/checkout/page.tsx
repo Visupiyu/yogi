@@ -25,6 +25,13 @@ import {
 } from "@/lib/shipping";
 import { getEffectiveCommissionRate } from "@/lib/commission";
 
+// Business rule: pay-on-delivery orders are settled via UPI only at the
+// moment of delivery — cash is never accepted. This exact string is the
+// stored paymentMethod value; the seller-side "mark Paid on Delivered"
+// check (app/seller/orders/[id]/page.tsx) tests `!== "ONLINE"`, not an
+// exact match to this value, so it stays correct regardless of the label.
+const PAY_ON_DELIVERY_METHOD = "Pay on Delivery (UPI Only)";
+
 export default function CheckoutPage() {
   const router = useRouter();
 
@@ -35,7 +42,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [coupon, setCoupon] = useState("");
   const [shipping, setShipping] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [paymentMethod, setPaymentMethod] = useState(PAY_ON_DELIVERY_METHOD);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [discount, setDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
@@ -415,8 +422,8 @@ setAddress(userData.address || "");
   ) => {
     const finalTotal = verifiedAmount ?? grandTotal;
     // Same commissionRate either way — captured once when the page loaded,
-    // before payment method is chosen, so COD and Razorpay orders stamp
-    // the identical rate.
+    // before payment method is chosen, so Pay-on-Delivery and Razorpay
+    // orders stamp the identical rate.
     const orderCommission =
       verifiedAmount != null
         ? Math.round(verifiedAmount * commissionRate)
@@ -510,8 +517,8 @@ setAddress(userData.address || "");
 
     setLoading(true);
     try {
-      // COD hasn't captured any payment yet, so a failed reservation can
-      // simply block the order — nothing to reconcile.
+      // Pay-on-Delivery hasn't captured any payment yet, so a failed
+      // reservation can simply block the order — nothing to reconcile.
       const reservation = await reserveStock();
       if (!reservation.ok) {
         alert(reservation.message);
@@ -950,22 +957,23 @@ Choose your preferred payment option.</p>
               <div className="space-y-3">
                 <label
                   className={`flex items-center gap-3 border-2 rounded-xl p-4 cursor-pointer transition ${
-                    paymentMethod === "COD"
+                    paymentMethod === PAY_ON_DELIVERY_METHOD
                       ? "border-green-600 bg-green-50"
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
                   <input
                     type="radio"
-                    value="COD"
-                    checked={paymentMethod === "COD"}
+                    value={PAY_ON_DELIVERY_METHOD}
+                    checked={paymentMethod === PAY_ON_DELIVERY_METHOD}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                     className="w-4 h-4 accent-green-600"
                   />
                   <div>
-                    <p className="font-semibold">Cash on Delivery</p>
+                    <p className="font-semibold">Pay on Delivery (UPI Only)</p>
                     <p className="text-sm text-gray-500">
-                      Pay when your order arrives
+                      Pay securely via UPI when your order is delivered.
+                      Cash is not accepted.
                     </p>
                   </div>
                 </label>

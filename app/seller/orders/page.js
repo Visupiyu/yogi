@@ -89,8 +89,9 @@ export default function SellerOrdersPage() {
         updatedAt: serverTimestamp(),
       };
 
-      // COD collects payment on delivery — mark it paid in the same
-      // write, matching what the Firestore rule allows a seller to do.
+      // Pay on Delivery (UPI Only) collects payment on delivery — mark it
+      // paid in the same write, matching what the Firestore rule allows a
+      // seller to do.
       if (
         newStatus === "Delivered" &&
         currentOrder?.paymentMethod !== "ONLINE" &&
@@ -232,7 +233,7 @@ export default function SellerOrdersPage() {
                 </span>
               </p>
 
-              <p>Method: {order.paymentMethod || "COD"}</p>
+              <p>Method: {order.paymentMethod || "Pay on Delivery (UPI Only)"}</p>
               <p>
                 Seller Earnings: ₹
                 {(() => {

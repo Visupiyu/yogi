@@ -25,7 +25,7 @@ export default function FAQPage() {
     {
       question: "Which payment methods are supported?",
       answer:
-        "We support Razorpay payments, UPI, cards, net banking, and Cash on Delivery where available."
+        "We support Razorpay payments (UPI, cards, net banking) and Pay on Delivery (UPI Only) where available."
     },
 
     {

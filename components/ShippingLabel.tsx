@@ -91,7 +91,7 @@ export default function ShippingLabel({ order }: ShippingLabelProps) {
       <div className="border border-black p-1 mb-1">
         <div className="flex justify-between">
           <span>Payment Method</span>
-          <strong>{order.paymentMethod || "COD"}</strong>
+          <strong>{order.paymentMethod || "Pay on Delivery (UPI Only)"}</strong>
         </div>
         <div className="flex justify-between">
           <span>Payment Status</span>

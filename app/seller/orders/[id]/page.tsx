@@ -178,8 +178,9 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
       };
 
-      // COD collects payment on delivery — mark it paid in the same
-      // write, matching what the Firestore rule allows a seller to do.
+      // Pay on Delivery (UPI Only) collects payment on delivery — mark it
+      // paid in the same write, matching what the Firestore rule allows a
+      // seller to do.
       if (
         status === "Delivered" &&
         order.paymentMethod !== "ONLINE" &&

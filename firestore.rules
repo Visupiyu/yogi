@@ -338,7 +338,8 @@ service cloud.firestore {
           )
           // A seller may only ever move paymentStatus to 'Paid', and only
           // in the same write that marks the order Delivered — covers
-          // COD collection on delivery, never lets them touch it otherwise.
+          // Pay on Delivery (UPI Only) collection at delivery time, never
+          // lets them touch it otherwise.
           && (
             unchanged('paymentStatus')
             || (

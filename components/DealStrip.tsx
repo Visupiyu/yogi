@@ -2,7 +2,7 @@ export default function DealStrip() {
   const deals = [
     "🔥 Welcome Offer 10% OFF",
     "🚚 Free Delivery Above ₹499",
-    "💳 COD Available",
+    "💳 Pay on Delivery (UPI Only)",
     "🛍 Multi-Vendor Marketplace",
     "⭐ Trusted Sellers",
   ];

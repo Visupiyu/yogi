@@ -266,7 +266,7 @@ export default function OrdersPage() {
   <div className="flex justify-between">
     <span>Method</span>
     <span>
-      {order.paymentMethod || "COD"}
+      {order.paymentMethod || "Pay on Delivery (UPI Only)"}
     </span>
   </div>
   <div className="flex justify-between">
