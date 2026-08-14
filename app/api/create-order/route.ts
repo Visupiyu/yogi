@@ -1,9 +1,6 @@
 import Razorpay from "razorpay";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
-import { getShippingSettings } from "@/lib/shipping";
 
 const ORDER_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const ORDER_RATE_LIMIT_MAX = 15;
@@ -85,9 +82,9 @@ export async function POST(
         );
       }
 
-      const snap = await getDoc(doc(db, "products", item.id));
+      const snap = await getAdminDb().collection("products").doc(item.id).get();
 
-      if (!snap.exists()) {
+      if (!snap.exists) {
         return Response.json(
           { error: "One or more products are no longer available" },
           { status: 400 }
@@ -120,8 +117,24 @@ export async function POST(
       subtotal += price * qty;
     }
 
-    const { freeShippingThreshold, standardShippingCharge } =
-      await getShippingSettings();
+    const settingsSnap = await getAdminDb()
+      .collection("settings")
+      .doc("global")
+      .get();
+
+    const settingsData = settingsSnap.exists
+      ? settingsSnap.data()
+      : null;
+
+    const freeShippingThreshold =
+      typeof settingsData?.freeShippingThreshold === "number"
+        ? settingsData.freeShippingThreshold
+        : 999;
+
+    const standardShippingCharge =
+      typeof settingsData?.standardShippingCharge === "number"
+        ? settingsData.standardShippingCharge
+        : 99;
 
     const shipping =
       subtotal > freeShippingThreshold ? 0 : standardShippingCharge;
