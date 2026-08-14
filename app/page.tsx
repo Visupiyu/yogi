@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -10,6 +12,7 @@ import FeaturedProducts from "@/components/home/FeaturedProducts";
 import FlashSale from "@/components/home/FlashSale";
 import FeatureStrip from "@/components/home/FeatureStrip";
 import OfferCards from "@/components/home/OfferCards";
+import LaunchTrustBanner from "@/components/home/LaunchTrustBanner";
 import ProductSkeleton from "@/components/ProductSkeleton";
 import TrendingProducts from "@/components/TrendingProducts";
 import BestSellers from "@/components/BestSellers";
@@ -117,6 +120,27 @@ if (filteredData.length === 0) {
       <section className="max-w-7xl mx-auto px-2 py-2">
   <HeroSlider />
 </section>
+
+      {/* YOMICO Independence Day launch banner — separate promotional
+          banner, not part of HeroSlider. Links to /sell (the existing
+          vendor page); no new route created. */}
+      <section className="max-w-7xl mx-auto px-2 pb-2">
+        <Link href="/sell" className="block overflow-hidden rounded-2xl shadow-md">
+          <Image
+            src="/yomico-independence-day-launch.jpg"
+            alt="YOMICO Independence Day launch banner - 15 August"
+            width={1168}
+            height={784}
+            sizes="(max-width: 768px) 100vw, 1152px"
+            className="h-auto w-full"
+            priority
+          />
+        </Link>
+      </section>
+
+      {/* Coded (no image asset) customer-facing trust/launch banner —
+          reinforces the same 0% commission launch, framed for shoppers. */}
+      <LaunchTrustBanner />
 
 <section className="max-w-7xl mx-auto px-2 pb-4">
   <OfferCards />
