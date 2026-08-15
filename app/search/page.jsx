@@ -67,8 +67,8 @@ const [quickColor, setQuickColor] = useState("");
         snapshot.forEach((doc) => {
           const data = doc.data();
           const searchText = `${data.title || data.name || ""} ${
-            data.brand || ""
-          } ${data.description || ""}`.toLowerCase();
+            data.shortTitle || ""
+          } ${data.brand || ""} ${data.description || ""}`.toLowerCase();
 
           if (searchText.includes(query.trim().toLowerCase())) {
             items.push(toLegacyProduct(doc.id, data));

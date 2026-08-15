@@ -45,7 +45,7 @@ export default function FeaturedProducts() {
         const data = doc.data();
         items.push({
           id: doc.id,
-          name: data.title || data.name || "",
+          name: data.shortTitle || data.title || data.name || "",
         price: Number(
   data.sellingPrice ??
   data.price ??

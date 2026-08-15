@@ -90,7 +90,7 @@ queryFn: fetchBestSellers,
   <ProductCard
     key={product.id}
     id={product.id}
-    name={product.title || product.name || "Product"}
+    name={product.shortTitle || product.title || product.name || "Product"}
     price={product.sellingPrice ?? product.price ?? 0}
     image={
       product.thumbnail ||

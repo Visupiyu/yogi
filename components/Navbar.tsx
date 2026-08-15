@@ -135,12 +135,17 @@ useEffect(() => {
         const items: ProductSuggestion[] = [];
         snapshot.forEach((doc) => {
   const data = doc.data();
-  const title: string = data.title || data.name || "";
+  const fullTitle: string = data.title || data.name || "";
+  const shortTitle: string = data.shortTitle || "";
+  const q = trimmed.toLowerCase();
 
-  if (title.toLowerCase().includes(trimmed.toLowerCase())) {
+  if (
+    fullTitle.toLowerCase().includes(q) ||
+    shortTitle.toLowerCase().includes(q)
+  ) {
     items.push({
       id: doc.id,
-      name: title,
+      name: shortTitle || fullTitle,
       image:
         data.thumbnail ||
         (Array.isArray(data.images) ? data.images[0] : "") ||

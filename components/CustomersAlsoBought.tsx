@@ -42,7 +42,7 @@ export default function CustomersAlsoBought({
         if (doc.id !== currentProductId) {
           items.push({
             id: doc.id,
-            name: data.title || data.name || "",
+            name: data.shortTitle || data.title || data.name || "",
             image:
               data.thumbnail ||
               (Array.isArray(data.images) ? data.images[0] : "") ||

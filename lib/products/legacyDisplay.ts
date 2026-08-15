@@ -35,7 +35,10 @@ export function toLegacyProduct(id: string, data: any): LegacyProductView {
     // whatever is in the raw doc, so they come last, never first.
     ...data,
     id,
-    name: data.title || data.name || "",
+    // shortTitle is the concise customer-facing name for cards (homepage,
+    // category, search, etc.) — falls back to the full title for products
+    // saved before shortTitle existed, so nothing breaks retroactively.
+    name: data.shortTitle || data.title || data.name || "",
     price:
       typeof data.sellingPrice === "number" ? data.sellingPrice : data.price || 0,
     image:

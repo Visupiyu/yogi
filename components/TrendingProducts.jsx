@@ -169,6 +169,7 @@ export default function TrendingProducts() {
                       "/placeholder.png"
                     }
                     alt={
+                      product.shortTitle ||
                       product.name ||
                       product.title ||
                       "Product"
@@ -198,7 +199,8 @@ export default function TrendingProducts() {
                     transition-colors
                   "
                 >
-                  {product.name ||
+                  {product.shortTitle ||
+                    product.name ||
                     product.title ||
                     "Product"}
                 </h3>
