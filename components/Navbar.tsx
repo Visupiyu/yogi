@@ -47,6 +47,12 @@ export default function Navbar() {
   const [cartCount, setCartCount] = useState(0);
   const [wishlistCount, setWishlistCount] = useState(0);
   const [user, setUser] = useState<User | null>(null);
+  // Same admin > vendor > customer precedence loadUser() already uses to
+  // pick which saved session to display — reused here to route the
+  // profile button, since neither a vendor nor an admin session has a
+  // /profile page of its own (that's the customer account area).
+  const [isVendor, setIsVendor] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = () => {
@@ -102,12 +108,20 @@ localStorage.setItem(
 
   if (savedAdmin) {
     setUser(JSON.parse(savedAdmin));
+    setIsVendor(false);
+    setIsAdmin(true);
   } else if (savedVendor) {
     setUser(JSON.parse(savedVendor));
+    setIsVendor(true);
+    setIsAdmin(false);
   } else if (savedUser) {
     setUser(JSON.parse(savedUser));
+    setIsVendor(false);
+    setIsAdmin(false);
   } else {
     setUser(null);
+    setIsVendor(false);
+    setIsAdmin(false);
   }
 };
 
@@ -419,8 +433,10 @@ useEffect(() => {
               )}
             </Link>
 
-            {/* PROFILE / LOGIN */}
-            <Link href="/profile">
+            {/* PROFILE / LOGIN — vendors and admins have no /profile (that's
+                the customer account area), so those sessions route to their
+                own area instead; customer/logged-out behavior is unchanged. */}
+            <Link href={isAdmin ? "/admin" : isVendor ? "/seller/settings" : "/profile"}>
               <div className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white px-4 py-2 rounded-full transition">
                 <User size={18} />
                 <span className="hidden md:block">{userLabel}</span>
