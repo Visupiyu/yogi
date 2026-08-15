@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Product } from "@/lib/products/product";
 import { generateSKU, generateSlug } from "@/lib/products/helpers";
 import CategorySelector from "./CategorySelector";
@@ -187,6 +187,27 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
 
     useState("");
     const router = useRouter();
+
+  // Keeps the Inventory section's aggregate stock number equal to the
+  // sum of the variant stocks whenever variants are in use, so "Available
+  // Stock" always matches what VariantSelector's per-size stock inputs
+  // actually add up to, instead of being a second, separately-editable
+  // number that could drift out of sync.
+  useEffect(() => {
+    if (product.variants.length === 0) return;
+
+    const total = product.variants.reduce(
+      (sum, variant) => sum + (Number(variant.stock) || 0),
+      0
+    );
+
+    if (total !== product.stock) {
+      setProduct((previous) => ({ ...previous, stock: total }));
+    }
+    // Intentionally re-runs only when the variants themselves change —
+    // not on every unrelated product-state edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.variants]);
 
   // ==========================================
   // Auto Generate
@@ -489,11 +510,17 @@ value={product.title}
 
 onChange={(e)=>updateTitle(e.target.value)}
 
-placeholder="Enter Product Name"
+placeholder="e.g., Men's Regular Fit Cotton Casual Shorts – Navy Blue"
 
 className="w-full rounded-lg border p-3 outline-none focus:border-blue-600"
 
 />
+
+<p className="mt-1 text-xs text-gray-500">
+
+Full official name. Shown on the Product Details page.
+
+</p>
 
 </div>
 
@@ -525,13 +552,21 @@ shortTitle:e.target.value,
 
 }
 
-placeholder="Short Product Name"
+placeholder="e.g., Men Cotton Shorts"
 
 className="w-full rounded-lg border p-3"
 
 />
 
+<p className="mt-1 text-xs text-gray-500">
+
+Short, concise name shown on homepage, category, and search cards. Uses Product Name if left blank.
+
+</p>
+
 </div>
+
+<div>
 
 <label className="mb-2 block text-sm font-semibold">
 
@@ -557,7 +592,7 @@ model:e.target.value,
 
 }
 
-placeholder="Model Number"
+placeholder="Manufacturer model number (optional)"
 
 className="w-full rounded-lg border p-3"
 
@@ -585,6 +620,12 @@ className="w-full rounded-lg border bg-gray-100 p-3"
 
 />
 
+<p className="mt-1 text-xs text-gray-500">
+
+Auto-generated stock identifier, based on category and brand.
+
+</p>
+
 </div>
 
 {/* Slug */}
@@ -606,6 +647,14 @@ value={product.slug}
 className="w-full rounded-lg border bg-gray-100 p-3"
 
 />
+
+<p className="mt-1 text-xs text-gray-500">
+
+Auto-generated URL-friendly version of the Product Name.
+
+</p>
+
+</div>
 
 </div>
 
@@ -734,12 +783,7 @@ Category
   <input
     type="text"
     value={product.brand}
-    onChange={(e) =>
-      setProduct({
-        ...product,
-        brand: e.target.value,
-      })
-    }
+    onChange={(e) => updateBrand(e.target.value)}
     placeholder="Enter brand name"
     className="w-full rounded-xl border p-3"
   />
@@ -997,6 +1041,8 @@ Available Stock
 
 type="number"
 
+readOnly={product.variants.length > 0}
+
 value={product.stock}
 
 onChange={(e)=>
@@ -1011,9 +1057,19 @@ stock:Number(e.target.value),
 
 }
 
-className="w-full rounded-lg border p-3"
+className={`w-full rounded-lg border p-3 ${product.variants.length > 0 ? "bg-gray-100" : ""}`}
 
 />
+
+{product.variants.length > 0 && (
+
+<p className="mt-1 text-xs text-gray-500">
+
+Auto-calculated as the sum of stock across all sizes.
+
+</p>
+
+)}
 
 </div>
 

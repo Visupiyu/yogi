@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CATEGORY_VARIANTS } from "@/lib/catalog/categoryVariants";
 
 interface ProductVariant {
@@ -34,6 +34,20 @@ export default function VariantSelector({
     CATEGORY_VARIANTS[categoryId.toUpperCase()] ||
     [];
 
+  const colorField = fields.find(
+    (field) => field.name === "Color" || field.name === "Shade"
+  );
+
+  const sizeField = fields.find((field) => field.name === "Size");
+
+  // Categories that have both a Color/Shade and a Size field (Fashion,
+  // Footwear, Beauty) use the simplified one-color-many-sizes flow below,
+  // with stock entered inline per size and no per-variant price. Every
+  // other category shape (Mobiles' RAM+Storage+Color, Laptops, ...) keeps
+  // the original single-select-per-field, one-variant-per-click flow with
+  // its own editable stock/price table further down, completely untouched.
+  const isColorSizeFlow = Boolean(colorField && sizeField);
+
   // ==========================================
   // Custom colors and sizes
   // ==========================================
@@ -57,20 +71,71 @@ export default function VariantSelector({
   const [selectedValues, setSelectedValues] =
     useState<Record<string, string>>({});
 
-  // Size is the one field a seller can multi-select — one color can be
-  // added in several sizes with a single "+ Add Variant" click instead of
-  // repeating the whole flow per size. Every other field (Color, RAM,
-  // Processor, ...) stays single-select via selectedValues above.
-  const [selectedSizes, setSelectedSizes] =
-    useState<string[]>([]);
+  // Color+Size flow only: which sizes are checked and the stock entered
+  // for each — keyed by size, so a size's presence here IS "checked".
+  // Values are kept as raw strings (not numbers) so the input can be
+  // temporarily empty while the seller is typing without fighting them.
+  const [sizeStock, setSizeStock] =
+    useState<Record<string, string>>({});
+
+  const hydratedRef = useRef(false);
+
+  // Load an existing product's color + per-size stock into the form once,
+  // on first mount, so editing shows exactly what's already saved instead
+  // of an empty selector. Guarded to run only once — without the guard,
+  // every onChange() call from Save below would feed the new `variants`
+  // prop straight back in and re-hydrate mid-edit, clobbering whatever
+  // the seller had just typed.
+  useEffect(() => {
+    if (!isColorSizeFlow || hydratedRef.current) return;
+    if (variants.length === 0) return;
+
+    hydratedRef.current = true;
+
+    const firstColor = variants
+      .map((v) => v.attributes[colorField!.name])
+      .find(Boolean);
+
+    if (!firstColor) return;
+
+    setSelectedValues((previous) => ({
+      ...previous,
+      [colorField!.name]: firstColor,
+    }));
+
+    const stockBySize: Record<string, string> = {};
+
+    variants
+      .filter((v) => v.attributes[colorField!.name] === firstColor)
+      .forEach((v) => {
+        const size = v.attributes[sizeField!.name];
+        if (size) stockBySize[size] = String(v.stock);
+      });
+
+    setSizeStock(stockBySize);
+    // Only ever needs to run once, when the existing variants first
+    // arrive — not on every subsequent variants/onChange cycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isColorSizeFlow, variants]);
 
   const toggleSize = (size: string) => {
-    setSelectedSizes((previous) =>
-      previous.includes(size)
-        ? previous.filter((item) => item !== size)
-        : [...previous, size]
-    );
+    setSizeStock((previous) => {
+      if (size in previous) {
+        const { [size]: _removed, ...rest } = previous;
+        return rest;
+      }
+      return { ...previous, [size]: "" };
+    });
   };
+
+  const updateSizeStock = (size: string, value: string) => {
+    setSizeStock((previous) => ({ ...previous, [size]: value }));
+  };
+
+  const totalInventory = Object.values(sizeStock).reduce(
+    (sum, value) => sum + (Number(value) > 0 ? Number(value) : 0),
+    0
+  );
 
   // ==========================================
   // Get field values
@@ -150,7 +215,7 @@ export default function VariantSelector({
       (field) => field.name === "Shade"
     );
 
-    const colorField = fields.find(
+    const colorFieldMatch = fields.find(
       (field) => field.name === "Color"
     );
 
@@ -159,7 +224,7 @@ export default function VariantSelector({
         ...previous,
         Shade: color,
       }));
-    } else if (colorField) {
+    } else if (colorFieldMatch) {
       setSelectedValues((previous) => ({
         ...previous,
         Color: color,
@@ -201,13 +266,10 @@ export default function VariantSelector({
       size,
     ]);
 
-    // Immediately check the newly added size, same spirit as addColor
-    // above — Size is multi-select, so this adds to the checked list
-    // instead of overwriting a single selected value.
-    setSelectedSizes((previous) =>
-      previous.includes(size)
-        ? previous
-        : [...previous, size]
+    // Immediately check the newly added size with an empty stock value,
+    // same spirit as addColor above.
+    setSizeStock((previous) =>
+      size in previous ? previous : { ...previous, [size]: "" }
     );
 
     setNewSize("");
@@ -228,7 +290,8 @@ export default function VariantSelector({
   };
 
   // ==========================================
-  // Add variant
+  // Add variant (non Color+Size categories only —
+  // Mobiles, Laptops, Furniture, ... one variant per click, unchanged)
   // ==========================================
 
   const makeVariantId = () =>
@@ -248,96 +311,87 @@ export default function VariantSelector({
     );
 
   const addVariant = () => {
-    const attributes: Record<
-      string,
-      string
-    > = {};
+    const attributes: Record<string, string> = {};
 
-    // Size is validated and collected separately below — every other
-    // field (Color, RAM, Processor, ...) still requires exactly one
-    // selected value, same as before.
     for (const field of fields) {
-      if (field.name === "Size") continue;
-
-      const value =
-        selectedValues[field.name];
+      const value = selectedValues[field.name];
 
       if (!value) {
-        alert(
-          `Please select ${field.name}.`
-        );
+        alert(`Please select ${field.name}.`);
         return;
       }
 
       attributes[field.name] = value;
     }
 
-    const hasSizeField = fields.some(
-      (field) => field.name === "Size"
-    );
-
-    if (!hasSizeField) {
-      // Categories with no Size field (Mobiles, Laptops, ...) behave
-      // exactly as before: one variant per click.
-      if (isDuplicate(attributes, variants)) {
-        alert("This variant already exists.");
-        return;
-      }
-
-      onChange([
-        ...variants,
-        { id: makeVariantId(), attributes, stock: 0, price: 0 },
-      ]);
-
-      setSelectedValues({});
+    if (isDuplicate(attributes, variants)) {
+      alert("This variant already exists.");
       return;
     }
 
-    if (selectedSizes.length === 0) {
+    onChange([
+      ...variants,
+      { id: makeVariantId(), attributes, stock: 0, price: 0 },
+    ]);
+
+    setSelectedValues({});
+  };
+
+  // ==========================================
+  // Save variants (Color+Size categories only) —
+  // replaces the product's whole variant list with exactly the checked
+  // sizes and their entered stock for the selected color, matching the
+  // "one color, many sizes" model. Unchecking a size and saving here is
+  // how a size gets removed.
+  // ==========================================
+
+  const saveColorSizeVariants = () => {
+    const color = selectedValues[colorField!.name];
+
+    if (!color) {
+      alert(`Please select a ${colorField!.name.toLowerCase()}.`);
+      return;
+    }
+
+    const sizes = Object.keys(sizeStock);
+
+    if (sizes.length === 0) {
       alert("Please select at least one size.");
       return;
     }
 
-    const newVariants: ProductVariant[] = [];
-    let skippedCount = 0;
+    for (const size of sizes) {
+      const raw = sizeStock[size];
+      const parsed = Number(raw);
 
-    for (const size of selectedSizes) {
-      const fullAttributes = { ...attributes, Size: size };
-
-      if (
-        isDuplicate(fullAttributes, variants) ||
-        isDuplicate(fullAttributes, newVariants)
-      ) {
-        skippedCount++;
-        continue;
+      if (raw.trim() === "" || Number.isNaN(parsed) || parsed < 0) {
+        alert(`Please enter a valid stock quantity for size ${size}.`);
+        return;
       }
-
-      newVariants.push({
-        id: makeVariantId(),
-        attributes: fullAttributes,
-        stock: 0,
-        price: 0,
-      });
     }
 
-    if (newVariants.length === 0) {
-      alert("Those color/size combinations already exist.");
-      return;
-    }
-
-    onChange([...variants, ...newVariants]);
-    setSelectedValues({});
-    setSelectedSizes([]);
-
-    if (skippedCount > 0) {
-      alert(
-        `Added ${newVariants.length} new variant(s). ${skippedCount} combination(s) already existed and were skipped.`
+    const newVariants: ProductVariant[] = sizes.map((size) => {
+      const existing = variants.find(
+        (v) =>
+          v.attributes[colorField!.name] === color &&
+          v.attributes[sizeField!.name] === size
       );
-    }
+
+      return {
+        id: existing?.id ?? makeVariantId(),
+        attributes: { [colorField!.name]: color, [sizeField!.name]: size },
+        stock: Number(sizeStock[size]),
+        // Product-level MRP/Selling Price is used for every size — no
+        // per-variant price in this flow.
+        price: 0,
+      };
+    });
+
+    onChange(newVariants);
   };
 
   // ==========================================
-  // Update variant
+  // Update variant (non Color+Size categories only)
   // ==========================================
 
   const updateVariant = (
@@ -359,7 +413,7 @@ export default function VariantSelector({
   };
 
   // ==========================================
-  // Remove variant
+  // Remove variant (non Color+Size categories only)
   // ==========================================
 
   const removeVariant = (
@@ -427,6 +481,7 @@ export default function VariantSelector({
             return (
               <div
                 key={field.name}
+                className={isSizeField && isColorSizeFlow ? "md:col-span-2" : undefined}
               >
 
                 <label className="mb-2 block font-semibold text-gray-800">
@@ -434,30 +489,47 @@ export default function VariantSelector({
                 </label>
 
                 {isSizeField ? (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-3">
                     {values.map((option, index) => {
-                      const checked = selectedSizes.includes(option);
+                      const checked = option in sizeStock;
                       return (
-                        <label
+                        <div
                           key={`${field.name}-${option}-${index}`}
                           className={`
-                            flex cursor-pointer items-center gap-2
-                            rounded-lg border px-3 py-2 text-sm font-medium
+                            flex items-center gap-2 rounded-lg border px-3 py-2
                             ${
                               checked
-                                ? "border-blue-600 bg-blue-50 text-blue-700"
-                                : "border-gray-300 bg-white text-gray-700"
+                                ? "border-blue-600 bg-blue-50"
+                                : "border-gray-300 bg-white"
                             }
                           `}
                         >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleSize(option)}
-                            className="h-4 w-4 accent-blue-600"
-                          />
-                          {option}
-                        </label>
+                          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-gray-700">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleSize(option)}
+                              className="h-4 w-4 accent-blue-600"
+                            />
+                            {option}
+                          </label>
+
+                          {checked && isColorSizeFlow && (
+                            <input
+                              type="number"
+                              min="0"
+                              value={sizeStock[option]}
+                              onChange={(e) =>
+                                updateSizeStock(option, e.target.value)
+                              }
+                              placeholder="Stock"
+                              className="
+                                w-20 rounded-md border border-gray-300 p-1
+                                text-sm focus:border-blue-600 focus:outline-none
+                              "
+                            />
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -613,13 +685,19 @@ export default function VariantSelector({
 
         </div>
 
+        {isColorSizeFlow && (
+          <p className="mt-4 text-sm font-semibold text-gray-700">
+            Total Inventory: {totalInventory}
+          </p>
+        )}
+
         {/* ================================= */}
-        {/* ADD VARIANT */}
+        {/* ADD / SAVE VARIANT */}
         {/* ================================= */}
 
         <button
           type="button"
-          onClick={addVariant}
+          onClick={isColorSizeFlow ? saveColorSizeVariants : addVariant}
           className="
             mt-6
             rounded-lg
@@ -632,16 +710,19 @@ export default function VariantSelector({
             hover:bg-blue-700
           "
         >
-          + Add Variant
+          {isColorSizeFlow ? "Save Sizes & Stock" : "+ Add Variant"}
         </button>
 
       </div>
 
       {/* ================================== */}
-      {/* VARIANT TABLE */}
+      {/* VARIANT TABLE — non Color+Size categories only. For the */}
+      {/* Color+Size flow, the checkboxes above already are the editable */}
+      {/* view of the current variants, so a second table would just */}
+      {/* duplicate the same information. */}
       {/* ================================== */}
 
-      {variants.length > 0 && (
+      {!isColorSizeFlow && variants.length > 0 && (
         <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-sm">
 
           <table className="w-full min-w-[750px]">
