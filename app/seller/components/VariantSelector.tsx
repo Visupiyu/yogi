@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CATEGORY_VARIANTS } from "@/lib/catalog/categoryVariants";
+import { findNodeById } from "@/lib/catalog/categoryUtils";
 
 interface ProductVariant {
   id: string;
@@ -28,10 +29,29 @@ export default function VariantSelector({
   // CATEGORY_VARIANTS mixes top-level codes (FASHION, MOBILES) with
   // leaf-style codes (FOOTWEAR, LAPTOPS) — try the most specific level
   // the seller picked first, then fall back up to the top-level category.
+  //
+  // The catalog tree's node ids aren't consistently bare words though —
+  // e.g. Footwear under Men/Women/Baby is stored as the compound,
+  // parent-prefixed id FASHION_MEN_FOOTWEAR / FASHION_WOMEN_FOOTWEAR /
+  // BABY_FOOTWEAR, which never matches a CATEGORY_VARIANTS key directly.
+  // Try the id as-is first (keeps every currently-working category —
+  // Fashion, Mobiles, Laptops, Beauty, Appliances, Furniture, Grocery —
+  // resolving exactly as before), and only if that fails, resolve the id
+  // to its real display name and match on that instead.
+  const resolveVariantFields = (id?: string) => {
+    if (!id) return undefined;
+
+    const direct = CATEGORY_VARIANTS[id.toUpperCase()];
+    if (direct) return direct;
+
+    const node = findNodeById(id);
+    return node ? CATEGORY_VARIANTS[node.name.toUpperCase()] : undefined;
+  };
+
   const fields =
-    CATEGORY_VARIANTS[(leafCategoryId ?? "").toUpperCase()] ||
-    CATEGORY_VARIANTS[(subCategoryId ?? "").toUpperCase()] ||
-    CATEGORY_VARIANTS[categoryId.toUpperCase()] ||
+    resolveVariantFields(leafCategoryId) ||
+    resolveVariantFields(subCategoryId) ||
+    resolveVariantFields(categoryId) ||
     [];
 
   const colorField = fields.find(
