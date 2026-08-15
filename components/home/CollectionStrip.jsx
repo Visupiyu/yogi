@@ -10,6 +10,7 @@ import {
   getDocs,
   query,
   where,
+  orderBy,
   limit,
 } from "firebase/firestore";
 
@@ -27,6 +28,7 @@ async function getProducts(category) {
     isTopLevelCategory(node)
       ? where("categoryId", "==", node.id)
       : where("subCategoryId", "==", node.id),
+    orderBy("createdAt", "desc"),
     limit(12)
   );
 
