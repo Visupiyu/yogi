@@ -57,6 +57,21 @@ export default function VariantSelector({
   const [selectedValues, setSelectedValues] =
     useState<Record<string, string>>({});
 
+  // Size is the one field a seller can multi-select — one color can be
+  // added in several sizes with a single "+ Add Variant" click instead of
+  // repeating the whole flow per size. Every other field (Color, RAM,
+  // Processor, ...) stays single-select via selectedValues above.
+  const [selectedSizes, setSelectedSizes] =
+    useState<string[]>([]);
+
+  const toggleSize = (size: string) => {
+    setSelectedSizes((previous) =>
+      previous.includes(size)
+        ? previous.filter((item) => item !== size)
+        : [...previous, size]
+    );
+  };
+
   // ==========================================
   // Get field values
   // ==========================================
@@ -186,11 +201,14 @@ export default function VariantSelector({
       size,
     ]);
 
-    // Immediately select the newly added size, same as addColor above.
-    setSelectedValues((previous) => ({
-      ...previous,
-      Size: size,
-    }));
+    // Immediately check the newly added size, same spirit as addColor
+    // above — Size is multi-select, so this adds to the checked list
+    // instead of overwriting a single selected value.
+    setSelectedSizes((previous) =>
+      previous.includes(size)
+        ? previous
+        : [...previous, size]
+    );
 
     setNewSize("");
   };
@@ -213,13 +231,34 @@ export default function VariantSelector({
   // Add variant
   // ==========================================
 
+  const makeVariantId = () =>
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random()}`;
+
+  const isDuplicate = (
+    attributes: Record<string, string>,
+    against: ProductVariant[]
+  ) =>
+    against.some((variant) =>
+      fields.every(
+        (field) =>
+          variant.attributes[field.name] === attributes[field.name]
+      )
+    );
+
   const addVariant = () => {
     const attributes: Record<
       string,
       string
     > = {};
 
+    // Size is validated and collected separately below — every other
+    // field (Color, RAM, Processor, ...) still requires exactly one
+    // selected value, same as before.
     for (const field of fields) {
+      if (field.name === "Size") continue;
+
       const value =
         selectedValues[field.name];
 
@@ -233,45 +272,68 @@ export default function VariantSelector({
       attributes[field.name] = value;
     }
 
-    const alreadyExists =
-      variants.some((variant) =>
-        fields.every(
-          (field) =>
-            variant.attributes[
-              field.name
-            ] ===
-            attributes[field.name]
-        )
-      );
+    const hasSizeField = fields.some(
+      (field) => field.name === "Size"
+    );
 
-    if (alreadyExists) {
-      alert(
-        "This variant already exists."
-      );
+    if (!hasSizeField) {
+      // Categories with no Size field (Mobiles, Laptops, ...) behave
+      // exactly as before: one variant per click.
+      if (isDuplicate(attributes, variants)) {
+        alert("This variant already exists.");
+        return;
+      }
+
+      onChange([
+        ...variants,
+        { id: makeVariantId(), attributes, stock: 0, price: 0 },
+      ]);
+
+      setSelectedValues({});
       return;
     }
 
-    const newVariant: ProductVariant = {
-      id:
-        typeof crypto !==
-          "undefined" &&
-        crypto.randomUUID
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random()}`,
+    if (selectedSizes.length === 0) {
+      alert("Please select at least one size.");
+      return;
+    }
 
-      attributes,
+    const newVariants: ProductVariant[] = [];
+    let skippedCount = 0;
 
-      stock: 0,
+    for (const size of selectedSizes) {
+      const fullAttributes = { ...attributes, Size: size };
 
-      price: 0,
-    };
+      if (
+        isDuplicate(fullAttributes, variants) ||
+        isDuplicate(fullAttributes, newVariants)
+      ) {
+        skippedCount++;
+        continue;
+      }
 
-    onChange([
-      ...variants,
-      newVariant,
-    ]);
+      newVariants.push({
+        id: makeVariantId(),
+        attributes: fullAttributes,
+        stock: 0,
+        price: 0,
+      });
+    }
 
+    if (newVariants.length === 0) {
+      alert("Those color/size combinations already exist.");
+      return;
+    }
+
+    onChange([...variants, ...newVariants]);
     setSelectedValues({});
+    setSelectedSizes([]);
+
+    if (skippedCount > 0) {
+      alert(
+        `Added ${newVariants.length} new variant(s). ${skippedCount} combination(s) already existed and were skipped.`
+      );
+    }
   };
 
   // ==========================================
@@ -359,6 +421,9 @@ export default function VariantSelector({
               field.name === "Color" ||
               field.name === "Shade";
 
+            const isSizeField =
+              field.name === "Size";
+
             return (
               <div
                 key={field.name}
@@ -368,47 +433,77 @@ export default function VariantSelector({
                   {field.name}
                 </label>
 
-                <select
-                  value={
-                    selectedValues[
-                      field.name
-                    ] || ""
-                  }
-                  onChange={(e) =>
-                    handleAttributeChange(
-                      field.name,
-                      e.target.value
-                    )
-                  }
-                  className="
-                    w-full
-                    rounded-lg
-                    border
-                    border-gray-300
-                    bg-white
-                    p-3
-                    focus:border-blue-600
-                    focus:outline-none
-                  "
-                >
+                {isSizeField ? (
+                  <div className="flex flex-wrap gap-2">
+                    {values.map((option, index) => {
+                      const checked = selectedSizes.includes(option);
+                      return (
+                        <label
+                          key={`${field.name}-${option}-${index}`}
+                          className={`
+                            flex cursor-pointer items-center gap-2
+                            rounded-lg border px-3 py-2 text-sm font-medium
+                            ${
+                              checked
+                                ? "border-blue-600 bg-blue-50 text-blue-700"
+                                : "border-gray-300 bg-white text-gray-700"
+                            }
+                          `}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleSize(option)}
+                            className="h-4 w-4 accent-blue-600"
+                          />
+                          {option}
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <select
+                    value={
+                      selectedValues[
+                        field.name
+                      ] || ""
+                    }
+                    onChange={(e) =>
+                      handleAttributeChange(
+                        field.name,
+                        e.target.value
+                      )
+                    }
+                    className="
+                      w-full
+                      rounded-lg
+                      border
+                      border-gray-300
+                      bg-white
+                      p-3
+                      focus:border-blue-600
+                      focus:outline-none
+                    "
+                  >
 
-                  <option value="">
-                    Select{" "}
-                    {field.name}
-                  </option>
+                    <option value="">
+                      Select{" "}
+                      {field.name}
+                    </option>
 
-                  {values.map(
-                    (option, index) => (
-                      <option
-                        key={`${field.name}-${option}-${index}`}
-                        value={option}
-                      >
-                        {option}
-                      </option>
-                    )
-                  )}
+                    {values.map(
+                      (option, index) => (
+                        <option
+                          key={`${field.name}-${option}-${index}`}
+                          value={option}
+                        >
+                          {option}
+                        </option>
+                      )
+                    )}
 
-                </select>
+                  </select>
+                )}
 
                 {/* ====================== */}
                 {/* ADD COLOR / SHADE */}

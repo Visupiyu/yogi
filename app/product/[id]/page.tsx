@@ -18,6 +18,7 @@ type Product = { id: string; name: string; image?: string;  images?: string[];  
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
   color?: string;  sizes?: string[];  material?: string;  brand?: string;  countryOfOrigin?: string;
   rating?: number;  reviewCount?: number;
+  variants?: { id: string; attributes: Record<string, string>; stock: number; price: number }[];
   // Fashion
 pattern?: string;fitType?: string;sleeveType?: string;neckType?: string;
 
@@ -92,6 +93,7 @@ function normalizeProduct(id: string, data: any): Product {
     vendorName: data.vendorName || "",
     color: data.color,
     sizes: data.sizes,
+    variants: Array.isArray(data.variants) ? data.variants : [],
     material: data.material,
     brand: data.brand,
     countryOfOrigin: data.countryOfOrigin,
@@ -293,14 +295,41 @@ questionSnap.forEach((d) => {
 
 }, [showGallery, selectedImage, product]);
 
-  const colors = product?.color
-    ? product.color.split(",").map((c: string) => c.trim()).filter(Boolean)
-    : [];
+  // Colors/sizes come from the seller-entered variants (each variant is one
+  // color+size combination — see VariantSelector) rather than the legacy
+  // top-level color/sizes fields, which the current seller form never
+  // writes. The legacy fields are kept as a fallback for any older product
+  // that predates variants.
+  const variantList = product?.variants || [];
+
+  const variantColors = Array.from(
+    new Set(
+      variantList
+        .map((v) => v.attributes.Color || v.attributes.Shade)
+        .filter((c): c is string => Boolean(c))
+    )
+  );
+
+  const variantSizes = Array.from(
+    new Set(
+      variantList
+        .map((v) => v.attributes.Size)
+        .filter((s): s is string => Boolean(s))
+    )
+  );
+
+  const colors =
+    variantColors.length > 0
+      ? variantColors
+      : product?.color
+      ? product.color.split(",").map((c: string) => c.trim()).filter(Boolean)
+      : [];
 
   // Filter out empty entries — an empty sizes field can be stored as [""].
-  const sizes = (product?.sizes || []).filter(
-    (s: string) => s && s.trim()
-  );
+  const sizes =
+    variantSizes.length > 0
+      ? variantSizes
+      : (product?.sizes || []).filter((s: string) => s && s.trim());
 
    const addItemToCart = (): boolean => {
   if (!product) return false;
