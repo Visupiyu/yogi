@@ -26,11 +26,13 @@ export default function SpecificationForm({
  // picked first. No fallback to an unrelated category's fields: showing
  // the wrong fields (e.g. t-shirt sizing on a phone listing) is worse
  // than showing none.
- const fields =
+ const resolvedFields =
   categoryFields[leafCategoryId ?? ""] ??
   categoryFields[subCategoryId ?? ""] ??
   categoryFields[categoryId] ??
   [];
+
+ const fields = Array.isArray(resolvedFields) ? resolvedFields : [];
 
   const updateField = (
     key: string,
