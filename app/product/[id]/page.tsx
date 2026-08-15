@@ -310,9 +310,18 @@ questionSnap.forEach((d) => {
     )
   );
 
+  // Once a color is picked, only that color's sizes are offered — a
+  // customer shouldn't be able to pick a Black/XL combination that was
+  // never actually listed as a variant. Before any color is picked, this
+  // stays the union across every color, same as before this change.
   const variantSizes = Array.from(
     new Set(
       variantList
+        .filter(
+          (v) =>
+            !selectedColor ||
+            (v.attributes.Color || v.attributes.Shade) === selectedColor
+        )
         .map((v) => v.attributes.Size)
         .filter((s): s is string => Boolean(s))
     )
@@ -331,6 +340,24 @@ questionSnap.forEach((d) => {
       ? variantSizes
       : (product?.sizes || []).filter((s: string) => s && s.trim());
 
+  // A size that was valid for the previous color may not exist for the
+  // newly selected one (Black has S/M/L, Blue has M/L/XL) — clear it
+  // rather than leave an invalid color+size combination selected.
+  useEffect(() => {
+    if (!selectedColor || !selectedSize) return;
+
+    const stillValid = variantList.some(
+      (v) =>
+        (v.attributes.Color || v.attributes.Shade) === selectedColor &&
+        v.attributes.Size === selectedSize
+    );
+
+    if (!stillValid) setSelectedSize("");
+    // Only re-check when the color changes — checking on every render
+    // (e.g. when selectedSize itself changes) isn't needed here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedColor]);
+
    const addItemToCart = (): boolean => {
   if (!product) return false;
 
@@ -342,6 +369,23 @@ questionSnap.forEach((d) => {
   if (colors.length > 0 && !selectedColor) {
     alert("Please select a color");
     return false;
+  }
+
+  // Belt-and-suspenders check for variant products: the size-clearing
+  // effect above should already prevent this, but the cart write itself
+  // is the right place to guarantee an invalid color+size combination
+  // (one with no matching variant) can never be added.
+  if (variantList.length > 0 && selectedColor && selectedSize) {
+    const validCombo = variantList.some(
+      (v) =>
+        (v.attributes.Color || v.attributes.Shade) === selectedColor &&
+        v.attributes.Size === selectedSize
+    );
+
+    if (!validCombo) {
+      alert("Please select a valid color and size combination.");
+      return false;
+    }
   }
 
   return addToCartHelper(product, {
