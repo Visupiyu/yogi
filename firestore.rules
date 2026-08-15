@@ -184,9 +184,20 @@ service cloud.firestore {
     // this field set at all (signup doesn't write it), so .get() with a
     // default is required -- direct dot-access on a genuinely absent field
     // throws and would deny every order for every never-blocked customer.
+    //
+    // The users/{uid} document itself can also be entirely absent -- not
+    // just the status field -- for any account created through a flow that
+    // never writes one (e.g. seller/vendor registration, which only ever
+    // writes vendors/{uid}). get().data on a nonexistent document throws
+    // and denies the whole rule, so exists() must be checked first; a
+    // missing document is treated the same as an unblocked account, same
+    // as the client-side blocked-check in app/checkout/page.tsx already does.
     function isNotBlocked() {
       return isSignedIn()
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'Active') != 'Blocked';
+        && (
+          !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('status', 'Active') != 'Blocked'
+        );
     }
 
     function affectedKeysOnly(fields) {

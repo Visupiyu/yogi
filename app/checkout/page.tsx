@@ -253,8 +253,9 @@ setAddress(userData.address || "");
   ];
 
   // Shared side-effects after an order document is created. Stock/sales are
-  // NOT touched here — reserveStock() already committed them atomically
-  // before the order was created (see placeCODOrder/payNow).
+  // NOT touched here — reserveStock() already committed them (atomically
+  // together with the order itself, for Pay on Delivery; best-effort after
+  // payment capture, for ONLINE) before this runs (see placeCODOrder/payNow).
   const applyPostOrderEffects = async (
     firebaseUser: any,
     orderId: string,
@@ -565,14 +566,11 @@ setAddress(userData.address || "");
 
       // Pay-on-Delivery hasn't captured any payment yet, so a failed
       // reservation can simply block the order — nothing to reconcile.
-      const reservation = await reserveStock();
-      if (!reservation.ok) {
-        alert(reservation.message);
-        return;
-      }
-
-      const orderRef = await addDoc(
-        collection(db, "orders"),
+      // The order document is created in the SAME transaction as the stock
+      // decrement (see reserveStock()'s orderData param) so a rejected
+      // order write can never leave stock decremented with no order to
+      // show for it.
+      const reservation = await reserveStock(
         // paymentAmount is also the server-verified amount here (it comes
         // from the same computeVerifiedOrderAmount() call as ONLINE orders'
         // verifiedAmount) — passing undefined previously meant finalTotal/
@@ -582,6 +580,12 @@ setAddress(userData.address || "");
         // actually told to pay.
         buildOrderData(firebaseUser, "Pending", paymentAmount, paymentAmount)
       );
+      if (!reservation.ok) {
+        alert(reservation.message);
+        return;
+      }
+
+      const orderRef = reservation.orderRef;
       await applyPostOrderEffects(firebaseUser, orderRef.id, "Pending");
 
       alert(
@@ -782,9 +786,26 @@ setAddress(userData.address || "");
   // customers racing for the last unit can't both succeed — one gets a
   // clean rejection here instead of the order silently going out with
   // stock never actually decremented.
-  const reserveStock = async (): Promise<
-    { ok: true } | { ok: false; failedItem?: any; message: string }
+  //
+  // When orderData is passed (the Pay on Delivery path, where no payment
+  // has been captured yet), the orders document is created in this SAME
+  // transaction as the stock decrement — Firestore transactions are
+  // all-or-nothing across every read/write they touch, including the
+  // security-rule evaluation for each one, so a rejected order write (e.g.
+  // the vendor-account isNotBlocked() gap) now rolls the stock decrement
+  // back with it instead of leaving a phantom decrement with no order to
+  // show for it. reserveStockBestEffort() below is intentionally NOT
+  // folded into this — the online-payment path runs after Razorpay has
+  // already captured money, where blocking the whole order on a stock
+  // conflict would be worse than an oversold item.
+  const reserveStock = async (
+    orderData?: any
+  ): Promise<
+    | { ok: true; orderRef?: any }
+    | { ok: false; failedItem?: any; message: string }
   > => {
+
+    const orderRef = orderData ? doc(collection(db, "orders")) : undefined;
 
     try {
 
@@ -830,9 +851,13 @@ setAddress(userData.address || "");
           });
         });
 
+        if (orderRef && orderData) {
+          transaction.set(orderRef, orderData);
+        }
+
       });
 
-      return { ok: true };
+      return { ok: true, orderRef };
 
     } catch (err: any) {
 
