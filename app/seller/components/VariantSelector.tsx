@@ -84,6 +84,12 @@ export default function VariantSelector({
   const [newSize, setNewSize] =
     useState("");
 
+  // Grocery's "Pack Size" has no fixed set of real-world values (655 g,
+  // 1.25 kg, 750 ml, ...), so unlike Color/Size it never had a predefined
+  // dropdown worth keeping — this is its only entry point.
+  const [newPackSize, setNewPackSize] =
+    useState("");
+
   // ==========================================
   // Selected values
   // ==========================================
@@ -296,6 +302,29 @@ export default function VariantSelector({
   };
 
   // ==========================================
+  // Add custom Pack Size
+  // ==========================================
+
+  const addPackSize = () => {
+    const packSize = newPackSize.trim();
+
+    if (!packSize) {
+      alert("Please enter a pack size.");
+      return;
+    }
+
+    // Selects it immediately, same as addColor/addSize — the seller then
+    // clicks "+ Add Variant" below to actually create it, where the
+    // existing isDuplicate() check already catches a repeat entry.
+    setSelectedValues((previous) => ({
+      ...previous,
+      "Pack Size": packSize,
+    }));
+
+    setNewPackSize("");
+  };
+
+  // ==========================================
   // Attribute change
   // ==========================================
 
@@ -498,6 +527,9 @@ export default function VariantSelector({
             const isSizeField =
               field.name === "Size";
 
+            const isPackSizeField =
+              field.name === "Pack Size";
+
             return (
               <div
                 key={field.name}
@@ -508,7 +540,51 @@ export default function VariantSelector({
                   {field.name}
                 </label>
 
-                {isSizeField ? (
+                {isPackSizeField ? (
+                  <div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newPackSize}
+                        onChange={(e) => setNewPackSize(e.target.value)}
+                        placeholder="e.g., 655 g, 1.25 kg, 750 ml"
+                        className="
+                          flex-1
+                          rounded-lg
+                          border
+                          border-gray-300
+                          p-3
+                          focus:border-blue-600
+                          focus:outline-none
+                        "
+                      />
+
+                      <button
+                        type="button"
+                        onClick={addPackSize}
+                        className="
+                          rounded-lg
+                          border
+                          border-blue-600
+                          px-4
+                          py-2
+                          font-semibold
+                          text-blue-600
+                          hover:bg-blue-50
+                        "
+                      >
+                        + Add Pack Size
+                      </button>
+                    </div>
+
+                    {selectedValues["Pack Size"] && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Selected: {selectedValues["Pack Size"]} — click
+                        &quot;+ Add Variant&quot; below to add it.
+                      </p>
+                    )}
+                  </div>
+                ) : isSizeField ? (
                   <div className="flex flex-wrap gap-3">
                     {values.map((option, index) => {
                       const checked = option in sizeStock;
