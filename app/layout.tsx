@@ -110,6 +110,7 @@ export default function RootLayout({
           to-blue-50
           min-h-screen
         "
+        suppressHydrationWarning
       >
         <ClientLayout>
           {children}
