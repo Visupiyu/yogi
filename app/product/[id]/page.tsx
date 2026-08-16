@@ -789,14 +789,14 @@ if (product.stock > 20) {
     Explore complete product information, seller details, delivery options and customer reviews.
   </p>
 </div>
-            <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-start">
               {/* IMAGE GALLERY */}
-              <div className="md:sticky md:top-24 self-start">
-               <div className="flex flex-col md:flex-row gap-4">
+              <div className="md:sticky md:top-24 self-start min-w-0">
+               <div className="flex flex-col md:flex-row gap-4 min-w-0">
 
   {/* Thumbnails */}
 
- <div className="order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-visible">
+ <div className="order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-visible min-w-0">
 
   {(product.images ?? [product.image])
     .filter((img): img is string => Boolean(img))
