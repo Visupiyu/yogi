@@ -101,7 +101,7 @@ export default function RootLayout({
 }) {
   
   return (
-    <html lang="en">
+    <html lang="en" className="overflow-x-hidden">
       <body
         className="
           bg-gradient-to-br
@@ -109,6 +109,7 @@ export default function RootLayout({
           via-white
           to-blue-50
           min-h-screen
+          overflow-x-hidden
         "
         suppressHydrationWarning
       >
