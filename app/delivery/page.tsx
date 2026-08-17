@@ -234,7 +234,7 @@ const deliveredDeliveries =
 
         </div>
 
-        <div className="grid md:grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
 
           <div className="bg-white rounded-2xl p-6 shadow">
 

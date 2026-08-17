@@ -16,6 +16,7 @@ export default function InvoiceInfo({
         Invoice Information
       </h2>
 
+      <div className="overflow-x-auto">
       <table className="w-full border-2 border-black border-collapse">
 
         <tbody>
@@ -99,6 +100,7 @@ export default function InvoiceInfo({
         </tbody>
 
       </table>
+      </div>
 
     </div>
 

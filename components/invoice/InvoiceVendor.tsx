@@ -22,48 +22,48 @@ export default function InvoiceVendor({
 
       </div>
 
-      <table className="w-full border-collapse">
+      <table className="w-full table-fixed border-collapse">
 
         <tbody>
 
          <tr>
-  <td className="border border-black p-1 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-1 font-semibold w-28 sm:w-40">
     Vendor Name
   </td>
-  <td className="border border-black p-1 w-full">
+  <td className="border border-black p-1 w-full break-words">
     {order.vendorName || "YOMICO Seller"}
   </td>
 </tr>
 
 <tr>
-  <td className="border border-black p-1 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-1 font-semibold w-28 sm:w-40">
     GSTIN
   </td>
-  <td className="border border-black p-1 w-full">
+  <td className="border border-black p-1 w-full break-words">
     {order.vendorGST || "-"}
   </td>
 </tr>
 
 <tr>
-  <td className="border border-black p-1 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-1 font-semibold w-28 sm:w-40">
     Phone
   </td>
-  <td className="border border-black p-1 w-full">
+  <td className="border border-black p-1 w-full break-words">
     {order.vendorPhone || "-"}
   </td>
 </tr>
 
 <tr>
-  <td className="border border-black p-1 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-1 font-semibold w-28 sm:w-40">
     Email
   </td>
-  <td className="border border-black p-1 w-full">
+  <td className="border border-black p-1 w-full break-words">
     {order.vendorEmail || "-"}
   </td>
 </tr>
 
 <tr>
-  <td className="border border-black p-1 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-1 font-semibold w-28 sm:w-40">
     Address
   </td>
   <td className="border border-black p-1 w-full whitespace-pre-line break-words">
@@ -72,10 +72,10 @@ export default function InvoiceVendor({
 </tr>
 
 <tr>
-  <td className="border border-black p-1 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-1 font-semibold w-28 sm:w-40">
     Vendor ID
   </td>
-  <td className="border border-black p-1 w-full">
+  <td className="border border-black p-1 w-full break-words">
     {order.vendorId || "-"}
   </td>
          </tr>

@@ -195,7 +195,7 @@ export default function OrdersPage() {
                 className="bg-white rounded-3xl shadow-md border overflow-hidden"
               >
                 {/* ORDER SUMMARY */}
-                <div className="grid lg:grid-cols-3 gap-8 p-8 border-b">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 p-8 border-b">
                   {/* LEFT */}
                   <div>
                     <h2 className="text-2xl font-bold">
@@ -629,13 +629,13 @@ export default function OrdersPage() {
 
 ) : (
 
-  <div className="flex items-center justify-between">
+  <div className="flex items-center justify-between overflow-x-auto">
 
     {steps.map((step, index) => (
 
       <div
         key={index}
-        className="flex items-center flex-1"
+        className="flex items-center flex-1 min-w-[120px]"
       >
 
       {/* Circle */}

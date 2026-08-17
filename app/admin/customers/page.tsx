@@ -103,7 +103,7 @@ export default function AdminCustomersPage() {
           </button>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-5 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
           <div className="bg-white rounded-2xl shadow p-6">
             <p>Total Customers</p>
             <h2 className="text-3xl font-bold">{customers.length}</h2>

@@ -445,7 +445,7 @@ Contact Support
       className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="grid md:grid-cols-2">
+      <div className="grid grid-cols-1 md:grid-cols-2">
 
         <div className="bg-gray-100">
           <img

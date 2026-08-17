@@ -143,7 +143,7 @@ export default function AdminAnalyticsPage() {
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* REVENUE BY CATEGORY */}
           <div className="bg-white rounded-3xl shadow-sm p-6">
             <h2 className="text-xl font-bold mb-4">Revenue by Category</h2>

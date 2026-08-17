@@ -26,7 +26,7 @@ export default function AboutPage() {
           customers with trusted sellers across India.
         </p>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
           <div className="bg-white p-8 rounded-2xl shadow">
 
@@ -87,7 +87,7 @@ export default function AboutPage() {
             Why Shop With Us?
           </h2>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
             <div>
               <h3 className="font-bold text-xl mb-2">
@@ -153,7 +153,7 @@ export default function AboutPage() {
 </div>
 <div className="bg-green-50 border border-green-200 rounded-2xl p-8 mt-10">
 
-  <div className="grid md:grid-cols-5 gap-4 text-center">
+  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
 
     <div>✅ Secure Payments</div>
 

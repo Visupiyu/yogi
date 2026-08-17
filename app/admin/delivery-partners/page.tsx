@@ -240,7 +240,7 @@ export default function DeliveryPartnersPage() {
           <p className="mt-2 opacity-90">Manage marketplace delivery staff</p>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 grid md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 grid grid-cols-1 md:grid-cols-2 gap-4">
           <input placeholder="Partner Name" value={name} onChange={(e) => setName(e.target.value)} className="border rounded-xl p-3" />
           <input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border rounded-xl p-3" />
           <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} className="border rounded-xl p-3" />

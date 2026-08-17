@@ -93,8 +93,9 @@ return (
     />
 
     <div className="overflow-hidden rounded-xl border bg-white shadow">
+      <div className="overflow-x-auto">
 
-      <table className="w-full">
+      <table className="w-full min-w-[640px]">
 
         <thead className="bg-gray-100">
 
@@ -222,6 +223,7 @@ return (
         </tbody>
 
       </table>
+      </div>
 
     </div>
 

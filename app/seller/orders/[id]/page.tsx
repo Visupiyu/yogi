@@ -405,6 +405,7 @@ finally{ setSaving(false);} };
 
               <div className="
                 grid
+                grid-cols-1
                 md:grid-cols-2
                 gap-4
               ">
@@ -1346,6 +1347,7 @@ finally{ setSaving(false);} };
 
           <div className="
             grid
+            grid-cols-1
             md:grid-cols-2
             gap-4
           ">
@@ -1371,25 +1373,63 @@ finally{ setSaving(false);} };
 
  onClick={() => {
 
+  const labelHtml = shippingLabelRef.current?.innerHTML;
+
+  if (!labelHtml) {
+    alert("Shipping label isn't ready yet. Please try again.");
+    return;
+  }
+
   const printWindow = window.open("", "_blank");
 
-  if (!printWindow) return;
+  if (!printWindow) {
+    alert("Please allow pop-ups for this site to print the shipping label.");
+    return;
+  }
 
-  printWindow.document.write(`
+  // Reuse the page's own compiled stylesheets so the label's Tailwind
+  // classes (border/flex/grid/etc.) actually render in the new window —
+  // a blank window.open("", ...) document has no stylesheet of its own.
+  const styleTags = Array.from(
+    document.querySelectorAll('link[rel="stylesheet"], style')
+  )
+    .map((el) => el.outerHTML)
+    .join("\n");
+
+  printWindow.document.open();
+
+  printWindow.document.write(`<!DOCTYPE html>
     <html>
       <head>
+        <meta charset="utf-8" />
         <title>Shipping Label</title>
+        ${styleTags}
+        <style>
+          body { margin: 0; padding: 16px; }
+        </style>
       </head>
       <body>
-        ${shippingLabelRef.current?.innerHTML}
+        ${labelHtml}
       </body>
     </html>
   `);
 
   printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
-  printWindow.close();
+
+  // Wait for the new window (styles/images/barcode+QR SVGs) to actually
+  // finish loading before printing — calling print() immediately after
+  // write() can fire before layout/paint completes, and closing right
+  // after print() can kill the dialog before the browser has even shown
+  // it. Closing is deferred to afterprint, once the user has actually
+  // finished interacting with the print dialog (printed or cancelled).
+  printWindow.onload = () => {
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  printWindow.onafterprint = () => {
+    printWindow.close();
+  };
 
 }}
 

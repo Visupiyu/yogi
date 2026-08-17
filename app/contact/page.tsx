@@ -22,7 +22,7 @@ export default function ContactPage() {
           We'd love to hear from you. Get in touch with the YOMICO team.
         </p>
 
-       <div className="grid md:grid-cols-2 gap-10">
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
 
   {/* Left Column */}
 

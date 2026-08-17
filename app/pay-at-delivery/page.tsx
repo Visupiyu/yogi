@@ -81,7 +81,7 @@ export default function PayAtDeliveryPage() {
         </div>
 
         {/* Benefits */}
-        <div className="grid md:grid-cols-3 gap-6 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
 
           <div className="bg-white rounded-2xl p-6 shadow">
             <div className="text-4xl mb-3">💳</div>

@@ -65,7 +65,7 @@ export default function AdminCouponsPage() {
         </p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-5 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
         <div className="bg-white rounded-3xl shadow-lg p-6 text-center">
           <p>Total Coupons</p>
           <h2 className="text-3xl font-bold">{coupons.length}</h2>

@@ -16,6 +16,7 @@ export default function InvoiceItems({
         Invoice Items
       </h2>
 
+      <div className="overflow-x-auto">
       <table className="w-full border-2 border-black border-collapse">
 
         <thead>
@@ -169,6 +170,7 @@ export default function InvoiceItems({
         </tbody>
 
       </table>
+      </div>
 
     </div>
 

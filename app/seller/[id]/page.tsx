@@ -423,7 +423,7 @@ if (!seller) {
   {product.category}
 </p>
 
-<div className="flex items-center justify-between mt-4">
+<div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-1 mt-4">
 
   <span className="text-yellow-500">
     ⭐⭐⭐⭐⭐

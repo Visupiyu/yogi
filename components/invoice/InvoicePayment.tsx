@@ -16,56 +16,56 @@ export default function InvoicePayment({
         Payment Information
       </h2>
 
-      <table className="w-full border-2 border-black border-collapse">
+      <table className="w-full table-fixed border-2 border-black border-collapse">
 
         <tbody>
 
  <tr>
-  <td className="border border-black p-2 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-2 font-semibold w-28 sm:w-40">
     Payment Method
   </td>
 
-  <td className="border border-black p-2 w-full">
+  <td className="border border-black p-2 w-full break-words">
     {order.paymentMethod || "-"}
   </td>
 </tr>
 
 <tr>
-  <td className="border border-black p-2 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-2 font-semibold w-28 sm:w-40">
     Payment Status
   </td>
 
-  <td className="border border-black p-2 w-full">
+  <td className="border border-black p-2 w-full break-words">
     {order.paymentStatus || "-"}
   </td>
 </tr>
 
 <tr>
-  <td className="border border-black p-2 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-2 font-semibold w-28 sm:w-40">
     Order Status
   </td>
 
-  <td className="border border-black p-2 w-full">
+  <td className="border border-black p-2 w-full break-words">
     {order.status || "-"}
   </td>
 </tr>
 
 <tr>
-  <td className="border border-black p-2 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-2 font-semibold w-28 sm:w-40">
     Transaction ID
   </td>
 
-  <td className="border border-black p-2 w-full">
+  <td className="border border-black p-2 w-full break-words">
     {order.transactionId || "-"}
   </td>
 </tr>
 
 <tr>
-  <td className="border border-black p-2 font-semibold w-40 whitespace-nowrap">
+  <td className="border border-black p-2 font-semibold w-28 sm:w-40">
     Payment Date
   </td>
 
-  <td className="border border-black p-2 w-full">
+  <td className="border border-black p-2 w-full break-words">
     {order.paymentDate
       ? new Date(order.paymentDate).toLocaleDateString("en-IN")
       : "-"}

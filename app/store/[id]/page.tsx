@@ -369,7 +369,7 @@ Secure Shopping
     🎁 Store Coupons
   </h2>
 
-  <div className="grid md:grid-cols-3 gap-6">
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
     <div className="rounded-3xl border-2 border-dashed border-green-500 bg-green-50 p-6">
 
@@ -649,7 +649,7 @@ Secure Shopping
     🏪 About This Store
   </h2>
 
-  <div className="grid md:grid-cols-2 gap-8">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
     <div className="space-y-4">
 
@@ -749,7 +749,7 @@ Secure Shopping
     📞 Contact Seller
   </h2>
 
-  <div className="grid md:grid-cols-2 gap-6">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
     <div>
       <p className="font-semibold">Business Phone</p>

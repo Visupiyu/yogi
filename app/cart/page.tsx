@@ -175,7 +175,7 @@ const moveToCart = (index: number) => {
   );
 
   const productSavings = Math.max(0, mrpTotal - total);
-  const shipping = total > FREE_DELIVERY_THRESHOLD || total === 0 ? 0 : SHIPPING_FEE;
+  const shipping = total >= FREE_DELIVERY_THRESHOLD || total === 0 ? 0 : SHIPPING_FEE;
   const grandTotal = Math.max(0, total + shipping);
   const totalSavings = productSavings + (shipping === 0 && total > 0 ? SHIPPING_FEE : 0);
 

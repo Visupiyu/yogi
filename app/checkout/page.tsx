@@ -119,7 +119,7 @@ setAddress(userData.address || "");
   // Shipping + delivery date recompute whenever the amount changes, or once
   // the live settings values load in behind the defaults.
   useEffect(() => {
-    setShipping(finalAmount > FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE);
+    setShipping(finalAmount >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE);
 
     const d = new Date();
     d.setDate(d.getDate() + 5);

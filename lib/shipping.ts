@@ -4,9 +4,9 @@ import { db } from "@/lib/firebase";
 // Fallback defaults — used whenever settings/global is missing, unreadable,
 // or has a malformed field, so a bad/absent settings doc can never break
 // checkout. Admin-configurable value lives in Firestore; see getShippingSettings().
-export const FREE_SHIPPING_THRESHOLD = 999;
+export const FREE_SHIPPING_THRESHOLD = 499;
 
-export const STANDARD_SHIPPING_CHARGE = 99;
+export const STANDARD_SHIPPING_CHARGE = 49;
 
 export interface ShippingSettings {
   freeShippingThreshold: number;
