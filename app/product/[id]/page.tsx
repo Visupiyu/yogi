@@ -1334,6 +1334,7 @@ Easy Returns
       placeholder="Enter PIN Code"
       className="
 flex-1
+min-w-0
 border
 border-gray-300
 rounded-2xl
@@ -1365,6 +1366,7 @@ px-6
 rounded-2xl
 font-semibold
 transition
+shrink-0
 " >
       Check
     </button>
