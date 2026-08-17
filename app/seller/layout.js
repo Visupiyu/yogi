@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useVendor } from "@/hooks/useVendor";
@@ -59,6 +59,14 @@ const BLOCKED_MESSAGES = {
 export default function SellerLayout({ children }) {
   const pathname = usePathname() || "";
   const router = useRouter();
+  // Permanent sidebar only makes sense once there's room for it — below
+  // md it becomes an off-canvas drawer instead (see <aside> below), toggled
+  // by this state and always closed again on route change.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
 
   const segments = pathname.split("/").filter(Boolean); // ["seller", ...]
   const firstSegment = segments[1];
@@ -116,9 +124,48 @@ export default function SellerLayout({ children }) {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      {/* SIDEBAR */}
-      <aside className="w-64 shrink-0 bg-gradient-to-b from-green-700 to-blue-700 text-white flex flex-col sticky top-0 h-screen">
-        <div className="p-5 text-center border-b border-white/10">
+      {/* MOBILE TOP BAR — only the sidebar's own trigger; the desktop
+          sidebar below is untouched at md: and up. */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 flex items-center justify-between gap-3 bg-gradient-to-r from-green-700 to-blue-700 text-white px-4 py-3">
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          aria-label="Open seller menu"
+          className="text-2xl leading-none px-1"
+        >
+          ☰
+        </button>
+        <span className="font-bold">Seller Panel</span>
+        <span className="w-8" aria-hidden="true" />
+      </div>
+
+      {/* MOBILE BACKDROP */}
+      {mobileNavOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/50"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* SIDEBAR — fixed off-canvas drawer below md (slides in/out via
+          translate-x, toggled by mobileNavOpen), reverts to the original
+          in-flow sticky sidebar unchanged at md: and up. */}
+      <aside
+        className={`
+          w-64 shrink-0 bg-gradient-to-b from-green-700 to-blue-700 text-white flex flex-col
+          fixed inset-y-0 left-0 z-50 h-screen transition-transform duration-300 ease-in-out
+          md:sticky md:top-0 md:inset-auto md:z-auto md:translate-x-0
+          ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}
+        `}
+      >
+        <div className="p-5 text-center border-b border-white/10 relative">
+          <button
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Close seller menu"
+            className="md:hidden absolute top-3 right-3 text-2xl leading-none"
+          >
+            ✕
+          </button>
          <Image
   src="/logo.png"
   alt="YOMICO"
@@ -142,6 +189,7 @@ export default function SellerLayout({ children }) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setMobileNavOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl whitespace-nowrap transition ${
                   active ? "bg-white/20 font-semibold" : "hover:bg-white/10"
                 }`}
@@ -164,8 +212,9 @@ export default function SellerLayout({ children }) {
         </div>
       </aside>
 
-      {/* CONTENT */}
-      <main className="flex-1 min-w-0">{children}</main>
+      {/* CONTENT — pt-14 clears the fixed mobile top bar; removed again
+          at md: since the top bar itself is md:hidden there. */}
+      <main className="flex-1 min-w-0 pt-14 md:pt-0">{children}</main>
 
     </div>
   );
