@@ -11,7 +11,6 @@ import {
   orderBy,
   limit,
   updateDoc,
-  deleteDoc,
   doc,
 } from "firebase/firestore";
 
@@ -134,24 +133,26 @@ export default function SellerNotificationsPage() {
 
   };
 
-  const deleteNotification = async (id: string) => {
+  const markAllAsRead = async () => {
 
-    await deleteDoc(
+    // Update all unread notifications to read: true
+    const unreadNotifications = notifications.filter((item) => !item.read);
 
-      doc(db, "notifications", id)
+    for (const notification of unreadNotifications) {
+      try {
+        await updateDoc(
+          doc(db, "notifications", notification.id),
+          { read: true }
+        );
+      } catch (error) {
+        console.error("Failed to mark notification as read:", error);
+      }
+    }
 
-    );
-
+    // Update local state
     setNotifications(
-
-      notifications.filter(
-
-        (item) => item.id !== id
-
-      )
-
+      notifications.map((item) => ({ ...item, read: true }))
     );
-
   };
 
   if (loading) {
@@ -180,17 +181,41 @@ export default function SellerNotificationsPage() {
 
         <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-8 mb-8">
 
-          <h1 className="text-4xl font-bold">
+          <div className="flex items-center justify-between">
 
-            🔔 Seller Notifications
+            <div>
 
-          </h1>
+              <h1 className="text-4xl font-bold">
 
-          <p className="mt-2">
+                🔔 Seller Notifications
 
-            Orders, chats, reviews and payment updates
+              </h1>
 
-          </p>
+              <p className="mt-2">
+
+                Orders, chats, reviews and payment updates
+
+              </p>
+
+            </div>
+
+            {notifications.length > 0 && notifications.some((item) => !item.read) && (
+
+              <button
+
+                onClick={markAllAsRead}
+
+                className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition"
+
+              >
+
+                Mark All Read
+
+              </button>
+
+            )}
+
+          </div>
 
         </div>
 
@@ -279,18 +304,6 @@ export default function SellerNotificationsPage() {
                     </button>
 
                   )}
-
-                  <button
-
-                    onClick={() => deleteNotification(item.id)}
-
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg"
-
-                  >
-
-                    Delete
-
-                  </button>
 
                 </div>
 
