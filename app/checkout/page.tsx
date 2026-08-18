@@ -269,80 +269,59 @@ setAddress(userData.address || "");
   ) => {
     const earnedPoints = Math.floor(grandTotal / 100);
 
-    // Admin notification
-    await addDoc(collection(db, "notifications"), {
-      title: "🛒 New Order",
-      message: `${name} placed an order worth ₹${grandTotal}`,
-      type: "order",
-      role: "admin",
-      read: false,
-      createdAt: Timestamp.now(),
-    });
+    // Notifications (admin + every seller in the order + the customer) are
+    // created by /api/notify, not here. The browser only names the event and
+    // the order id — the server re-reads the order, checks it belongs to the
+    // caller, and derives every recipient and every word of the message from
+    // Firestore, so a tampered cart can't address another vendor's feed or
+    // forge an admin alert. One request replaces the previous 2+N writes.
+    //
+    // Strictly best-effort: this runs after payment has been captured and the
+    // order document already exists, so a notification failure must never
+    // surface as a failed order. Each call is individually swallowed.
+    const notify = async (payload: Record<string, unknown>) => {
+      try {
+        const notifyIdToken = await firebaseUser.getIdToken();
+        const response = await fetch("/api/notify", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${notifyIdToken}`,
+          },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          console.error(
+            "Notification request failed:",
+            payload.event,
+            response.status
+          );
+        }
+      } catch (e) {
+        console.error("Notification request failed:", payload.event, e);
+      }
+    };
+
+    await notify({ event: "order.placed", resourceId: orderId });
 
     if (stockIssueItems.length > 0) {
-      try {
-        await addDoc(collection(db, "notifications"), {
-          title: "⚠ Stock oversold after payment",
-          message: `Order ${orderId.slice(0, 8)}: ${stockIssueItems
-            .map((i) => i.name)
-            .join(", ")} sold out during checkout — payment was captured, stock was not decremented. Needs manual review.`,
-          type: "order",
-          role: "admin",
-          read: false,
-          createdAt: Timestamp.now(),
-        });
-      } catch (e) {
-        console.error("❌ Stock-issue admin notification failed:", e);
-      }
+      // Only the ids — the server validates each one belongs to this order
+      // and builds the message from the real product documents.
+      await notify({
+        event: "order.stockIssue",
+        resourceId: orderId,
+        failedItemIds: stockIssueItems
+          .map((i) => i.id)
+          .filter((id: unknown): id is string => typeof id === "string"),
+      });
     }
 
     if (couponConflict) {
-      try {
-        await addDoc(collection(db, "notifications"), {
-          title: "⚠ Coupon possibly redeemed twice",
-          message: `Order ${orderId.slice(0, 8)}: coupon "${coupon
-            .trim()
-            .toUpperCase()}" was already redeemed by this customer on another order — payment was captured, this order was not rejected. Needs manual review.`,
-          type: "order",
-          role: "admin",
-          read: false,
-          createdAt: Timestamp.now(),
-        });
-      } catch (e) {
-        console.error("❌ Coupon-conflict admin notification failed:", e);
-      }
+      // No coupon code is sent: the server re-derives the conflict from the
+      // order's stored couponCode and the deterministic redemption claim, and
+      // stays silent if there wasn't actually one.
+      await notify({ event: "order.couponConflict", resourceId: orderId });
     }
-
-    // Seller notifications
-    for (const item of items) {
-      if (item.vendorId) {
-        try {
-          await addDoc(collection(db, "notifications"), {
-            userId: item.vendorId,
-            role: "seller",
-            title: "🛒 New Order",
-            message: `${name} ordered ${item.name}`,
-            type: "order",
-            read: false,
-            createdAt: Timestamp.now(),
-          });
-          console.log("✅ Seller notification:", item.name);
-        } catch (e) {
-          console.error("❌ Seller notification failed:", item.name, e);
-          // Do NOT throw
-        }
-      }
-    }
-    // Customer notification
-    await addDoc(collection(db, "notifications"), {
-      userId: firebaseUser.uid,
-      role: "customer",
-      title: "✅ Order Placed",
-      message: `Your order worth ₹${grandTotal} has been placed successfully.`,
-      type: "order",
-      read: false,
-      createdAt: Timestamp.now(),
-    });
 
     // Confirmation email (best-effort)
     try {
