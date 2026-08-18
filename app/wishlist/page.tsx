@@ -94,6 +94,10 @@ export default function WishlistPage() {
     item: any
   ) => {
 
+    if (item.stock <= 0) {
+      return;
+    }
+
     const cart =
       JSON.parse(
         localStorage.getItem(
@@ -263,17 +267,6 @@ window.dispatchEvent(
       🚚
     </h2>
   </div>
-
-</div>
-<div className="flex items-center gap-1 mt-2 text-yellow-500">
-
-★★★★★
-
-<span className="text-gray-500 text-xs">
-
-(4.9)
-
-</span>
 
 </div>
 
@@ -480,6 +473,7 @@ duration-500
                       onClick={() =>
                         moveToCart(item)
                       }
+                      disabled={item.stock <= 0}
                      >
                     🛒 Move To Cart
                     </button>

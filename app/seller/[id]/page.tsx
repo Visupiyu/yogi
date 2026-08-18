@@ -425,10 +425,6 @@ if (!seller) {
 
 <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-1 mt-4">
 
-  <span className="text-yellow-500">
-    ⭐⭐⭐⭐⭐
-  </span>
-
   <span className="text-blue-600 font-semibold">
     View Product →
   </span>

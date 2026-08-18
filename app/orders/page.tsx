@@ -9,6 +9,11 @@ import {
   updateDoc,
   doc,
   increment,
+  getDoc,
+  deleteDoc,
+  runTransaction,
+  addDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -110,10 +115,24 @@ export default function OrdersPage() {
     )
       return;
     try {
-      const order = orders.find((o) => o.id === id);
+      const orderRef = doc(db, "orders", id);
+      const orderSnap = await getDoc(orderRef);
+
+      if (!orderSnap.exists()) {
+        console.log("Order not found:", id);
+        return;
+      }
+
+      const orderData: any = orderSnap.data();
+
+      // Already cancelled — skip everything below so a repeated/duplicate
+      // cancel request can't restore stock or reverse rewards/coupons twice.
+      if (orderData.status === "Cancelled") {
+        return;
+      }
 
       await updateDoc(
-        doc(db, "orders", id),
+        orderRef,
         {
           status: "Cancelled",
         }
@@ -122,7 +141,7 @@ export default function OrdersPage() {
       // Checkout decremented stock/incremented sales for these items —
       // restore them now that the order won't be fulfilled. Best-effort
       // per item so one deleted product doesn't block the rest.
-      for (const item of order?.items || []) {
+      for (const item of orderData.items || []) {
         try {
           await updateDoc(doc(db, "products", item.id), {
             stock: increment(item.qty || 0),
@@ -131,6 +150,91 @@ export default function OrdersPage() {
         } catch (stockError) {
           console.error("Failed to restore stock for", item.id, stockError);
         }
+      }
+
+      // Reward points: reverse both sides of what checkout applied for this
+      // order — the points it awarded for the purchase, and the points it
+      // deducted for redemption — using only what's stored on the order
+      // itself. earnedPoints isn't persisted directly on the order, so it's
+      // recomputed with the exact same formula checkout used
+      // (Math.floor(finalTotal/100)) against the order's own stored
+      // finalTotal, not invented.
+      try {
+        const earnedPoints = Math.floor(
+          Number(orderData.finalTotal || 0) / 100
+        );
+        const redeemedValue = Number(orderData.rewardValue || 0);
+
+        if (orderData.userId && (earnedPoints > 0 || redeemedValue > 0)) {
+          await runTransaction(db, async (transaction) => {
+            const userRef = doc(db, "users", orderData.userId);
+            const userSnap = await transaction.get(userRef);
+            const currentPoints = userSnap.exists()
+              ? Number(userSnap.data().rewardPoints || 0)
+              : 0;
+
+            const newBalance = Math.max(
+              0,
+              currentPoints - earnedPoints + redeemedValue
+            );
+
+            transaction.set(
+              userRef,
+              { rewardPoints: newBalance },
+              { merge: true }
+            );
+          });
+
+          if (earnedPoints > 0) {
+            await addDoc(collection(db, "rewardTransactions"), {
+              userId: orderData.userId,
+              userEmail: orderData.userEmail,
+              type: "Cancelled - Points Reversed",
+              points: earnedPoints,
+              orderId: id,
+              createdAt: Timestamp.now(),
+            });
+          }
+
+          if (redeemedValue > 0) {
+            await addDoc(collection(db, "rewardTransactions"), {
+              userId: orderData.userId,
+              userEmail: orderData.userEmail,
+              type: "Cancelled - Points Restored",
+              points: redeemedValue,
+              orderId: id,
+              createdAt: Timestamp.now(),
+            });
+          }
+        }
+      } catch (rewardError) {
+        console.error(
+          "Failed to reverse reward points for order",
+          id,
+          rewardError
+        );
+      }
+
+      // Coupon: free the redemption so this customer can use the same code
+      // again. Matched strictly by orderId — couponRedemptions.code is
+      // stored uppercased while orderData.couponCode may not be, so orderId
+      // is the only reliable link back to this specific order.
+      try {
+        const redemptionSnap = await getDocs(
+          query(
+            collection(db, "couponRedemptions"),
+            where("orderId", "==", id)
+          )
+        );
+        for (const redemptionDoc of redemptionSnap.docs) {
+          await deleteDoc(redemptionDoc.ref);
+        }
+      } catch (couponError) {
+        console.error(
+          "Failed to reverse coupon redemption for order",
+          id,
+          couponError
+        );
       }
 
       setOrders((prev) =>

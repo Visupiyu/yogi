@@ -436,7 +436,6 @@ export default function OrderDetailsPage() {
           >
             ← Back to Orders
           </Link>
-        </div>
 
         {/* ORDERED PRODUCTS */}
         <div className="mt-8 bg-white rounded-3xl shadow border p-8">
@@ -530,6 +529,7 @@ export default function OrderDetailsPage() {
             </Link>
           </div>
         )}
+        </div>
       </section>
   );
 }

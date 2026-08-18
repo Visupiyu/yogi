@@ -736,12 +736,25 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    function isCancelledCouponReversal() {
+      // Cancelling an order should free up the coupon it used, the same way
+      // isStockRestoreUpdate() frees up stock — the redemption may only be
+      // deleted by its own owner, and only once the order it's tied to has
+      // already legitimately transitioned to Cancelled (itself gated by the
+      // orders update rule's own Pending -> Cancelled restriction).
+      return isOwnerUid(resource.data.userId)
+        && 'orderId' in resource.data
+        && resource.data.orderId is string
+        && get(/databases/$(database)/documents/orders/$(resource.data.orderId)).data.status == 'Cancelled';
+    }
+
     match /couponRedemptions/{redemptionId} {
       allow read: if isAdmin() || isOwnerUid(resource.data.userId);
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && isValidString('code', 50);
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || isCancelledCouponReversal();
     }
 
     // ---------------------------------------------------------

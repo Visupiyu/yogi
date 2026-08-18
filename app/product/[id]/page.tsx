@@ -1241,7 +1241,7 @@ Easy Returns
 
       <h3 className="text-xl font-bold text-gray-800 mt-1">
   <Link
-    href={`/seller/${product.vendorId}`}
+    href={`/store/${product.vendorId}`}
     className="hover:text-green-600 hover:underline"
   >
     🏪 {product.vendorName}
@@ -1290,7 +1290,7 @@ Easy Returns
     </div>
 
    <Link
-  href={`/seller/${product.vendorId}`}
+  href={`/store/${product.vendorId}`}
   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-2xl font-semibold transition"
 >
   Visit Store
@@ -1354,7 +1354,7 @@ focus:ring-green-500
         }
 
         setDeliveryMessage(
-          `Delivery available to ${pinCode}. Estimated delivery: 2–5 business days.`
+          "PIN code received. Standard delivery estimate: 2–5 business days."
         );
 
       }}
@@ -2004,10 +2004,6 @@ p-6
       <h3 className="font-bold text-lg mt-3">
         {review.customerName}
       </h3>
-
-      <span className="inline-block mt-1 bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
-        ✔ Verified Purchase
-      </span>
 
     </div>
 

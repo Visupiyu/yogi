@@ -256,11 +256,16 @@ setAddress(userData.address || "");
   // NOT touched here — reserveStock() already committed them (atomically
   // together with the order itself, for Pay on Delivery; best-effort after
   // payment capture, for ONLINE) before this runs (see placeCODOrder/payNow).
+  // The coupon redemption record is claimed the same way — atomically with
+  // the order for Pay on Delivery, best-effort after payment for ONLINE —
+  // so it is never written here; couponConflict just reports whether that
+  // claim lost a race, for the admin notification below.
   const applyPostOrderEffects = async (
     firebaseUser: any,
     orderId: string,
     paymentStatus: string,
-    stockIssueItems: any[] = []
+    stockIssueItems: any[] = [],
+    couponConflict: boolean = false
   ) => {
     const earnedPoints = Math.floor(grandTotal / 100);
 
@@ -288,6 +293,23 @@ setAddress(userData.address || "");
         });
       } catch (e) {
         console.error("❌ Stock-issue admin notification failed:", e);
+      }
+    }
+
+    if (couponConflict) {
+      try {
+        await addDoc(collection(db, "notifications"), {
+          title: "⚠ Coupon possibly redeemed twice",
+          message: `Order ${orderId.slice(0, 8)}: coupon "${coupon
+            .trim()
+            .toUpperCase()}" was already redeemed by this customer on another order — payment was captured, this order was not rejected. Needs manual review.`,
+          type: "order",
+          role: "admin",
+          read: false,
+          createdAt: Timestamp.now(),
+        });
+      } catch (e) {
+        console.error("❌ Coupon-conflict admin notification failed:", e);
       }
     }
 
@@ -396,18 +418,10 @@ setAddress(userData.address || "");
       });
     }
 
-    if (couponApplied && coupon) {
-      try {
-        await addDoc(collection(db, "couponRedemptions"), {
-          userId: firebaseUser.uid,
-          code: coupon.trim().toUpperCase(),
-          orderId,
-          createdAt: Timestamp.now(),
-        });
-      } catch (e) {
-        console.error("Failed to record coupon redemption:", e);
-      }
-    }
+    // couponRedemptions is claimed atomically by reserveStock() (Pay on
+    // Delivery) or the ONLINE success handler before this function runs —
+    // writing it here too would create a second, redundant record for the
+    // same order.
 
     localStorage.removeItem("cart");
     localStorage.removeItem("checkoutItems");
@@ -604,7 +618,16 @@ setAddress(userData.address || "");
   };
 
   const payNow = async () => {
-    if (!validateForm()) return;
+    // Set immediately, before any validation/network work, so a second
+    // click can't re-enter this function while the first click is still
+    // validating/creating the order — every exit path below must reset
+    // this back to false, or the button gets stuck disabled.
+    setLoading(true);
+
+    if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
 
     // Must check login BEFORE opening Razorpay, not after payment succeeds
     // — otherwise a session that expires mid-checkout lets Razorpay
@@ -613,6 +636,7 @@ setAddress(userData.address || "");
     if (!payingUser) {
       alert("Please login again.");
       router.push("/login");
+      setLoading(false);
       return;
     }
 
@@ -623,20 +647,23 @@ setAddress(userData.address || "");
     const payingUserSnap = await getDoc(doc(db, "users", payingUser.uid));
     if (payingUserSnap.exists() && payingUserSnap.data().status === "Blocked") {
       alert("Your account has been blocked. Please contact support.");
+      setLoading(false);
       return;
     }
 
-      if (!(await validateStock())) return;
-      if (!(await validateRewardPoints())) return;
+      if (!(await validateStock())) { setLoading(false); return; }
+      if (!(await validateRewardPoints())) { setLoading(false); return; }
 
     const res: any = await loadRazorpayScript();
     if (!res) {
       alert("Razorpay failed");
+      setLoading(false);
       return;
     }
 
     if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY) {
       alert("Razorpay Key Missing");
+      setLoading(false);
       return;
     }
 
@@ -660,6 +687,7 @@ setAddress(userData.address || "");
 
     if (!response.ok || data.error) {
       alert(data.error || "Couldn't start payment. Please try again.");
+      setLoading(false);
       return;
     }
 
@@ -689,12 +717,14 @@ setAddress(userData.address || "");
 
         if (!verifyData.success) {
           alert("Payment Verification Failed");
+          setLoading(false);
           return;
         }
 
         const firebaseUser = auth.currentUser;
         if (!firebaseUser) {
           alert("Please login again.");
+          setLoading(false);
           return;
         }
 
@@ -710,11 +740,48 @@ setAddress(userData.address || "");
             collection(db, "orders"),
             buildOrderData(firebaseUser, "Paid", verifyData.amount)
           );
+
+          // Coupon: same atomic claim reserveStock() uses for Pay on
+          // Delivery, but a conflict here must never fail the order —
+          // payment is already captured and can't be undone. A conflict is
+          // recorded and flagged for admin review instead, exactly like
+          // reserveStockBestEffort()'s oversold items above.
+          let couponConflict = false;
+          const normalizedCode =
+            couponApplied && coupon ? coupon.trim().toUpperCase() : null;
+          if (normalizedCode) {
+            const redemptionRef = doc(
+              db,
+              "couponRedemptions",
+              `${firebaseUser.uid}_${normalizedCode}`
+            );
+            try {
+              await runTransaction(db, async (transaction) => {
+                const redemptionSnap = await transaction.get(redemptionRef);
+                if (redemptionSnap.exists()) {
+                  couponConflict = true;
+                  return;
+                }
+                transaction.set(redemptionRef, {
+                  userId: firebaseUser.uid,
+                  userEmail: firebaseUser.email,
+                  code: normalizedCode,
+                  orderId: orderRef.id,
+                  createdAt: Timestamp.now(),
+                });
+              });
+            } catch (e) {
+              console.error("Coupon claim failed:", e);
+              couponConflict = true;
+            }
+          }
+
           await applyPostOrderEffects(
             firebaseUser,
             orderRef.id,
             "Paid",
-            failedItems
+            failedItems,
+            couponConflict
           );
 
           alert("Order Placed Successfully");
@@ -728,6 +795,7 @@ setAddress(userData.address || "");
       },
       modal: {
         ondismiss: function () {
+          setLoading(false);
           alert("Payment Cancelled");
         },
       },
@@ -807,6 +875,19 @@ setAddress(userData.address || "");
 
     const orderRef = orderData ? doc(collection(db, "orders")) : undefined;
 
+    // Deterministic ID so the redemption for this exact customer+coupon can
+    // be read (and claimed) inside the same transaction as the stock/order
+    // writes below — a second, concurrent checkout claiming the same
+    // coupon aborts here before either the order or the stock decrement
+    // ever commit, the same way an oversold item already does.
+    const currentUser = auth.currentUser;
+    const normalizedCode =
+      couponApplied && coupon ? coupon.trim().toUpperCase() : null;
+    const redemptionRef =
+      normalizedCode && currentUser
+        ? doc(db, "couponRedemptions", `${currentUser.uid}_${normalizedCode}`)
+        : null;
+
     try {
 
       await runTransaction(db, async (transaction) => {
@@ -815,6 +896,13 @@ setAddress(userData.address || "");
         const snaps = await Promise.all(
           refs.map((ref: any) => transaction.get(ref))
         );
+
+        // All reads must happen before any write in a Firestore
+        // transaction — the coupon-redemption read sits alongside the
+        // stock reads above, before the writes further down.
+        const redemptionSnap = redemptionRef
+          ? await transaction.get(redemptionRef)
+          : null;
 
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
@@ -844,6 +932,14 @@ setAddress(userData.address || "");
           }
         }
 
+        if (redemptionSnap && redemptionSnap.exists()) {
+          const err: any = new Error("coupon");
+          err.couponConflict = true;
+          err.message =
+            "This coupon has already been used. Please remove it and try again.";
+          throw err;
+        }
+
         refs.forEach((ref: any, i: number) => {
           transaction.update(ref, {
             stock: increment(-items[i].qty),
@@ -855,6 +951,16 @@ setAddress(userData.address || "");
           transaction.set(orderRef, orderData);
         }
 
+        if (redemptionRef && orderRef && normalizedCode && currentUser) {
+          transaction.set(redemptionRef, {
+            userId: currentUser.uid,
+            userEmail: currentUser.email,
+            code: normalizedCode,
+            orderId: orderRef.id,
+            createdAt: Timestamp.now(),
+          });
+        }
+
       });
 
       return { ok: true, orderRef };
@@ -863,6 +969,10 @@ setAddress(userData.address || "");
 
       if (err && err.failedItem) {
         return { ok: false, failedItem: err.failedItem, message: err.message };
+      }
+
+      if (err && err.couponConflict) {
+        return { ok: false, message: err.message };
       }
 
       console.error("Stock reservation failed:", err);

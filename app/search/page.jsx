@@ -390,7 +390,7 @@ if (minimumDiscount > 0) {
                         {product.name}
                       </h3>
                       <div className="flex items-center gap-1 mt-2 text-yellow-500">
-                       ★★★★★ <span className="text-xs text-gray-500">({Number(product.rating || 0).toFixed(1)})</span></div>
+                       <span className="text-xs text-gray-500">({Number(product.rating || 0).toFixed(1)})</span></div>
 
                     <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-3 mt-6">
                         <span className="text-green-600 font-bold">

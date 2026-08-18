@@ -175,6 +175,7 @@ export default function ProfilePage() {
     { href: "/profile/wallet", icon: "🏆", title: "Rewards", desc: "Points & transaction history" },
     { href: "/profile/refunds", icon: "↩️", title: "My Refunds", desc: "Track returns & refund status" },
     { href: "/profile/tickets", icon: "🎫", title: "Support Tickets", desc: "View your requests and replies" },
+    { href: "/profile/referrals", icon: "🎁", title: "Referrals", desc: "Invite friends and earn rewards" },
     { href: "/settings", icon: "⚙️", title: "Settings", desc: "Manage account preferences" },
   ];
 
