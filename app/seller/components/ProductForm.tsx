@@ -420,7 +420,21 @@ const handleSubmit = async (
     // ==========================================
 
     if (isEditing && existingProduct) {
-      const { id, createdAt, ...updatePayload } = finalProduct as typeof finalProduct & {
+      // active/approved/featured are admin-controlled moderation fields —
+      // never send them back here. This form only ever holds whatever
+      // value was loaded when the page opened, so if admin changes any of
+      // them in the meantime, submitting a stale copy fails Firestore's
+      // unchanged('active'/'approved'/'featured') rule with a permission
+      // error. Omitting them lets Firestore's partial-update semantics
+      // preserve whatever the current stored value actually is.
+      const {
+        id,
+        createdAt,
+        active,
+        approved,
+        featured,
+        ...updatePayload
+      } = finalProduct as typeof finalProduct & {
         id?: string;
       };
       await updateDoc(
