@@ -9,6 +9,7 @@ import {
   doc,
   query,
   where,
+  limit,
 } from "firebase/firestore";
 import {
   BarChart,
@@ -237,11 +238,16 @@ export default function AdminPage() {
       // Missing the role scope /admin/notifications already uses — this
       // counted every unread customer/seller notification in the whole
       // marketplace too, not just admin's own.
+      //
+      // Bounded to 50 so this can't fan out into an unbounded read on every
+      // dashboard load. The badge is therefore capped at 50 — it reads as
+      // "50+" below rather than claiming an exact total it no longer fetches.
       const snapshot = await getDocs(
         query(
           collection(db, "notifications"),
           where("role", "==", "admin"),
-          where("read", "==", false)
+          where("read", "==", false),
+          limit(50)
         )
       );
       setUnreadCount(snapshot.size);
@@ -289,7 +295,7 @@ export default function AdminPage() {
                 🔔 System Notifications
                 {unreadCount > 0 && (
                   <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full">
-                    {unreadCount}
+                    {unreadCount >= 50 ? "50+" : unreadCount}
                   </span>
                 )}
               </button>

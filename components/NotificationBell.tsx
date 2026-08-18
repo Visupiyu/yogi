@@ -11,7 +11,8 @@ import {
   updateDoc,
   doc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 
 interface Notification {
   id: string;
@@ -29,37 +30,59 @@ export default function NotificationBell() {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const user = JSON.parse(
-      localStorage.getItem("user") ||
-        localStorage.getItem("vendor") ||
-        "{}"
-    );
-    if (!user.uid) return;
+    let unsubscribeSnapshot: (() => void) | undefined;
 
-    const role = localStorage.getItem("vendor") ? "seller" : "customer";
+    // The uid now comes from Firebase Auth rather than a localStorage copy,
+    // which could be stale or edited — a mismatched uid produced a query the
+    // security rules rejected, and with no error handler the bell just sat
+    // silently empty. The seller/customer distinction still comes from the
+    // "vendor" key, which is the only role signal available here; it is read
+    // inside the callback so it stays in sync with the current session.
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = undefined;
+      }
 
-    // No orderBy here → avoids a composite index. We sort in JS below.
-    const q = query(
-      collection(db, "notifications"),
-      where("userId", "==", user.uid),
-      where("role", "==", role)
-    );
+      if (!firebaseUser) {
+        setNotifications([]);
+        return;
+      }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: Notification[] = [];
-      snapshot.forEach((docSnap) => {
-        list.push({
-          id: docSnap.id,
-          ...(docSnap.data() as Omit<Notification, "id">),
-        });
-      });
-      list.sort(
-        (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+      const role = localStorage.getItem("vendor") ? "seller" : "customer";
+
+      // No orderBy here → avoids a composite index. We sort in JS below.
+      const q = query(
+        collection(db, "notifications"),
+        where("userId", "==", firebaseUser.uid),
+        where("role", "==", role)
       );
-      setNotifications(list);
+
+      unsubscribeSnapshot = onSnapshot(
+        q,
+        (snapshot) => {
+          const list: Notification[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push({
+              id: docSnap.id,
+              ...(docSnap.data() as Omit<Notification, "id">),
+            });
+          });
+          list.sort(
+            (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+          );
+          setNotifications(list);
+        },
+        (error) => {
+          console.error("Failed to load notifications:", error);
+        }
+      );
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
+    };
   }, []);
 
   // Close on outside click

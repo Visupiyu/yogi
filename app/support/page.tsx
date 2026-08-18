@@ -43,6 +43,15 @@ async()=>{
     return;
   }
 
+  // The admin notification below uses the subject as its message, and
+  // firestore.rules requires a non-empty notification message — a blank
+  // subject saved the ticket but then threw on the notification write,
+  // silently skipping the success alert and the form reset.
+  if (!subject.trim()) {
+    alert("Please enter a subject.");
+    return;
+  }
+
   try{
 
     setLoading(true);

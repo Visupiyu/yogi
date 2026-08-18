@@ -663,10 +663,39 @@ service cloud.firestore {
       allow read: if isAdmin()
         || ('userId' in resource.data && isOwnerUid(resource.data.userId));
 
+      // Notification creation is legitimately cross-user in this app — a
+      // customer's checkout writes to the seller's and admin's feeds, a
+      // seller's order update writes to the customer's — so ownership
+      // (userId == request.auth.uid) deliberately CANNOT be required here
+      // without breaking those flows. Instead the payload itself is pinned
+      // down: only known fields, only known roles/types, always unread on
+      // creation, and non-empty text. This bounds what a forged write can
+      // look like; it does not by itself stop impersonation, which needs
+      // creation moved server-side behind the Admin SDK.
+      //
+      // Field/type lists below are derived from every creation site in the
+      // app (checkout, admin orders/delivery/support, seller orders/wallet,
+      // delivery, returns, support, vendor-register, lib/returns.ts).
       allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+             'title', 'message', 'role', 'type', 'read', 'createdAt',
+             'userId', 'userEmail'
+           ])
+        && request.resource.data.keys().hasAll([
+             'title', 'message', 'role', 'type', 'read', 'createdAt'
+           ])
         && request.resource.data.role in ['customer', 'seller', 'admin']
-        && isValidString('title', 200)
-        && isValidString('message', 1000)
+        && request.resource.data.type in [
+             'order', 'delivery', 'shipping', 'refund',
+             'support', 'vendor', 'withdrawal'
+           ]
+        && request.resource.data.read == false
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200
+        && request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 1000
         && (request.resource.data.role == 'admin' || request.resource.data.userId is string);
 
       allow update: if (

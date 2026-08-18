@@ -8,6 +8,7 @@ import {
   where,
   updateDoc,
   doc,
+  limit,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -26,9 +27,14 @@ export default function AdminNotificationsPage() {
 
   useEffect(() => {
     // Admin notifications only (role == "admin"). No orderBy → no composite index.
+    // Bounded like the customer/seller notification pages already are —
+    // this previously loaded the entire admin notification history on every
+    // page open, growing slower and pricier over time. Sorting still happens
+    // client-side below.
     const q = query(
       collection(db, "notifications"),
-      where("role", "==", "admin")
+      where("role", "==", "admin"),
+      limit(50)
     );
 
     const unsubscribe = onSnapshot(

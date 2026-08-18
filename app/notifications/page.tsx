@@ -13,7 +13,9 @@ import {
   orderBy,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+
+import { auth, db } from "@/lib/firebase";
 
 interface Notification {
   id: string;
@@ -32,57 +34,78 @@ export default function NotificationsPage() {
 
 useEffect(() => {
 
-  const user = JSON.parse(
+  let unsubscribeSnapshot: (() => void) | undefined;
 
-    localStorage.getItem("user") || "{}"
+  // The uid comes from Firebase Auth, not localStorage — a stale cached
+  // "user" entry (e.g. left over from a previous account) produced a query
+  // the security rules correctly rejected, and the failure was swallowed
+  // silently, leaving the page permanently showing "No Notifications".
+  const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
 
-  );
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = undefined;
+    }
 
-  if (!user.uid) return;
+    if (!firebaseUser) {
+      setNotifications([]);
+      return;
+    }
 
-  const q = query(
+    const q = query(
 
-    collection(db, "notifications"),
+      collection(db, "notifications"),
 
-    where("userId", "==", user.uid),
+      where("userId", "==", firebaseUser.uid),
 
-    where("role", "==", "customer"),
+      where("role", "==", "customer"),
 
-    orderBy("createdAt", "desc"),
+      orderBy("createdAt", "desc"),
 
-    // Unbounded before — kept loading the customer's entire notification
-    // history forever, growing slower and pricier over time.
-    limit(50)
+      // Unbounded before — kept loading the customer's entire notification
+      // history forever, growing slower and pricier over time.
+      limit(50)
 
-  );
+    );
 
-  const unsubscribe = onSnapshot(
+    unsubscribeSnapshot = onSnapshot(
 
-    q,
+      q,
 
-    (snapshot) => {
+      (snapshot) => {
 
-      const list: Notification[] = [];
+        const list: Notification[] = [];
 
-      snapshot.forEach((docSnap) => {
+        snapshot.forEach((docSnap) => {
 
-        list.push({
+          list.push({
 
-          id: docSnap.id,
+            id: docSnap.id,
 
-          ...(docSnap.data() as Omit<Notification, "id">),
+            ...(docSnap.data() as Omit<Notification, "id">),
+
+          });
 
         });
 
-      });
+        setNotifications(list);
 
-      setNotifications(list);
+      },
 
-    }
+      (error) => {
 
-  );
+        console.error("Failed to load notifications:", error);
 
-  return () => unsubscribe();
+      }
+
+    );
+
+  });
+
+  return () => {
+    unsubscribeAuth();
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+  };
 
 }, []);
 
