@@ -70,18 +70,30 @@ export default function SignupPage() {
       const myReferralCode =
         "YOGI" + Math.floor(100000 + Math.random() * 900000);
 
-      await setDoc(doc(db, "users", result.user.uid), {
-        uid: result.user.uid,
-        name,
-        email: cleanEmail,
-        phone,
-        role: "customer",
-        rewardPoints: 0,
-        referralCode: myReferralCode,
-        referredBy: referralCode || "",
-        totalReferrals: 0,
-        createdAt: new Date(),
-      });
+      try {
+        await setDoc(doc(db, "users", result.user.uid), {
+          uid: result.user.uid,
+          name,
+          email: cleanEmail,
+          phone,
+          role: "customer",
+          rewardPoints: 0,
+          referralCode: myReferralCode,
+          referredBy: referralCode || "",
+          totalReferrals: 0,
+          createdAt: new Date(),
+        });
+      } catch (profileError) {
+        // The Auth account exists but has no profile behind it — roll it
+        // back so the email is signup-able again, instead of leaving a
+        // customer who can log in but has no working account.
+        console.error("Failed to create user profile:", profileError);
+        await result.user.delete().catch((deleteError) =>
+          console.error("Failed to roll back orphaned Auth account:", deleteError)
+        );
+        alert("Signup couldn't be completed. Please try again.");
+        return;
+      }
 
       if (referralCode) {
         try {
