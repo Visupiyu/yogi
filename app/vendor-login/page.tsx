@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { signInWithEmailAndPassword, signOut, sendEmailVerification } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -40,7 +41,9 @@ export default function VendorLoginPage() {
 );
 
       if (!userCredential.user.emailVerified) {
-        await sendEmailVerification(userCredential.user);
+        // Same branded server-side email as registration — sent while still
+        // signed in, since the endpoint authenticates with this user's ID token.
+        await sendVerificationEmail(userCredential.user);
         await signOut(auth);
         alert(
           "Your seller account's email isn't verified yet. We just sent a verification link to " +

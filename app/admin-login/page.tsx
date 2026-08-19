@@ -4,10 +4,10 @@ import { useState } from "react";
 import {
   signInWithEmailAndPassword,
   signOut,
-  sendEmailVerification,
 } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
+import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
 import Image from "next/image";
 import Link from "next/link";
 import { ADMIN_EMAIL } from "@/lib/adminConfig";
@@ -39,7 +39,9 @@ if (userEmail !== ADMIN_EMAIL) {
 }
 
 if (!result.user.emailVerified) {
-  await sendEmailVerification(result.user);
+  // Same branded server-side email as signup — sent while still signed in,
+  // since the endpoint authenticates with this user's ID token.
+  await sendVerificationEmail(result.user);
   await signOut(auth);
   alert(
     "This admin account's email isn't verified yet, which the security rules now require for admin access. " +

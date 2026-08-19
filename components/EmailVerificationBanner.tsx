@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, sendEmailVerification, type User } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
 import { toast } from "sonner";
 
 // Non-blocking reminder for customers with an unverified email —
@@ -36,7 +37,10 @@ export default function EmailVerificationBanner() {
   const resend = async () => {
     setSending(true);
     try {
-      await sendEmailVerification(user);
+      // Goes through the same server endpoint as signup, so the customer gets
+      // the branded YOMICO email rather than Firebase's default — one system,
+      // not two.
+      await sendVerificationEmail(user);
       toast.success("Verification email sent — check your inbox.");
     } catch (error) {
       console.error(error);

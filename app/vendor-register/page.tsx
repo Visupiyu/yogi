@@ -9,7 +9,6 @@ import {
 
 import {
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   signOut,
 } from "firebase/auth";
 
@@ -28,6 +27,7 @@ import {
 } from "firebase/storage";
 
 import { auth, db, storage } from "@/lib/firebase";
+import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
 
 const citiesByState = {
   Gujarat: ["Ahmedabad", "Surat", "Vadodara", "Rajkot"],
@@ -338,10 +338,16 @@ export default function VendorRegisterPage() {
 
       const uid = userCredential.user.uid;
 
+      // Branded YOMICO verification email via the server (Resend) instead of
+      // Firebase's default, so sellers get the same mail customers do and
+      // only one email is ever sent.
+      //
       // Best-effort — seller login enforces this later (blocking, since
       // it's a business account), but don't let a flaky email send abort
-      // the whole registration.
-      sendEmailVerification(userCredential.user).catch((err) =>
+      // the whole registration. Kept in this position deliberately: the
+      // vendor document doesn't exist yet at this point (KYC uploads run
+      // below), so the server simply greets without a name.
+      sendVerificationEmail(userCredential.user).catch((err) =>
         console.error("Failed to send seller verification email:", err)
       );
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
   doc,
   setDoc,
@@ -16,6 +16,7 @@ import {
   increment,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -60,13 +61,6 @@ export default function SignupPage() {
         password
       );
 
-      // Best-effort — a customer who never gets/clicks the email still
-      // gets a working account (verification is a reminder, not a
-      // login gate, for this role).
-      sendEmailVerification(result.user).catch((err) =>
-        console.error("Failed to send verification email:", err)
-      );
-
       const myReferralCode =
         "YOGI" + Math.floor(100000 + Math.random() * 900000);
 
@@ -94,6 +88,18 @@ export default function SignupPage() {
         alert("Signup couldn't be completed. Please try again.");
         return;
       }
+
+      // Branded YOMICO verification email, sent from the server via Resend —
+      // Firebase's own sendEmailVerification() is no longer used, so exactly
+      // one email goes out. Runs after the profile document exists so the
+      // server can greet the customer by name.
+      //
+      // Best-effort, as before: a customer who never gets/clicks the email
+      // still has a working account (verification is a reminder, not a login
+      // gate, for this role), so a mail failure must not fail the signup.
+      sendVerificationEmail(result.user).catch((err) =>
+        console.error("Failed to send verification email:", err)
+      );
 
       if (referralCode) {
         try {

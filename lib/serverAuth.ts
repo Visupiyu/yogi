@@ -5,6 +5,10 @@ export type VerifiedUser = {
   uid: string;
   email: string | null;
   isAdmin: boolean;
+  // Google's lookup response already carries this; surfacing it lets the
+  // verification-email route skip re-sending to an already-verified address
+  // without a second round trip. Additive — existing callers ignore it.
+  emailVerified: boolean;
 };
 
 // Verifies the Firebase ID token the client sent (Authorization: Bearer
@@ -56,6 +60,7 @@ export async function verifyRequestUser(
       uid: user.localId,
       email: user.email ?? null,
       isAdmin: user.email === ADMIN_EMAIL,
+      emailVerified: user.emailVerified === true,
     };
   } catch (error) {
     console.error("verifyRequestUser: ID token verification failed:", error);
