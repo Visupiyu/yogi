@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import AIChatWidget from "@/components/ai/AIChatWidget";
+import { auth } from "@/lib/firebase";
 export default function SellerAssistantPage(){
 
   const [productName,setProductName] =useState("");
@@ -48,12 +49,26 @@ const copyText = (
     return;
   }
 
+  // The generator endpoint now requires a signed-in caller, since each run
+  // costs real AI spend. The seller dashboard already gates this page, so
+  // this only fails if the session expired mid-visit.
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    toast.error("Please sign in again.");
+    return;
+  }
+
   setGenerating(true);
 
   try {
+    const idToken = await currentUser.getIdToken();
+
     const response = await fetch("/api/ai/seller-assistant", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
       body: JSON.stringify({ productName, category }),
     });
 

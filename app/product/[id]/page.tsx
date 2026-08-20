@@ -456,6 +456,16 @@ questionSnap.forEach((d) => {
   const askAI = async () => {
     if (!product) return;
 
+    // The Q&A endpoint costs real AI spend per call, so it now requires a
+    // signed-in caller — same gate the neighbouring askQuestion() and
+    // submitReview() actions on this page already apply.
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      alert("Please login first.");
+      router.push("/login");
+      return;
+    }
+
     if (!aiQuestion.trim()) {
       alert("Enter a question");
       return;
@@ -473,9 +483,14 @@ questionSnap.forEach((d) => {
         {}
       );
 
+      const idToken = await currentUser.getIdToken();
+
       const response = await fetch("/api/ai/product-qa", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           question: aiQuestion,
           productName: product.name,
