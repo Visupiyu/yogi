@@ -1,17 +1,24 @@
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Fallback defaults — used whenever settings/global is missing, unreadable,
-// or has a malformed field, so a bad/absent settings doc can never break
-// checkout. Admin-configurable value lives in Firestore; see getShippingSettings().
-export const FREE_SHIPPING_THRESHOLD = 499;
+// Client-side entry point for the shared shipping rule. The constants, the
+// ShippingSettings shape and calculateShippingCharge() itself now live in
+// lib/shippingRules.ts so the server (lib/orderPricing.ts) can use the exact
+// same logic without importing the client Firebase SDK this file pulls in.
+// Re-exported here so existing client imports keep working unchanged.
+import {
+  FREE_SHIPPING_THRESHOLD,
+  STANDARD_SHIPPING_CHARGE,
+  calculateShippingCharge,
+  type ShippingSettings,
+} from "@/lib/shippingRules";
 
-export const STANDARD_SHIPPING_CHARGE = 49;
-
-export interface ShippingSettings {
-  freeShippingThreshold: number;
-  standardShippingCharge: number;
-}
+export {
+  FREE_SHIPPING_THRESHOLD,
+  STANDARD_SHIPPING_CHARGE,
+  calculateShippingCharge,
+  type ShippingSettings,
+};
 
 export async function getShippingSettings(): Promise<ShippingSettings> {
   try {
@@ -63,19 +70,17 @@ export function calculateShipping(
 
   const today = new Date();
 
-  let shippingCharge = STANDARD_SHIPPING_CHARGE;
+  // Delegates to the shared rule rather than re-deriving it, so this
+  // helper cannot drift from what the cart, checkout and server charge.
+  const shippingCharge = calculateShippingCharge(subtotal, {
+    freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
+    standardShippingCharge: STANDARD_SHIPPING_CHARGE,
+  });
 
-  let shippingMethod: ShippingMethod = "Standard";
+  const shippingMethod: ShippingMethod =
+    shippingCharge === 0 ? "Free" : "Standard";
 
   const estimatedDays = 5;
-
-  if (subtotal >= FREE_SHIPPING_THRESHOLD) {
-
-    shippingCharge = 0;
-
-    shippingMethod = "Free";
-
-  }
 
   const estimatedDelivery = new Date(today);
 

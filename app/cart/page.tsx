@@ -14,6 +14,7 @@ import {
 import {
   FREE_SHIPPING_THRESHOLD as DEFAULT_FREE_DELIVERY_THRESHOLD,
   STANDARD_SHIPPING_CHARGE as DEFAULT_SHIPPING_FEE,
+  calculateShippingCharge,
   getShippingSettings,
 } from "@/lib/shipping";
 
@@ -175,7 +176,10 @@ const moveToCart = (index: number) => {
   );
 
   const productSavings = Math.max(0, mrpTotal - total);
-  const shipping = total >= FREE_DELIVERY_THRESHOLD || total === 0 ? 0 : SHIPPING_FEE;
+  const shipping = calculateShippingCharge(total, {
+    freeShippingThreshold: FREE_DELIVERY_THRESHOLD,
+    standardShippingCharge: SHIPPING_FEE,
+  });
   const grandTotal = Math.max(0, total + shipping);
   const totalSavings = productSavings + (shipping === 0 && total > 0 ? SHIPPING_FEE : 0);
 

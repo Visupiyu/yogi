@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   collection,
@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import {
   FREE_SHIPPING_THRESHOLD as DEFAULT_FREE_SHIPPING_THRESHOLD,
   STANDARD_SHIPPING_CHARGE as DEFAULT_SHIPPING_FEE,
+  calculateShippingCharge,
   getShippingSettings,
 } from "@/lib/shipping";
 import { getEffectiveCommissionRate } from "@/lib/commission";
@@ -57,6 +58,12 @@ export default function CheckoutPage() {
   // Defaults to 0 (no commission) until the live setting loads — matches
   // YOMICO's zero-commission launch policy; never guess a nonzero charge.
   const [commissionRate, setCommissionRate] = useState(0);
+
+  // One key per COD attempt, held across retries so a resubmit after a
+  // network failure reaches /api/place-order with the SAME key and resolves
+  // to the same order document instead of creating a second one. Cleared
+  // only once an order actually exists.
+  const codIdempotencyKey = useRef<string | null>(null);
 
   useEffect(() => {
     getShippingSettings().then((settings) => {
@@ -119,7 +126,16 @@ setAddress(userData.address || "");
   // Shipping + delivery date recompute whenever the amount changes, or once
   // the live settings values load in behind the defaults.
   useEffect(() => {
-    setShipping(finalAmount >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE);
+    // Shared with the cart and with lib/orderPricing.ts, so what is shown
+    // here is what the server will actually charge. The base is the
+    // pre-discount item subtotal, not finalAmount: a coupon must not claw
+    // back the free delivery the cart already promised at that subtotal.
+    setShipping(
+      calculateShippingCharge(total, {
+        freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
+        standardShippingCharge: SHIPPING_FEE,
+      })
+    );
 
     const d = new Date();
     d.setDate(d.getDate() + 5);
@@ -130,7 +146,7 @@ setAddress(userData.address || "");
     year: "numeric",
   })
 );
-  }, [finalAmount, FREE_SHIPPING_THRESHOLD, SHIPPING_FEE]);
+  }, [total, finalAmount, FREE_SHIPPING_THRESHOLD, SHIPPING_FEE]);
 
   const applyCoupon = async () => {
     if (couponApplied) {
@@ -265,7 +281,11 @@ setAddress(userData.address || "");
     orderId: string,
     paymentStatus: string,
     stockIssueItems: any[] = [],
-    couponConflict: boolean = false
+    couponConflict: boolean = false,
+    // COD now goes through /api/place-order, which moves the reward balance
+    // inside the same transaction as the order and writes the ledger rows
+    // itself. Running the block below as well would credit twice.
+    rewardsAlreadyApplied: boolean = false
   ) => {
     const earnedPoints = Math.floor(grandTotal / 100);
 
@@ -370,7 +390,7 @@ setAddress(userData.address || "");
     // balance. Re-clamps the redemption against the REAL current balance
     // at write time, not just what the page happened to load with.
     let actualRedeemed = 0;
-    try {
+    if (!rewardsAlreadyApplied) try {
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, "users", firebaseUser.uid);
         const userSnap = await transaction.get(userRef);
@@ -399,6 +419,7 @@ setAddress(userData.address || "");
     localStorage.setItem("user", JSON.stringify(user));
 
     // Reward transactions (must include userId to satisfy Firestore rules)
+    if (!rewardsAlreadyApplied) {
     await addDoc(collection(db, "rewardTransactions"), {
       userId: firebaseUser.uid,
       userEmail: firebaseUser.email,
@@ -416,6 +437,7 @@ setAddress(userData.address || "");
         points: actualRedeemed,
         createdAt: Timestamp.now(),
       });
+    }
     }
 
     // couponRedemptions is claimed atomically by reserveStock() (Pay on
@@ -529,8 +551,6 @@ setAddress(userData.address || "");
 
   const placeCODOrder = async () => {
     if (!validateForm()) return;
-     if (!(await validateStock())) return;
-     if (!(await validateRewardPoints())) return;
 
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
@@ -539,68 +559,90 @@ setAddress(userData.address || "");
       return;
     }
 
-    // A blocked customer can still hold a live browser session from before
-    // they were blocked — Firestore rules already reject the order write
-    // itself, but checking here first avoids the confusing generic
-    // "Order Failed" that would otherwise be all they see.
-    const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
-    if (userSnap.exists() && userSnap.data().status === "Blocked") {
-      alert("Your account has been blocked. Please contact support.");
-      return;
+    // Held across retries — see codIdempotencyKey. crypto.randomUUID is
+    // available in every browser this app already targets.
+    if (!codIdempotencyKey.current) {
+      codIdempotencyKey.current = crypto.randomUUID().replace(/-/g, "");
     }
 
     setLoading(true);
     try {
-      // The exact amount the customer must pay by UPI at delivery is
-      // never trusted from this browser session — the same server-side
-      // pricing logic ONLINE orders already use (real product/stock/
-      // shipping lookups) computes it here too, before the order is ever
-      // written. See app/api/create-order/route.ts's computeVerifiedOrderAmount().
+      // Server-authoritative COD creation. The browser no longer builds the
+      // order document, reserves stock, claims the coupon or moves reward
+      // points — /api/place-order does all four in one Admin transaction,
+      // pricing everything from live product/coupon/settings data.
+      //
+      // Stock, blocked-account and reward-balance checks now happen inside
+      // that transaction against current state, so the pre-flight
+      // validateStock() / validateRewardPoints() / Blocked reads this
+      // function used to perform are redundant round trips. The route
+      // returns the same message strings those checks used to show.
       const idToken = await firebaseUser.getIdToken();
-      const amountResponse = await fetch("/api/create-order", {
+      const response = await fetch("/api/place-order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
+        // Order INTENT only. No price, total, discount, reward value,
+        // shipping, commission or vendor id is sent — a tampered request
+        // cannot influence what the customer is charged.
         body: JSON.stringify({
-          items: items.map((item) => ({ id: item.id, qty: item.qty })),
-          discountAmount: discount + rewardValue,
+          items: items.map((item: any) => ({
+            id: item.id,
+            qty: item.qty,
+            size: item.size,
+            color: item.color,
+          })),
+          couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
+          redeemPoints,
           paymentMethod: "PAY_ON_DELIVERY_UPI",
+          customerName: name,
+          phone,
+          address,
+          idempotencyKey: codIdempotencyKey.current,
         }),
       });
-      const amountData = await amountResponse.json();
 
-      if (!amountResponse.ok || amountData.error || typeof amountData.paymentAmount !== "number") {
-        alert(amountData.error || "Couldn't confirm your order amount. Please try again.");
+      const data = await response.json();
+
+      if (!response.ok || data.error || !data.orderId) {
+        alert(data.error || "Order Failed");
         return;
       }
 
-      const paymentAmount = amountData.paymentAmount;
+      // The order exists now, so this attempt is finished — a later checkout
+      // must start a fresh key.
+      codIdempotencyKey.current = null;
 
-      // Pay-on-Delivery hasn't captured any payment yet, so a failed
-      // reservation can simply block the order — nothing to reconcile.
-      // The order document is created in the SAME transaction as the stock
-      // decrement (see reserveStock()'s orderData param) so a rejected
-      // order write can never leave stock decremented with no order to
-      // show for it.
-      const reservation = await reserveStock(
-        // paymentAmount is also the server-verified amount here (it comes
-        // from the same computeVerifiedOrderAmount() call as ONLINE orders'
-        // verifiedAmount) — passing undefined previously meant finalTotal/
-        // commission/sellerEarning were derived from the client-computed
-        // grandTotal instead, so a stale cart price could make those
-        // bookkeeping fields disagree with the amount the customer is
-        // actually told to pay.
-        buildOrderData(firebaseUser, "Pending", paymentAmount, paymentAmount)
-      );
-      if (!reservation.ok) {
-        alert(reservation.message);
+      const paymentAmount = Number(data.paymentAmount || 0);
+
+      // alreadyPlaced means the route matched this idempotency key to an
+      // order that already exists — a double submit, or a retry after a lost
+      // response. Re-running the post-order effects would send a second
+      // confirmation email and duplicate the admin/seller/customer
+      // notifications for one order, so they are skipped entirely.
+      //
+      // The cart is still cleared: it is local, idempotent, writes nothing to
+      // Firestore, and leaving a placed order sitting in the cart is its own
+      // bug.
+      if (data.alreadyPlaced) {
+        localStorage.removeItem("cart");
+        localStorage.removeItem("checkoutItems");
+        window.dispatchEvent(new Event("cartUpdated"));
+
+        alert(
+          "This order has already been placed.\n\n" +
+            `Amount to Pay: ₹${paymentAmount.toLocaleString("en-IN")}`
+        );
+        window.location.href = "/orders";
         return;
       }
 
-      const orderRef = reservation.orderRef;
-      await applyPostOrderEffects(firebaseUser, orderRef.id, "Pending");
+      // Notifications, the confirmation email and cart cleanup still run
+      // here. Reward points are skipped: the route already moved the balance
+      // and wrote the ledger rows atomically with the order.
+      await applyPostOrderEffects(firebaseUser, data.orderId, "Pending", [], false, true);
 
       alert(
         "🎉 Your Order is Confirmed!\n\n" +
@@ -677,10 +719,12 @@ setAddress(userData.address || "");
       },
       // Send what's in the cart, not a pre-computed total — the amount
       // actually charged is calculated server-side from real product
-      // prices, not trusted from the browser.
+      // prices, not trusted from the browser. Same for the discounts: the
+      // coupon code and a redeem flag, never the rupee value of either.
       body: JSON.stringify({
         items: items.map((item: any) => ({ id: item.id, qty: item.qty })),
-        discountAmount: discount + rewardValue,
+        couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
+        redeemPoints,
       }),
     });
     const data = await response.json();
@@ -1247,7 +1291,7 @@ Easy Returns
                 ? "🎉 You have unlocked FREE delivery"
                 : `🚚 Add ₹${Math.max(
                     0,
-                    FREE_SHIPPING_THRESHOLD - finalAmount
+                    FREE_SHIPPING_THRESHOLD - total
                   ).toLocaleString("en-IN")} more for FREE delivery`}
             </div>
 
