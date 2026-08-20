@@ -230,14 +230,44 @@ service cloud.firestore {
         && d.stock is number && d.stock >= 0;
     }
 
-    function isCheckoutStockUpdate() {
-      // Any signed-in customer completing checkout may decrement stock /
-      // increment sales on a product line item — nothing else may change.
+    // Shared precondition for BOTH directional stock rules below.
+    //
+    // Individually each of those is bounded — one only allows stock to fall,
+    // the other only allows it to rise. But `allow update` is an || chain, so
+    // a client may satisfy whichever it prefers, and the union of the two was
+    // unbounded in both directions: any signed-in user could set ANY
+    // product's stock (and, via the unvalidated `sales` in the checkout rule,
+    // its sales count) to any value at all. Neither rule checks ownership,
+    // because checkout is legitimately performed by a customer who does not
+    // own the product.
+    //
+    // What every legitimate movement DOES have in common is that units only
+    // ever move between the two fields: checkout is -qty/+qty, cancellation
+    // is +qty/-qty. So stock + sales is conserved, and requiring that here
+    // removes the ability to invent or destroy inventory while leaving both
+    // real flows untouched.
+    //
+    // This is a stopgap, not a complete fix: a caller can still shift a
+    // competitor's stock into sales (stock->0), which reads as "Out of
+    // Stock". Rules cannot tell whether a decrement corresponds to a real
+    // order — only server-authored stock movement can. It does make any
+    // tampering visible in `sales` rather than silent.
+    function isStockTransfer() {
       return isSignedIn()
         && affectedKeysOnly(['stock', 'sales'])
         && request.resource.data.stock is number
-        && request.resource.data.stock <= resource.data.stock
-        && request.resource.data.stock >= 0;
+        && request.resource.data.sales is number
+        && request.resource.data.stock >= 0
+        && request.resource.data.sales >= 0
+        && request.resource.data.stock + request.resource.data.sales
+           == resource.data.stock + resource.data.sales;
+    }
+
+    function isCheckoutStockUpdate() {
+      // Any signed-in customer completing checkout may decrement stock /
+      // increment sales on a product line item — nothing else may change.
+      return isStockTransfer()
+        && request.resource.data.stock <= resource.data.stock;
     }
 
     function isReviewRatingUpdate() {
@@ -267,16 +297,11 @@ service cloud.firestore {
     function isStockRestoreUpdate() {
       // Cancelling an order (by the customer or the seller/admin) restores
       // the stock and reverses the sale count that checkout previously
-      // recorded. Bounded to the same direction-only trust level already
-      // used for isCheckoutStockUpdate's decrement — stock can only move
-      // up, sales can only move down, and never negative.
-      return isSignedIn()
-        && affectedKeysOnly(['stock', 'sales'])
-        && request.resource.data.stock is number
-        && request.resource.data.stock >= resource.data.stock
-        && request.resource.data.sales is number
-        && request.resource.data.sales <= resource.data.sales
-        && request.resource.data.sales >= 0;
+      // recorded — the exact inverse of isCheckoutStockUpdate, sharing the
+      // same conservation precondition so the pair can no longer be combined
+      // to reach an arbitrary stock value.
+      return isStockTransfer()
+        && request.resource.data.stock >= resource.data.stock;
     }
 
     match /products/{productId} {
@@ -737,12 +762,74 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---- P0 #4: refund amount validation ----
+    //
+    // The refund flow has no API route: app/returns/page.tsx creates the
+    // record client-side, an admin types an amount into
+    // app/admin/refunds/page.tsx, and lib/returns.ts credits that number
+    // verbatim as reward points. Nothing anywhere reads the order, so the
+    // amount was unbounded on BOTH sides — a customer could create a record
+    // carrying any refundAmount (and any status), and an admin's typed
+    // figure had no ceiling at all.
+
+    // orderId arrives straight from a ?orderId= query string and was only
+    // ever checked to be a string, so a return could be filed against an
+    // order the caller never placed — or one that does not exist. Binding
+    // the record to a real order owned by the caller is also what makes the
+    // ceiling below meaningful: without it there is no order to cap against.
+    function ownsReturnOrder(orderId) {
+      return exists(/databases/$(database)/documents/orders/$(orderId))
+        && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+    }
+
+    // Trusted ceiling for an admin-entered refund.
+    //
+    // finalTotal is the post-coupon, post-reward figure /api/cancel-order
+    // already treats as authoritative. Orders predating it may not carry the
+    // field, so fall back to total, which isValidOrder() has always required
+    // on create. Both use .data.get(field, default) rather than a bare field
+    // access: a missing field would otherwise raise and deny, and the final
+    // default of 0 means a malformed order caps the refund at zero instead
+    // of failing open.
+    //
+    // Note this is a bound, not a guarantee — finalTotal is still
+    // client-authored at checkout today. It becomes fully trustworthy once
+    // orders are server-authored (P1).
+    function refundCeiling(orderId) {
+      let d = get(/databases/$(database)/documents/orders/$(orderId)).data;
+      return d.get('finalTotal', d.get('total', 0));
+    }
+
+    function isValidRefundAmount(orderId) {
+      return request.resource.data.refundAmount is number
+        && request.resource.data.refundAmount >= 0
+        && request.resource.data.refundAmount <= refundCeiling(orderId);
+    }
+
     match /returns/{returnId} {
       allow read: if isAdmin() || isOwnerEmail(resource.data.userEmail);
+      // refundAmount and status are pinned to exactly what the real form
+      // already sends (app/returns/page.tsx writes refundAmount: 0 and
+      // status: "Pending"), so the legitimate flow is unaffected while a
+      // hand-crafted SDK write can no longer arrive pre-approved or
+      // pre-priced.
       allow create: if isSignedIn()
         && request.resource.data.userEmail == request.auth.token.email
-        && request.resource.data.orderId is string;
-      allow update: if isAdmin();
+        && request.resource.data.orderId is string
+        && request.resource.data.refundAmount == 0
+        && request.resource.data.status == 'Pending'
+        && ownsReturnOrder(request.resource.data.orderId);
+      // The cap is only evaluated when the amount actually changes, so every
+      // other admin action (status, pickup details, transaction id) still
+      // works even if the underlying order was since deleted — only raising
+      // the amount requires the order to be readable. orderId must hold
+      // still in that same write, otherwise the ceiling would be checked
+      // against one order while a different one is stored.
+      allow update: if isAdmin()
+        && (
+          unchanged('refundAmount')
+          || (unchanged('orderId') && isValidRefundAmount(resource.data.orderId))
+        );
       allow delete: if isAdmin();
     }
 
@@ -778,7 +865,29 @@ service cloud.firestore {
     }
 
     match /couponRedemptions/{redemptionId} {
-      allow read: if isAdmin() || isOwnerUid(resource.data.userId);
+      // Checkout must be able to ask "have I already claimed this coupon?"
+      // BEFORE the claim exists (app/checkout/page.tsx's reserveStock reads
+      // couponRedemptions/{uid}_{CODE} inside its transaction). For a
+      // document that does not exist `resource` is null, so the
+      // isOwnerUid(resource.data.userId) clause alone can only ever be
+      // satisfied once the claim is already there — which denied every
+      // first-time coupon checkout.
+      //
+      // Claims use a deterministic id (uid + '_' + UPPERCASE code), so
+      // ownership is derivable from the PATH, which exists whether or not
+      // the document does. A Firebase uid contains no underscore, so the
+      // first segment is exactly the owner even when the coupon code
+      // contains one. Reading someone else's id is still denied, and this
+      // deliberately avoids a blanket `resource == null` allowance, which
+      // would let anyone probe {otherUid}_{CODE} and learn from
+      // allow-vs-deny whether that customer had redeemed that coupon.
+      //
+      // The original clause is kept last for redemptions created before the
+      // deterministic id existed — those have random ids and can only be
+      // authorised by their stored userId.
+      allow read: if isAdmin()
+        || (isSignedIn() && redemptionId.split('_')[0] == request.auth.uid)
+        || isOwnerUid(resource.data.userId);
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid
         && isValidString('code', 50);
