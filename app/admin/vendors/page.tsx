@@ -98,7 +98,7 @@ export default function AdminVendorsPage() {
   const backfillPublicProfiles = async () => {
     // One-time migration: vendors registered before the vendors_public
     // mirror existed have no public-safe profile yet, so they're invisible
-    // on /stores, /seller/[id] and the homepage Top Vendors strip. Safe to
+    // on /store, /seller/[id] and the homepage Top Vendors strip. Safe to
     // re-run any time (idempotent merge writes).
     setBackfilling(true);
     try {

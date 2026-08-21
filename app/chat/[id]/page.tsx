@@ -17,6 +17,7 @@ import {
   where
 } from "firebase/firestore";
 import { db, storage, auth } from "@/lib/firebase";
+import { chatImagePath } from "@/lib/storagePaths";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -39,9 +40,16 @@ export default function ChatRoomPage() {
 
   const uploadImage = async () => {
     if (!imageFile) return "";
+    // Uid-scoped: a chat attachment now belongs to whoever sent it, and
+    // cannot be replaced by the other party or by any other signed-in user.
+    const senderUid = auth.currentUser?.uid;
+    if (!senderUid) {
+      router.push("/login");
+      return "";
+    }
     const storageRef = ref(
       storage,
-      `chat/${Date.now()}-${imageFile.name}`
+      chatImagePath(senderUid, imageFile)
     );
     await uploadBytes(storageRef, imageFile);
     return await getDownloadURL(storageRef);

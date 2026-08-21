@@ -3,6 +3,11 @@ import { chatWithTools, type ChatTurn, type ToolCallRecord } from "@/lib/ai/clie
 import { customerTools } from "@/lib/ai/tools/customerTools";
 import { buildToolRegistry } from "@/lib/ai/tools/types";
 import { verifyRequestUser } from "@/lib/serverAuth";
+import {
+  isWithinRateLimit,
+  AI_CHAT_RATE_LIMIT_MAX,
+  AI_CHAT_RATE_LIMIT_WINDOW_MS,
+} from "@/lib/rateLimit";
 
 const SYSTEM_PROMPT = `You are the YOMICO Shopping Assistant, helping customers on the YOMICO multi-vendor marketplace find products, compare options, and check their own orders. Use the available tools to look up real product and order data — never invent product names, prices, stock levels, or order details. Keep answers concise and friendly. If a customer asks about anything outside shopping/orders on YOMICO, politely redirect them. Never reveal information belonging to another customer or another seller's private data.`;
 
@@ -58,6 +63,23 @@ export async function POST(request: Request) {
     const user = await verifyRequestUser(request);
     if (!user) {
       return NextResponse.json({ error: "Please sign in to use the shopping assistant." }, { status: 401 });
+    }
+
+    // Every turn can fan out into multiple Gemini calls through the tool
+    // loop, so an unbounded client costs real money. Auth alone was not a
+    // budget: one signed-in account could loop this route indefinitely.
+    if (
+      !(await isWithinRateLimit(
+        "ai-customer-chat",
+        user.uid,
+        AI_CHAT_RATE_LIMIT_MAX,
+        AI_CHAT_RATE_LIMIT_WINDOW_MS
+      ))
+    ) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a few minutes and try again." },
+        { status: 429 }
+      );
     }
 
     const body = await request.json();

@@ -8,7 +8,7 @@ import { db } from "@/lib/firebase";
 import ProductFilters from "@/components/ProductFilters";
 import { addToCart as addToCartHelper } from "@/lib/cart";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
-import { toLegacyProduct } from "@/lib/products/legacyDisplay";
+import { toLegacyProduct, isStorefrontVisible } from "@/lib/products/legacyDisplay";
 
 // label = shown in the dropdown, value = the catalog node name used to
 // resolve the real categoryId/subCategoryId (Men/Women are subcategories of
@@ -66,6 +66,8 @@ const [quickColor, setQuickColor] = useState("");
         const items = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
+          // Admin-blocked products must not appear in search results.
+          if (!isStorefrontVisible(data)) return;
           const searchText = `${data.title || data.name || ""} ${
             data.shortTitle || ""
           } ${data.brand || ""} ${data.description || ""}`.toLowerCase();

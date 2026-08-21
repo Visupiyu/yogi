@@ -49,7 +49,7 @@ export default function DashboardCards({
       icon: "💸",
     },
     {
-      title: "Net Earnings",
+      title: "Total Earnings",
       value: `₹${netEarnings.toLocaleString()}`,
       color: "bg-emerald-600",
       icon: "🏆",

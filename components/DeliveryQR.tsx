@@ -136,14 +136,17 @@ export default function DeliveryQR({
 
       </div>
 
-      {/* Phase 2 */}
+      {/* Payment confirmation is NOT performed here. Once the customer
+          pays, the assigned delivery partner submits the UPI transaction
+          reference from app/delivery/[id], which moves the order to
+          AwaitingVerification; an admin then verifies receipt against
+          YOMICO's own account to reach Paid. This card only shows the
+          customer what to pay. */}
 
-      <button
-        disabled
-        className="w-full mt-8 bg-gray-300 text-gray-600 py-4 rounded-2xl font-bold cursor-not-allowed"
-      >
-        Payment Confirmation (Coming Soon)
-      </button>
+      <p className="w-full mt-8 bg-gray-100 text-gray-600 py-4 rounded-2xl font-semibold text-center text-sm">
+        After paying, your delivery partner records the transaction
+        reference and YOMICO confirms receipt.
+      </p>
 
     </div>
   );

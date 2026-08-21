@@ -7,6 +7,7 @@ import {
   computeOrderPricing,
   type PricedItemInput,
 } from "@/lib/orderPricing";
+import { Timestamp } from "firebase-admin/firestore";
 
 const ORDER_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const ORDER_RATE_LIMIT_MAX = 15;
@@ -39,6 +40,18 @@ async function isWithinOrderRateLimit(uid: string): Promise<boolean> {
   });
 }
 
+
+// Same "+5 days, en-IN" string the checkout page and /api/place-order
+// produce, so order pages, invoices and emails render what they always have.
+function deliveryDateString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 5);
+  return d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export async function POST(
   req:Request
@@ -106,6 +119,28 @@ export async function POST(
       return Response.json({ paymentAmount: finalAmount });
     }
 
+    // ---- ONLINE only, from here down ----
+    //
+    // Delivery details are user input, not financial data, so they are read
+    // from the request — but they are stored SERVER-SIDE now rather than
+    // being carried back through the browser at finalisation time. Everything
+    // monetary comes from `priced.pricing`, which the browser never touched.
+    const customerName =
+      typeof body.customerName === "string" ? body.customerName.trim() : "";
+    const phone = typeof body.phone === "string" ? body.phone.trim() : "";
+    const address = typeof body.address === "string" ? body.address.trim() : "";
+
+    if (!customerName || !address) {
+      return Response.json({ error: "Fill all checkout fields" }, { status: 400 });
+    }
+
+    if (!/^\d{10}$/.test(phone)) {
+      return Response.json(
+        { error: "Enter valid 10 digit phone number" },
+        { status: 400 }
+      );
+    }
+
     const razorpay =
       new Razorpay({
 
@@ -144,6 +179,53 @@ export async function POST(
       await razorpay.orders.create(
         options
       );
+
+    // The authoritative order intent, keyed by the Razorpay order id.
+    //
+    // This is what makes a server-authoritative ONLINE order possible at all:
+    // at finalisation the browser sends only payment identifiers, and both
+    // the callback route and the webhook read the priced order from here. The
+    // webhook in particular has no session and no cart — without this record
+    // it could verify a payment but would have nothing to build an order
+    // from, so a customer whose browser died after capture could not be
+    // reconciled.
+    //
+    // The pricing snapshot is stored rather than re-derived at finalisation
+    // on purpose: it is exactly what the Razorpay charge amount was computed
+    // from, so a product price edited in between cannot produce an order
+    // whose total disagrees with what the card was debited.
+    //
+    // Written with the Admin SDK into a collection no client rule matches, so
+    // firestore.rules' default-deny already covers it.
+    try {
+      await getAdminDb()
+        .collection("paymentIntents")
+        .doc(order.id)
+        .set({
+          uid: requester.uid,
+          email: requester.email,
+          pricing: priced.pricing,
+          customerName,
+          phone,
+          address,
+          couponCode,
+          redeemPoints: body.redeemPoints === true,
+          deliveryDate: deliveryDateString(),
+          expectedAmountPaise: finalAmount * 100,
+          razorpayOrderId: order.id,
+          status: "created",
+          createdAt: Timestamp.now(),
+        });
+    } catch (error) {
+      // Without the intent, finalisation has nothing to build an order from,
+      // so this must fail BEFORE the customer is shown the payment modal
+      // rather than after their money is taken.
+      console.error("create-order: failed to persist payment intent:", error);
+      return Response.json(
+        { error: "Couldn't start payment. Please try again." },
+        { status: 500 }
+      );
+    }
 
     return Response.json(order);
 

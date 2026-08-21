@@ -27,6 +27,22 @@ export type LegacyProductView = {
   [key: string]: any;
 };
 
+// Admin blocks a product by setting active:false (app/admin/products).
+// Nothing on the storefront checked it, so a blocked product stayed
+// browsable, add-to-cart-able and only failed at checkout with a generic
+// "currently unavailable" — after the customer had already committed.
+//
+// Tested as `!== false` rather than `=== true` on purpose: one production
+// product has no `active` field at all, and every server-side gate that
+// already exists (computeOrderPricing, checkout validateStock) uses the
+// same `active === false` test. Treating a missing field as visible keeps
+// that product live and matches the server exactly — a `where("active","==",true)`
+// query would silently drop it, and would need a new composite index on
+// the category page besides.
+export function isStorefrontVisible(data: any): boolean {
+  return data?.active !== false;
+}
+
 export function toLegacyProduct(id: string, data: any): LegacyProductView {
   return {
     // Spread first — some product docs carry a stray, useless `id: ""`

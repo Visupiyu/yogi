@@ -79,7 +79,30 @@ async(vendorUid: string, vendorEmailArg: string)=>{
 
       const order:any = docSnap.data();
 
-      if (order.status === "Cancelled") return;
+      // Money becomes withdrawable only once the order is actually
+      // fulfilled AND the money has actually arrived. Both conditions are
+      // required because the two payment methods reach them in opposite
+      // order: a Pay-on-Delivery (UPI Only) order is Delivered before the
+      // customer transfers, and only reaches Paid after the delivery
+      // partner submits a transaction reference and an admin verifies it
+      // against YOMICO's own account; a Razorpay order is Paid at
+      // creation and Delivered much later. Checking one alone would pay a
+      // vendor for goods not delivered, or for money not received.
+      //
+      // This also subsumes the previous Cancelled check — a Cancelled
+      // order can never satisfy it.
+      // An order flagged needsReview was PAID but could not be fulfilled as
+      // priced — short stock, a coupon already spent, or a reward balance
+      // that moved (see lib/onlineOrder.ts). Its items[] still carry the
+      // full requested quantities, so computeVendorShare() would credit the
+      // vendor for units that were never in stock. Excluded until an admin
+      // resolves the flag; the Delivered + Paid gate alone cannot see it.
+      if (
+        order.status !== "Delivered" ||
+        order.paymentStatus !== "Paid" ||
+        order.needsReview === true
+      )
+        return;
 
       const share = computeVendorShare(order, vendorUid);
       if (share) {

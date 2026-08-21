@@ -20,6 +20,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { db, auth } from "@/lib/firebase";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -118,27 +119,84 @@ export default function AdminPage() {
     ordersSnapshot.forEach((docItem) => {
       const order = docItem.data();
 
-      if (order.items) {
-        order.items.forEach((item: any) => {
-          revenue += item.price * item.qty;
+      // Six historical orders store their line quantity as `quantity`
+      // while every formula in the app reads `qty`. `price * undefined`
+      // is NaN, and a single NaN permanently poisoned the accumulators
+      // below — the dashboard was rendering "₹NaN" for Total Revenue and
+      // for every vendor row. Normalising here (read-time, dashboard-only)
+      // fixes the arithmetic without rewriting stored documents or
+      // changing the shared helpers.
+      const normalizedOrder = {
+        ...order,
+        items: (order.items || []).map((item: any) => ({
+          ...item,
+          qty: Number(item?.qty ?? item?.quantity ?? 0) || 0,
+          price: Number(item?.price ?? 0) || 0,
+        })),
+      };
 
-          const vid = item.vendorId || "unknown";
+      const isCancelled = order.status === "Cancelled";
+
+      if (!isCancelled) {
+        // Revenue is the amount actually charged, taken from the order's
+        // own authoritative total rather than re-derived from line items —
+        // the previous sum ignored discounts, reward redemptions and
+        // shipping entirely. finalTotal is what checkout and
+        // /api/place-order commit; `total` is the pre-discount fallback for
+        // orders written before finalTotal existed, and the line-item sum
+        // is a last resort so a malformed order contributes 0 rather than
+        // NaN.
+        const finalTotal = Number(order.finalTotal);
+        const legacyTotal = Number(order.total);
+        const lineSum = normalizedOrder.items.reduce(
+          (sum: number, item: any) => sum + item.price * item.qty,
+          0
+        );
+
+        revenue += Number.isFinite(finalTotal)
+          ? finalTotal
+          : Number.isFinite(legacyTotal)
+          ? legacyTotal
+          : lineSum;
+
+        // Vendor sales/commission/earnings come from the one shared
+        // formula (lib/vendorEarnings.ts), the same one the seller wallet
+        // and admin payouts page use. The previous inline `amount * 0.1`
+        // was a fourth, hardcoded commission rate that ignored each
+        // order's own stamped commissionRate — currently 0 on every
+        // order — as well as discounts and cancellations.
+        const vendorIds = [
+          ...new Set(
+            normalizedOrder.items
+              .map((item: any) => item.vendorId)
+              .filter(Boolean)
+          ),
+        ] as string[];
+
+        vendorIds.forEach((vid) => {
+          const share = computeVendorShare(normalizedOrder, vid);
+          if (!share) return;
+
           if (!payouts[vid]) {
+            const named = normalizedOrder.items.find(
+              (item: any) => item.vendorId === vid && item.vendorName
+            );
             payouts[vid] = {
               vendorId: vid,
-              vendorName: item.vendorName || "Unknown",
+              vendorName: named?.vendorName || "Unknown",
               orders: 0,
               sales: 0,
               commission: 0,
               payout: 0,
             };
           }
-          const amount = item.price * item.qty;
-          const commission = amount * 0.1;
+
+          // One per ORDER, not per line item — this used to increment
+          // inside the item loop, so a two-line order counted as two.
           payouts[vid].orders += 1;
-          payouts[vid].sales += amount;
-          payouts[vid].commission += commission;
-          payouts[vid].payout += amount - commission;
+          payouts[vid].sales += share.vendorRawSubtotal;
+          payouts[vid].commission += share.vendorCommission;
+          payouts[vid].payout += share.vendorEarning;
         });
       }
 
@@ -152,7 +210,7 @@ export default function AdminPage() {
         };
       }
       customerMap[email].totalOrders += 1;
-      customerMap[email].totalSpent += order.total || 0;
+      customerMap[email].totalSpent += Number(order.total) || 0;
 
       orderItems.push({ id: docItem.id, ...order } as Order);
     });

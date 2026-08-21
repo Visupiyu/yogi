@@ -35,34 +35,135 @@ service firebase.storage {
         && request.resource.size < maxMb * 1024 * 1024;
     }
 
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'adminyogimart@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    // KYC legitimately includes PDFs, unlike the image-only paths below.
+    function isKycDocument() {
+      return request.resource.contentType.matches('image/.*')
+        || request.resource.contentType == 'application/pdf';
+    }
+
     match /vendor-kyc/{uid}/{fileName} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
+      // Admin read added: /admin/kyc exists to review these GST/Aadhaar/
+      // cancelled-cheque documents, but the rule was owner-only, so the
+      // reviewer could not actually open them through a rules-checked read.
+      // The header comment already claimed "owner + admin read only" — this
+      // makes the rule match the documented intent.
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
       // request.resource is null on delete requests, so folding the size
       // check into a single `write` rule made every delete evaluate to
       // false (storage/unauthorized) even for the file's own owner.
+      //
+      // Content type is now restricted to exactly what the upload control
+      // offers (app/vendor-register: accept="image/*,application/pdf"), so
+      // this path cannot be used to park arbitrary files. Content type is
+      // client-declared, so this bounds abuse rather than proving the
+      // format.
       allow create, update: if isSignedIn() && request.auth.uid == uid
-        && request.resource.size < 10 * 1024 * 1024;
+        && request.resource.size < 10 * 1024 * 1024
+        && isKycDocument();
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
+    // ---------------------------------------------------------------
+    // Legacy flat paths — FROZEN (read-only)
+    // ---------------------------------------------------------------
+    //
+    // These objects were written before uploads were owner-scoped, so they
+    // carry no ownership information and their exact paths are published
+    // inside every product's public download URL. While writes were open,
+    // any signed-in user could overwrite or delete another vendor's images
+    // with no discovery step (ST-2).
+    //
+    // Reads stay exactly as they were: existing Firestore documents still
+    // reference these URLs and the storefront must keep rendering them.
+    // Nothing is moved, renamed or deleted — only new writes are refused.
+    // Every application upload site now writes the uid-scoped equivalents
+    // below (lib/storagePaths.ts), so nothing legitimate targets these
+    // paths any more.
+
     match /products/{fileName} {
+      // Public read preserved — storefront images.
       allow read: if true;
-      allow write: if isSignedIn() && isImageUnderLimit(5);
+      allow write: if false;
     }
 
     match /chat/{fileName} {
+      // Authenticated read preserved — existing chat attachments.
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && isImageUnderLimit(5);
+      allow write: if false;
     }
 
     match /delivery-proof/{fileName} {
+      // Authenticated read preserved — existing proof-of-delivery photos.
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && isImageUnderLimit(5);
+      allow write: if false;
     }
 
     match /vendor-store/{fileName} {
+      // Public read preserved — store logos and banners.
       allow read: if true;
-      allow write: if isSignedIn() && isImageUnderLimit(5);
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // Owner-scoped paths (the durable model)
+    // ---------------------------------------------------------------
+    //
+    // The flat paths above cannot express ownership: a file written to
+    // products/{timestamp}-{name} belongs to nobody, and because that exact
+    // object path is published inside every product's public download URL,
+    // any signed-in user can overwrite or delete another vendor's images
+    // with no discovery step at all.
+    //
+    // These uid-scoped equivalents fix that, and every application upload
+    // site now writes here — paths are built in lib/storagePaths.ts so the
+    // five call sites cannot drift back to the flat namespace:
+    //
+    //   app/seller/components/ProductForm.tsx   -> products/{uid}/...
+    //   app/seller/settings/page.tsx            -> vendor-store/{uid}/...
+    //   app/chat/[id]/page.tsx                  -> chat/{uid}/...
+    //   app/seller/chat/[id]/page.tsx           -> chat/{uid}/...
+    //   app/delivery/[id]/page.tsx              -> delivery-proof/{uid}/...
+    //
+    // The legacy blocks above are now read-only. Existing files are never
+    // moved and existing URLs never rewritten, so the storefront is
+    // unaffected — only new writes to the flat namespace are refused.
+    //
+    // DEPLOYMENT ORDER MATTERS: these rules and the application code must
+    // ship together. Deploying the freeze while old client code is still
+    // live would reject every upload.
+    //
+    // Ownership is proven here; approved-vendor status is NOT. A customer
+    // can still write products/{theirOwnUid}/... — Storage rules cannot
+    // resolve the vendors collection (it is keyed by random document id,
+    // not uid). That remains a separate workstream.
+    match /products/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == uid
+        && isImageUnderLimit(5);
+    }
+
+    match /vendor-store/{uid}/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && request.auth.uid == uid
+        && isImageUnderLimit(5);
+    }
+
+    match /chat/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid
+        && isImageUnderLimit(5);
+    }
+
+    match /delivery-proof/{uid}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid
+        && isImageUnderLimit(5);
     }
 
     match /{allPaths=**} {

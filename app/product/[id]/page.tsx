@@ -14,7 +14,7 @@ import { categoryFields } from "@/lib/catalog/categoryFields";
 import { findNodeById } from "@/lib/catalog/categoryUtils";
 import { UNIVERSAL_SPEC_FIELDS } from "@/lib/catalog/universalSpecFields";
 
-type Product = { id: string; name: string; image?: string;  images?: string[];  price: number;  mrp?: number;
+type Product = { id: string; name: string; active?: boolean; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
   color?: string;  sizes?: string[];  material?: string;  brand?: string;  countryOfOrigin?: string;
   rating?: number;  reviewCount?: number;
@@ -73,6 +73,10 @@ type CartItem = {
 function normalizeProduct(id: string, data: any): Product {
   return {
     id,
+    // Admin blocks a product with active:false. Carried through so the
+    // add-to-cart guard below can refuse it, and so related-product
+    // listings can filter it out.
+    active: data.active,
     name: data.title || data.name || "",
     image:
       data.thumbnail ||
@@ -194,7 +198,8 @@ setSelectedImage(
           const related: Product[] = [];
 
 relatedSnap.forEach((d) => {
-  if (d.id !== snap.id) {
+  // Blocked products must not be recommended either.
+  if (d.id !== snap.id && d.data()?.active !== false) {
     related.push(normalizeProduct(d.id, d.data()));
   }
 });
@@ -360,6 +365,15 @@ questionSnap.forEach((d) => {
 
    const addItemToCart = (): boolean => {
   if (!product) return false;
+
+  // An admin-blocked product must not enter the cart. Until now this was
+  // caught only at checkout (computeOrderPricing / validateStock), so the
+  // customer could browse it, add it, and reach payment before being told
+  // it was unavailable. Matches the server's own `active === false` test.
+  if (product.active === false) {
+    alert("This product is currently unavailable.");
+    return false;
+  }
 
   if (sizes.length > 0 && !selectedSize) {
     alert("Please select a size");

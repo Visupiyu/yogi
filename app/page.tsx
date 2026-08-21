@@ -23,7 +23,7 @@ import CollectionStrip from "@/components/home/CollectionStrip";
 import PromoBanner from "@/components/home/PromoBanner";
 import { catalogTree } from "@/lib/catalog/catalogTree";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog/categoryUtils";
-import { toLegacyProduct, type LegacyProductView } from "@/lib/products/legacyDisplay";
+import { toLegacyProduct, isStorefrontVisible, type LegacyProductView } from "@/lib/products/legacyDisplay";
 
 type Product = LegacyProductView;
 
@@ -53,7 +53,10 @@ async function loadProducts(): Promise<Product[]> {
   const snapshot = await getDocs(collection(db, "products"));
   const items: Product[] = [];
   snapshot.forEach((docSnap) => {
-    items.push(toLegacyProduct(docSnap.id, docSnap.data()));
+    const data = docSnap.data();
+    // Admin-blocked products must not appear on the storefront.
+    if (!isStorefrontVisible(data)) return;
+    items.push(toLegacyProduct(docSnap.id, data));
   });
   return items;
 }

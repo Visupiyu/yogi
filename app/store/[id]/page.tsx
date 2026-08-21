@@ -6,7 +6,7 @@ import Link from "next/link";
 import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductCard from "@/components/ProductCard";
-import { toLegacyProduct } from "@/lib/products/legacyDisplay";
+import { toLegacyProduct, isStorefrontVisible } from "@/lib/products/legacyDisplay";
 
 export default function StorePage() {const params = useParams(); const router = useRouter();
 
@@ -32,7 +32,10 @@ export default function StorePage() {const params = useParams(); const router = 
         const snapshot = await getDocs(q);
         const items: any[] = [];
         snapshot.forEach((docSnap) => {
-          items.push(toLegacyProduct(docSnap.id, docSnap.data()));
+          const data = docSnap.data();
+          // Admin-blocked products must not appear on the storefront.
+          if (!isStorefrontVisible(data)) return;
+          items.push(toLegacyProduct(docSnap.id, data));
         });
         setProducts(items);
 
@@ -159,7 +162,7 @@ export default function StorePage() {const params = useParams(); const router = 
     if (window.history.length > 1) {
       router.back();
     } else {
-      router.push("/stores");
+      router.push("/store");
     }
   }}
   className="
@@ -787,7 +790,7 @@ Secure Shopping
       <div className="text-center py-10 text-gray-400">
 Looking for another seller?
 <Link
-href="/stores"
+href="/store"
 className="text-green-600 ml-2 hover:underline"
 >
 Browse All Stores

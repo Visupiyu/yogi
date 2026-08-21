@@ -57,7 +57,16 @@ export default function AdminPayoutsPage() {
 
       withdrawalSnapshot.forEach((docSnap) => {
         const w: any = docSnap.data();
-        if (w.status !== "Paid") return;
+        // Reserve open requests too, not just settled ones. Counting only
+        // "Paid" meant a seller with a Pending request still showed their
+        // full earnings as payable here, while their own wallet had already
+        // deducted it (app/seller/wallet subtracts Pending + Approved from
+        // the available balance). An admin settling that figure via
+        // "Mark Paid" wrote a vendor_payouts row, and the untouched request
+        // could then ALSO be marked Paid on app/admin/withdrawals — paying
+        // the same earnings twice, with Math.max(0, ...) below hiding the
+        // resulting negative balance. Both pages now reserve the same set.
+        if (!["Paid", "Pending", "Approved"].includes(w.status)) return;
         const vendorUid = w.vendorId || uidByEmail[w.vendorEmail];
         if (!vendorUid) return;
         paidByVendor[vendorUid] =
@@ -75,7 +84,22 @@ export default function AdminPayoutsPage() {
 
         orderSnapshot.forEach((orderDoc) => {
           const order: any = orderDoc.data();
-          if (order.status === "Cancelled") return; // exclude cancelled
+          // Same fulfilled-and-paid gate the seller wallet applies, so
+          // the amount an admin can settle here never exceeds what the
+          // seller could legitimately request. Subsumes the previous
+          // Cancelled-only exclusion.
+          // An order flagged needsReview was PAID but could not be fulfilled
+          // as priced (short stock, coupon already spent, reward balance
+          // moved — see lib/onlineOrder.ts). Its items[] still carry the full
+          // requested quantities, so computeVendorShare() would credit the
+          // vendor for units that were never in stock. Excluded until an
+          // admin resolves the flag.
+          if (
+            order.status !== "Delivered" ||
+            order.paymentStatus !== "Paid" ||
+            order.needsReview === true
+          )
+            return;
 
           const share = computeVendorShare(order, vendor.uid);
 

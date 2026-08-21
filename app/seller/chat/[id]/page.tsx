@@ -27,6 +27,7 @@ import {
 import Image from "next/image";
 
 import { auth, db, storage } from "@/lib/firebase";
+import { chatImagePath } from "@/lib/storagePaths";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   getDownloadURL,
@@ -167,9 +168,17 @@ loadChat();
 
     if (!imageFile) return "";
 
+    // Uid-scoped: the attachment belongs to the seller who sent it.
+    const senderUid = auth.currentUser?.uid;
+
+    if (!senderUid) {
+      router.push("/vendor-login");
+      return "";
+    }
+
     const storageRef = ref(
       storage,
-      `chat/${Date.now()}-${imageFile.name}`
+      chatImagePath(senderUid, imageFile)
     );
 
     await uploadBytes(storageRef, imageFile);

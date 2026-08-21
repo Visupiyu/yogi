@@ -58,7 +58,7 @@ export default function TopVendors() {
   </div>
 
   <Link
-    href="/stores"
+    href="/store"
     className="inline-flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition-all hover:scale-105"
   >
     View All Sellers →

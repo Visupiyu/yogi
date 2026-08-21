@@ -420,10 +420,27 @@ service cloud.firestore {
         || (isSignedIn() && request.auth.uid in resource.data.vendorIds)
         || isAssignedDeliveryPartner();
 
-      allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid
-        && isValidOrder()
-        && isNotBlocked();
+      // Order creation is now SERVER-ONLY, for both payment methods.
+      //
+      // Pay on Delivery goes through app/api/place-order and Razorpay through
+      // app/api/finalize-online-order (or app/api/razorpay/webhook when the
+      // browser disappears after capture). All three write with the Admin
+      // SDK, which bypasses these rules entirely, so denying client creation
+      // costs no legitimate flow — verified: zero addDoc/setDoc against the
+      // orders collection remains anywhere in app/.
+      //
+      // What this closes: isValidOrder() only ever checked that userId,
+      // vendorIds, items and total were present and that status was
+      // Pending. It never validated finalTotal, prices, discount,
+      // rewardValue, shippingCharge, commission or sellerEarning — so a
+      // signed-in customer could write an order document with any financial
+      // figures they liked, and the vendor-payout calculations downstream
+      // would believe them. That is the last client-authored money path in
+      // the app.
+      //
+      // Reads, cancellation, returns and every other branch below are
+      // unchanged; only creation moves server-side.
+      allow create: if false;
 
       allow update: if isAdmin()
         || (
@@ -448,19 +465,29 @@ service cloud.firestore {
           )
           // A seller may only ever move paymentStatus to 'Paid', and only
           // in the same write that marks the order Delivered — this
-          // self-mark-paid path is now reserved for legacy orders (the old
-          // paymentMethod == 'COD' cash flow, and admin-driven ONLINE
-          // reconciliation is handled elsewhere). New Pay on Delivery (UPI
-          // Only) orders are deliberately excluded here — their
-          // paymentStatus can only ever move via the assigned delivery
-          // partner's own confirmation write below, never automatically
-          // just because status became Delivered.
+          // self-mark-paid path is reserved for the legacy cash-COD flow.
+          //
+          // Now an ALLOW-LIST. It previously read
+          // `paymentMethod != 'PAY_ON_DELIVERY_UPI'`, which excluded exactly
+          // one value and admitted every other — including 'ONLINE', the
+          // bare 'UPI' value some orders carry, and the display string
+          // 'Pay on Delivery (UPI Only)'. Production holds four distinct
+          // paymentMethod values, so the deny-list left most of them
+          // self-certifiable by the vendor, and with earnings now gated on
+          // Delivered + Paid that also unlocked their own payout.
+          //
+          // 'COD' is the only method settled in cash at the door with no
+          // second party able to verify it. Pay on Delivery (UPI Only)
+          // reaches Paid solely through the delivery partner's
+          // transaction-reference write plus admin verification
+          // (isValidDeliveryPaymentSubmission below); ONLINE is already
+          // Paid at creation. Anything unrecognised is refused by default.
           && (
             unchanged('paymentStatus')
             || (
               request.resource.data.paymentStatus == 'Paid'
               && request.resource.data.status == 'Delivered'
-              && resource.data.paymentMethod != 'PAY_ON_DELIVERY_UPI'
+              && resource.data.paymentMethod == 'COD'
             )
           )
         )
@@ -835,10 +862,26 @@ service cloud.firestore {
 
     match /withdrawals/{withdrawalId} {
       allow read: if isAdmin() || isOwnerEmail(resource.data.vendorEmail);
+      // vendorEmail was the ONLY field bound to the caller. vendorId and
+      // status were written by app/seller/wallet but never checked here, so
+      // a hand-crafted SDK write could set vendorId to ANOTHER vendor's uid
+      // and status straight to 'Paid'. app/admin/payouts keys its
+      // already-paid tally on vendorId, so such a document silently zeroes
+      // the victim's pending payout — and stays invisible to them, because
+      // their wallet page lists withdrawals by vendorEmail, which is the
+      // attacker's. Pinning both fields closes that off.
+      //
+      // NOTE: this bounds who and what, not how much. The "is this within
+      // your balance?" check still lives only in the browser
+      // (app/seller/wallet's requestWithdrawal), because the real balance
+      // is an aggregate over every order plus two payout ledgers — rules
+      // cannot query or sum collections. That needs a server route.
       allow create: if isSignedIn()
+        && request.resource.data.vendorId == request.auth.uid
         && request.resource.data.vendorEmail == request.auth.token.email
         && request.resource.data.amount is number
-        && request.resource.data.amount > 0;
+        && request.resource.data.amount > 0
+        && request.resource.data.status == 'Pending';
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

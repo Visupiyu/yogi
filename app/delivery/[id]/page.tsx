@@ -17,6 +17,7 @@ import {
 
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, storage } from "@/lib/firebase";
+import { deliveryProofPath } from "@/lib/storagePaths";
 import {
 
   ref,
@@ -207,11 +208,22 @@ let proofImageUrl = order.proofImage || "";
 
 if (proofImage) {
 
+  // Uid-scoped so one delivery partner cannot overwrite another's proof
+  // photo. The order id is deliberately kept — it was the only link back
+  // from a proof image to its delivery, and the old flat path carried it.
+  const uploaderUid = auth.currentUser?.uid;
+
+  if (!uploaderUid) {
+    alert("Your session expired. Please sign in again.");
+    setSaving(false);
+    return;
+  }
+
   const storageRef = ref(
 
     storage,
 
-    `delivery-proof/${id}-${Date.now()}`
+    deliveryProofPath(uploaderUid, id, proofImage)
 
   );
 

@@ -34,11 +34,14 @@ export async function POST(
       );
     }
 
-    const {
-      customerName,
-      orderId,
-      total,
-    } = await request.json();
+    // Only orderId is taken from the request. customerName and total used
+    // to arrive in the body and were rendered straight into the email, so
+    // the confirmation could state a name and an amount that never matched
+    // the order — and after the P1 pricing work the browser's figure can
+    // legitimately differ from what the server charged. Both now come from
+    // the order document that is loaded below for the ownership check
+    // anyway, so this costs no extra read.
+    const { orderId } = await request.json();
 
     if (!orderId) {
       return Response.json(
@@ -70,6 +73,22 @@ export async function POST(
       );
     }
 
+    // finalTotal is what checkout and /api/place-order commit as the
+    // charged amount; total is the pre-discount fallback for orders
+    // written before finalTotal existed. Never the browser's number.
+    const finalTotal = Number(orderData?.finalTotal);
+    const legacyTotal = Number(orderData?.total);
+    const total = Number.isFinite(finalTotal)
+      ? finalTotal
+      : Number.isFinite(legacyTotal)
+      ? legacyTotal
+      : 0;
+
+    const customerName =
+      typeof orderData?.customerName === "string" && orderData.customerName
+        ? orderData.customerName
+        : "there";
+
     const customerEmail = orderData?.userEmail || requester.email;
 
     if (!customerEmail) {
@@ -83,7 +102,7 @@ export async function POST(
       await resend.emails.send({
 
         from:
-          "YOMICO <onboarding@resend.dev>",
+          "YOMICO <onboarding@yomico.in>",
 
         to:
           customerEmail,
@@ -109,7 +128,7 @@ export async function POST(
 
           <p>
             Total:
-            ₹${total}
+            ₹${total.toLocaleString("en-IN")}
           </p>
 
           <p>

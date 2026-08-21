@@ -17,6 +17,7 @@ import {
   db,
   storage,
 } from "@/lib/firebase";
+import { vendorStorePath } from "@/lib/storagePaths";
 
 import {
   onAuthStateChanged,
@@ -167,9 +168,17 @@ const uploadStoreImage = async (
 
     setUploading(true);
 
+    // Uid-scoped so one seller cannot overwrite another's logo or banner.
+    const uploaderUid = auth.currentUser?.uid;
+
+    if (!uploaderUid) {
+      alert("Your session expired. Please sign in again to upload images.");
+      return;
+    }
+
     const storageRef = ref(
       storage,
-      `vendor-store/${Date.now()}-${file.name}`
+      vendorStorePath(uploaderUid, file)
     );
 
     await uploadBytes(storageRef, file);

@@ -28,6 +28,10 @@ const NEXT_STATUSES = {
   Cancelled: [],
 };
 
+// The ONLY paymentMethod a vendor may mark Paid by themselves. Kept as an
+// explicit allow-list so an unrecognised or newly-added method is refused
+// by default rather than silently permitted.
+const VENDOR_SELF_PAID_METHODS = ["COD"];
 export default function SellerOrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState([]);
@@ -91,14 +95,25 @@ export default function SellerOrdersPage() {
 
       // Legacy cash-COD orders collect payment on delivery — mark it paid
       // in the same write, matching what the Firestore rule allows a
-      // seller to do. Pay on Delivery (UPI Only) orders are deliberately
-      // excluded: those can only move to Paid via the assigned delivery
-      // partner's own payment-confirmation write (with a UPI transaction
-      // reference), never automatically just because status is Delivered.
+      // seller to do.
+      //
+      // ALLOW-LIST, not a deny-list. This previously excluded only
+      // "ONLINE" and "PAY_ON_DELIVERY_UPI", so every other value defaulted
+      // to permitted — and production carries four distinct paymentMethod
+      // values, including "UPI" and the display string
+      // "Pay on Delivery (UPI Only)". That let a vendor self-certify
+      // payment on orders whose money had not been verified, which with
+      // the fulfilled+paid payout gate also unlocks their own earnings.
+      //
+      // "COD" is the only value that legitimately settles in cash at the
+      // door with no second party to verify it (see PaymentMethod in
+      // lib/payment.ts). Everything else — known or unknown, now or later
+      // — is blocked by default: Pay on Delivery (UPI Only) moves to Paid
+      // only via the delivery partner's transaction-reference write plus
+      // admin verification, and ONLINE is already Paid at creation.
       if (
         newStatus === "Delivered" &&
-        currentOrder?.paymentMethod !== "ONLINE" &&
-        currentOrder?.paymentMethod !== "PAY_ON_DELIVERY_UPI" &&
+        VENDOR_SELF_PAID_METHODS.includes(currentOrder?.paymentMethod) &&
         currentOrder?.paymentStatus !== "Paid"
       ) {
         payload.paymentStatus = "Paid";

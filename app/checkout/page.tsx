@@ -285,7 +285,11 @@ setAddress(userData.address || "");
     // COD now goes through /api/place-order, which moves the reward balance
     // inside the same transaction as the order and writes the ledger rows
     // itself. Running the block below as well would credit twice.
-    rewardsAlreadyApplied: boolean = false
+    rewardsAlreadyApplied: boolean = false,
+    // ONLINE orders are finalised server-side, and lib/onlineOrder.ts sends
+    // the confirmation from there so the webhook path reaches the customer
+    // too. Sending again from here would mean two emails per order.
+    skipConfirmationEmail: boolean = false
   ) => {
     const earnedPoints = Math.floor(grandTotal / 100);
 
@@ -365,7 +369,7 @@ setAddress(userData.address || "");
     });
 
     // Confirmation email (best-effort)
-    try {
+    if (!skipConfirmationEmail) try {
       const emailIdToken = await firebaseUser.getIdToken();
       await fetch("/api/send-order-email", {
         method: "POST",
@@ -725,6 +729,13 @@ setAddress(userData.address || "");
         items: items.map((item: any) => ({ id: item.id, qty: item.qty })),
         couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
         redeemPoints,
+        // Delivery details are user input, not money. The server stores them
+        // with the priced intent so finalisation — and the webhook, which has
+        // no session at all — can build the order without the browser
+        // supplying anything financial afterwards.
+        customerName: name,
+        phone,
+        address,
       }),
     });
     const data = await response.json();
@@ -743,96 +754,92 @@ setAddress(userData.address || "");
       description: "Marketplace Payment",
       order_id: data.id,
       handler: async function (rzp: any) {
-        const verifyIdToken = await payingUser.getIdToken();
-
-        const verifyResponse = await fetch("/api/verify-payments", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${verifyIdToken}`,
-          },
-          body: JSON.stringify({
-            razorpay_order_id: rzp.razorpay_order_id,
-            razorpay_payment_id: rzp.razorpay_payment_id,
-            razorpay_signature: rzp.razorpay_signature,
-          }),
-        });
-        const verifyData = await verifyResponse.json();
-
-        if (!verifyData.success) {
-          alert("Payment Verification Failed");
-          setLoading(false);
-          return;
-        }
-
-        const firebaseUser = auth.currentUser;
-        if (!firebaseUser) {
-          alert("Please login again.");
-          setLoading(false);
-          return;
-        }
-
+        // Server-authoritative finalisation.
+        //
+        // This used to verify the payment, then reserve stock, then addDoc()
+        // the whole order document straight from the browser — with prices,
+        // totals, discounts, commission, sellerEarning and vendorIds all
+        // taken from React state, a random document id, and four separate
+        // writes that could half-complete after the card was charged.
+        //
+        // Now it sends the three Razorpay identifiers and nothing else. The
+        // server re-verifies with Razorpay, loads the order intent it priced
+        // and stored before this modal opened, and writes the order, stock,
+        // coupon and reward changes in one transaction keyed on the payment
+        // id — so a double callback, a refresh, or the webhook arriving first
+        // all resolve to the same single order.
         setLoading(true);
+
         try {
-          // Payment is already captured at this point, so stock issues
-          // can no longer block the order — reserve what's available and
-          // flag the rest for manual follow-up instead of losing track of
-          // captured payment.
-          const failedItems = await reserveStockBestEffort();
+          const finalizeIdToken = await payingUser.getIdToken();
 
-          const orderRef = await addDoc(
-            collection(db, "orders"),
-            buildOrderData(firebaseUser, "Paid", verifyData.amount)
-          );
+          const finalizeResponse = await fetch("/api/finalize-online-order", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${finalizeIdToken}`,
+            },
+            // Payment identifiers ONLY. No amount, no totals, no discount,
+            // no reward value, no commission, no vendor ids, no
+            // paymentStatus — the server derives every one of those.
+            body: JSON.stringify({
+              razorpay_order_id: rzp.razorpay_order_id,
+              razorpay_payment_id: rzp.razorpay_payment_id,
+              razorpay_signature: rzp.razorpay_signature,
+            }),
+          });
 
-          // Coupon: same atomic claim reserveStock() uses for Pay on
-          // Delivery, but a conflict here must never fail the order —
-          // payment is already captured and can't be undone. A conflict is
-          // recorded and flagged for admin review instead, exactly like
-          // reserveStockBestEffort()'s oversold items above.
-          let couponConflict = false;
-          const normalizedCode =
-            couponApplied && coupon ? coupon.trim().toUpperCase() : null;
-          if (normalizedCode) {
-            const redemptionRef = doc(
-              db,
-              "couponRedemptions",
-              `${firebaseUser.uid}_${normalizedCode}`
+          const finalizeData = await finalizeResponse.json();
+
+          if (!finalizeResponse.ok || !finalizeData?.orderId) {
+            // The payment may well have succeeded even though this call did
+            // not — the webhook reconciles independently. Never tell the
+            // customer to pay again.
+            alert(
+              finalizeData?.error ||
+                "We're confirming your payment. Check My Orders in a moment — do not pay again."
             );
-            try {
-              await runTransaction(db, async (transaction) => {
-                const redemptionSnap = await transaction.get(redemptionRef);
-                if (redemptionSnap.exists()) {
-                  couponConflict = true;
-                  return;
-                }
-                transaction.set(redemptionRef, {
-                  userId: firebaseUser.uid,
-                  userEmail: firebaseUser.email,
-                  code: normalizedCode,
-                  orderId: orderRef.id,
-                  createdAt: Timestamp.now(),
-                });
-              });
-            } catch (e) {
-              console.error("Coupon claim failed:", e);
-              couponConflict = true;
-            }
+            window.location.href = "/orders";
+            return;
           }
 
-          await applyPostOrderEffects(
-            firebaseUser,
-            orderRef.id,
-            "Paid",
-            failedItems,
-            couponConflict
-          );
+          const firebaseUser = auth.currentUser;
 
-          alert("Order Placed Successfully");
+          // Notifications, the confirmation email and cart cleanup. Skipped
+          // when the order already existed (webhook first, or a repeat
+          // callback) so a retry cannot send a second confirmation email or
+          // duplicate the notifications. Reward points are always skipped:
+          // the server moved the balance inside the order transaction.
+          if (firebaseUser && !finalizeData.alreadyPlaced) {
+            await applyPostOrderEffects(
+              firebaseUser,
+              finalizeData.orderId,
+              "Paid",
+              [],
+              false,
+              true,
+              // lib/onlineOrder.ts already sent the confirmation from the
+              // server, so that the webhook path reaches the customer too.
+              true
+            );
+          } else {
+            localStorage.removeItem("cart");
+            localStorage.removeItem("checkoutItems");
+            window.dispatchEvent(new Event("cartUpdated"));
+          }
+
+          alert(
+            finalizeData.alreadyPlaced
+              ? "This order has already been placed."
+              : "Order Placed Successfully"
+          );
           window.location.href = "/orders";
         } catch (error) {
           console.error("Checkout Error:", error);
-          alert("Order save failed");
+          alert(
+            "We're confirming your payment. Check My Orders in a moment — do not pay again."
+          );
+          window.location.href = "/orders";
         } finally {
           setLoading(false);
         }

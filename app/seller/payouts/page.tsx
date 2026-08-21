@@ -224,13 +224,20 @@ export default function SellerPayoutsPage() {
             rounded-2xl
             shadow
           ">
-            <h3>Net Earnings</h3>
+            <h3>Total Earnings</h3>
             <p className="
               text-3xl
               font-bold
               text-green-600
             ">
               ₹{netEarnings}
+            </p>
+            <p className="
+              text-xs
+              text-gray-500
+              mt-1
+            ">
+              Includes earnings from orders still in progress.
             </p>
           </div>
 

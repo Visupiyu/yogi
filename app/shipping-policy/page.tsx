@@ -295,7 +295,7 @@ Related Policies
 <div className="flex flex-wrap gap-4">
 
 <Link
-href="/returns-refunds"
+href="/return-refund"
 className="text-green-600 hover:underline"
 >
 Return & Refund Policy

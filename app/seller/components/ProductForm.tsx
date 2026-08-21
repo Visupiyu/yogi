@@ -8,7 +8,8 @@ import VariantSelector from "./VariantSelector";
 import SpecificationForm from "./SpecificationForm";
 import ProductPreview from "./ProductPreview";
 import {validateProduct} from "@/lib/products/validation";
-import { db, storage } from "@/lib/firebase";
+import { auth, db, storage } from "@/lib/firebase";
+import { productImagePath } from "@/lib/storagePaths";
 import { collection,addDoc,doc,updateDoc,serverTimestamp,} from "firebase/firestore";
 import {ref,uploadBytes,getDownloadURL,} from "firebase/storage";
 import { useRouter } from "next/navigation";
@@ -367,11 +368,29 @@ const handleSubmit = async (
     // ==========================================
 
     if (imageFiles.length > 0) {
+      // Uploads now land under the uploader's own uid, which is what
+      // storage.rules matches request.auth.uid against — another vendor can
+      // no longer overwrite these objects even knowing the exact path from a
+      // product's public download URL.
+      //
+      // The uid comes from the live session rather than the vendorId prop so
+      // the path provably matches the token the write is made with.
+      const uploaderUid = auth.currentUser?.uid;
+
+      if (!uploaderUid) {
+        alert("Your session expired. Please sign in again to upload images.");
+        return;
+      }
+
       for (const file of imageFiles) {
 
+        // productImagePath() also fixes a latent collision: the old
+        // `${Date.now()}-${file.name}` was built inside this loop, so two
+        // files picked with the same name in the same millisecond produced
+        // one object path and the second overwrote the first.
         const storageRef = ref(
           storage,
-          `products/${Date.now()}-${file.name}`
+          productImagePath(uploaderUid, file)
         );
 
         await uploadBytes(

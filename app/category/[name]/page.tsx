@@ -6,7 +6,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductCard from "@/components/ProductCard";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog/categoryUtils";
-import { toLegacyProduct } from "@/lib/products/legacyDisplay";
+import { toLegacyProduct, isStorefrontVisible } from "@/lib/products/legacyDisplay";
 
 type Product = {
   id: string;
@@ -53,6 +53,8 @@ export default function CategoryPage() {
             )
           );
           snapshot.forEach((docSnap) => {
+            // Admin-blocked products must not appear on the storefront.
+            if (!isStorefrontVisible(docSnap.data())) return;
             const legacy = toLegacyProduct(docSnap.id, docSnap.data());
             items.push({
               id: legacy.id,
