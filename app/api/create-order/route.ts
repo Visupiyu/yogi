@@ -67,7 +67,17 @@ export async function POST(
         { status: 401 }
       );
     }
+    const userSnap = await getAdminDb()
+  .collection("users")
+  .doc(requester.uid)
+  .get();
 
+if (userSnap.exists && userSnap.data()?.status === "Blocked") {
+  return Response.json(
+    { error: "Your account has been blocked. Please contact support." },
+    { status: 403 }
+  );
+}
     if (!(await isWithinOrderRateLimit(requester.uid))) {
       return Response.json(
         { error: "Too many order attempts. Please wait a few minutes and try again." },
@@ -229,14 +239,27 @@ export async function POST(
 
     return Response.json(order);
 
-  }catch(err:any){
-
-    return Response.json({
-
-      error:err.message
-
-    });
-
+  } catch (err) {
+    // Unexpected failure. Two things were wrong with what stood here:
+    // Response.json() was called with no init, so Next.js returned 200 and any
+    // caller checking response.ok saw success; and the body echoed err.message
+    // straight to the browser, which leaked internal text — lib/firebaseAdmin's
+    // "FIREBASE_SERVICE_ACCOUNT_KEY is not set..." among others.
+    //
+    // The Razorpay SDK made the missing status more than cosmetic. Its
+    // normalizeError (node_modules/razorpay/dist/api.js) throws a plain object
+    // rather than an Error, so err.message was undefined, JSON.stringify
+    // dropped the key, and the client's `!response.ok || data.error` guard
+    // passed on an empty 200 body — checkout carried on and opened the payment
+    // modal with an undefined order_id instead of reporting the failure.
+    //
+    // Detail goes to the server log only, matching finalize-online-order and
+    // the webhook.
+    console.error("create-order: unexpected failure:", err);
+    return Response.json(
+      { error: "Something went wrong while starting payment. Please try again." },
+      { status: 500 }
+    );
   }
 
 }

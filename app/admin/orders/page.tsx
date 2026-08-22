@@ -32,6 +32,20 @@ type Order = {
   expectedDelivery?: string;
   paymentAmount?: number;
   paymentTransactionId?: string;
+  // Set by lib/onlineOrder.ts when a captured Razorpay payment could not be
+  // fulfilled as priced. The order is deliberately NOT rejected — the money
+  // is already taken — so it is created and flagged instead. Until an admin
+  // clears the flag, app/seller/wallet, app/seller/payouts, app/admin/payouts
+  // and app/admin/withdrawals all exclude the order from vendor earnings.
+  needsReview?: boolean;
+  stockShortfall?: {
+    id: string;
+    name: string;
+    wanted: number;
+    available: number;
+  }[];
+  couponConflict?: boolean;
+  rewardShortfall?: number;
 };
 
 export default function AdminOrdersPage() {
@@ -66,6 +80,14 @@ export default function AdminOrdersPage() {
           expectedDelivery: data.expectedDelivery || "",
           paymentAmount: data.paymentAmount || 0,
           paymentTransactionId: data.paymentTransactionId || "",
+          // Carried through as written. needsReview is absent (not false) on
+          // a clean order, and every consumer tests === true, so no default
+          // is applied here — coercing it would invent a value the document
+          // does not have.
+          needsReview: data.needsReview,
+          stockShortfall: data.stockShortfall,
+          couponConflict: data.couponConflict,
+          rewardShortfall: data.rewardShortfall,
         });
       });
       // newest-ish: sort by original timestamp if present is lost after formatting,
@@ -123,6 +145,51 @@ setOrders(items);
       setOrders(
         orders.map((order) =>
           order.id === orderId ? { ...order, status } : order
+        )
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Clears the needsReview flag once an admin has dealt with the underlying
+  // problem, releasing the order into the vendor payout calculations that
+  // currently exclude it.
+  //
+  // Writes THREE fields and nothing else. finalTotal, total, discount,
+  // rewardValue, commission, sellerEarning, items, status and paymentStatus
+  // are all left exactly as committed: finalTotal is the amount Razorpay
+  // actually captured, and resolving a fulfilment problem must never restate
+  // what the customer was charged. Any money owed back to the customer is a
+  // refund, which is a separate flow — not this button.
+  //
+  // Reversible: an admin can re-flag by writing needsReview: true.
+  const markReviewed = async (orderId: string) => {
+    if (
+      !confirm(
+        "Mark this order as reviewed?\n\nThis releases it into vendor payout calculations. It does not change the amount charged or issue any refund."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        needsReview: false,
+        reviewedAt: serverTimestamp(),
+        // Self-attested from the client, like every other admin action on
+        // this page. firestore.rules' `allow update: if isAdmin()` controls
+        // who may write; this records which admin did.
+        reviewedBy: auth.currentUser?.uid || "",
+      });
+
+      await logAdminAction("order_review_resolved", orderId, {
+        reviewedByEmail: auth.currentUser?.email || "",
+      });
+
+      setOrders(
+        orders.map((order) =>
+          order.id === orderId ? { ...order, needsReview: false } : order
         )
       );
     } catch (error) {
@@ -283,6 +350,43 @@ const filtered = orders.filter(
                         >
                           {order.status}
                         </span>
+
+                        {order.needsReview === true && (
+                          <div className="mt-2 border border-amber-300 bg-amber-50 rounded-lg p-2">
+                            <p className="text-amber-800 text-xs font-bold">
+                              ⚠ Needs Review
+                            </p>
+
+                            <p className="text-amber-700 text-[11px] mt-1">
+                              Payment was captured. Vendor earnings for this
+                              order are withheld until reviewed.
+                            </p>
+
+                            <ul className="text-amber-900 text-[11px] mt-1 list-disc list-inside space-y-0.5">
+                              {(order.stockShortfall || []).map((s) => (
+                                <li key={s.id}>
+                                  {s.name}: wanted {s.wanted}, had {s.available}
+                                </li>
+                              ))}
+                              {order.couponConflict === true && (
+                                <li>Coupon already redeemed by this customer</li>
+                              )}
+                              {(order.rewardShortfall || 0) > 0 && (
+                                <li>
+                                  Reward shortfall: {order.rewardShortfall}{" "}
+                                  points
+                                </li>
+                              )}
+                            </ul>
+
+                            <button
+                              onClick={() => markReviewed(order.id)}
+                              className="mt-2 bg-amber-600 hover:bg-amber-700 transition text-white px-3 py-1.5 rounded-lg text-xs"
+                            >
+                              Mark Reviewed
+                            </button>
+                          </div>
+                        )}
 
                         <div className="w-full bg-gray-200 h-2 rounded-full mt-2">
                           <div

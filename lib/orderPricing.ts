@@ -160,12 +160,39 @@ export async function computeOrderPricing(
   let subtotal = 0;
   const pricedItems: PricedLineItem[] = [];
 
+  // ---- Pass 1: validate the request and aggregate quantity per PRODUCT ----
+  //
+  // Stock is held per product, but lib/cart.ts keys cart lines on
+  // id + size + color, so one product ordered in two sizes arrives as two
+  // lines sharing an id. Checking each line's qty against the product's stock
+  // independently let 3 + 3 of a product with 4 in stock pass, because
+  // neither line alone exceeded it.
+  //
+  // Aggregating first is the same approach app/api/place-order and
+  // lib/onlineOrder.ts already take for the authoritative check; this brings
+  // the advisory pre-flight into line with them so the customer is not told
+  // an order is fine that the authoritative check will refuse.
+  const qtyByProduct = new Map<string, number>();
+
   for (const item of items) {
     if (!item.id || !(Number(item.qty) > 0)) {
       return { ok: false, error: "Invalid item in cart", status: 400 };
     }
 
-    const snap = await db.collection("products").doc(item.id).get();
+    qtyByProduct.set(
+      item.id,
+      (qtyByProduct.get(item.id) || 0) + Number(item.qty)
+    );
+  }
+
+  // ---- Pass 2: one read per product, checked against the aggregate ----
+  //
+  // Also removes a duplicate read: the previous loop fetched the same product
+  // document once per cart line.
+  const productById = new Map<string, any>();
+
+  for (const [productId, totalQty] of qtyByProduct) {
+    const snap = await db.collection("products").doc(productId).get();
 
     if (!snap.exists) {
       return {
@@ -185,15 +212,26 @@ export async function computeOrderPricing(
       };
     }
 
-    const qty = Number(item.qty);
-
-    if ((product.stock ?? 0) < qty) {
+    // totalQty, not the individual line's qty — the whole point of the fix.
+    if ((product.stock ?? 0) < totalQty) {
       return {
         ok: false,
         error: `${product.title || "A product"} has insufficient stock`,
         status: 400,
       };
     }
+
+    productById.set(productId, product);
+  }
+
+  // ---- Pass 3: price each CART LINE, preserving size/color ----
+  //
+  // Still one priced line per cart line, in the order received. Aggregation
+  // above governs the stock check only; it must not collapse two variants of
+  // the same product into a single order line.
+  for (const item of items) {
+    const product: any = productById.get(item.id);
+    const qty = Number(item.qty);
 
     const price =
       typeof product.sellingPrice === "number"

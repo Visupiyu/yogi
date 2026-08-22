@@ -4,6 +4,7 @@ import { verifyRazorpayPayment } from "@/lib/razorpayVerify";
 import {
   finalizeOnlineOrder,
   onlineOrderIdFor,
+  recordUnmatchedPayment,
   type PaymentIntent,
 } from "@/lib/onlineOrder";
 import { isWithinRateLimit } from "@/lib/rateLimit";
@@ -128,7 +129,22 @@ export async function POST(request: Request) {
 
     if (!intentSnap.exists) {
       // Money is captured but there is nothing to build an order from. Do not
-      // invent one — surface it for manual reconciliation instead.
+      // invent one — record it and surface it for manual reconciliation.
+      //
+      // Reached only after verifyRazorpayPayment succeeded above, so Razorpay
+      // has confirmed this payment was captured. Recording from here rather
+      // than relying on the webhook matters: the webhook 503s until
+      // RAZORPAY_WEBHOOK_SECRET is configured, and without this the only
+      // trace of the orphan is the log line below.
+      await recordUnmatchedPayment({
+        razorpayPaymentId: razorpay_payment_id,
+        razorpayOrderId: razorpay_order_id,
+        amountPaise: verification.amountPaise,
+        uid: requester.uid,
+        reason: "no matching paymentIntent",
+        source: "browser",
+      });
+
       console.error(
         "finalize-online-order: captured payment with no intent:",
         razorpay_order_id,
@@ -146,6 +162,21 @@ export async function POST(request: Request) {
     const intent = intentSnap.data() as PaymentIntent;
 
     if (intent.uid !== requester.uid) {
+      // Also a captured-but-unmatched payment: verification passed, so money
+      // moved, but the intent belongs to someone else and finalising it here
+      // would attach the order to the wrong account. Recorded for the same
+      // reason as the missing-intent case — the 404 below is deliberately
+      // uninformative to the caller, which leaves nothing else to reconcile
+      // against. The response itself is unchanged.
+      await recordUnmatchedPayment({
+        razorpayPaymentId: razorpay_payment_id,
+        razorpayOrderId: razorpay_order_id,
+        amountPaise: verification.amountPaise,
+        uid: intent.uid,
+        reason: "payment intent belongs to a different account",
+        source: "browser",
+      });
+
       return Response.json({ error: "Order not found." }, { status: 404 });
     }
 

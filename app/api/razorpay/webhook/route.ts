@@ -1,7 +1,10 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRazorpayWebhookSignature } from "@/lib/razorpayVerify";
-import { finalizeOnlineOrder, type PaymentIntent } from "@/lib/onlineOrder";
-import { Timestamp } from "firebase-admin/firestore";
+import {
+  finalizeOnlineOrder,
+  recordUnmatchedPayment,
+  type PaymentIntent,
+} from "@/lib/onlineOrder";
 
 // ---------------------------------------------------------------------------
 // Razorpay webhook — server-to-server reconciliation.
@@ -85,19 +88,17 @@ export async function POST(request: Request) {
     if (!intentSnap.exists) {
       // A captured payment we cannot match to a cart. Record it rather than
       // discarding it: this is exactly the money-with-no-order case the
-      // webhook exists to catch, and an admin needs to see it. Keyed by
-      // payment id so repeated deliveries overwrite rather than pile up.
-      try {
-        await db.collection("unmatchedPayments").doc(paymentId).set({
-          razorpayPaymentId: paymentId,
-          razorpayOrderId: orderId,
-          amountPaise,
-          reason: "no matching paymentIntent",
-          seenAt: Timestamp.now(),
-        });
-      } catch (error) {
-        console.error("razorpay/webhook: failed to record unmatched payment:", error);
-      }
+      // webhook exists to catch, and an admin needs to see it. The shared
+      // recorder keys on the payment id (so repeated deliveries overwrite
+      // rather than pile up) and raises the admin notification that makes the
+      // record visible — the collection itself has no client read access.
+      await recordUnmatchedPayment({
+        razorpayPaymentId: paymentId,
+        razorpayOrderId: orderId,
+        amountPaise,
+        reason: "no matching paymentIntent",
+        source: "webhook",
+      });
 
       console.error("razorpay/webhook: captured payment with no intent:", orderId);
       // 200 so Razorpay stops retrying — it is recorded, and retrying will
@@ -121,25 +122,15 @@ export async function POST(request: Request) {
       // representing it is exactly what needs a queryable record. Same
       // collection and same document key as the no-intent case above, so a
       // repeated delivery overwrites rather than piling up duplicates.
-      //
-      // Identifiers and amounts only: no signature, no secret, and no card or
-      // payer detail is copied out of the webhook payload.
-      try {
-        await db.collection("unmatchedPayments").doc(paymentId).set({
-          razorpayPaymentId: paymentId,
-          razorpayOrderId: orderId,
-          amountPaise,
-          expectedAmountPaise: Number(intent.expectedAmountPaise),
-          uid: intent.uid,
-          reason: "captured amount does not match the priced intent",
-          seenAt: Timestamp.now(),
-        });
-      } catch (error) {
-        console.error(
-          "razorpay/webhook: failed to record amount mismatch:",
-          error
-        );
-      }
+      await recordUnmatchedPayment({
+        razorpayPaymentId: paymentId,
+        razorpayOrderId: orderId,
+        amountPaise,
+        expectedAmountPaise: Number(intent.expectedAmountPaise),
+        uid: intent.uid,
+        reason: "captured amount does not match the priced intent",
+        source: "webhook",
+      });
 
       console.error(
         "razorpay/webhook: captured amount does not match the priced intent:",

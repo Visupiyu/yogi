@@ -72,7 +72,31 @@ export default function SellerPayoutsPage() {
           const order:any =
             doc.data();
 
-          if (order.status === "Cancelled") return;
+          // Same eligibility gate app/seller/wallet/page.tsx applies, so the
+          // two seller-facing figures agree. This page previously counted
+          // every non-Cancelled order — Pending, Packed, Shipped and unpaid
+          // Pay-on-Delivery included — which reported a larger "Payout
+          // Report" than the seller could ever withdraw.
+          //
+          // Delivered AND Paid are both required because the two payment
+          // methods reach them in opposite order: a Pay-on-Delivery order is
+          // Delivered before the customer transfers, a Razorpay order is Paid
+          // long before it ships. Either alone would count money not received
+          // or goods not delivered. This also subsumes the old Cancelled
+          // check — a Cancelled order can never satisfy it.
+          //
+          // needsReview marks an order that was PAID but could not be
+          // fulfilled as priced (short stock, a coupon already spent, a moved
+          // reward balance — see lib/onlineOrder.ts). Its items[] still carry
+          // the full requested quantities, so computeVendorShare() would
+          // credit units that were never in stock. Excluded until an admin
+          // resolves the flag in app/admin/orders.
+          if (
+            order.status !== "Delivered" ||
+            order.paymentStatus !== "Paid" ||
+            order.needsReview === true
+          )
+            return;
 
           const share = computeVendorShare(order, vendorUid);
 
@@ -237,7 +261,7 @@ export default function SellerPayoutsPage() {
               text-gray-500
               mt-1
             ">
-              Includes earnings from orders still in progress.
+              Delivered and paid orders only.
             </p>
           </div>
 

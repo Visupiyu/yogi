@@ -327,7 +327,56 @@ export async function finalizeOnlineOrder(params: {
   } catch (error) {
     console.error("finalizeOnlineOrder: confirmation email threw:", error);
   }
+  // In-app notifications, for the WEBHOOK path only.
+  //
+  // The browser path writes these itself, in app/checkout/page.tsx's
+  // applyPostOrderEffects() — the same admin, per-vendor seller and customer
+  // documents. Running both would file two of each for one order, so this is
+  // gated on source rather than skipped from the caller the way the
+  // confirmation email is.
+  //
+  // Exactly one set is written in either race order: when the browser wins it
+  // reaches applyPostOrderEffects with alreadyPlaced === false and notifies;
+  // when the webhook wins it notifies here, and the browser then takes its
+  // alreadyPlaced branch, which writes nothing.
+  if (source === "webhook") {
+    try {
+      await db.collection("notifications").add({
+        title: "🛒 New Order",
+        message: `${intent.customerName} placed an order worth ₹${outcome.finalTotal}`,
+        type: "order",
+        role: "admin",
+        read: false,
+        createdAt: Timestamp.now(),
+      });
 
+      for (const item of pricing.items) {
+        if (!item.vendorId) continue;
+
+        await db.collection("notifications").add({
+          userId: item.vendorId,
+          role: "seller",
+          title: "🛒 New Order",
+          message: `${intent.customerName} ordered ${item.name}`,
+          type: "order",
+          read: false,
+          createdAt: Timestamp.now(),
+        });
+      }
+
+      await db.collection("notifications").add({
+        userId: intent.uid,
+        role: "customer",
+        title: "✅ Order Placed",
+        message: `Your order worth ₹${outcome.finalTotal} has been placed successfully.`,
+        type: "order",
+        read: false,
+        createdAt: Timestamp.now(),
+      });
+    } catch (error) {
+      console.error("finalizeOnlineOrder: notification failed:", error);
+    }
+  }
   if (outcome.shortfalls?.length || outcome.couponConflict || outcome.rewardShort) {
     try {
       const parts: string[] = [];
@@ -357,4 +406,94 @@ export async function finalizeOnlineOrder(params: {
   }
 
   return { kind: "created", orderId, finalTotal: outcome.finalTotal };
+}
+
+/**
+ * Records a captured payment that could not be turned into an order.
+ *
+ * Called from both finalisation entry points, for the cases where Razorpay
+ * has confirmed money moved but there is nothing to build an order from. The
+ * alternative is what used to happen: a console.error, and a payment whose
+ * only trace is a Vercel log line.
+ *
+ * Deliberately NOT called for verification failures. Everything here runs
+ * downstream of a successful verifyRazorpayPayment (browser) or a valid
+ * webhook signature, so an unauthenticated caller posting junk identifiers
+ * cannot write into this collection.
+ *
+ * No order is created from these records. Without a payment intent there is
+ * no priced cart, no vendor split and no commission basis, so an invented
+ * order would feed fabricated figures into the payout chain. Reconciliation
+ * against the Razorpay dashboard is manual by design; this exists to make
+ * that possible.
+ *
+ * Never throws — an audit record must not fail a request whose payment has
+ * already been captured.
+ */
+export async function recordUnmatchedPayment(params: {
+  razorpayPaymentId: string;
+  razorpayOrderId: string;
+  amountPaise: number;
+  reason: string;
+  /** Which entry point saw it. Both write the same doc id, so last one wins. */
+  source: "browser" | "webhook";
+  uid?: string | null;
+  expectedAmountPaise?: number | null;
+}): Promise<void> {
+  const {
+    razorpayPaymentId,
+    razorpayOrderId,
+    amountPaise,
+    reason,
+    source,
+    uid,
+    expectedAmountPaise,
+  } = params;
+
+  const db = getAdminDb();
+
+  // Keyed by payment id so a webhook redelivery — or the webhook arriving
+  // after the browser already recorded the same orphan — overwrites rather
+  // than piling up duplicates for one payment.
+  //
+  // Identifiers and amounts only: no signature, no secret, and no card or
+  // payer detail is copied out of the payment payload.
+  try {
+    await db
+      .collection("unmatchedPayments")
+      .doc(razorpayPaymentId)
+      .set({
+        razorpayPaymentId,
+        razorpayOrderId,
+        amountPaise,
+        reason,
+        source,
+        // Set now so a future admin view can filter without a backfill.
+        resolved: false,
+        seenAt: Timestamp.now(),
+        ...(uid ? { uid } : {}),
+        ...(expectedAmountPaise != null ? { expectedAmountPaise } : {}),
+      });
+  } catch (error) {
+    console.error("recordUnmatchedPayment: failed to record:", error);
+  }
+
+  // Surfaced through the existing admin feed rather than a new page:
+  // app/admin/notifications/page.tsx already queries role == "admin" and
+  // renders type == "order". Without this the record above is written into a
+  // collection no client rule grants read access to, so nobody would see it.
+  try {
+    await db.collection("notifications").add({
+      title: "⚠ Captured payment with no order",
+      message: `Payment ${razorpayPaymentId} of ₹${(
+        Math.round(amountPaise) / 100
+      ).toLocaleString("en-IN")} was captured but ${reason}. No order was created. Reconcile against the Razorpay dashboard.`,
+      role: "admin",
+      type: "order",
+      read: false,
+      createdAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error("recordUnmatchedPayment: admin notification failed:", error);
+  }
 }

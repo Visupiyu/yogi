@@ -7,8 +7,6 @@ import {
   addDoc,
   Timestamp,
   doc,
-  updateDoc,
-  increment,
   getDocs, getDoc,
   query,
   where,
@@ -263,19 +261,12 @@ setAddress(userData.address || "");
       document.body.appendChild(script);
     });
 
-  // Unique vendor ids in this order (for scoped vendor reads under rules).
-  const vendorIdsForOrder = () => [
-    ...new Set(items.map((i: any) => i.vendorId).filter(Boolean)),
-  ];
-
   // Shared side-effects after an order document is created. Stock/sales are
-  // NOT touched here — reserveStock() already committed them (atomically
-  // together with the order itself, for Pay on Delivery; best-effort after
-  // payment capture, for ONLINE) before this runs (see placeCODOrder/payNow).
-  // The coupon redemption record is claimed the same way — atomically with
-  // the order for Pay on Delivery, best-effort after payment for ONLINE —
-  // so it is never written here; couponConflict just reports whether that
-  // claim lost a race, for the admin notification below.
+  // NOT touched here — the server already committed them inside the same
+  // transaction as the order: /api/place-order for Pay on Delivery,
+  // lib/onlineOrder.ts for Razorpay. The coupon redemption record is claimed
+  // the same way, so it is never written here; couponConflict just reports
+  // whether that claim lost a race, for the admin notification below.
   const applyPostOrderEffects = async (
     firebaseUser: any,
     orderId: string,
@@ -444,68 +435,14 @@ setAddress(userData.address || "");
     }
     }
 
-    // couponRedemptions is claimed atomically by reserveStock() (Pay on
-    // Delivery) or the ONLINE success handler before this function runs —
-    // writing it here too would create a second, redundant record for the
-    // same order.
+    // couponRedemptions is claimed server-side, inside the order transaction
+    // (/api/place-order for Pay on Delivery, lib/onlineOrder.ts for Razorpay),
+    // before this function runs — writing it here too would create a second,
+    // redundant record for the same order.
 
     localStorage.removeItem("cart");
     localStorage.removeItem("checkoutItems");
     window.dispatchEvent(new Event("cartUpdated"));
-  };
-
-  const buildOrderData = (
-    firebaseUser: any,
-    paymentStatus: string,
-    // For online payments, this is the amount Razorpay actually
-    // confirmed was captured (from verify-payments) — using it instead
-    // of the client-computed grandTotal means the order record always
-    // matches what was really charged, even if they somehow diverge.
-    verifiedAmount?: number,
-    // For Pay on Delivery (UPI Only) orders: the exact amount
-    // app/api/create-order computed server-side from real product/
-    // shipping data. This — not anything client-computed — is what the
-    // delivery-partner UPI QR/deep-link will show and what admin verifies
-    // against; the browser never gets to declare it.
-    podPaymentAmount?: number
-  ) => {
-    const finalTotal = verifiedAmount ?? grandTotal;
-    // Same commissionRate either way — captured once when the page loaded,
-    // before payment method is chosen, so Pay-on-Delivery and Razorpay
-    // orders stamp the identical rate.
-    const orderCommission =
-      verifiedAmount != null
-        ? Math.round(verifiedAmount * commissionRate)
-        : commission;
-    const orderSellerEarning = finalTotal - orderCommission;
-
-    return {
-      customerName: name,
-      phone,
-      address,
-      userEmail: firebaseUser.email,
-      userId: firebaseUser.uid,
-      vendorIds: vendorIdsForOrder(),
-      items,
-      total,
-      status: "Pending",
-      paymentMethod,
-      paymentStatus,
-      shippingCharge: shipping,
-      finalTotal,
-      deliveryDate,
-      commission: orderCommission,
-      sellerEarning: orderSellerEarning,
-      commissionRate,
-      couponCode: couponApplied ? coupon : "",
-      discount,
-      // Persisted so per-vendor earnings (wallet/payouts pages) can
-      // proportionally deduct redeemed reward points too, not just the
-      // coupon discount — this order's total was reduced by both.
-      rewardValue: redeemPoints ? rewardValue : 0,
-      createdAt: Timestamp.now(),
-      ...(podPaymentAmount != null ? { paymentAmount: podPaymentAmount } : {}),
-    };
   };
 
   const validateForm = () => {
@@ -726,7 +663,7 @@ setAddress(userData.address || "");
       // prices, not trusted from the browser. Same for the discounts: the
       // coupon code and a redeem flag, never the rupee value of either.
       body: JSON.stringify({
-        items: items.map((item: any) => ({ id: item.id, qty: item.qty })),
+      items: items.map((item: any) => ({id: item.id, qty: item.qty, size: item.size || "", color: item.color || "",})),
         couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
         redeemPoints,
         // Delivery details are user input, not money. The server stores them
@@ -772,7 +709,6 @@ setAddress(userData.address || "");
 
         try {
           const finalizeIdToken = await payingUser.getIdToken();
-
           const finalizeResponse = await fetch("/api/finalize-online-order", {
             method: "POST",
             headers: {
@@ -863,17 +799,49 @@ setAddress(userData.address || "");
   };
   // Cheap, read-only pre-flight check — good UX (fail fast before opening
   // Razorpay) but NOT the authoritative check, since a plain read-then-write
-  // has a race window. reserveStock() below is what actually commits.
+  // has a race window. The real commit happens server-side, in the order
+  // transaction: /api/place-order (rejects on shortfall) for Pay on Delivery,
+  // lib/onlineOrder.ts (records and flags, never rejects) for Razorpay.
   const validateStock = async () => {
 
+  // Stock is held per product, but lib/cart.ts keys cart lines on
+  // id + size + color — so one product ordered in two sizes is two lines
+  // sharing an id. Comparing each line's qty against the product's stock
+  // separately passed 3 + 3 of a product with 4 in stock, because neither
+  // line alone exceeded it, and the customer only found out after
+  // /api/create-order (or, on the Razorpay path, after paying).
+  //
+  // Aggregate per product first, matching what /api/place-order and
+  // lib/onlineOrder.ts already do for the authoritative check.
+  const requestedByProduct = new Map<string, number>();
+  const lineCountByProduct = new Map<string, number>();
+  const displayNameByProduct = new Map<string, string>();
+
   for (const item of items) {
+    requestedByProduct.set(
+      item.id,
+      (requestedByProduct.get(item.id) || 0) + Number(item.qty || 0)
+    );
+    lineCountByProduct.set(
+      item.id,
+      (lineCountByProduct.get(item.id) || 0) + 1
+    );
+    if (!displayNameByProduct.has(item.id)) {
+      displayNameByProduct.set(item.id, item.name);
+    }
+  }
+
+  // One read per product rather than one per cart line.
+  for (const [productId, requested] of requestedByProduct) {
+
+    const name = displayNameByProduct.get(productId) || "This product";
 
     const snap = await getDoc(
-      doc(db, "products", item.id)
+      doc(db, "products", productId)
     );
 
     if (!snap.exists()) {
-      alert(`${item.name} is no longer available.`);
+      alert(`${name} is no longer available.`);
       return false;
     }
 
@@ -883,13 +851,23 @@ setAddress(userData.address || "");
     // `status`/`approved` are dead fields nothing in the app ever sets to
     // enable a product, so checking them here blocked every product.
     if (product.active === false) {
-  alert(`${item.name} is currently unavailable.`);
-  return false;
-}
+      alert(`${name} is currently unavailable.`);
+      return false;
+    }
 
-    if ((product.stock ?? 0) < item.qty) {
+    const available = product.stock ?? 0;
+
+    if (available < requested) {
+      // When several lines share this product the bare "only N left" reads as
+      // wrong to a customer looking at two rows that each seem fine, so the
+      // combined figure is spelled out. A single-line cart keeps the original
+      // message unchanged.
       alert(
-        `${item.name} has only ${product.stock} item(s) left in stock.`
+        (lineCountByProduct.get(productId) || 1) > 1
+          ? `${name} has only ${available} item(s) left in stock, but your cart has ${requested} across ${lineCountByProduct.get(
+              productId
+            )} options.`
+          : `${name} has only ${available} item(s) left in stock.`
       );
       return false;
     }
@@ -899,188 +877,6 @@ setAddress(userData.address || "");
   return true;
 
 };
-
-  // Authoritative stock commit: reads and decrements every item's stock
-  // (plus increments sales) in a single Firestore transaction, so two
-  // customers racing for the last unit can't both succeed — one gets a
-  // clean rejection here instead of the order silently going out with
-  // stock never actually decremented.
-  //
-  // When orderData is passed (the Pay on Delivery path, where no payment
-  // has been captured yet), the orders document is created in this SAME
-  // transaction as the stock decrement — Firestore transactions are
-  // all-or-nothing across every read/write they touch, including the
-  // security-rule evaluation for each one, so a rejected order write (e.g.
-  // the vendor-account isNotBlocked() gap) now rolls the stock decrement
-  // back with it instead of leaving a phantom decrement with no order to
-  // show for it. reserveStockBestEffort() below is intentionally NOT
-  // folded into this — the online-payment path runs after Razorpay has
-  // already captured money, where blocking the whole order on a stock
-  // conflict would be worse than an oversold item.
-  const reserveStock = async (
-    orderData?: any
-  ): Promise<
-    | { ok: true; orderRef?: any }
-    | { ok: false; failedItem?: any; message: string }
-  > => {
-
-    const orderRef = orderData ? doc(collection(db, "orders")) : undefined;
-
-    // Deterministic ID so the redemption for this exact customer+coupon can
-    // be read (and claimed) inside the same transaction as the stock/order
-    // writes below — a second, concurrent checkout claiming the same
-    // coupon aborts here before either the order or the stock decrement
-    // ever commit, the same way an oversold item already does.
-    const currentUser = auth.currentUser;
-    const normalizedCode =
-      couponApplied && coupon ? coupon.trim().toUpperCase() : null;
-    const redemptionRef =
-      normalizedCode && currentUser
-        ? doc(db, "couponRedemptions", `${currentUser.uid}_${normalizedCode}`)
-        : null;
-
-    try {
-
-      await runTransaction(db, async (transaction) => {
-
-        const refs = items.map((item: any) => doc(db, "products", item.id));
-        const snaps = await Promise.all(
-          refs.map((ref: any) => transaction.get(ref))
-        );
-
-        // All reads must happen before any write in a Firestore
-        // transaction — the coupon-redemption read sits alongside the
-        // stock reads above, before the writes further down.
-        const redemptionSnap = redemptionRef
-          ? await transaction.get(redemptionRef)
-          : null;
-
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i];
-          const snap = snaps[i];
-
-          if (!snap.exists()) {
-            const err: any = new Error("unavailable");
-            err.failedItem = item;
-            err.message = `${item.name} is no longer available.`;
-            throw err;
-          }
-
-          const product: any = snap.data();
-
-          if (product.active === false) {
-            const err: any = new Error("unavailable");
-            err.failedItem = item;
-            err.message = `${item.name} is currently unavailable.`;
-            throw err;
-          }
-
-          if ((product.stock ?? 0) < item.qty) {
-            const err: any = new Error("stock");
-            err.failedItem = item;
-            err.message = `${item.name} has only ${product.stock ?? 0} item(s) left in stock.`;
-            throw err;
-          }
-        }
-
-        if (redemptionSnap && redemptionSnap.exists()) {
-          const err: any = new Error("coupon");
-          err.couponConflict = true;
-          err.message =
-            "This coupon has already been used. Please remove it and try again.";
-          throw err;
-        }
-
-        refs.forEach((ref: any, i: number) => {
-          transaction.update(ref, {
-            stock: increment(-items[i].qty),
-            sales: increment(items[i].qty),
-          });
-        });
-
-        if (orderRef && orderData) {
-          transaction.set(orderRef, orderData);
-        }
-
-        if (redemptionRef && orderRef && normalizedCode && currentUser) {
-          transaction.set(redemptionRef, {
-            userId: currentUser.uid,
-            userEmail: currentUser.email,
-            code: normalizedCode,
-            orderId: orderRef.id,
-            createdAt: Timestamp.now(),
-          });
-        }
-
-      });
-
-      return { ok: true, orderRef };
-
-    } catch (err: any) {
-
-      if (err && err.failedItem) {
-        return { ok: false, failedItem: err.failedItem, message: err.message };
-      }
-
-      if (err && err.couponConflict) {
-        return { ok: false, message: err.message };
-      }
-
-      console.error("Stock reservation failed:", err);
-      return {
-        ok: false,
-        message: "Something went wrong checking stock. Please try again.",
-      };
-
-    }
-
-  };
-
-  // Used after payment has already been captured (Razorpay), where we can
-  // no longer just reject the order — money changed hands. Reserves each
-  // item independently so one oversold item doesn't block stock from being
-  // correctly decremented for the others; failures are collected and
-  // surfaced via an admin notification instead of silently dropped.
-  const reserveStockBestEffort = async () => {
-
-    const failedItems: any[] = [];
-
-    for (const item of items) {
-
-      try {
-
-        await runTransaction(db, async (transaction) => {
-
-          const ref = doc(db, "products", item.id);
-          const snap = await transaction.get(ref);
-
-          if (!snap.exists()) {
-            throw new Error("missing");
-          }
-
-          const product: any = snap.data();
-
-          if ((product.stock ?? 0) < item.qty) {
-            throw new Error("stock");
-          }
-
-          transaction.update(ref, {
-            stock: increment(-item.qty),
-            sales: increment(item.qty),
-          });
-
-        });
-
-      } catch (err) {
-        console.error("Stock reservation failed for", item.name, err);
-        failedItems.push(item);
-      }
-
-    }
-
-    return failedItems;
-
-  };
 
   return (
     <section className="py-8 px-4 bg-gray-50 min-h-screen">
