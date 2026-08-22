@@ -760,13 +760,82 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------
-    // addresses / tickets / returns  (owner = userEmail)
+    // addresses / tickets / returns  (owner = userEmail, or userId on the
+    // mobile-app branches)
     // ---------------------------------------------------------
 
     match /addresses/{addressId} {
-      allow read, update, delete: if isAdmin() || isOwnerEmail(resource.data.userEmail);
+      // TWO ownership models coexist here, deliberately:
+      //
+      //   web    app/addresses/add writes userEmail + fullName/phone/
+      //          addressLine1/addressLine2/landmark/... and NO userId
+      //   mobile writes userId + name/mobile/address/... and NO userEmail
+      //
+      // .get(field, '') rather than a bare resource.data.userEmail: a
+      // document written by one client has no field for the other, and a
+      // bare access on a missing field RAISES and denies the whole rule
+      // rather than falling through to the next branch of the ||. Same
+      // idiom isNotBlocked() and refundCeiling() already use above.
+      //
+      // Neither branch can reach the other's documents: a web address has
+      // no userId, so .get('userId','') yields '' which never equals a real
+      // uid, and vice versa.
+      allow read, delete: if isAdmin()
+        || isOwnerEmail(resource.data.get('userEmail', ''))
+        || isOwnerUid(resource.data.get('userId', ''));
+
+      // Update is split out from read/delete for one reason: the ownership
+      // fields must be immutable.
+      //
+      // Ownership here is whatever the document itself claims, so an owner
+      // who can rewrite userEmail/userId can hand their own document to
+      // another account — adding a userEmail to a mobile-owned address, say,
+      // which grants that mailbox's owner read/update/delete over it. Nobody
+      // gains access to a record they did not already own, so this is
+      // nuisance-injection rather than a data leak, but the fix is cheap and
+      // an ownership field that the owner can rewrite is not really an
+      // ownership field.
+      //
+      // unchanged() handles both shapes correctly, which is why one guard
+      // covers both branches: it treats absent-in-both as unchanged, so
+      // unchanged('userId') passes on a web address that never had one, and
+      // unchanged('userEmail') passes on a mobile address that never had one.
+      // It also counts a field deletion as a change, so the guard cannot be
+      // bypassed by stripping the field with FieldValue.delete() and
+      // re-adding it.
+      //
+      // The legitimate write path is unaffected: app/addresses/page.tsx only
+      // ever sends updateDoc({ isDefault }), leaving both fields untouched.
+      //
+      // isAdmin() is deliberately NOT subject to the guard — admin update
+      // access is preserved exactly as it was.
+      allow update: if isAdmin()
+        || (
+          (
+            isOwnerEmail(resource.data.get('userEmail', ''))
+            || isOwnerUid(resource.data.get('userId', ''))
+          )
+          && unchanged('userEmail')
+          && unchanged('userId')
+        );
+
+      // Web create — unchanged.
       allow create: if isSignedIn()
         && request.resource.data.userEmail == request.auth.token.email;
+
+      // Mobile create — uid ownership, never email, plus validation of the
+      // fields the mobile form actually sends. Field names differ from the
+      // web payload above, so the two create branches are kept separate
+      // instead of trying to validate one shape against both.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && isValidString('name', 200)
+        && isValidString('mobile', 20)
+        && isValidString('address', 500)
+        && isValidString('city', 100)
+        && isValidString('state', 100)
+        && isValidString('pincode', 20)
+        && request.resource.data.isDefault is bool;
     }
 
     match /sellerInquiries/{inquiryId} {
@@ -780,11 +849,31 @@ service cloud.firestore {
     }
 
     match /tickets/{ticketId} {
-      allow read: if isAdmin() || isOwnerEmail(resource.data.userEmail);
+      // app/support/page.tsx writes BOTH userId and userEmail; the mobile
+      // app lists with where("userId","==",uid). An email-only read rule
+      // cannot satisfy that query — a list is only permitted when every
+      // document it can return provably passes — so every mobile customer's
+      // ticket list failed outright.
+      //
+      // .get(field, '') for the same reason as /addresses above: a document
+      // missing one of the two fields must fall through to the other branch
+      // rather than raise and deny.
+      allow read: if isAdmin()
+        || isOwnerEmail(resource.data.get('userEmail', ''))
+        || isOwnerUid(resource.data.get('userId', ''));
+
+      // Create validation unchanged. The mobile payload carries userEmail
+      // too, so it already satisfies this branch as written.
       allow create: if isSignedIn()
         && request.resource.data.userEmail == request.auth.token.email
         && isValidString('subject', 200)
         && isValidString('message', 2000);
+
+      // Unchanged, and already sufficient for the "customers cannot modify
+      // another customer's ticket" requirement: no customer can update or
+      // delete ANY ticket, their own included. adminReply/status stay
+      // admin-only, which is what keeps a customer from answering their own
+      // ticket or reopening a closed one.
       allow update: if isAdmin() && affectedKeysOnly(['status', 'adminReply']);
       allow delete: if isAdmin();
     }
@@ -1020,6 +1109,67 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------
+    // Mobile app reviews
+    //
+    // A SEPARATE collection from /productReviews above, not a rename: the
+    // mobile app writes /reviews with its own schema (productId,
+    // productName, vendorId, vendorName, orderId, userId, customerName,
+    // customerEmail, rating, review, photos, createdAt). /productReviews is
+    // left exactly as it was.
+    //
+    // Ownership is on userId, never customerEmail — a customer must not be
+    // able to post a review carrying someone else's identity, and uid is
+    // the only field the client cannot forge.
+    // ---------------------------------------------------------
+
+    match /reviews/{reviewId} {
+      // Public, like /productReviews: the product screen shows a product's
+      // reviews to signed-out visitors too.
+      allow read: if true;
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && isValidString('productId', 200)
+        && isValidString('review', 2000)
+        // Optional fields are validated only when present. Hard-requiring
+        // every field in the schema would reject a legitimate review that
+        // omits photos, or one written outside a purchase (no orderId),
+        // and a rejected review is a silent failure in the mobile UI.
+        && (!('customerName' in request.resource.data) || isValidString('customerName', 200))
+        && (!('productName' in request.resource.data) || isValidString('productName', 300))
+        && (!('vendorId' in request.resource.data) || isValidString('vendorId', 200))
+        && (!('vendorName' in request.resource.data) || isValidString('vendorName', 200))
+        && (!('orderId' in request.resource.data) || isValidString('orderId', 200))
+        && (
+          !('photos' in request.resource.data)
+          || (
+            request.resource.data.photos is list
+            && request.resource.data.photos.size() <= 10
+          )
+        );
+
+      // A customer may edit their OWN review. userId is pinned on both
+      // sides so an edit can neither be applied to another user's review
+      // nor reassign authorship of one's own.
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && isValidString('review', 2000);
+
+      // Owner or admin. Admin delete matches /productReviews' moderation
+      // capability; the owner branch is what lets a customer retract their
+      // own review.
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // ---------------------------------------------------------
     // Admin-only collections (no legitimate client write path exists
     // outside the admin console today)
     // ---------------------------------------------------------
@@ -1105,6 +1255,32 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid;
 
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+
+      allow delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+    // ---------------------------------------------------------
+    // Mobile app recentlyViewed
+    //
+    // Browsing history — strictly private, per-user. Same shape as /cart
+    // and /wishlist above: uid ownership on every operation, no public
+    // read, and deliberately NO admin branch. An admin has no product
+    // reason to read an individual customer's browsing history, and the
+    // two sibling collections grant none either.
+    // ---------------------------------------------------------
+
+    match /recentlyViewed/{docId} {
+      allow read: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      // userId pinned on both sides so an update can neither target another
+      // customer's document nor reassign ownership of one's own.
       allow update: if isSignedIn()
         && resource.data.userId == request.auth.uid
         && request.resource.data.userId == request.auth.uid;
