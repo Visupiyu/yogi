@@ -80,9 +80,16 @@ rules_version = '2';
 //   (userId==uid) or admin (for role=="admin" docs).
 //
 // Collection: addresses, tickets, returns, withdrawals   Doc ID: auto-id
-//   No uid field in any of these — ownership is by `userEmail` /
-//   `vendorEmail` matching request.auth.token.email.
+//   Web-app documents in these have no uid field — ownership is by
+//   `userEmail` / `vendorEmail` matching request.auth.token.email.
+//   addresses and tickets additionally accept the mobile app's own
+//   userId-owned documents (screens/AddressScreen.tsx,
+//   screens/SupportScreen.tsx write/query by auth.currentUser.uid,
+//   not email) — see isValidMobileAddress() and the isOwnerUid()
+//   branch on tickets' read rule. Two independent, additive
+//   ownership models on the same collection, not a replacement.
 //
+
 // Collection: coupons               Doc ID: auto-id
 //   Admin-written only. Read allowed to any signed-in user (checkout needs to
 //   look up a coupon by code before purchase).
@@ -103,6 +110,20 @@ rules_version = '2';
 //   the fallback for legacy pre-fix docs missing the field. productReviews
 //   has no purchase-verification or one-review-per-user enforcement (a real,
 //   known gap, not a rules oversight — flagged separately).
+//
+// Collection: reviews               Doc ID: auto-id
+//   The MOBILE app's own product-review collection — separate from
+//   productReviews above, keyed by {productId, orderId, userId(=uid),
+//   customerName, customerEmail, rating(1-5), review, photos(array),
+//   createdAt}. Unlike productReviews, create requires the caller to
+//   actually own the referenced order (ownsReviewOrder()), so a review
+//   can't be filed against an order that isn't the caller's. Read:
+//   public. No client update/delete — no such UI exists in the app.
+//
+// Collection: recentlyViewed        Doc ID: auto-id
+//   {userId(=uid), productId, name, price, mrp, image, vendorId,
+//   vendorName, discountPercent, viewedAt}. Mobile-only, same
+//   userId-owned CRUD shape as the cart/wishlist blocks below.
 //
 // Collection: adminUsers   Doc ID: auto-id
 //   Admin-only in every direction. No legitimate client write/read path
@@ -760,13 +781,46 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------
-    // addresses / tickets / returns  (owner = userEmail)
+    // addresses / tickets / returns  (owner = userEmail, except
+    // addresses which also accepts the mobile app's userId-owned
+    // documents — see isValidMobileAddress() below)
     // ---------------------------------------------------------
 
+    // Mobile app's addresses/{addressId} documents are owned by userId
+    // (auth.currentUser.uid), not userEmail like the web app's — this
+    // is a separate, additive ownership model, not a replacement for
+    // the userEmail one above. Validates the exact fields
+    // screens/AddressScreen.tsx's saveAddress() writes.
+    function isValidMobileAddress() {
+      let d = request.resource.data;
+      return 'userId' in d
+        && d.userId == request.auth.uid
+        && isValidString('name', 100)
+        && isValidString('mobile', 15)
+        && isValidString('address', 500)
+        && isValidString('city', 100)
+        && isValidString('state', 100)
+        && isValidString('pincode', 10)
+        && d.isDefault is bool;
+    }
+
     match /addresses/{addressId} {
-      allow read, update, delete: if isAdmin() || isOwnerEmail(resource.data.userEmail);
+      // 'field' in data guards are required here (not optional style),
+      // same reason notifications/rewardTransactions' read rules use
+      // them above: web-owned docs have no userId field, mobile-owned
+      // docs have no userEmail field, and accessing an absent map key
+      // directly errors — which would deny the whole || chain instead
+      // of falling through to the branch that actually applies.
+      allow read, update, delete: if isAdmin()
+        || ('userEmail' in resource.data && isOwnerEmail(resource.data.userEmail))
+        || ('userId' in resource.data && isOwnerUid(resource.data.userId));
+
       allow create: if isSignedIn()
-        && request.resource.data.userEmail == request.auth.token.email;
+        && (
+          ('userEmail' in request.resource.data
+            && request.resource.data.userEmail == request.auth.token.email)
+          || isValidMobileAddress()
+        );
     }
 
     match /sellerInquiries/{inquiryId} {
@@ -780,7 +834,17 @@ service cloud.firestore {
     }
 
     match /tickets/{ticketId} {
-      allow read: if isAdmin() || isOwnerEmail(resource.data.userEmail);
+      // Mobile app's screens/SupportScreen.tsx writes both userEmail
+      // AND userId on create, but loadTickets() queries by userId —
+      // a field this rule never checked, so the customer's own
+      // ticket-list query was rejected outright. isOwnerUid() is
+      // additive here, same ownership model as addresses above;
+      // create/update/delete are unchanged. 'field' in data guards
+      // are required (see addresses above) since not every ticket
+      // is guaranteed to carry both fields.
+      allow read: if isAdmin()
+        || ('userEmail' in resource.data && isOwnerEmail(resource.data.userEmail))
+        || ('userId' in resource.data && isOwnerUid(resource.data.userId));
       allow create: if isSignedIn()
         && request.resource.data.userEmail == request.auth.token.email
         && isValidString('subject', 200)
@@ -1020,6 +1084,52 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------
+    // reviews  (mobile app's own product-review collection — a
+    // separate collection from productReviews above, keyed by
+    // orderId+productId+userId, written by
+    // screens/OrderDetailsScreen.tsx's submitReview() and read by
+    // screens/ProductDetailsScreen.tsx's loadReviews())
+    // ---------------------------------------------------------
+
+    // Confirms orderId actually belongs to the caller, the same
+    // get()-based ownership pattern returns/{returnId}'s
+    // ownsReturnOrder() already uses above — this is what stops a
+    // customer from creating a review that claims a rating/photos
+    // against an order that isn't theirs, on top of the userId==uid
+    // check already covering their own identity.
+    function ownsReviewOrder(orderId) {
+      return exists(/databases/$(database)/documents/orders/$(orderId))
+        && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid;
+    }
+
+    function isValidMobileReview() {
+      let d = request.resource.data;
+      return d.userId == request.auth.uid
+        && d.productId is string && d.productId.size() > 0
+        && d.orderId is string && d.orderId.size() > 0
+        && ownsReviewOrder(d.orderId)
+        && d.rating is number && d.rating >= 1 && d.rating <= 5
+        && isValidString('review', 2000)
+        && d.photos is list
+        && d.photos.size() <= 10;
+    }
+
+    match /reviews/{reviewId} {
+      // Public read, matching productReviews above — review content is
+      // meant to be shown on the product page regardless of whether
+      // the viewer is signed in.
+      allow read: if true;
+
+      allow create: if isSignedIn() && isValidMobileReview();
+
+      // No owner-edit/delete path exists in the mobile app today
+      // (submitReview() only ever creates); mirrors productReviews'
+      // own posture rather than inventing one.
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
     // Admin-only collections (no legitimate client write path exists
     // outside the admin console today)
     // ---------------------------------------------------------
@@ -1099,6 +1209,24 @@ service cloud.firestore {
     // ---------------------------------------------------------
 
     match /wishlist/{docId} {
+      allow read: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+
+      allow delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+    // ---------------------------------------------------------
+    // Mobile app recently viewed
+    // ---------------------------------------------------------
+
+    match /recentlyViewed/{docId} {
       allow read: if isSignedIn()
         && resource.data.userId == request.auth.uid;
 
