@@ -69,13 +69,13 @@ export default function CollectionStrip({
 
     return (
 
-      <section className="max-w-7xl mx-auto px-4 py-8">
+      <section className="max-w-7xl mx-auto px-4 py-4">
 
-        <div className="bg-white rounded-3xl shadow border border-gray-100 p-6">
+        <div className="bg-white rounded-3xl shadow border border-gray-100 p-3">
 
           <div className="h-8 w-72 bg-gray-200 rounded mb-6 animate-pulse"/>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-1">
 
             {[...Array(12)].map((_,index)=>(
 
@@ -106,7 +106,7 @@ export default function CollectionStrip({
 
     return (
 
-      <section className="max-w-7xl mx-auto px-4 py-8">
+      <section className="max-w-7xl mx-auto px-2 py-4">
 
         <div className="bg-red-50 border border-red-200 rounded-3xl p-8 text-center">
 
@@ -129,7 +129,7 @@ export default function CollectionStrip({
   }
 
   return (
-    <section className="max-w-7xl mx-auto px-4 py-8">
+    <section className="max-w-7xl mx-auto px-2 py-4">
 
   <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6">
 
