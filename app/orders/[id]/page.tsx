@@ -512,6 +512,46 @@ export default function OrderDetailsPage() {
       </span>
     </div>
 
+    {/* Refund status — read-only. Present only on a cancelled order whose
+        payment was actually captured; absent on every other order, so
+        nothing renders for the normal case. Wording stays honest about
+        whether the money has actually been returned yet. */}
+    {order.refundStatus === "Required" && (
+      <div className="border-t pt-4 text-sm">
+        <p className="font-semibold text-amber-700">Refund pending</p>
+        <p className="text-gray-600 mt-1">
+          A refund of ₹
+          {Number(order.refundAmountDue || 0).toLocaleString("en-IN")} is being
+          arranged for this cancelled order. It has not been sent yet.
+        </p>
+      </div>
+    )}
+
+    {order.refundStatus === "Processing" && (
+      <div className="border-t pt-4 text-sm">
+        <p className="font-semibold text-orange-700">Refund in progress</p>
+        <p className="text-gray-600 mt-1">
+          Your refund of ₹
+          {Number(order.refundAmountDue || 0).toLocaleString("en-IN")} has been
+          initiated. Banks usually take 5–7 business days.
+        </p>
+      </div>
+    )}
+
+    {order.refundStatus === "Refunded" && (
+      <div className="border-t pt-4 text-sm">
+        <p className="font-semibold text-green-700">Refunded</p>
+        <p className="text-gray-600 mt-1">
+          ₹{Number(order.refundedAmount || 0).toLocaleString("en-IN")} has been
+          refunded
+          {order.refundTransactionId
+            ? ` · Ref: ${order.refundTransactionId}`
+            : ""}
+          .
+        </p>
+      </div>
+    )}
+
   </div>
 
 </div>

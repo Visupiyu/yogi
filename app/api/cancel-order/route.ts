@@ -69,6 +69,8 @@ type OrderRecord = {
   finalTotal?: unknown;
   rewardValue?: unknown;
   couponCode?: unknown;
+  paymentMethod?: unknown;
+  paymentStatus?: unknown;
 };
 
 // Mirrors isLegalOrderStatusTransition() in firestore.rules: Cancelled is
@@ -255,10 +257,40 @@ export async function POST(request: Request) {
             : null;
         const couponSnap = couponRef ? await tx.get(couponRef) : null;
 
+        // Cancelling a captured ONLINE payment creates an obligation to return
+        // real money. Cancellation records that obligation; it deliberately
+        // does NOT execute the refund — no Razorpay call happens here, and
+        // paymentStatus stays "Paid" until money has actually been returned.
+        //
+        // Without this the obligation was invisible: an order could be
+        // Cancelled while paymentStatus remained "Paid" with nothing anywhere
+        // indicating a refund was owed (see order pay_TTvsOzR88T5Ed7).
+        //
+        // ONLINE + Paid only. A Pay-on-Delivery / COD order is cancelled
+        // before any money is collected, so there is nothing to refund and
+        // none of these fields are written.
+        //
+        // refundAmountDue is the full finalTotal, shipping included, because
+        // cancellation happens before dispatch. A partial-return refund is a
+        // different calculation and belongs to the return flow, not here.
+        //
+        // refundedAmount and refundTransactionId are deliberately NOT written
+        // yet — absent means "nothing refunded", the same convention
+        // needsReview uses. Writing 0 would read as "refunded ₹0".
+        const owesRefund =
+          order.paymentMethod === "ONLINE" && order.paymentStatus === "Paid";
+
         // ---- WRITES ----
         tx.update(orderRef, {
           status: "Cancelled",
           updatedAt: Timestamp.now(),
+          ...(owesRefund
+            ? {
+                refundStatus: "Required",
+                refundAmountDue: Number(order.finalTotal || 0),
+                refundRequestedAt: Timestamp.now(),
+              }
+            : {}),
         });
 
         for (const { ref, qty } of restorable) {

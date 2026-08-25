@@ -46,6 +46,14 @@ type Order = {
   }[];
   couponConflict?: boolean;
   rewardShortfall?: number;
+  // Set by app/api/cancel-order when a captured ONLINE payment is cancelled.
+  // "Required" means real money is owed back and has NOT been returned yet —
+  // YOMICO does not move the money itself in this phase, so these fields
+  // record an obligation and, once settled elsewhere, the evidence of it.
+  refundStatus?: "Required" | "Processing" | "Refunded";
+  refundAmountDue?: number;
+  refundedAmount?: number;
+  refundTransactionId?: string;
 };
 
 export default function AdminOrdersPage() {
@@ -88,6 +96,11 @@ export default function AdminOrdersPage() {
           stockShortfall: data.stockShortfall,
           couponConflict: data.couponConflict,
           rewardShortfall: data.rewardShortfall,
+          // Same convention: absent means no refund is owed, so no default.
+          refundStatus: data.refundStatus,
+          refundAmountDue: data.refundAmountDue,
+          refundedAmount: data.refundedAmount,
+          refundTransactionId: data.refundTransactionId,
         });
       });
       // newest-ish: sort by original timestamp if present is lost after formatting,
@@ -234,6 +247,126 @@ setOrders(items);
       );
     } catch (error) {
       console.error(error);
+    }
+  };
+
+  // Records that a refund has been INITIATED elsewhere (Razorpay dashboard,
+  // UPI, bank transfer). Deliberately does not claim completion — that needs
+  // a reference, see recordRefundCompleted below.
+  const markRefundProcessing = async (orderId: string) => {
+    if (
+      !confirm(
+        "Mark this refund as in progress?\n\nUse this once you have initiated the refund elsewhere. It does NOT move any money and does not mark the refund complete."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "orders", orderId), {
+        refundStatus: "Processing",
+      });
+
+      await logAdminAction("order_refund_processing", orderId, {
+        recordedByEmail: auth.currentUser?.email || "",
+      });
+
+      setOrders(
+        orders.map((order) =>
+          order.id === orderId
+            ? { ...order, refundStatus: "Processing" as const }
+            : order
+        )
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Records EVIDENCE of a refund that has already been paid out somewhere
+  // else. This button does not send money and must never be usable as a way
+  // to declare an order refunded without proof, so both the amount and an
+  // external reference (Razorpay refund id / UPI UTR / bank reference) are
+  // required before anything is written.
+  //
+  // paymentStatus is deliberately NOT changed here. Moving it to "Refunded"
+  // would alter 18 existing `paymentStatus === "Paid"` checks across the app;
+  // that transition belongs to the dedicated refund route in a later phase.
+  const recordRefundCompleted = async (order: Order) => {
+    const due = Number(order.refundAmountDue || order.finalTotal || 0);
+
+    const amountInput = prompt(
+      `Amount actually refunded for order ${order.id.slice(0, 8)} (₹).\n\nAmount owed: ₹${due.toLocaleString(
+        "en-IN"
+      )}`,
+      String(due)
+    );
+    if (amountInput === null) return;
+
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      alert("Enter a valid refund amount.");
+      return;
+    }
+    if (amount > due) {
+      alert(
+        `Refund cannot exceed the amount owed (₹${due.toLocaleString("en-IN")}).`
+      );
+      return;
+    }
+
+    const reference = prompt(
+      "Reference for this refund (Razorpay refund id, UPI UTR, or bank reference).\n\nThis is required — it is the evidence that the money actually left."
+    );
+    if (reference === null) return;
+
+    const refundTransactionId = reference.trim();
+    if (!refundTransactionId) {
+      alert("A refund reference is required to record a completed refund.");
+      return;
+    }
+
+    if (
+      !confirm(
+        `Record this refund as COMPLETED?\n\nAmount: ₹${amount.toLocaleString(
+          "en-IN"
+        )}\nReference: ${refundTransactionId}\n\nOnly do this if the money has already been returned to the customer.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "orders", order.id), {
+        refundStatus: "Refunded",
+        refundedAmount: amount,
+        refundTransactionId,
+        refundedAt: serverTimestamp(),
+        refundedBy: auth.currentUser?.uid || "",
+      });
+
+      await logAdminAction("order_refund_recorded", order.id, {
+        refundedAmount: amount,
+        refundTransactionId,
+        refundAmountDue: due,
+        recordedByEmail: auth.currentUser?.email || "",
+      });
+
+      setOrders(
+        orders.map((o) =>
+          o.id === order.id
+            ? {
+                ...o,
+                refundStatus: "Refunded" as const,
+                refundedAmount: amount,
+                refundTransactionId,
+              }
+            : o
+        )
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Couldn't record the refund. Please try again.");
     }
   };
 
@@ -425,6 +558,75 @@ const filtered = orders.filter(
                             >
                               Mark Reviewed
                             </button>
+                          </div>
+                        )}
+
+                        {/* Refund obligation. YOMICO does not move money from
+                            this screen — these controls record what happened
+                            elsewhere, which is why the labels say "Record". */}
+                        {order.refundStatus === "Required" && (
+                          <div className="mt-2 border border-red-300 bg-red-50 rounded-lg p-2">
+                            <p className="text-red-800 text-xs font-bold">
+                              ⚠ Refund Required — money NOT yet returned
+                            </p>
+                            <p className="text-red-700 text-[11px] mt-1">
+                              Amount owed: ₹
+                              {Number(
+                                order.refundAmountDue || 0
+                              ).toLocaleString("en-IN")}
+                              . Refund the customer in Razorpay (or by UPI /
+                              bank transfer), then record it here.
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <button
+                                onClick={() => markRefundProcessing(order.id)}
+                                className="bg-orange-600 hover:bg-orange-700 transition text-white px-3 py-1.5 rounded-lg text-xs"
+                              >
+                                Mark In Progress
+                              </button>
+                              <button
+                                onClick={() => recordRefundCompleted(order)}
+                                className="bg-red-600 hover:bg-red-700 transition text-white px-3 py-1.5 rounded-lg text-xs"
+                              >
+                                Record Refund
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {order.refundStatus === "Processing" && (
+                          <div className="mt-2 border border-orange-300 bg-orange-50 rounded-lg p-2">
+                            <p className="text-orange-800 text-xs font-bold">
+                              ⏳ Refund In Progress
+                            </p>
+                            <p className="text-orange-700 text-[11px] mt-1">
+                              Initiated but not yet confirmed. Amount owed: ₹
+                              {Number(
+                                order.refundAmountDue || 0
+                              ).toLocaleString("en-IN")}
+                              .
+                            </p>
+                            <button
+                              onClick={() => recordRefundCompleted(order)}
+                              className="mt-2 bg-red-600 hover:bg-red-700 transition text-white px-3 py-1.5 rounded-lg text-xs"
+                            >
+                              Record Refund
+                            </button>
+                          </div>
+                        )}
+
+                        {order.refundStatus === "Refunded" && (
+                          <div className="mt-2 border border-green-300 bg-green-50 rounded-lg p-2">
+                            <p className="text-green-800 text-xs font-bold">
+                              ✅ Refund Recorded
+                            </p>
+                            <p className="text-green-700 text-[11px] mt-1">
+                              ₹
+                              {Number(
+                                order.refundedAmount || 0
+                              ).toLocaleString("en-IN")}{" "}
+                              · Ref: {order.refundTransactionId || "—"}
+                            </p>
                           </div>
                         )}
 
