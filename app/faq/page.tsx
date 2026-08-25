@@ -51,7 +51,7 @@ export default function FAQPage() {
     "Can I return a product?",
 
   answer:
-    "Yes. Eligible products can be returned within the applicable return period. Please refer to our Return Policy for complete details."
+    "Yes. Eligible products can be returned within 7 days of delivery. Please refer to our Return Policy for complete details."
 },
 
 {

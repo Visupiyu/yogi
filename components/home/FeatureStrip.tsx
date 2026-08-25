@@ -24,7 +24,10 @@ const features = [
   },
   {
     title: "↩ EASY RETURNS",
-    subtitle: "14 Day Returns",
+    // Matches RETURN_WINDOW_DAYS in lib/returnEligibility.ts, which
+    // /api/request-return enforces. This read "14 Day Returns" while the
+    // server refused any request past day 7.
+    subtitle: "7 Day Returns",
     icon: RotateCcw,
     bg: "bg-gradient-to-r from-orange-500 to-red-600",
   },
