@@ -13,6 +13,11 @@ import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { addToCart } from "@/lib/cart";
 import { ORDER_STEPS, getStep } from "@/lib/orderTracking";
+import {
+  RETURN_WINDOW_DAYS,
+  canRequestReturn,
+  returnWindowEndsAt,
+} from "@/lib/returnEligibility";
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
@@ -887,24 +892,43 @@ export default function OrdersPage() {
 
       </p>
 
-      <a
-        href={`/returns?orderId=${order.id}`}
-        className="
-          inline-flex
-          mt-5
-          bg-orange-500
-          hover:bg-orange-600
-          text-white
-          px-6
-          py-3
-          rounded-xl
-          font-semibold
-        "
-      >
+      {/* Return action only while eligible. Delivered-only behaviour is
+          preserved — this whole block already required it — with the 7-day
+          window added on top. canRequestReturn() is the same rule
+          /api/request-return enforces server-side; this is only what the
+          customer sees. */}
+      {canRequestReturn(order) ? (
+        <a
+          href={`/returns?orderId=${order.id}`}
+          className="
+            inline-flex
+            mt-5
+            bg-orange-500
+            hover:bg-orange-600
+            text-white
+            px-6
+            py-3
+            rounded-xl
+            font-semibold
+          "
+        >
 
-        Request Return
+          Request Return
 
-      </a>
+        </a>
+      ) : (
+        <p className="mt-5 text-sm text-gray-600">
+          {returnWindowEndsAt(order)
+            ? `The ${RETURN_WINDOW_DAYS}-day return window closed on ${returnWindowEndsAt(
+                order
+              )!.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}.`
+            : `The ${RETURN_WINDOW_DAYS}-day return window has closed.`}
+        </p>
+      )}
 
     </div>
 

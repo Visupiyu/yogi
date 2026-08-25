@@ -17,6 +17,11 @@ import { useRouter, useParams } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { ORDER_STEPS, TOTAL_STEPS, getStep } from "@/lib/orderTracking";
+import {
+  RETURN_WINDOW_DAYS,
+  canRequestReturn,
+  returnWindowEndsAt,
+} from "@/lib/returnEligibility";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -592,12 +597,30 @@ export default function OrderDetailsPage() {
             <p className="mt-3 text-gray-700">
             Thank you for shopping with YOMICO.
             </p>
-            <Link
-              href={`/returns?orderId=${order.id}`}
-              className="inline-flex mt-6 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold"
-            >
-              Request Return
-            </Link>
+            {/* Return action only while eligible. Delivered-only behaviour is
+                preserved — this block already required it — with the 7-day
+                window added on top. canRequestReturn() is the same rule
+                /api/request-return enforces server-side. */}
+            {canRequestReturn(order) ? (
+              <Link
+                href={`/returns?orderId=${order.id}`}
+                className="inline-flex mt-6 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold"
+              >
+                Request Return
+              </Link>
+            ) : (
+              <p className="mt-6 text-sm text-gray-600">
+                {returnWindowEndsAt(order)
+                  ? `The ${RETURN_WINDOW_DAYS}-day return window closed on ${returnWindowEndsAt(
+                      order
+                    )!.toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}.`
+                  : `The ${RETURN_WINDOW_DAYS}-day return window has closed.`}
+              </p>
+            )}
           </div>
         )}
         </div>

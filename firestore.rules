@@ -938,17 +938,28 @@ service cloud.firestore {
 
     match /returns/{returnId} {
       allow read: if isAdmin() || isOwnerEmail(resource.data.userEmail);
-      // refundAmount and status are pinned to exactly what the real form
-      // already sends (app/returns/page.tsx writes refundAmount: 0 and
-      // status: "Pending"), so the legitimate flow is unaffected while a
-      // hand-crafted SDK write can no longer arrive pre-approved or
-      // pre-priced.
-      allow create: if isSignedIn()
-        && request.resource.data.userEmail == request.auth.token.email
-        && request.resource.data.orderId is string
-        && request.resource.data.refundAmount == 0
-        && request.resource.data.status == 'Pending'
-        && ownsReturnOrder(request.resource.data.orderId);
+      // Return creation is now SERVER-ONLY.
+      //
+      // app/returns/page.tsx used to addDoc() this document straight from the
+      // browser, and the rule below it was the only thing standing between a
+      // hand-crafted SDK write and a return record — it pinned refundAmount to
+      // 0, status to 'Pending' and verified order ownership. What it could NOT
+      // express is everything else that actually governs eligibility:
+      //
+      //   - the order must be Delivered (a rule cannot read the order's status
+      //     without a get() on every write, and there was none)
+      //   - the request must be inside the 7-day return window
+      //   - only one return may exist per order
+      //
+      // All three are enforced in app/api/request-return, which re-reads the
+      // order and does the duplicate check and the write in one Admin SDK
+      // transaction. The Admin SDK bypasses these rules entirely, so denying
+      // client creation costs that route nothing — verified: zero addDoc/setDoc
+      // against the returns collection remains anywhere in app/.
+      //
+      // Reads, the admin update branch and admin delete below are unchanged;
+      // only creation moves server-side.
+      allow create: if false;
       // The cap is only evaluated when the amount actually changes, so every
       // other admin action (status, pickup details, transaction id) still
       // works even if the underlying order was since deleted — only raising
