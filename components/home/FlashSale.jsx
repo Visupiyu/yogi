@@ -1,48 +1,32 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 
+// The countdown that used to live here was removed, not rebuilt.
+//
+// It computed `Date.now() + 24h` inside a useEffect on every mount, so it
+// restarted at ~23:59:59 on every page load and every refresh — it could
+// never reach zero, and there was no sale window behind it to count down to.
+// No flashSale / saleEndsAt / salePrice field exists on any product, so
+// nothing anywhere defined an end time. A timer implies a deadline; there
+// isn't one, so the honest fix is to show no timer rather than a fake one.
+//
+// What IS real: every product carries mrp > sellingPrice, and
+// app/search/page.jsx already filters on that via its minimumDiscount
+// control. Both CTAs now point at that filter, so "deals" links to actual
+// discounted products instead of the unfiltered catalogue.
+//
+// Deliberately NOT done here: no sale data model, no price changes. Building
+// a genuine countdown needs sale start/end timestamps, an admin UI to set
+// them and server-side enforcement so the price actually changes at expiry —
+// a feature, not a correction.
+
+// Keep this in step with the seeded filter in app/search/page.jsx. 40% is
+// used because it is the deepest band the catalogue currently fills well.
+const DEALS_HREF = "/search?minDiscount=40";
+
 export default function FlashSale() {
-  // targetTime is computed only inside useEffect (client-only), so the
-  // server-rendered HTML and React's first client render both show the
-  // same static 00:00:00 before it. Computing it from Date.now() in a
-  // useState initializer ran once at server-render time and again at
-  // client-hydration time, producing two different countdown values and
-  // a "Hydration failed" mismatch.
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
-
-  useEffect(() => {
-    const targetTime = new Date().getTime() + 1000 * 60 * 60 * 24;
-
-    const calculateTimeLeft = () => {
-      const now = new Date().getTime();
-      const difference = Math.max(0, targetTime - now);
-      return {
-        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((difference / 1000 / 60) % 60),
-        seconds: Math.floor((difference / 1000) % 60),
-      };
-    };
-
-    setTimeLeft(calculateTimeLeft());
-
-    const timer = setInterval(() => {
-      setTimeLeft(calculateTimeLeft());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const units = [
-  { label: "Hours", value: timeLeft.hours },
-  { label: "Minutes", value: timeLeft.minutes },
-  { label: "Seconds", value: timeLeft.seconds },
-];
-
-const primaryButton =
-  "inline-flex items-center justify-center px-5 py-2 sm:px-8 sm:py-4 rounded-2xl text-sm sm:text-lg font-semibold shadow-xl transition-all hover:scale-105";
-
 return (
     <section className="py-3 px-2">
       <motion.div
@@ -59,29 +43,25 @@ return (
   </div>
 
   <div className="relative flex flex-col lg:flex-row items-center justify-between gap-6">
-            <div className="absolute top-3 right-3 bg-yellow-400 text-black px-3 py-1 text-xs mb-2 rounded-full text-xs font-bold shadow-lg rotate-6">
-  BIGGEST SALE OF THE SEASON
-</div>
             {/* LEFT */}
             <div className="text-center lg:text-left">
+              {/* One badge. This copy was rendered twice — once here and once
+                  as a rotated badge in the corner — inside the same card. */}
               <span className="inline-block bg-white text-red-600 px-4 py-1 rounded-full text-sm font-bold shadow-lg mb-4">
-  🔥 BIGGEST SALE OF THE SEASON
+  🔥 BIGGEST DISCOUNTS ON YOMICO
 </span>
              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight">
-                ⚡ Flash Sale
-                <br />
-                MEGA SALE
+                🏷️ Best Deals
               </h2>
+              {/* Describes what the links actually show — products discounted
+                  40% or more off MRP — with no claim of a time limit. */}
               <p className="mt-4 text-lg text-white/95 max-w-md">
-               Limited-time deals. Shop now.
+               Save 40% or more off MRP across the store.
               </p>
-              <div className="mt-4 inline-flex items-center bg-white/20 px-4 py-2 rounded-full backdrop-blur-md text-sm font-semibold">
-⏳ Hurry! Deals end soon.
-</div>
               <div className="mt-5 flex flex-wrap gap-4 items-center">
 
                 <Link
-  href="/search"
+  href={DEALS_HREF}
   className="
 inline-flex
 items-center
@@ -97,10 +77,10 @@ shadow-lg
 transition-all
 hover:scale-105"
 >
-  Shop Now →
+  Shop Deals →
 </Link>
                 <Link
-  href="/search"
+  href={DEALS_HREF}
   className="
 inline-flex
 items-center
@@ -125,20 +105,6 @@ transition-all
              </div>
 
 
-            {/* TIMER */}
-            <div className="flex gap-3">
-              {units.map((u) => (
-                <div
-                  key={u.label}
-                  className="bg-white/15 backdrop-blur-md rounded-2xl p-2 min-w-[50px] sm:min-w-[90px] h-[60px] sm:h-[95px] flex flex-col justify-center text-center border border-white/20"
-                >
-                  <h3 className="text-xl sm:text-3xl font-bold">
-                    {String(u.value).padStart(2, "0")}
-                  </h3>
-                  <p className="mt-1 text-xs sm:text-sm">{u.label}</p>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </motion.div>

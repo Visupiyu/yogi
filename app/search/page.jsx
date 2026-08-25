@@ -30,6 +30,18 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
 
+  // Seeds the existing minimumDiscount filter from the URL, so a link can
+  // point straight at discounted products — /search?minDiscount=40. The
+  // filter itself already existed (see the minimumDiscount block below) but
+  // was reachable only by moving the slider, which meant nothing could link
+  // to "deals". Clamped to 0-100 and ignored when absent or unparseable, so
+  // the default behaviour of /search is unchanged.
+  const minDiscountParam = Number(searchParams.get("minDiscount"));
+  const initialMinimumDiscount =
+    Number.isFinite(minDiscountParam) && minDiscountParam > 0
+      ? Math.min(100, minDiscountParam)
+      : 0;
+
   const [products, setProducts] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -41,7 +53,7 @@ function SearchContent() {
   const [minPrice, setMinPrice] = useState(0);
 const [maxPrice, setMaxPrice] = useState(1000000);
 const [minimumRating, setMinimumRating] = useState(0);
-const [minimumDiscount, setMinimumDiscount] = useState(0);
+const [minimumDiscount, setMinimumDiscount] = useState(initialMinimumDiscount);
 const [inStockOnly, setInStockOnly] = useState(false);
 const [sortBy, setSortBy] = useState("default");
 const [quickViewProduct, setQuickViewProduct] = useState(null);
@@ -236,6 +248,12 @@ if (minimumDiscount > 0) {
   <option value={0}>All Discounts</option>
   <option value={10}>🏷️ 10% & Above</option>
   <option value={25}>🏷️ 25% & Above</option>
+  {/* 40% is what /search?minDiscount=40 seeds, and what the homepage Best
+      Deals section links to. With no matching option the select had no
+      value to select, so it displayed "All Discounts" while the list
+      behind it was correctly filtered to 40%+ — the control contradicted
+      the results. */}
+  <option value={40}>🏷️ 40% & Above</option>
   <option value={50}>🏷️ 50% & Above</option>
   <option value={70}>🏷️ 70% & Above</option>
 </select>
