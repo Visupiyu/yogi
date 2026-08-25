@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
-import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp,increment} from "firebase/firestore";
+import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import ShippingLabel from "@/components/ShippingLabel";
@@ -163,6 +163,65 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
     try{ setSaving(true);
 
+      // Cancellation is server-authoritative — /api/cancel-order is the single
+      // implementation, the same one app/orders (customer) and
+      // app/seller/orders already call.
+      //
+      // This path used to set status and restore stock from the browser and
+      // nothing else, so a seller-cancelled order left the customer's reward
+      // points credited for an order that never happened AND their coupon
+      // still consumed. The route re-reads the order, authorizes the caller
+      // against it (vendorIds branch), and does status + stock/sales + reward
+      // reversal + coupon release in one Admin SDK transaction.
+      //
+      // Cancelling is terminal, so the tracking/courier fields edited on this
+      // form are not sent — the route accepts an orderId and nothing else.
+      // Every other status transition below is unchanged.
+      if (status === "Cancelled" && order.status !== "Cancelled") {
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          toast.error("Please login first.");
+          router.push("/vendor-login");
+          return;
+        }
+
+        const idToken = await currentUser.getIdToken();
+
+        const response = await fetch("/api/cancel-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ orderId: id }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          toast.error(data?.error || "Couldn't cancel this order.");
+          return;
+        }
+
+        // The route does not write notifications, so this stays here —
+        // same wording, shape and type as the general path below.
+        await addDoc(collection(db, "notifications"), {
+          title: "Order Status Updated",
+          message: `Your order ${id.slice(0, 8)} is now ${status}`,
+          userId: order.userId,
+          userEmail: order.userEmail,
+          role: "customer",
+          type: "shipping",
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+
+        toast.success("Order updated successfully.");
+        setOrder({ ...order, status });
+        return;
+      }
+
       const payload: any = {
 
           status,
@@ -220,20 +279,9 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
       );
 
-      if (status === "Cancelled" && order.status !== "Cancelled") {
-        // Restore what checkout decremented — best-effort per item so
-        // one deleted product doesn't block the rest.
-        for (const item of order.items || []) {
-          try {
-            await updateDoc(doc(db, "products", item.id), {
-              stock: increment(item.qty || 0),
-              sales: increment(-(item.qty || 0)),
-            });
-          } catch (stockError) {
-            console.error("Failed to restore stock for", item.id, stockError);
-          }
-        }
-      }
+      // The client-side stock/sales restore that stood here is gone —
+      // cancellation returns above, and /api/cancel-order performs the
+      // restoration inside the same transaction as the status change.
 
       await addDoc(
 

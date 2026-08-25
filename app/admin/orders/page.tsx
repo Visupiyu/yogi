@@ -112,7 +112,47 @@ setOrders(items);
   const updateStatus = async (orderId: string, status: string) => {
     try {
       const previousStatus = orders.find((order) => order.id === orderId)?.status;
-      await updateDoc(doc(db, "orders", orderId), { status });
+
+      // Cancellation is server-authoritative — /api/cancel-order is the single
+      // implementation, shared with the customer and seller paths.
+      //
+      // This path was the weakest of the three: it set status and did nothing
+      // else, so an admin cancellation restored no stock, reversed no reward
+      // points and released no coupon. The route re-reads the order,
+      // authorizes the caller (isAdmin branch) and performs all of it in one
+      // Admin SDK transaction. Note it applies CANCELLABLE_STATUSES to admins
+      // too, so cancelling a Delivered order is now correctly refused rather
+      // than silently restoring stock for goods already delivered.
+      //
+      // Every other status transition below is unchanged.
+      if (status === "Cancelled") {
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          alert("Please sign in again.");
+          return;
+        }
+
+        const idToken = await currentUser.getIdToken();
+
+        const response = await fetch("/api/cancel-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ orderId }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data?.error || "Couldn't cancel this order.");
+          return;
+        }
+      } else {
+        await updateDoc(doc(db, "orders", orderId), { status });
+      }
 
       await logAdminAction("order_status_change", orderId, {
         oldStatus: previousStatus,

@@ -11,7 +11,6 @@ import {
   updateDoc,
   addDoc,
   serverTimestamp,
-  increment,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
@@ -88,6 +87,68 @@ export default function SellerOrdersPage() {
     try {
       const currentOrder = orders.find((order) => order.id === orderId);
 
+      // Cancellation is server-authoritative — /api/cancel-order is the single
+      // implementation, the same one app/orders (customer) already calls.
+      //
+      // This path used to set status and restore stock from the browser and
+      // nothing else, so a seller-cancelled order left the customer's reward
+      // points credited for an order that never happened AND their coupon
+      // still consumed. Which button was pressed silently changed the
+      // financial outcome. The route re-reads the order, authorizes the
+      // caller against it (vendorIds branch), and does status + stock/sales +
+      // reward reversal + coupon release in one Admin SDK transaction.
+      //
+      // Every other status transition below is unchanged.
+      if (newStatus === "Cancelled") {
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          alert("Please login first");
+          router.push("/vendor-login");
+          return;
+        }
+
+        const idToken = await currentUser.getIdToken();
+
+        const response = await fetch("/api/cancel-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ orderId }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data?.error || "Couldn't cancel this order.");
+          return;
+        }
+
+        // The route does not write notifications, so this stays here —
+        // same wording and shape as before.
+        if (currentOrder?.userId) {
+          await addDoc(collection(db, "notifications"), {
+            userId: currentOrder.userId,
+            role: "customer",
+            title: "📦 Order Updated",
+            message: `Your order is now ${newStatus}.`,
+            type: "order",
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        setOrders((prev) =>
+          prev.map((order) =>
+            order.id === orderId ? { ...order, status: newStatus } : order
+          )
+        );
+
+        return;
+      }
+
       const payload = {
         status: newStatus,
         updatedAt: serverTimestamp(),
@@ -121,20 +182,10 @@ export default function SellerOrdersPage() {
 
       await updateDoc(doc(db, "orders", orderId), payload);
 
-      if (newStatus === "Cancelled" && currentOrder?.status !== "Cancelled") {
-        // Restore what checkout decremented — best-effort per item so one
-        // deleted product doesn't block the rest.
-        for (const item of currentOrder?.items || []) {
-          try {
-            await updateDoc(doc(db, "products", item.id), {
-              stock: increment(item.qty || 0),
-              sales: increment(-(item.qty || 0)),
-            });
-          } catch (stockError) {
-            console.error("Failed to restore stock for", item.id, stockError);
-          }
-        }
-      }
+      // The client-side stock/sales restore that stood here is gone —
+      // cancellation returns above, and /api/cancel-order performs the
+      // restoration inside the same transaction as the status change, so a
+      // failed write can no longer leave stock and status disagreeing.
 
       if (currentOrder?.userId) {
         await addDoc(collection(db, "notifications"), {

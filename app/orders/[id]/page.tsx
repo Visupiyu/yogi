@@ -155,7 +155,11 @@ export default function OrderDetailsPage() {
   };
 
   const steps = [
-    "📝 Placed",
+    // Label matches the stored order status exactly, as every other entry in
+    // this array already did. It read "Placed" while getStep() above maps the
+    // stored value "Pending" to this step, so the tracker said "Placed" while
+    // the status chip on the same page said "Pending".
+    "📝 Pending",
     "✅ Confirmed",
     "📦 Packed",
     "🚚 Shipped",
