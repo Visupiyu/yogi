@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
+import { ORDER_STEPS, TOTAL_STEPS, getStep } from "@/lib/orderTracking";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -131,40 +132,53 @@ export default function OrderDetailsPage() {
 }
 };
 
-  const getStep = (status: string = "") => {
-    switch (status) {
-      case "Pending":
-        return 1;
-      case "Confirmed":
-        return 2;
-      case "Packed":
-        return 3;
-      case "Shipped":
-        return 4;
-      case "Out For Delivery":
-        return 5;
-      case "Delivered":
-        return 6;
-      case "Delivery Failed":
-        // Same step as "Out For Delivery" — a failed attempt doesn't erase
-        // progress already made, it just doesn't advance past it.
-        return 5;
-      default:
-        return 1;
+  // getStep() and the labels now live in lib/orderTracking.ts, shared with
+  // app/orders and app/track-order. They were duplicated per page and had
+  // already drifted apart; one definition prevents that recurring.
+  const steps = ORDER_STEPS;
+
+  // Same server-authoritative cancellation the orders list uses — the request
+  // shape, confirmation, error handling and success behaviour are identical.
+  // /api/cancel-order re-reads the order, authorizes the caller against it and
+  // performs status + stock/sales + reward reversal + coupon release in one
+  // Admin SDK transaction, so there is no cancellation logic to duplicate here
+  // and none is added.
+  const cancelOrder = async () => {
+    if (!confirm("Cancel this order?")) return;
+
+    try {
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        alert("Please login first");
+        router.push("/login");
+        return;
+      }
+
+      const idToken = await currentUser.getIdToken();
+
+      const response = await fetch("/api/cancel-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ orderId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data?.error || "Couldn't cancel this order.");
+        return;
+      }
+
+      setOrder((prev: any) => ({ ...prev, status: "Cancelled" }));
+    } catch (error) {
+      console.error("Cancel Error:", error);
+      alert("Couldn't cancel this order.");
     }
   };
-
-  // Labels match the stored order status exactly — getStep() above maps the
-  // stored value "Pending" to step 1, so this must read "Pending" and not
-  // "Placed", or the tracker and the status chip disagree on the same page.
-  const steps = [
-    "📦 Pending",
-    "✅ Confirmed",
-    "📦 Packed",
-    "🚚 Shipped",
-    "🚚 Out For Delivery",
-    "🎉 Delivered",
-  ];
 
   if (loading) {
     return (
@@ -281,6 +295,20 @@ export default function OrderDetailsPage() {
           </div>
         </div>
 
+        {/* CANCEL — same Pending-only condition the orders list uses, so a
+            customer can cancel from the page they opened to look at the order
+            instead of having to navigate back to the list. */}
+        {order.status === "Pending" && (
+          <div className="mt-8 bg-white rounded-3xl shadow border p-6">
+            <button
+              onClick={cancelOrder}
+              className="w-full h-12 rounded-xl bg-red-600 hover:bg-red-700 transition text-white font-semibold"
+            >
+              ❌ Cancel Order
+            </button>
+          </div>
+        )}
+
         {/* TRACKING (or cancelled notice) */}
         {order.status === "Cancelled" ? (
           <div className="mt-8 bg-red-50 border border-red-200 rounded-3xl p-8">
@@ -353,7 +381,7 @@ export default function OrderDetailsPage() {
     <div
       className="bg-white h-4 rounded-full transition-all duration-500"
       style={{
-        width: `${(getStep(order.status) / 6) * 100}%`,
+        width: `${(getStep(order.status) / TOTAL_STEPS) * 100}%`,
       }}
     />
 

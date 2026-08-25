@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { addToCart } from "@/lib/cart";
+import { ORDER_STEPS, getStep } from "@/lib/orderTracking";
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
@@ -73,30 +74,10 @@ export default function OrdersPage() {
     );
     return () => unsub();
   }, [router]);
-  const getStep = (
-    status: string = ""
-  ) => {
-    switch (status) {
-      case "Pending":
-       return 1;
-      case "Confirmed":
-        return 2;
-      case "Packed":
-        return 3;
-      case "Shipped":
-        return 4;
-      case "Out For Delivery":
-       return 5;
-      case "Delivered":
-        return 6;
-      case "Delivery Failed":
-        // Same step as "Out For Delivery" — a failed attempt doesn't erase
-        // progress already made, it just doesn't advance past it.
-        return 5;
-      default:
-        return 1;
-    }
-  };
+  // getStep() and the step labels now come from lib/orderTracking.ts, shared
+  // with app/orders/[id] and app/track-order. This page's copy had already
+  // drifted — it still read "Placed" for the stored status "Pending" after the
+  // detail page was corrected.
   const cancelOrder = async (
     id: string
   ) => {
@@ -167,14 +148,7 @@ export default function OrdersPage() {
 );
   router.push("/cart");
 };
-  const steps = [
-    "📝 Placed",
-    "✅ Confirmed",
-    "📦 Packed",
-    "🚚 Shipped",
-    "🏍️ Out For Delivery",
-    "🎉 Delivered",
-  ];
+  const steps = ORDER_STEPS;
   if (loading) {
     return (
       <div className="py-20 text-center">
@@ -412,6 +386,46 @@ export default function OrdersPage() {
       ❌ Cancel Order
     </button>
 
+)}
+
+{/* Refund status — read-only, mirroring app/orders/[id]. Present only on a
+    cancelled order whose payment was actually captured, so nothing renders
+    for the normal case. Wording stays honest about whether the money has
+    actually been returned yet. */}
+{order.refundStatus === "Required" && (
+  <div className="mt-5 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm">
+    <p className="font-semibold text-amber-700">Refund pending</p>
+    <p className="text-gray-600 mt-1">
+      A refund of ₹
+      {Number(order.refundAmountDue || 0).toLocaleString("en-IN")} is being
+      arranged for this cancelled order. It has not been sent yet.
+    </p>
+  </div>
+)}
+
+{order.refundStatus === "Processing" && (
+  <div className="mt-5 rounded-3xl border border-orange-200 bg-orange-50 p-5 text-sm">
+    <p className="font-semibold text-orange-700">Refund in progress</p>
+    <p className="text-gray-600 mt-1">
+      Your refund of ₹
+      {Number(order.refundAmountDue || 0).toLocaleString("en-IN")} has been
+      initiated. Banks usually take 5–7 business days.
+    </p>
+  </div>
+)}
+
+{order.refundStatus === "Refunded" && (
+  <div className="mt-5 rounded-3xl border border-green-200 bg-green-50 p-5 text-sm">
+    <p className="font-semibold text-green-700">Refunded</p>
+    <p className="text-gray-600 mt-1">
+      ₹{Number(order.refundedAmount || 0).toLocaleString("en-IN")} has been
+      refunded
+      {order.refundTransactionId
+        ? ` · Ref: ${order.refundTransactionId}`
+        : ""}
+      .
+    </p>
+  </div>
 )}
 
 {/* ORDER STATUS */}
