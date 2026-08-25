@@ -8,6 +8,16 @@ rules_version = '2';
 //   The only genuinely uid-scoped path in the app today. Holds GST/Aadhaar/
 //   cancelled-cheque documents — sensitive PII, owner + admin read only.
 //
+// reviews/{uid}/{timestamp}-{index}.jpg
+//   Mobile app only (screens/OrderDetailsScreen.tsx's submitReview()) —
+//   photos attached to a product review. No matching rule existed here at
+//   all, so every upload fell through to the default-deny fallback below;
+//   since the upload loop runs before the review document write, this
+//   silently failed the ENTIRE review (not just the photo) whenever the
+//   customer attached one. Same owner-scoped shape as products/{uid} below
+//   — public read (shown on the product page), write restricted to the
+//   uploading customer, 5MB image cap.
+//
 // products/{timestamp}-{filename}
 // chat/{timestamp}-{filename}
 // delivery-proof/{orderId}-{timestamp}
@@ -162,6 +172,15 @@ service firebase.storage {
 
     match /delivery-proof/{uid}/{fileName} {
       allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.auth.uid == uid
+        && isImageUnderLimit(5);
+    }
+
+    // Mobile app's product-review photos — see the path-model note above.
+    // Public read (shown on the product page next to the review), write
+    // restricted to the customer whose uid the path carries.
+    match /reviews/{uid}/{fileName} {
+      allow read: if true;
       allow write: if isSignedIn() && request.auth.uid == uid
         && isImageUnderLimit(5);
     }
