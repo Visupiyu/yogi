@@ -23,6 +23,56 @@ import {
   returnWindowEndsAt,
 } from "@/lib/returnEligibility";
 
+// Display-only. Same colours app/profile/refunds already uses for the same
+// four statuses, so the two customer views of one return agree.
+const RETURN_STATUS_STYLES: Record<string, string> = {
+  Pending: "bg-yellow-100 text-yellow-800",
+  Approved: "bg-blue-100 text-blue-800",
+  Rejected: "bg-red-100 text-red-800",
+  Refunded: "bg-green-100 text-green-800",
+};
+
+// The three-stage progress app/profile/refunds renders, expressed once.
+const RETURN_STEPS: {
+  label: string;
+  tone: string;
+  reached: (status: string) => boolean;
+}[] = [
+  {
+    label: "Review",
+    tone: "bg-blue-600 text-white",
+    reached: (status) => status !== "Pending",
+  },
+  {
+    label: "Approved",
+    tone: "bg-yellow-500 text-white",
+    reached: (status) => status === "Approved" || status === "Refunded",
+  },
+  {
+    label: "Refunded",
+    tone: "bg-green-600 text-white",
+    reached: (status) => status === "Refunded",
+  },
+];
+
+/** Firestore Timestamp | ISO string | Date -> a readable date, or a dash. */
+function formatReturnDate(value: any): string {
+  if (!value) return "—";
+
+  const date =
+    typeof value?.toDate === "function"
+      ? value.toDate()
+      : new Date(value?.seconds ? value.seconds * 1000 : value);
+
+  if (Number.isNaN(date?.getTime?.())) return "—";
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
 // showing the internal "AwaitingVerification" wording to customers.
@@ -38,6 +88,11 @@ export default function OrderDetailsPage() {
   const orderId = params.id as string;
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<any>(null);
+
+  // The order's return document, or null when none was ever requested. Read
+  // alongside the order so the Return & Refund card below can show what
+  // actually happened to a request the customer already made.
+  const [returnRecord, setReturnRecord] = useState<any>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -66,6 +121,30 @@ export default function OrderDetailsPage() {
         }
 
         setOrder(data);
+
+        // Queried on userEmail, not orderId: firestore.rules grants read on
+        // returns via isOwnerEmail(resource.data.userEmail), and Firestore
+        // rejects a query it cannot prove satisfies that rule. Same single
+        // equality filter app/profile/refunds already uses, so no new index —
+        // the order match is applied here instead.
+        //
+        // Best-effort: a customer must still see their order if this fails.
+        try {
+          const returnsSnap = await getDocs(
+            query(
+              collection(db, "returns"),
+              where("userEmail", "==", user.email)
+            )
+          );
+
+          const match = returnsSnap.docs
+            .map((d) => ({ id: d.id, ...(d.data() as any) }))
+            .find((r: any) => r.orderId === orderId);
+
+          setReturnRecord(match || null);
+        } catch (returnError) {
+          console.error("Return lookup failed:", returnError);
+        }
       } catch (err) {
         console.error("Order page error:", err);
       } finally {
@@ -587,6 +666,180 @@ export default function OrderDetailsPage() {
   </div>
 
 </div>
+
+        {/* RETURN & REFUND — only once a return actually exists. Every value
+            below is read straight from the existing return document written by
+            app/api/request-return and updated by the admin return/refund
+            screens; nothing here calculates or changes anything. */}
+        {returnRecord && (
+          <div className="mt-8 bg-white rounded-3xl shadow border p-8">
+
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <h2 className="text-2xl font-bold">
+                ↩ Return &amp; Refund
+              </h2>
+
+              <span
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold ${
+                  RETURN_STATUS_STYLES[returnRecord.status] ||
+                  "bg-gray-100 text-gray-700"
+                }`}
+              >
+                {returnRecord.status || "Pending"}
+              </span>
+            </div>
+
+            {/* Progress, mirroring app/profile/refunds so the two customer
+                views of the same record cannot tell different stories. A
+                rejected return leaves the later steps unfilled. */}
+            {returnRecord.status !== "Rejected" && (
+              <div className="flex flex-wrap items-center gap-2 text-xs mb-6">
+                {RETURN_STEPS.map((step, index) => (
+                  <div key={step.label} className="flex items-center gap-2">
+                    <span
+                      className={`px-3 py-1 rounded-full ${
+                        step.reached(returnRecord.status)
+                          ? step.tone
+                          : "bg-gray-200 text-gray-600"
+                      }`}
+                    >
+                      {step.label}
+                    </span>
+                    {index < RETURN_STEPS.length - 1 && (
+                      <span className="text-gray-400">→</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {returnRecord.status === "Rejected" && (
+              <p className="mb-6 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl p-4">
+                This return request was not approved. The order stands as
+                delivered.
+              </p>
+            )}
+
+            <div className="space-y-4 text-sm">
+
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Requested on</span>
+                <span className="font-medium text-right">
+                  {formatReturnDate(returnRecord.createdAt)}
+                </span>
+              </div>
+
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Reason</span>
+                <span className="font-medium text-right">
+                  {returnRecord.reason || "—"}
+                </span>
+              </div>
+
+              {returnRecord.comments && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-gray-600">Your comments</span>
+                  <span className="font-medium text-right">
+                    {returnRecord.comments}
+                  </span>
+                </div>
+              )}
+
+              {returnRecord.refundMethod && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-gray-600">Refund method</span>
+                  <span className="font-medium text-right">
+                    {returnRecord.refundMethod}
+                  </span>
+                </div>
+              )}
+
+              {/* Pickup details appear only once an admin has actually filled
+                  them in — they are written as empty strings at request time. */}
+              {(returnRecord.pickupDate ||
+                returnRecord.pickupPartner ||
+                returnRecord.pickupPhone) && (
+                <div className="border-t pt-4 space-y-4">
+                  {returnRecord.pickupDate && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-gray-600">Pickup date</span>
+                      <span className="font-medium text-right">
+                        {returnRecord.pickupDate}
+                      </span>
+                    </div>
+                  )}
+                  {returnRecord.pickupPartner && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-gray-600">Pickup partner</span>
+                      <span className="font-medium text-right">
+                        {returnRecord.pickupPartner}
+                      </span>
+                    </div>
+                  )}
+                  {returnRecord.pickupPhone && (
+                    <div className="flex justify-between gap-4">
+                      <span className="text-gray-600">Pickup contact</span>
+                      <span className="font-medium text-right">
+                        {returnRecord.pickupPhone}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* refundAmount is written as 0 at request time and set by the
+                  admin refund screen, so a real amount means a real decision.
+                  Wording stays honest about whether the money has moved: only
+                  a Refunded return is money actually sent. */}
+              <div className="border-t pt-4">
+                {Number(returnRecord.refundAmount) > 0 ? (
+                  <>
+                    <div className="flex justify-between gap-4 font-bold text-lg">
+                      <span>
+                        {returnRecord.status === "Refunded"
+                          ? "Refunded"
+                          : "Refund amount"}
+                      </span>
+                      <span
+                        className={
+                          returnRecord.status === "Refunded"
+                            ? "text-green-700"
+                            : ""
+                        }
+                      >
+                        ₹
+                        {Number(returnRecord.refundAmount).toLocaleString(
+                          "en-IN"
+                        )}
+                      </span>
+                    </div>
+
+                    {returnRecord.status !== "Refunded" && (
+                      <p className="mt-2 text-gray-600">
+                        This amount has been approved but not sent yet.
+                      </p>
+                    )}
+
+                    {returnRecord.refundTransactionId && (
+                      <div className="flex justify-between gap-4 mt-3">
+                        <span className="text-gray-600">Reference</span>
+                        <span className="font-mono text-xs text-right break-all">
+                          {returnRecord.refundTransactionId}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-gray-600">
+                    {returnRecord.status === "Rejected"
+                      ? "No refund is due for this order."
+                      : "The refund amount is confirmed once the return has been reviewed."}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* DELIVERY SUCCESS */}
         {order.status === "Delivered" && (
