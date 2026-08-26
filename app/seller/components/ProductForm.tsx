@@ -2,6 +2,12 @@
 import { useState, useMemo, useEffect } from "react";
 import { Product } from "@/lib/products/product";
 import { generateSKU, generateSlug } from "@/lib/products/helpers";
+import {
+  loadLastUpload,
+  saveLastUpload,
+  clearLastUpload,
+  type LastUploadDraft,
+} from "@/lib/products/lastUpload";
 import CategorySelector from "./CategorySelector";
 import BrandSelector from "./BrandSelector";
 import VariantSelector from "./VariantSelector";
@@ -158,15 +164,61 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
 
   }), [vendorId, vendorName]);
 
+  // Read once, when the form mounts. Deliberately not a useEffect: the
+  // form's state is seeded from this, and a later write would overwrite
+  // whatever the seller had already typed.
+  const [restoredDraft] = useState<LastUploadDraft | null>(() =>
+    existingProduct ? null : loadLastUpload(vendorId)
+  );
+
+  // Whether the form is currently showing values carried over from the
+  // previous upload. Turned off by Start Fresh; never true while editing.
+  const [prefilled, setPrefilled] = useState(Boolean(restoredDraft));
+
+  // Bumped by Start Fresh to remount the file input and the variant
+  // selector. Both hold internal state that resetting the product object
+  // cannot reach: <input type="file"> keeps its own FileList, and
+  // VariantSelector hydrates colour and per-size stock exactly once behind
+  // a hydratedRef that is never reset. Remounting clears both without
+  // reaching inside either component.
+  const [formInstance, setFormInstance] = useState(0);
+
   const initialProduct = useMemo<Product>(() => {
-    if (!existingProduct) return defaultProduct;
-    return {
-      ...defaultProduct,
-      ...existingProduct,
-      vendorId,
-      vendorName,
-    };
-  }, [defaultProduct, existingProduct, vendorId, vendorName]);
+
+    if (existingProduct) {
+      return {
+        ...defaultProduct,
+        ...existingProduct,
+        vendorId,
+        vendorName,
+      };
+    }
+
+    // Start the next product from the last one this seller uploaded. The
+    // stored draft carries no image fields, so defaultProduct's empty
+    // thumbnail/images/video win and the photos start blank.
+    if (restoredDraft) {
+      return {
+        ...defaultProduct,
+        ...restoredDraft,
+
+        // A SKU is a stock-keeping code for one product; carrying the
+        // previous one over verbatim would give two listings the same
+        // code. Regenerated from the retained category and brand, exactly
+        // as updateBrand does it, and editable like any other field.
+        sku: generateSKU(
+          restoredDraft.categoryId,
+          restoredDraft.brand
+        ),
+
+        vendorId,
+        vendorName,
+      };
+    }
+
+    return defaultProduct;
+
+  }, [defaultProduct, existingProduct, restoredDraft, vendorId, vendorName]);
 
   // ==========================================
   // State
@@ -188,6 +240,34 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
 
     useState("");
     const router = useRouter();
+
+  // ==========================================
+  // Start Fresh
+  // ==========================================
+
+  // Drops the carried-over values and returns the form to a blank state,
+  // so a seller moving on to a genuinely different product is not fighting
+  // the previous one's category and specifications.
+  const startFresh = () => {
+
+    clearLastUpload();
+
+    imagePreviews.forEach((preview) => {
+      if (preview.startsWith("blob:")) URL.revokeObjectURL(preview);
+    });
+
+    setImageFiles([]);
+    setImagePreviews([]);
+
+    setProduct(defaultProduct);
+    setPrefilled(false);
+
+    setError("");
+    setSuccess("");
+
+    setFormInstance((instance) => instance + 1);
+
+  };
 
   // Keeps the Inventory section's aggregate stock number equal to the
   // sum of the variant stocks whenever variants are in use, so "Available
@@ -261,13 +341,24 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
 
 ) => {
 
-  const files = Array.from(
+  const picked = Array.from(
 
     e.target.files || []
 
   );
 
-  if (files.length > 5) {
+  // Let the same filename be chosen again after it has been removed —
+  // otherwise the input's value is unchanged and onChange never fires.
+  e.target.value = "";
+
+  if (picked.length === 0) return;
+
+  // Picking again adds to the selection instead of discarding it, so a
+  // seller can build up to five photos over several trips to the file
+  // dialog and drop individual ones in between.
+  const combined = [...imageFiles, ...picked];
+
+  if (combined.length > 5) {
 
     setError("Maximum 5 images allowed.");
 
@@ -277,15 +368,36 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
 
   setError("");
 
-  setImageFiles(files);
+  // The first pick supersedes any previews still showing a saved
+  // product's images: the upload path already treats a non-empty
+  // selection as the complete replacement set.
+  const kept = imageFiles.length > 0 ? imagePreviews : [];
 
-  const previews = files.map(file =>
+  setImageFiles(combined);
 
-    URL.createObjectURL(file)
+  setImagePreviews([
+    ...kept,
+    ...picked.map(file => URL.createObjectURL(file)),
+  ]);
 
-  );
+};
 
-  setImagePreviews(previews);
+// Removes one photo without making the seller re-pick the rest. Only
+// previews backed by a picked file can go this way; when editing, previews
+// that are saved image URLs are still replaced by choosing new files.
+const removeImage = (index: number) => {
+
+  if (imageFiles.length !== imagePreviews.length) return;
+
+  const preview = imagePreviews[index];
+
+  if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
+
+  setImageFiles(files => files.filter((_, i) => i !== index));
+
+  setImagePreviews(previews => previews.filter((_, i) => i !== index));
+
+  setError("");
 
 };
 // ==========================================
@@ -476,6 +588,11 @@ const handleSubmit = async (
         { ...newProductPayload, createdAt: serverTimestamp() }
       );
 
+      // Remember these values so the next Add Product form starts from
+      // them. saveLastUpload strips the image fields — the next product
+      // needs its own photos.
+      saveLastUpload(vendorId, product);
+
       setSuccess(
         "Product Added Successfully."
       );
@@ -510,6 +627,29 @@ onSubmit={handleSubmit}
 
 className="space-y-8"
 >
+
+{/* ========================================== */}
+{/* Carried over from the previous upload */}
+{/* ========================================== */}
+
+{prefilled && (
+  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+
+    <p className="text-sm text-blue-900">
+      Prefilled from your last upload. Photos were not carried over — add
+      this product&apos;s own, then change whatever else differs.
+    </p>
+
+    <button
+      type="button"
+      onClick={startFresh}
+      className="shrink-0 rounded-lg border border-blue-600 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+    >
+      Start Fresh
+    </button>
+
+  </div>
+)}
 
 {/* ========================================== */}
 {/* Basic Information */}
@@ -839,6 +979,7 @@ Variants
 </h2>
 
 <VariantSelector
+  key={formInstance}
   categoryId={product.categoryId}
   subCategoryId={product.subCategoryId}
   leafCategoryId={product.leafCategoryId}
@@ -1576,6 +1717,8 @@ Product Images
 
 <input
 
+key={formInstance}
+
 type="file"
 
 multiple
@@ -1600,7 +1743,7 @@ Upload up to 5 product images.
 
   <div
     key={index}
-    className="overflow-hidden rounded-lg border"
+    className="relative overflow-hidden rounded-lg border"
   >
 
     <img
@@ -1609,23 +1752,28 @@ Upload up to 5 product images.
       className="h-40 w-full object-cover"
     />
 
+    {imageFiles.length === imagePreviews.length && (
+      <button
+        type="button"
+        onClick={() => removeImage(index)}
+        aria-label={`Remove image ${index + 1}`}
+        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-lg leading-none text-white hover:bg-black/80"
+      >
+        &times;
+      </button>
+    )}
+
+    {index === 0 && (
+      <span className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-xs text-white">
+        Main photo
+      </span>
+    )}
+
   </div>
 
 ))}
 
 </div>   {/* closes image grid */}
-
-<div className="flex justify-end mt-8">
-
-  <button
-    type="submit"
-    disabled={loading}
-    className="rounded-lg bg-blue-600 px-8 py-3 text-white"
-  >
-    {loading ? "Saving..." : isEditing ? "Update Product" : "Save Product"}
-  </button>
-
-</div>
 
 </div>   
 
