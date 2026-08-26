@@ -350,6 +350,13 @@ export async function POST(request: Request) {
         rewardValue: pricing.rewardValue,
         createdAt: Timestamp.now(),
         paymentAmount: pricing.finalTotal,
+
+        // Opts this order into deferred reward crediting. Points are NOT
+        // granted here; app/api/credit-reward-points moves them once the
+        // order is delivered, paid and past its return window. The absence
+        // of this field means an order predates the rule and was already
+        // credited at creation — see lib/rewardCredit.ts.
+        rewardPointsStatus: "pending",
       });
 
       if (couponRef && normalizedCode) {
@@ -362,9 +369,12 @@ export async function POST(request: Request) {
         });
       }
 
-      // Same net movement applyPostOrderEffects() performed, now atomic with
-      // the order it belongs to.
-      const newBalance = Math.max(0, balance + pricing.earnedPoints - pricing.rewardValue);
+      // Redemption only. What the customer SPENDS still leaves the balance
+      // here, atomically with the order — they are using those points right
+      // now. What the order EARNS is no longer added: an order that has only
+      // just been placed has not been delivered, paid for, or survived its
+      // return window, so its points are not earned yet.
+      const newBalance = Math.max(0, balance - pricing.rewardValue);
       if (newBalance !== balance) {
         tx.set(
           db.collection("users").doc(requester.uid),
@@ -394,10 +404,10 @@ export async function POST(request: Request) {
     // addDoc-style generated ids cannot be created inside a transaction; the
     // balance itself moved atomically above. The caller still owns the
     // notifications and the confirmation email.
+    // No "Earned" row at creation any more — nothing has been earned yet, and
+    // writing one would show the customer points they cannot spend.
+    // app/api/credit-reward-points writes it when the credit actually happens.
     const ledger: { type: string; points: number }[] = [];
-    if (pricing.earnedPoints > 0) {
-      ledger.push({ type: "Earned", points: pricing.earnedPoints });
-    }
     if (pricing.rewardValue > 0) {
       ledger.push({ type: "Redeemed", points: pricing.rewardValue });
     }

@@ -1,4 +1,5 @@
 import { verifyRequestUser, type VerifiedUser } from "@/lib/serverAuth";
+import { shouldReverseEarnedPoints } from "@/lib/rewardCredit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import {
   FieldValue,
@@ -233,7 +234,18 @@ export async function POST(request: Request) {
         // Same formula the customer path used: earnedPoints isn't persisted
         // on the order, so it is recomputed with checkout's own
         // Math.floor(finalTotal / 100) against the order's stored total.
-        const earnedPoints = Math.floor(Number(order.finalTotal || 0) / 100);
+        //
+        // DEFERRED CREDITING: reverse an earn only if one actually happened.
+        // Points are no longer granted at creation — an order carries
+        // rewardPointsStatus "pending" until app/api/credit-reward-points
+        // grants them, which cannot happen before its return window closes.
+        // Cancelling a pending order must deduct NOTHING; subtracting
+        // unconditionally would confiscate points the customer earned on
+        // entirely unrelated orders. Orders with no status field predate the
+        // rule, were credited at creation, and are still reversed as before.
+        const earnedPoints = shouldReverseEarnedPoints(order)
+          ? Math.floor(Number(order.finalTotal || 0) / 100)
+          : 0;
         const redeemedValue = Number(order.rewardValue || 0);
         const adjustsPoints =
           !!orderUserId && (earnedPoints > 0 || redeemedValue > 0);
