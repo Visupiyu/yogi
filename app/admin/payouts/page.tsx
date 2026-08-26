@@ -5,6 +5,8 @@ import {
   collection,
   getDocs,
   addDoc,
+  query,
+  where,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -22,13 +24,25 @@ export default function AdminPayoutsPage() {
 
   const loadPayouts = async () => {
     try {
-      const [vendorSnapshot, orderSnapshot, payoutSnapshot, withdrawalSnapshot] =
+      const [vendorSnapshot, orderSnapshot, payoutSnapshot, withdrawalSnapshot, refundedReturnsSnapshot] =
         await Promise.all([
           getDocs(collection(db, "vendors")),
           getDocs(collection(db, "orders")),
           getDocs(collection(db, "vendor_payouts")),
           getDocs(collection(db, "withdrawals")),
+          getDocs(query(collection(db, "returns"), where("status", "==", "Refunded"))),
         ]);
+
+      // Keyed by orderId — at most one return per order (see
+      // app/api/request-return's deterministic doc id), so a plain map is
+      // safe here.
+      const refundByOrderId: Record<string, { status: string; refundAmount: number }> = {};
+      refundedReturnsSnapshot.forEach((docSnap) => {
+        const r: any = docSnap.data();
+        if (r.orderId) {
+          refundByOrderId[r.orderId] = { status: r.status, refundAmount: r.refundAmount };
+        }
+      });
 
       // Sum already-paid amounts per vendor from the payouts ledger.
       // Keyed by the seller's auth uid — the same id order items use —
@@ -101,7 +115,7 @@ export default function AdminPayoutsPage() {
           )
             return;
 
-          const share = computeVendorShare(order, vendor.uid);
+          const share = computeVendorShare(order, vendor.uid, refundByOrderId[orderDoc.id]);
 
           if (share) {
             sales += share.vendorRawSubtotal;
