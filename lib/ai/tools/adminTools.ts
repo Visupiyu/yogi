@@ -81,6 +81,21 @@ const getVendorPerformance: ToolDefinition = {
       ? await db.collection("orders").where("vendorIds", "array-contains", vendorId).limit(500).get()
       : await db.collection("orders").limit(500).get();
 
+    // Keyed by orderId — at most one return per order (see
+    // app/api/request-return's deterministic doc id), so a plain map is
+    // safe here.
+    const refundedReturnsSnap = await db
+      .collection("returns")
+      .where("status", "==", "Refunded")
+      .get();
+    const refundByOrderId: Record<string, { status: string; refundAmount: number }> = {};
+    refundedReturnsSnap.docs.forEach((docSnap) => {
+      const r = docSnap.data();
+      if (r.orderId) {
+        refundByOrderId[r.orderId] = { status: r.status, refundAmount: r.refundAmount };
+      }
+    });
+
     const perVendor = new Map<string, { orders: number; revenue: number; commission: number; earning: number }>();
 
     for (const doc of ordersSnap.docs) {
@@ -88,7 +103,7 @@ const getVendorPerformance: ToolDefinition = {
       const vendorIds: string[] = Array.isArray(data.vendorIds) ? data.vendorIds : [];
 
       for (const vId of vendorIds) {
-        const share = computeVendorShare(data, vId);
+        const share = computeVendorShare(data, vId, refundByOrderId[doc.id]);
         if (!share) continue;
 
         const existing = perVendor.get(vId) || { orders: 0, revenue: 0, commission: 0, earning: 0 };
