@@ -241,6 +241,12 @@ export async function finalizeOnlineOrder(params: {
       rewardValue: pricing.rewardValue,
       createdAt: Timestamp.now(),
 
+      // Opts this order into deferred reward crediting, exactly as
+      // app/api/place-order does. Paid is not earned: the points are granted
+      // by app/api/credit-reward-points once the order is also delivered and
+      // past its return window. See lib/rewardCredit.ts.
+      rewardPointsStatus: "pending",
+
       // Payment provenance, for reconciliation against the Razorpay dashboard.
       razorpayPaymentId,
       razorpayOrderId,
@@ -266,9 +272,11 @@ export async function finalizeOnlineOrder(params: {
       });
     }
 
-    // Same net movement the COD path performs: spend what was redeemed, credit
-    // what was earned.
-    const newBalance = Math.max(0, balance + pricing.earnedPoints - actualRedeemed);
+    // Same net movement the COD path performs: spend what was redeemed, and
+    // nothing more. An ONLINE order is Paid at creation but not yet delivered
+    // and nowhere near the end of its return window, so its points are not
+    // earned — app/api/credit-reward-points grants them later.
+    const newBalance = Math.max(0, balance - actualRedeemed);
     if (newBalance !== balance) {
       tx.set(userRef, { rewardPoints: newBalance }, { merge: true });
     }
@@ -288,10 +296,8 @@ export async function finalizeOnlineOrder(params: {
   // ---- Best-effort, outside the transaction. None of these may fail an order
   // that has already committed and been paid for.
 
+  // No "Earned" row at creation — see app/api/place-order for why.
   const ledger: { type: string; points: number }[] = [];
-  if (pricing.earnedPoints > 0) {
-    ledger.push({ type: "Earned", points: pricing.earnedPoints });
-  }
   const redeemed = pricing.rewardValue - (outcome.rewardShort || 0);
   if (redeemed > 0) ledger.push({ type: "Redeemed", points: redeemed });
 
