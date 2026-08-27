@@ -985,17 +985,21 @@ service cloud.firestore {
       // their wallet page lists withdrawals by vendorEmail, which is the
       // attacker's. Pinning both fields closes that off.
       //
-      // NOTE: this bounds who and what, not how much. The "is this within
-      // your balance?" check still lives only in the browser
-      // (app/seller/wallet's requestWithdrawal), because the real balance
-      // is an aggregate over every order plus two payout ledgers — rules
-      // cannot query or sum collections. That needs a server route.
-      allow create: if isSignedIn()
-        && request.resource.data.vendorId == request.auth.uid
-        && request.resource.data.vendorEmail == request.auth.token.email
-        && request.resource.data.amount is number
-        && request.resource.data.amount > 0
-        && request.resource.data.status == 'Pending';
+      // Withdrawal creation is now SERVER-ONLY, for the reason the previous
+      // note here spelled out: these rules could bound WHO the request
+      // belonged to and WHAT state it started in, but never HOW MUCH. The
+      // real balance is a sum over every delivered-and-paid order minus two
+      // payout ledgers, and rules cannot query or sum collections — so the
+      // "is this within your balance?" test lived only in the browser, where
+      // a seller writing through the SDK simply skipped it.
+      //
+      // app/api/request-withdrawal now recomputes the payable amount with the
+      // Admin SDK (lib/vendorPayable.ts, the same calculation the admin
+      // settlement screen performs with its own copy) and refuses anything
+      // larger, so the amount
+      // that reaches this collection is server-decided. Reads, admin updates
+      // and admin deletes below are unchanged.
+      allow create: if false;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
