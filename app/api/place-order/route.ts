@@ -1,5 +1,6 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { computeOrderPricing, type PricedItemInput } from "@/lib/orderPricing";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
@@ -429,6 +430,27 @@ export async function POST(request: Request) {
       } catch (error) {
         console.error("place-order: reward ledger write failed:", error);
       }
+    }
+
+    // Pay-on-delivery notifications, previously written by the browser in
+    // app/checkout's applyPostOrderEffects. They moved here because writing
+    // them client-side required firestore.rules to let ANY signed-in client
+    // create role:"admin" notifications, and the admin feed is the one
+    // audience not scoped by userId — so a customer could put arbitrary text
+    // in front of an admin.
+    //
+    // Best-effort, like the reward ledger above: the order has already
+    // committed and must not fail over a notification. Values come from the
+    // server-priced order, never from the request body.
+    try {
+      await emitOrderPlacedNotifications(db, {
+        customerName,
+        customerUid: requester.uid,
+        orderTotal: pricing.finalTotal,
+        items: pricing.items,
+      });
+    } catch (error) {
+      console.error("place-order: notification failed:", error);
     }
 
     return Response.json({

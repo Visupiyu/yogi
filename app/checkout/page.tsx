@@ -271,8 +271,6 @@ setAddress(userData.address || "");
     firebaseUser: any,
     orderId: string,
     paymentStatus: string,
-    stockIssueItems: any[] = [],
-    couponConflict: boolean = false,
     // COD now goes through /api/place-order, which moves the reward balance
     // inside the same transaction as the order and writes the ledger rows
     // itself. Running the block below as well would credit twice.
@@ -284,80 +282,23 @@ setAddress(userData.address || "");
   ) => {
     const earnedPoints = Math.floor(grandTotal / 100);
 
-    // Admin notification
-    await addDoc(collection(db, "notifications"), {
-      title: "🛒 New Order",
-      message: `${name} placed an order worth ₹${grandTotal}`,
-      type: "order",
-      role: "admin",
-      read: false,
-      createdAt: Timestamp.now(),
-    });
-
-    if (stockIssueItems.length > 0) {
-      try {
-        await addDoc(collection(db, "notifications"), {
-          title: "⚠ Stock oversold after payment",
-          message: `Order ${orderId.slice(0, 8)}: ${stockIssueItems
-            .map((i) => i.name)
-            .join(", ")} sold out during checkout — payment was captured, stock was not decremented. Needs manual review.`,
-          type: "order",
-          role: "admin",
-          read: false,
-          createdAt: Timestamp.now(),
-        });
-      } catch (e) {
-        console.error("❌ Stock-issue admin notification failed:", e);
-      }
-    }
-
-    if (couponConflict) {
-      try {
-        await addDoc(collection(db, "notifications"), {
-          title: "⚠ Coupon possibly redeemed twice",
-          message: `Order ${orderId.slice(0, 8)}: coupon "${coupon
-            .trim()
-            .toUpperCase()}" was already redeemed by this customer on another order — payment was captured, this order was not rejected. Needs manual review.`,
-          type: "order",
-          role: "admin",
-          read: false,
-          createdAt: Timestamp.now(),
-        });
-      } catch (e) {
-        console.error("❌ Coupon-conflict admin notification failed:", e);
-      }
-    }
-
-    // Seller notifications
-    for (const item of items) {
-      if (item.vendorId) {
-        try {
-          await addDoc(collection(db, "notifications"), {
-            userId: item.vendorId,
-            role: "seller",
-            title: "🛒 New Order",
-            message: `${name} ordered ${item.name}`,
-            type: "order",
-            read: false,
-            createdAt: Timestamp.now(),
-          });
-          console.log("✅ Seller notification:", item.name);
-        } catch (e) {
-          console.error("❌ Seller notification failed:", item.name, e);
-          // Do NOT throw
-        }
-      }
-    }
-    // Customer notification
-    await addDoc(collection(db, "notifications"), {
-      userId: firebaseUser.uid,
-      role: "customer",
-      title: "✅ Order Placed",
-      message: `Your order worth ₹${grandTotal} has been placed successfully.`,
-      type: "order",
-      read: false,
-      createdAt: Timestamp.now(),
-    });
+      // Notifications moved SERVER-SIDE.
+      //
+      // This browser used to write the admin, seller and customer notifications
+      // for every order. Doing so required firestore.rules to let any signed-in
+      // client create role:"admin" documents, and the admin feed is the one
+      // audience not scoped by userId -- so a customer could put arbitrary text
+      // straight into an admin’s notification bell.
+      //
+      // Pay-on-delivery now emits them in app/api/place-order and ONLINE in
+      // lib/onlineOrder.ts (which previously only did so when the webhook won
+      // the finalisation race, and now covers both orders of it). Exactly one
+      // set is still written per order.
+      //
+      // The stock-oversold and coupon-conflict admin alerts that also stood here
+      // are covered by lib/onlineOrder.ts’s "Paid order needs review"
+      // notification; the COD route refuses both conditions outright (409), so
+      // neither can arise there.
 
     // Confirmation email (best-effort)
     if (!skipConfirmationEmail) try {
@@ -583,7 +524,7 @@ setAddress(userData.address || "");
       // Notifications, the confirmation email and cart cleanup still run
       // here. Reward points are skipped: the route already moved the balance
       // and wrote the ledger rows atomically with the order.
-      await applyPostOrderEffects(firebaseUser, data.orderId, "Pending", [], false, true);
+      await applyPostOrderEffects(firebaseUser, data.orderId, "Pending", true);
 
       alert(
         "🎉 Your Order is Confirmed!\n\n" +
@@ -757,8 +698,6 @@ setAddress(userData.address || "");
               firebaseUser,
               finalizeData.orderId,
               "Paid",
-              [],
-              false,
               true,
               // lib/onlineOrder.ts already sent the confirmation from the
               // server, so that the webhook path reaches the customer too.

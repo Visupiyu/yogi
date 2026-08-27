@@ -480,25 +480,25 @@ export default function VendorRegisterPage() {
         createdAt: serverTimestamp(),
       });
 
-      await addDoc(
-        collection(db, "notifications"),
-        {
-          title:
-            "New Vendor Registration",
+      // Moved server-side: writing this from the browser required
+      // firestore.rules to let any signed-in client create role:"admin"
+      // notifications. The route re-reads the vendor application and composes
+      // the message from the STORED business name, so what an admin sees is
+      // not attacker-controlled. Called before signOut() below, while the
+      // applicant token is still valid.
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
 
-          message:
-            `${formData.businessName} registered as a vendor`,
-
-          role: "admin",
-
-          type: "vendor",
-
-          read: false,
-
-          createdAt:
-            serverTimestamp(),
+        if (idToken) {
+          await fetch("/api/vendor-registered", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
         }
-      );
+      } catch (notifyError) {
+        // Never fail a completed registration over a notification.
+        console.error("Admin notification failed:", notifyError);
+      }
 
       await signOut(auth);
 

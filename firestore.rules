@@ -769,7 +769,23 @@ service cloud.firestore {
         && request.resource.data.message is string
         && request.resource.data.message.size() > 0
         && request.resource.data.message.size() <= 1000
-        && (request.resource.data.role == 'admin' || request.resource.data.userId is string);
+        && (request.resource.data.role == 'admin' || request.resource.data.userId is string)
+        // A role:"admin" notification is the only kind with no userId, which
+        // is why the admin feed queries on role alone — and why any signed-in
+        // customer could previously drop arbitrary text into it. The three
+        // non-admin writers that legitimately needed it have moved server-side
+        // (app/api/place-order and lib/onlineOrder for orders,
+        // app/api/vendor-registered for registrations); the Admin SDK bypasses
+        // these rules, so they are unaffected. What remains here is an admin
+        // notifying other admins, which app/admin/orders and
+        // app/admin/delivery still do from the browser.
+        //
+        // customer/seller notifications stay cross-user on purpose: a
+        // customer's order must reach the seller's feed and a seller's status
+        // update must reach the customer's. Those are bounded by the field,
+        // type, length and read==false constraints above, and are only
+        // readable by the uid they name.
+        && (request.resource.data.role != 'admin' || isAdmin());
 
       allow update: if (
           isAdmin()
