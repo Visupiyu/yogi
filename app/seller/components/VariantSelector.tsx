@@ -91,6 +91,30 @@ export default function VariantSelector({
     useState("");
 
   // ==========================================
+  // Custom capacity
+  // ==========================================
+
+  // Capacity's predefined list is a ladder of whole litres (1 L, 2 L, 5 L,
+  // ...), which does not describe a lot of real appliances — a 1.5 L mixer
+  // grinder or a 750 ml kettle had no selectable value at all. Unlike Pack
+  // Size the predefined list is genuinely useful, so it stays and an
+  // "Other" option is added alongside it rather than replacing it.
+  const CAPACITY_FIELD = "Capacity";
+
+  // Sentinel for the dropdown's "Other" row. It is never stored as a
+  // capacity — see handleCapacityChange.
+  const CUSTOM_CAPACITY_OPTION = "__OTHER_CAPACITY__";
+
+  const [customCapacities, setCustomCapacities] =
+    useState<string[]>([]);
+
+  const [newCapacity, setNewCapacity] =
+    useState("");
+
+  const [capacityCustomMode, setCapacityCustomMode] =
+    useState(false);
+
+  // ==========================================
   // Selected values
   // ==========================================
 
@@ -167,6 +191,19 @@ export default function VariantSelector({
   // Get field values
   // ==========================================
 
+  // Keeps the first spelling seen and drops later case-variants, so a
+  // custom "1.5 l" cannot appear twice next to "1.5 L".
+  const dedupe = (values: string[]): string[] => {
+    const seen = new Set<string>();
+
+    return values.filter((value) => {
+      const key = value.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const getFieldValues = (
     fieldName: string
   ): string[] => {
@@ -195,6 +232,22 @@ export default function VariantSelector({
         ...defaultValues,
         ...customSizes,
       ];
+    }
+
+    if (fieldName === CAPACITY_FIELD) {
+      // A capacity already on the product — carried in by a restored
+      // last-upload draft, or by editing an existing product — may be a
+      // custom value that was never in the predefined list. Surface those
+      // as well so the seller can re-select one instead of retyping it.
+      const fromVariants = variants
+        .map((variant) => variant.attributes[CAPACITY_FIELD])
+        .filter((value): value is string => Boolean(value));
+
+      return dedupe([
+        ...defaultValues,
+        ...fromVariants,
+        ...customCapacities,
+      ]);
     }
 
     return defaultValues;
@@ -325,6 +378,66 @@ export default function VariantSelector({
   };
 
   // ==========================================
+  // Custom capacity
+  // ==========================================
+
+  // Choosing "Other" is not itself a capacity. It only opens the text
+  // input, and deliberately clears any capacity already selected so
+  // addVariant's existing required-field check keeps refusing to add the
+  // variant until a real value has been entered. Capacity stays required.
+  const handleCapacityChange = (value: string) => {
+
+    if (value === CUSTOM_CAPACITY_OPTION) {
+
+      setCapacityCustomMode(true);
+
+      setSelectedValues((previous) => {
+        const { [CAPACITY_FIELD]: _cleared, ...rest } = previous;
+        return rest;
+      });
+
+      return;
+    }
+
+    setCapacityCustomMode(false);
+
+    handleAttributeChange(CAPACITY_FIELD, value);
+  };
+
+  const addCapacity = () => {
+    const capacity = newCapacity.trim();
+
+    if (!capacity) {
+      alert("Please enter a capacity.");
+      return;
+    }
+
+    const alreadyExists = getFieldValues(CAPACITY_FIELD).some(
+      (item) => item.toLowerCase() === capacity.toLowerCase()
+    );
+
+    // Typing a value that already exists is not an error the way a
+    // duplicate colour is — the seller wanted that capacity, so just
+    // select it rather than making them dismiss an alert and re-pick.
+    if (!alreadyExists) {
+      setCustomCapacities((previous) => [
+        ...previous,
+        capacity,
+      ]);
+    }
+
+    // Select it straight away, as addColor does, and leave custom mode so
+    // the dropdown shows the value as the current selection.
+    setSelectedValues((previous) => ({
+      ...previous,
+      [CAPACITY_FIELD]: capacity,
+    }));
+
+    setCapacityCustomMode(false);
+    setNewCapacity("");
+  };
+
+  // ==========================================
   // Attribute change
   // ==========================================
 
@@ -348,16 +461,25 @@ export default function VariantSelector({
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random()}`;
 
+  // Compares every dimension present on EITHER side, not just the ones the
+  // category currently defines. Matching on `fields` alone meant a dimension
+  // the category no longer lists — or one added to a product before its
+  // category changed — was ignored, so two variants differing only there
+  // were treated as identical and the real duplicate went undetected.
   const isDuplicate = (
     attributes: Record<string, string>,
     against: ProductVariant[]
   ) =>
-    against.some((variant) =>
-      fields.every(
-        (field) =>
-          variant.attributes[field.name] === attributes[field.name]
-      )
-    );
+    against.some((variant) => {
+      const keys = new Set([
+        ...Object.keys(variant.attributes || {}),
+        ...Object.keys(attributes),
+      ]);
+
+      return [...keys].every(
+        (key) => (variant.attributes || {})[key] === attributes[key]
+      );
+    });
 
   const addVariant = () => {
     const attributes: Record<string, string> = {};
@@ -530,6 +652,9 @@ export default function VariantSelector({
             const isPackSizeField =
               field.name === "Pack Size";
 
+            const isCapacityField =
+              field.name === CAPACITY_FIELD;
+
             return (
               <div
                 key={field.name}
@@ -632,15 +757,21 @@ export default function VariantSelector({
                 ) : (
                   <select
                     value={
-                      selectedValues[
-                        field.name
-                      ] || ""
+                      isCapacityField && capacityCustomMode
+                        ? CUSTOM_CAPACITY_OPTION
+                        : selectedValues[
+                            field.name
+                          ] || ""
                     }
                     onChange={(e) =>
-                      handleAttributeChange(
-                        field.name,
-                        e.target.value
-                      )
+                      isCapacityField
+                        ? handleCapacityChange(
+                            e.target.value
+                          )
+                        : handleAttributeChange(
+                            field.name,
+                            e.target.value
+                          )
                     }
                     className="
                       w-full
@@ -670,7 +801,67 @@ export default function VariantSelector({
                       )
                     )}
 
+                    {isCapacityField && (
+                      <option value={CUSTOM_CAPACITY_OPTION}>
+                        Other / Add custom capacity
+                      </option>
+                    )}
+
                   </select>
+                )}
+
+                {/* ====================== */}
+                {/* ADD CUSTOM CAPACITY */}
+                {/* ====================== */}
+
+                {isCapacityField && capacityCustomMode && (
+                  <div className="mt-3">
+
+                    <div className="flex gap-2">
+
+                      <input
+                        type="text"
+                        value={newCapacity}
+                        onChange={(e) =>
+                          setNewCapacity(e.target.value)
+                        }
+                        placeholder="e.g., 1.5 L, 2.5 L, 750 ml, 1500 ml"
+                        className="
+                          flex-1
+                          rounded-lg
+                          border
+                          border-gray-300
+                          p-3
+                          focus:border-blue-600
+                          focus:outline-none
+                        "
+                      />
+
+                      <button
+                        type="button"
+                        onClick={addCapacity}
+                        className="
+                          rounded-lg
+                          border
+                          border-blue-600
+                          px-4
+                          py-2
+                          font-semibold
+                          text-blue-600
+                          hover:bg-blue-50
+                        "
+                      >
+                        + Add Capacity
+                      </button>
+
+                    </div>
+
+                    <p className="mt-1 text-xs text-gray-500">
+                      Capacity is required — enter a value and click
+                      &quot;+ Add Capacity&quot;.
+                    </p>
+
+                  </div>
                 )}
 
                 {/* ====================== */}

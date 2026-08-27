@@ -14,6 +14,7 @@ import VariantSelector from "./VariantSelector";
 import SpecificationForm from "./SpecificationForm";
 import ProductPreview from "./ProductPreview";
 import {validateProduct} from "@/lib/products/validation";
+import { findDuplicateVariantGroups } from "@/lib/products/variantSelection";
 import { auth, db, storage } from "@/lib/firebase";
 import { productImagePath } from "@/lib/storagePaths";
 import { collection,addDoc,doc,updateDoc,serverTimestamp,} from "firebase/firestore";
@@ -459,6 +460,23 @@ const handleSubmit = async (
 
   if (!result.valid) {
     setError(result.errors.join("\n"));
+    return;
+  }
+
+  // Two variants with identical values on every dimension cannot be told
+  // apart by a customer, and the order would not record which one was
+  // bought. Refused rather than merged: merging would silently discard the
+  // per-variant stock the seller entered against one of them.
+  const duplicateGroups = findDuplicateVariantGroups(product.variants);
+
+  if (duplicateGroups.length > 0) {
+    setError(
+      "This product has the same variant more than once:\n" +
+        duplicateGroups
+          .map((group) => `  • ${group.label}  (added ${group.count} times)`)
+          .join("\n") +
+        "\nRemove the extra copies, then save again."
+    );
     return;
   }
 

@@ -10,6 +10,14 @@ import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
 import { addToCart as addToCartHelper } from "@/lib/cart";
+import {
+  variantDimensions,
+  optionsForDimension,
+  isSelectionComplete,
+  resolveVariant,
+  variantAttributes,
+  legacySizeColor,
+} from "@/lib/products/variantSelection";
 import { categoryFields } from "@/lib/catalog/categoryFields";
 import { findNodeById } from "@/lib/catalog/categoryUtils";
 import { UNIVERSAL_SPEC_FIELDS } from "@/lib/catalog/universalSpecFields";
@@ -118,6 +126,12 @@ export default function ProductPage() {
   const [selectedImage, setSelectedImage] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
+
+  // One entry per dimension the product actually varies on, e.g.
+  // { Color: "Silver", Capacity: "1.5 L" }. Replaces the two-field
+  // colour+size model for any product that has variants; products without
+  // variants still use selectedSize/selectedColor above.
+  const [selection, setSelection] = useState<Record<string, string>>({});
   const [showSizeChart, setShowSizeChart] = useState(false);
   const [question, setQuestion] = useState("");
   const [questions, setQuestions] = useState<ProductQuestion[]>([]);
@@ -307,61 +321,49 @@ questionSnap.forEach((d) => {
   // that predates variants.
   const variantList = product?.variants || [];
 
-  const variantColors = Array.from(
-    new Set(
-      variantList
-        .map((v) => v.attributes.Color || v.attributes.Shade)
-        .filter((c): c is string => Boolean(c))
-    )
-  );
+  // Every dimension THIS product varies on, read from the seller's own
+  // variants rather than from a hardcoded pair. Previously only Color/Shade
+  // and Size were read, so Capacity, RAM, Storage, Processor, Material and
+  // Pack Size were invisible to the customer — six of eight categories had
+  // dimensions that could not be chosen at all.
+  const dimensions = variantDimensions(variantList);
+  const hasVariants = dimensions.length > 0;
 
-  // Once a color is picked, only that color's sizes are offered — a
-  // customer shouldn't be able to pick a Black/XL combination that was
-  // never actually listed as a variant. Before any color is picked, this
-  // stays the union across every color, same as before this change.
-  const variantSizes = Array.from(
-    new Set(
-      variantList
-        .filter(
-          (v) =>
-            !selectedColor ||
-            (v.attributes.Color || v.attributes.Shade) === selectedColor
-        )
-        .map((v) => v.attributes.Size)
-        .filter((s): s is string => Boolean(s))
-    )
-  );
+  // The single variant matching the current choice, or null while the choice
+  // is incomplete, impossible, or ambiguous.
+  const selectedVariant = resolveVariant(variantList, selection);
 
-  const colors =
-    variantColors.length > 0
-      ? variantColors
-      : product?.color
-      ? product.color.split(",").map((c: string) => c.trim()).filter(Boolean)
-      : [];
+  // Legacy path, unchanged: products predating variants carry a comma-joined
+  // `color` string and a `sizes` array. Only used when there are no variants.
+  const colors = hasVariants
+    ? []
+    : product?.color
+    ? product.color.split(",").map((c: string) => c.trim()).filter(Boolean)
+    : [];
 
   // Filter out empty entries — an empty sizes field can be stored as [""].
-  const sizes =
-    variantSizes.length > 0
-      ? variantSizes
-      : (product?.sizes || []).filter((s: string) => s && s.trim());
+  const sizes = hasVariants
+    ? []
+    : (product?.sizes || []).filter((s: string) => s && s.trim());
 
-  // A size that was valid for the previous color may not exist for the
-  // newly selected one (Black has S/M/L, Blue has M/L/XL) — clear it
-  // rather than leave an invalid color+size combination selected.
-  useEffect(() => {
-    if (!selectedColor || !selectedSize) return;
+  // Choosing a value can invalidate an earlier one — picking Black when only
+  // Silver comes in 1.5 L must drop the 1.5 L. Rather than clear everything
+  // (which would make a three-dimension product infuriating), only the
+  // choices that are no longer offered are removed.
+  const chooseDimension = (dimension: string, value: string) => {
+    setSelection((previous) => {
+      const next: Record<string, string> = { ...previous, [dimension]: value };
 
-    const stillValid = variantList.some(
-      (v) =>
-        (v.attributes.Color || v.attributes.Shade) === selectedColor &&
-        v.attributes.Size === selectedSize
-    );
+      for (const other of dimensions) {
+        if (other === dimension || !next[other]) continue;
+        if (!optionsForDimension(variantList, other, next).includes(next[other])) {
+          delete next[other];
+        }
+      }
 
-    if (!stillValid) setSelectedSize("");
-    // Only re-check when the color changes — checking on every render
-    // (e.g. when selectedSize itself changes) isn't needed here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedColor]);
+      return next;
+    });
+  };
 
    const addItemToCart = (): boolean => {
   if (!product) return false;
@@ -375,37 +377,46 @@ questionSnap.forEach((d) => {
     return false;
   }
 
-  if (sizes.length > 0 && !selectedSize) {
-    alert("Please select a size");
-    return false;
-  }
+  if (hasVariants) {
+    // Every dimension must be chosen. Naming the missing ones beats a generic
+    // "please select an option" on a product varying three ways.
+    if (!isSelectionComplete(variantList, selection)) {
+      const missing = dimensions.filter((d) => !selection[d]);
+      alert("Please select " + missing.join(" and ") + ".");
+      return false;
+    }
 
-  if (colors.length > 0 && !selectedColor) {
-    alert("Please select a color");
-    return false;
-  }
+    // Complete but unresolvable means the combination was never listed, or
+    // the seller saved a duplicate. Either way the customer must not be sold
+    // an ambiguous variant — refuse rather than guess which one they meant.
+    if (!selectedVariant) {
+      alert("That combination isn't available. Please choose another.");
+      return false;
+    }
+  } else {
+    if (sizes.length > 0 && !selectedSize) {
+      alert("Please select a size");
+      return false;
+    }
 
-  // Belt-and-suspenders check for variant products: the size-clearing
-  // effect above should already prevent this, but the cart write itself
-  // is the right place to guarantee an invalid color+size combination
-  // (one with no matching variant) can never be added.
-  if (variantList.length > 0 && selectedColor && selectedSize) {
-    const validCombo = variantList.some(
-      (v) =>
-        (v.attributes.Color || v.attributes.Shade) === selectedColor &&
-        v.attributes.Size === selectedSize
-    );
-
-    if (!validCombo) {
-      alert("Please select a valid color and size combination.");
+    if (colors.length > 0 && !selectedColor) {
+      alert("Please select a color");
       return false;
     }
   }
 
+  const attributes = variantAttributes(selectedVariant);
+  const legacy = legacySizeColor(attributes);
+
   return addToCartHelper(product, {
     qty: quantity,
-    size: selectedSize,
-    color: selectedColor,
+    // size/color stay populated for the dimensions they have always meant, so
+    // existing cart, checkout and order displays keep working untouched.
+    size: hasVariants ? legacy.size : selectedSize,
+    color: hasVariants ? legacy.color : selectedColor,
+    // Identity and the full dimension set for everything else.
+    ...(selectedVariant?.id ? { variantId: selectedVariant.id } : {}),
+    ...(hasVariants ? { attributes } : {}),
   });
 };
   const addToCart = () => {
@@ -1176,7 +1187,69 @@ Easy Returns
 )}
                 </div>
 
-                {/* SIZE SELECTOR */}
+                {/* VARIANT SELECTORS — one per dimension the seller created */}
+                {hasVariants && (
+                  <div className="mb-5 space-y-5">
+                    {dimensions.map((dimension) => {
+                      const options = optionsForDimension(
+                        variantList,
+                        dimension,
+                        selection
+                      );
+                      if (options.length === 0) return null;
+
+                      return (
+                        <div key={dimension}>
+                          <div className="flex justify-between items-center mb-2">
+                            <p className="font-semibold">
+                              Select {dimension}
+                            </p>
+                            {dimension === "Size" && (
+                              <button
+                                type="button"
+                                onClick={() => setShowSizeChart(true)}
+                                className="text-green-600 text-sm font-semibold hover:underline"
+                              >
+                                Size Chart
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2 flex-wrap">
+                            {options.map((option) => (
+                              <button
+                                key={dimension + "-" + option}
+                                type="button"
+                                onClick={() => chooseDimension(dimension, option)}
+                                className={`min-w-12 px-4 py-2 border rounded-2xl font-medium transition ${
+                                  selection[dimension] === option
+                                    ? "bg-green-600 text-white border-green-600"
+                                    : "bg-white border-gray-300 hover:border-green-500"
+                                }`}
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Says what is still needed, so the customer is not left
+                        to discover it by pressing Add to Cart. */}
+                    {!isSelectionComplete(variantList, selection) && (
+                      <p className="text-sm text-gray-500">
+                        Select{" "}
+                        {dimensions
+                          .filter((d) => !selection[d])
+                          .join(" and ")}{" "}
+                        to continue.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* SIZE SELECTOR — legacy products with no variants */}
                 {sizes.length > 0 && (
                   <div className="mb-5">
                     <div className="flex justify-between items-center mb-2">

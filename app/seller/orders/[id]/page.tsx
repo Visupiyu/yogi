@@ -632,6 +632,31 @@ finally{ setSaving(false);} };
 
                         </h3>
 
+                        {/* Which variant to pick and pack. The seller order
+                            view never showed this at all, so an order for the
+                            1.5 L of a product listed in both 1 L and 1.5 L was
+                            indistinguishable from the 1 L. Newer orders carry
+                            the full attribute map; older ones size/color. */}
+                        {item.attributes &&
+                        Object.keys(item.attributes).length > 0 ? (
+                          <p className="text-sm font-semibold text-gray-800">
+                            {Object.entries(item.attributes)
+                              .map(([d, v]) => d + ": " + String(v))
+                              .join("  •  ")}
+                          </p>
+                        ) : (
+                          (item.color || item.size) && (
+                            <p className="text-sm font-semibold text-gray-800">
+                              {[
+                                item.color ? "Color: " + item.color : "",
+                                item.size ? "Size: " + item.size : "",
+                              ]
+                                .filter(Boolean)
+                                .join("  •  ")}
+                            </p>
+                          )
+                        )}
+
                         <p>
 
                           Qty :

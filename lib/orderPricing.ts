@@ -26,14 +26,25 @@ import {
   STANDARD_SHIPPING_CHARGE,
   calculateShippingCharge,
 } from "@/lib/shippingRules";
+import {
+  findVariantById,
+  variantAttributes,
+} from "@/lib/products/variantSelection";
 
 // size/color are variant intent, not money — the only client-supplied
 // fields that survive into the order line, and neither affects pricing.
+//
+// variantId is the seller's own id for one attribute combination. It is a
+// LOOKUP KEY, not data: the attributes written onto the order come from the
+// product document, never from the request, so a client cannot invent a
+// "Capacity: 5 L" that the seller never listed. Optional, because carts
+// already in a customer's localStorage and the mobile app do not send one.
 export type PricedItemInput = {
   id: string;
   qty: number;
   size?: string;
   color?: string;
+  variantId?: string;
 };
 
 // One order line, rebuilt from the product document rather than from
@@ -53,6 +64,12 @@ export type PricedLineItem = {
   vendorId: string;
   vendorName: string;
   lineTotal: number;
+
+  // Present only when the line resolved to a real variant. `attributes`
+  // carries every dimension — Capacity, RAM, Storage, Processor, Material,
+  // Pack Size — which size/color alone could never express.
+  variantId?: string;
+  attributes?: Record<string, string>;
 };
 
 export type OrderPricing = {
@@ -233,6 +250,30 @@ export async function computeOrderPricing(
     const product: any = productById.get(item.id);
     const qty = Number(item.qty);
 
+    // Re-resolve the variant against the seller's own product document. A
+    // variantId that does not exist on the product is refused rather than
+    // silently dropped: it means the cart is stale (the seller deleted or
+    // edited that variant) or the request was tampered with, and shipping
+    // "whichever variant" is exactly the ambiguity this must prevent.
+    const resolvedVariant = item.variantId
+      ? findVariantById(
+          Array.isArray(product.variants) ? product.variants : [],
+          item.variantId
+        )
+      : null;
+
+    if (item.variantId && !resolvedVariant) {
+      return {
+        ok: false,
+        error:
+          "One of the items in your cart is no longer available in the option you chose. Please remove it and select again.",
+        status: 409,
+      };
+    }
+
+    // Pricing is deliberately unchanged: still the product's sellingPrice.
+    // Per-variant price exists on the model but is always 0 and has never
+    // been charged, so honouring it here would change what customers pay.
     const price =
       typeof product.sellingPrice === "number"
         ? product.sellingPrice
@@ -258,6 +299,12 @@ export async function computeOrderPricing(
       vendorId: typeof product.vendorId === "string" ? product.vendorId : "",
       vendorName: typeof product.vendorName === "string" ? product.vendorName : "",
       lineTotal: price * qty,
+      ...(resolvedVariant
+        ? {
+            variantId: resolvedVariant.id,
+            attributes: variantAttributes(resolvedVariant),
+          }
+        : {}),
     });
   }
 

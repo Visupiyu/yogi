@@ -102,7 +102,8 @@ const removeItem = (index: number) => {
   removeFromCart(
     item.id,
     item.size,
-    item.color
+    item.color,
+    item.variantId
   );
 
   setCart(getCartItems());
@@ -333,7 +334,7 @@ Popular Categories
 
                 return (
                   <div
-                    key={`${item.id}-${item.size || ""}-${item.color || ""}`}
+                    key={`${item.id}-${item.variantId || `${item.size || ""}-${item.color || ""}`}`}
                     className="bg-white rounded-2xl shadow-sm hover:shadow-lg transition-shadow duration-300 p-5 flex flex-col sm:flex-row gap-5"
                   >
                     <Link href={`/product/${item.id}`} className="shrink-0 mx-auto sm:mx-0">

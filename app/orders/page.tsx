@@ -146,6 +146,10 @@ export default function OrdersPage() {
       qty: item.qty,
       size: item.size,
       color: item.color,
+      // Absent on older order items, which fall back to size/color exactly
+      // as before.
+      variantId: item.variantId,
+      attributes: item.attributes,
     });
   });
   toast.success(
@@ -809,27 +813,52 @@ export default function OrdersPage() {
 
               </p>
 
-              {item.color && (
+              {item.attributes &&
+              Object.keys(item.attributes).length > 0 ? (
 
-                <p>
+                Object.entries(item.attributes).map(
+                  ([dimension, value]) => (
 
-                  🎨 Color:
-                  {" "}
-                  {item.color}
+                    <p key={dimension}>
 
-                </p>
+                      🔹 {dimension}:
+                      {" "}
+                      {String(value)}
 
-              )}
+                    </p>
 
-              {item.size && (
+                  )
+                )
 
-                <p>
+              ) : (
 
-                  📏 Size:
-                  {" "}
-                  {item.size}
+                <>
 
-                </p>
+                  {item.color && (
+
+                    <p>
+
+                      🎨 Color:
+                      {" "}
+                      {item.color}
+
+                    </p>
+
+                  )}
+
+                  {item.size && (
+
+                    <p>
+
+                      📏 Size:
+                      {" "}
+                      {item.size}
+
+                    </p>
+
+                  )}
+
+                </>
 
               )}
 
