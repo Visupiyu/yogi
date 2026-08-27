@@ -283,36 +283,43 @@ async()=>{
       return;
 
     }
-    await addDoc(
+    // The request goes to the server, which recomputes what is actually
+    // payable and refuses anything larger. The balance check above stays as a
+    // courtesy so the seller gets told immediately, but it is no longer the
+    // control: this used to addDoc() straight into the collection, so a seller
+    // writing through the SDK skipped it entirely and could reserve any figure.
+    //
+    // The idempotency key makes a double-submitted form reserve once.
+    const currentUser = auth.currentUser;
 
-      collection(
-        db,
-        "withdrawals"
-      ),
+    if (!currentUser) {
+      alert("Please sign in again.");
+      return;
+    }
 
-      {
+    const idToken = await currentUser.getIdToken();
 
-        vendorId:
-          auth.currentUser?.uid || "",
+    const response = await fetch("/api/request-withdrawal", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        amount: Number(amount),
+        idempotencyKey:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : String(Date.now()) + "-" + Math.random(),
+      }),
+    });
 
-        vendorEmail:
-          vendorEmail,
+    const result = await response.json();
 
-        vendorName:
-          businessName,
-
-        amount:
-          Number(amount),
-
-        status:
-          "Pending",
-
-        createdAt:
-          serverTimestamp(),
-
-      }
-
-    );
+    if (!response.ok) {
+      alert(result?.error || "Could not submit your withdrawal request.");
+      return;
+    }
 
     // notifications requires `role` (and userId for non-admin roles) or
     // the write is rejected by Firestore rules — this was missing both,
