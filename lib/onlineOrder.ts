@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import type { OrderPricing } from "@/lib/orderPricing";
 import { sendOrderConfirmationEmail } from "@/lib/orderConfirmationEmail";
@@ -345,44 +346,26 @@ export async function finalizeOnlineOrder(params: {
   // reaches applyPostOrderEffects with alreadyPlaced === false and notifies;
   // when the webhook wins it notifies here, and the browser then takes its
   // alreadyPlaced branch, which writes nothing.
-  if (source === "webhook") {
+    // Emitted for BOTH sources now, not only the webhook.
+    //
+    // The browser used to write this set when it won the finalisation race,
+    // and this block covered the webhook-wins case. The browser no longer
+    // writes notifications at all -- that is exactly what allowed a customer
+    // to forge role:"admin" -- so the server must cover both orders of the
+    // race. Still exactly once: the early return above leaves only the
+    // kind === "created" path here, and the deterministic order id means
+    // only one caller ever creates.
     try {
-      await db.collection("notifications").add({
-        title: "🛒 New Order",
-        message: `${intent.customerName} placed an order worth ₹${outcome.finalTotal}`,
-        type: "order",
-        role: "admin",
-        read: false,
-        createdAt: Timestamp.now(),
-      });
-
-      for (const item of pricing.items) {
-        if (!item.vendorId) continue;
-
-        await db.collection("notifications").add({
-          userId: item.vendorId,
-          role: "seller",
-          title: "🛒 New Order",
-          message: `${intent.customerName} ordered ${item.name}`,
-          type: "order",
-          read: false,
-          createdAt: Timestamp.now(),
-        });
-      }
-
-      await db.collection("notifications").add({
-        userId: intent.uid,
-        role: "customer",
-        title: "✅ Order Placed",
-        message: `Your order worth ₹${outcome.finalTotal} has been placed successfully.`,
-        type: "order",
-        read: false,
-        createdAt: Timestamp.now(),
+      await emitOrderPlacedNotifications(db, {
+        customerName: intent.customerName,
+        customerUid: intent.uid,
+        orderTotal: outcome.finalTotal,
+        items: pricing.items,
       });
     } catch (error) {
       console.error("finalizeOnlineOrder: notification failed:", error);
     }
-  }
+
   if (outcome.shortfalls?.length || outcome.couponConflict || outcome.rewardShort) {
     try {
       const parts: string[] = [];
