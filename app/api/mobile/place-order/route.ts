@@ -423,6 +423,50 @@ export async function POST(request: Request) {
         status: "Pending",
         createdAt: Timestamp.now(),
         gstAmount,
+
+        // ---- Canonical web-schema aliases ----
+        //
+        // Purely additive: every field above is untouched, so OrdersScreen,
+        // OrderDetailsScreen, Buy Again, the cancellation stock-restore and
+        // reviews all keep reading exactly what they read today.
+        //
+        // The shared consumers speak the web schema, and without these a
+        // mobile order is invisible or plain wrong to all of them:
+        //
+        //   finalTotal   app/api/cancel-order reads order.finalTotal for both
+        //                the reward reversal and refundAmountDue, and
+        //                lib/rewardCredit.ts prices the reward off it. On a
+        //                mobile order it was undefined, so a cancelled paid
+        //                mobile order recorded a refund due of zero.
+        //
+        //                The two schemas disagree on what "total" means: here
+        //                it is the GRAND total (subtotal + shipping + gst -
+        //                discount, computed above); in place-order "total" is
+        //                the pre-shipping subtotal and the grand total is
+        //                "finalTotal". So this aliases total, NOT subtotal —
+        //                copying subtotal would under-refund by shipping+GST.
+        //
+        //   userEmail    the field every shared consumer reads, while the
+        //                mobile app reads customerEmail. Both now carry the
+        //                same verified value off the ID token, never the body.
+        //
+        //   rewardPointsStatus  opts the order into the deferred reward
+        //                system. Absence means "placed before that system
+        //                existed", so mobile orders were permanently
+        //                excluded from it. This credits nothing now: points
+        //                are granted only once the order is Delivered, Paid
+        //                and past its 7-day return window.
+        //
+        //   updatedAt    lib/returnEligibility.ts falls back to updatedAt
+        //                when deliveredAt is absent, and the reward credit
+        //                fails CLOSED without a basis date. Timestamp.now()
+        //                matches createdAt above and place-order convention;
+        //                this executes server-side inside a transaction, so
+        //                the value is the server clock, not the caller's.
+        finalTotal: total,
+        userEmail: requester.email || "",
+        rewardPointsStatus: "pending",
+        updatedAt: Timestamp.now(),
       });
 
       for (const cartDoc of cartDocs) {
