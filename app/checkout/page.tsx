@@ -663,7 +663,13 @@ setAddress(userData.address || "");
       // prices, not trusted from the browser. Same for the discounts: the
       // coupon code and a redeem flag, never the rupee value of either.
       body: JSON.stringify({
-      items: items.map((item: any) => ({id: item.id, qty: item.qty, size: item.size || "", color: item.color || "",})),
+      items: items.map((item: any) => ({
+        id: item.id,
+        qty: item.qty,
+        size: item.size || "",
+        color: item.color || "",
+        variantId: item.variantId,
+      })),
         couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
         redeemPoints,
         // Delivery details are user input, not money. The server stores them

@@ -140,6 +140,9 @@ export async function POST(request: Request) {
       qty: Number(i?.qty),
       size: typeof i?.size === "string" ? i.size : undefined,
       color: typeof i?.color === "string" ? i.color : undefined,
+      // A lookup key only — computeOrderPricing resolves it against the
+      // product document and takes the attributes from there.
+      variantId: typeof i?.variantId === "string" ? i.variantId : undefined,
     }));
 
     const customerName = typeof body.customerName === "string" ? body.customerName.trim() : "";

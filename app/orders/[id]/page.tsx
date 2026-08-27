@@ -502,8 +502,26 @@ export default function OrderDetailsPage() {
                       </span>
                     </p>
                     <p>📦 Quantity: {item.qty}</p>
-                    {item.color && <p>🎨 Color: {item.color}</p>}
-                    {item.size && <p>📏 Size: {item.size}</p>}
+                    {/* Orders placed since variants became selectable carry the
+                        full attribute map, covering dimensions size/color could
+                        never express (Capacity, RAM, Storage, Processor,
+                        Material, Pack Size). Older orders have only size/color
+                        and still render through the fallback below. */}
+                    {item.attributes &&
+                    Object.keys(item.attributes).length > 0 ? (
+                      Object.entries(item.attributes).map(
+                        ([dimension, value]) => (
+                          <p key={dimension}>
+                            🔹 {dimension}: {String(value)}
+                          </p>
+                        )
+                      )
+                    ) : (
+                      <>
+                        {item.color && <p>🎨 Color: {item.color}</p>}
+                        {item.size && <p>📏 Size: {item.size}</p>}
+                      </>
+                    )}
                   </div>
                 </div>
 

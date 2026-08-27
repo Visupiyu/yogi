@@ -101,6 +101,40 @@ export default function InvoiceItems({
                         {item.name}
                       </div>
 
+                      {/* Which variant was actually bought. Orders placed
+                          since variants became selectable carry the full
+                          attribute map, covering dimensions size/color could
+                          never express (Capacity, RAM, Storage, Processor,
+                          Material, Pack Size). Older orders carry only
+                          size/color, and orders with neither render nothing
+                          at all — exactly as before. */}
+                      {item.attributes &&
+                      Object.keys(item.attributes).length > 0 ? (
+
+                        <div className="text-xs text-gray-700 mt-1">
+                          {Object.entries(item.attributes)
+                            .map(
+                              ([dimension, value]) =>
+                                dimension + ": " + String(value)
+                            )
+                            .join("  |  ")}
+                        </div>
+
+                      ) : (
+                        (item.color || item.size) && (
+
+                          <div className="text-xs text-gray-700 mt-1">
+                            {[
+                              item.color ? "Color: " + item.color : "",
+                              item.size ? "Size: " + item.size : "",
+                            ]
+                              .filter(Boolean)
+                              .join("  |  ")}
+                          </div>
+
+                        )
+                      )}
+
                       {item.description && (
 
                         <div className="text-xs text-gray-500 mt-1">
