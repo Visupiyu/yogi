@@ -17,6 +17,7 @@ import { useRouter, useParams } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { ORDER_STEPS, TOTAL_STEPS, getStep } from "@/lib/orderTracking";
+import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 import {
   RETURN_WINDOW_DAYS,
   canRequestReturn,
@@ -38,6 +39,14 @@ export default function OrderDetailsPage() {
   const orderId = params.id as string;
   const [loading, setLoading] = useState(true);
   const [order, setOrder] = useState<any>(null);
+
+  // Per-item fulfilment. Item status lives in sellerOrders, which customers
+  // cannot read (those records carry seller earnings), so it comes from
+  // /api/order-fulfilment — a projection that verifies order ownership and
+  // returns product + quantity + status only.
+  const [itemStatuses, setItemStatuses] = useState<
+    { productId: string | null; qty: number; status: string }[]
+  >([]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -66,6 +75,26 @@ export default function OrderDetailsPage() {
         }
 
         setOrder(data);
+
+        try {
+          const token = await user.getIdToken();
+          const response = await fetch("/api/order-fulfilment", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ orderId }),
+          });
+
+          if (response.ok) {
+            const payload = await response.json();
+            setItemStatuses(payload.items || []);
+          }
+        } catch (fulfilmentError) {
+          // Tracking detail is additive — the page still works without it.
+          console.error("Fulfilment status unavailable:", fulfilmentError);
+        }
       } catch (err) {
         console.error("Order page error:", err);
       } finally {
@@ -293,7 +322,7 @@ export default function OrderDetailsPage() {
                       : "text-blue-600"
                   }`}
                 >
-                  {order.status}
+                  {fulfilmentStageLabel(order.status)}
                 </span>
               </div>
             </div>
@@ -377,7 +406,7 @@ export default function OrderDetailsPage() {
   <p className="mt-4 text-lg">
     Current Status:
     <span className="font-bold ml-2">
-      {order.status}
+      {fulfilmentStageLabel(order.status)}
     </span>
   </p>
 
@@ -493,6 +522,36 @@ export default function OrderDetailsPage() {
                     Category: {item.category || "-"}
                   </p>
                   <h3 className="text-xl font-bold">{item.name}</h3>
+
+                  {/* Each product tracked on its own. On a multi-seller order
+                      these advance independently, so two lines can sit at
+                      different stages. */}
+                  {(() => {
+                    const matches = itemStatuses.filter(
+                      (s) => s.productId === item.id
+                    );
+                    const tracked = matches[
+                      order.items
+                        .slice(0, index)
+                        .filter(
+                          (prev: { id?: string }) => prev.id === item.id
+                        ).length
+                    ];
+
+                    if (!tracked) return null;
+
+                    return (
+                      <span
+                        className={`inline-block mt-2 text-xs font-semibold px-3 py-1 rounded-full border ${
+                          tracked.status === "Delivered"
+                            ? "bg-green-100 text-green-800 border-green-300"
+                            : "bg-blue-100 text-blue-800 border-blue-300"
+                        }`}
+                      >
+                        {fulfilmentStageLabel(tracked.status)}
+                      </span>
+                    );
+                  })()}
 
                   <div className="mt-3 space-y-2 text-gray-600">
                     <p>

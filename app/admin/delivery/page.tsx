@@ -13,6 +13,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 
 type Delivery = {
   id: string;
@@ -192,13 +193,17 @@ export default function AdminDeliveryPage() {
             <h2 className="text-3xl font-bold text-indigo-600">{assignedCount}</h2>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow">
-            <p className="text-gray-500">Out For Delivery</p>
+            <p className="text-gray-500">
+              {fulfilmentStageLabel("Out For Delivery")}
+            </p>
             <h2 className="text-3xl font-bold text-blue-600">
               {outForDeliveryCount}
             </h2>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow">
-            <p className="text-gray-500">Delivered</p>
+            <p className="text-gray-500">
+              {fulfilmentStageLabel("Delivered")}
+            </p>
             <h2 className="text-3xl font-bold text-green-600">{deliveredCount}</h2>
           </div>
           <div className="bg-white rounded-2xl p-6 shadow">
@@ -219,13 +224,17 @@ export default function AdminDeliveryPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="border rounded-2xl p-4"
           >
-            <option>All</option>
-            <option>Assigned</option>
-            <option>Packed</option>
-            <option>Shipped</option>
-            <option>Out For Delivery</option>
-            <option>Delivered</option>
-            <option>Delivery Failed</option>
+            <option value="All">All</option>
+            <option value="Assigned">Assigned</option>
+            <option value="Packed">{fulfilmentStageLabel("Packed")}</option>
+            <option value="Shipped">{fulfilmentStageLabel("Shipped")}</option>
+            <option value="Out For Delivery">
+              {fulfilmentStageLabel("Out For Delivery")}
+            </option>
+            <option value="Delivered">
+              {fulfilmentStageLabel("Delivered")}
+            </option>
+            <option value="Delivery Failed">Delivery Failed</option>
           </select>
         </div>
 
@@ -260,7 +269,7 @@ export default function AdminDeliveryPage() {
                             : "bg-yellow-100 text-yellow-700"
                         }`}
                       >
-                        {order.status}
+                        {fulfilmentStageLabel(order.status)}
                       </span>
                       {order.deliveryPartnerId && (
                         <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">

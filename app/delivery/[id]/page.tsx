@@ -18,6 +18,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db, storage } from "@/lib/firebase";
 import { deliveryProofPath } from "@/lib/storagePaths";
+import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 import {
 
   ref,
@@ -285,7 +286,7 @@ if (proofImage) {
       "Delivery Update",
 
     message:
-      `Your order ${id.slice(0,8)} is now ${status}.`,
+      `Your order ${id.slice(0,8)} is now ${fulfilmentStageLabel(status)}.`,
 
     userId:
       order.userId,
@@ -667,12 +668,12 @@ if (proofImage) {
             >
 
               <option value={order.status}>
-                {order.status} (current)
+                {fulfilmentStageLabel(order.status)} (current)
               </option>
 
               {(NEXT_STATUSES[order.status] || []).map((next) => (
                 <option key={next} value={next}>
-                  {next}
+                  {fulfilmentStageLabel(next)}
                 </option>
               ))}
 

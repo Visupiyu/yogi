@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 type Delivery = {
   id: string;
   customerName: string;
@@ -272,7 +273,7 @@ const deliveredDeliveries =
 
             <p className="text-gray-500">
 
-              Out For Delivery
+              {fulfilmentStageLabel("Out For Delivery")}
 
             </p>
 
@@ -337,19 +338,21 @@ const deliveredDeliveries =
 
   >
 
-    <option>All</option>
+    <option value="All">All</option>
 
-    <option>Confirmed</option>
+    <option value="Confirmed">{fulfilmentStageLabel("Confirmed")}</option>
 
-    <option>Packed</option>
+    <option value="Packed">{fulfilmentStageLabel("Packed")}</option>
 
-    <option>Shipped</option>
+    <option value="Shipped">{fulfilmentStageLabel("Shipped")}</option>
 
-    <option>Out For Delivery</option>
+    <option value="Out For Delivery">
+      {fulfilmentStageLabel("Out For Delivery")}
+    </option>
 
-    <option>Delivered</option>
+    <option value="Delivered">{fulfilmentStageLabel("Delivered")}</option>
 
-    <option>Delivery Failed</option>
+    <option value="Delivery Failed">Delivery Failed</option>
 
   </select>
 

@@ -13,6 +13,7 @@ import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { addToCart } from "@/lib/cart";
 import { ORDER_STEPS, getStep } from "@/lib/orderTracking";
+import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 import {
   RETURN_WINDOW_DAYS,
   canRequestReturn,
@@ -262,7 +263,7 @@ export default function OrdersPage() {
   <div className="flex justify-between">
     <span>Status</span>
     <span className="text-blue-600 font-semibold">
-      {order.status}
+      {fulfilmentStageLabel(order.status)}
     </span>
   </div>
   <div className="flex justify-between">
@@ -507,7 +508,7 @@ export default function OrdersPage() {
       `}
     >
 
-      {order.status}
+      {fulfilmentStageLabel(order.status)}
 
     </span>
 

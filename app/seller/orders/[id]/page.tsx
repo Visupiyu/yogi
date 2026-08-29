@@ -10,19 +10,41 @@ import { auth, db } from "@/lib/firebase";
 import ShippingLabel from "@/components/ShippingLabel";
 import Invoice from "@/components/invoice/Invoice";
 import { computeVendorShare } from "@/lib/vendorEarnings";
+import {
+  ITEM_FULFILMENT_STAGES,
+  deriveFulfilmentStage,
+  fulfilmentActionLabel,
+  fulfilmentStageLabel,
+  isStageComplete,
+  nextItemStage,
+  type ItemFulfilmentMap,
+} from "@/lib/itemFulfilment";
+import { requestItemAdvance } from "@/lib/sellerFulfilmentClient";
+import { sellerOrderRecordId } from "@/lib/sellerOrderRecord";
+import { formatIst } from "@/lib/orderTiming";
 
 import { useRef } from "react";
 
 // Mirrors isLegalOrderStatusTransition in firestore.rules — used here
 // only to keep the dropdown from offering a move the rule would reject.
-const NEXT_STATUSES: Record<string, string[]> = {
-  Pending: ["Confirmed", "Cancelled"],
-  Confirmed: ["Packed", "Cancelled"],
-  Packed: ["Shipped", "Cancelled"],
-  Shipped: ["Out For Delivery"],
-  "Out For Delivery": ["Delivered"],
-  Delivered: [],
-  Cancelled: [],
+// Order-level statuses a seller may still cancel from. Forward fulfilment is
+// per item now and lives in sellerOrders, so this is all that remains of the
+// parent-status control.
+const CANCELLABLE_BY_SELLER = ["Confirmed", "Packed"];
+
+type FulfilmentLine = {
+  itemKey?: string;
+  name?: string;
+  qty?: number;
+  size?: string;
+  color?: string;
+};
+
+type SellerFulfilmentRecord = {
+  id: string;
+  items?: FulfilmentLine[];
+  itemFulfilment?: ItemFulfilmentMap;
+  deliveryDeadlineAt?: unknown;
 };
 
 // The ONLY paymentMethod a vendor may mark Paid by themselves. Kept as an
@@ -44,6 +66,12 @@ export default function SellerOrderDetailsPage(){
   const [expectedDelivery,setExpectedDelivery] =useState("");
   const [sellerNotes,setSellerNotes] = useState("");
   const [vendorUid,setVendorUid] = useState("");
+
+  // The seller's own fulfilment record for this order. This — not
+  // order.status — is what drives every stage shown below.
+  const [sellerRecord,setSellerRecord] =
+    useState<SellerFulfilmentRecord | null>(null);
+  const [busyItemKey,setBusyItemKey] = useState<string | null>(null);
   const invoiceRef = useRef<HTMLDivElement>(null);
 const shippingLabelRef = useRef<HTMLDivElement>(null);
    
@@ -99,6 +127,21 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
         setOrder(data);
 
+        // Fulfilment lives in the seller's own record, addressed by the
+        // deterministic (orderId, vendorId) id. firestore.rules restricts it
+        // to this vendor, so there is nothing to filter.
+        try {
+          const recordSnap = await getDoc(
+            doc(db, "sellerOrders", sellerOrderRecordId(id, vendorUid))
+          );
+
+          if (recordSnap.exists()) {
+            setSellerRecord({ id: recordSnap.id, ...recordSnap.data() });
+          }
+        } catch (recordError) {
+          console.error("Fulfilment record unavailable:", recordError);
+        }
+
         setStatus(
           data.status || "Pending"
         );
@@ -137,6 +180,67 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
   };
   
+
+  // Server-side, so the parent order's derived status is recalculated in the
+  // same transaction. itemFulfilment is server-only in firestore.rules.
+  const advanceItem = async (itemKey: string) => {
+
+    if (!sellerRecord) return;
+
+    if (!nextItemStage(String(sellerRecord.itemFulfilment?.[itemKey]?.status))) {
+      return;
+    }
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+
+      setBusyItemKey(itemKey);
+
+      const result = await requestItemAdvance({
+        idToken: await user.getIdToken(),
+        recordId: sellerRecord.id,
+        itemKey,
+      });
+
+      if (!result.ok) {
+        toast.error(result.error || "Could not update this product.");
+        return;
+      }
+
+      setSellerRecord((prev) =>
+        prev
+          ? {
+              ...prev,
+              itemFulfilment: {
+                ...prev.itemFulfilment,
+                [itemKey]: {
+                  status: String(result.itemStatus),
+                  updatedAt: new Date(),
+                },
+              },
+            }
+          : prev
+      );
+
+      // Reflect the recalculated parent summary without a refetch.
+      if (order && result.parentStatus) {
+        setOrder({ ...order, status: result.parentStatus });
+      }
+
+      toast.success(
+        `Marked ${fulfilmentStageLabel(result.itemStatus)} · order is now ` +
+          fulfilmentStageLabel(result.parentStatus)
+      );
+
+    } finally {
+
+      setBusyItemKey(null);
+
+    }
+
+  };
 
   const saveOrder = async()=>{
     if (
@@ -208,7 +312,9 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
         // same wording, shape and type as the general path below.
         await addDoc(collection(db, "notifications"), {
           title: "Order Status Updated",
-          message: `Your order ${id.slice(0, 8)} is now ${status}`,
+          message: `Your order ${id.slice(0, 8)} is now ${fulfilmentStageLabel(
+            status
+          )}`,
           userId: order.userId,
           userEmail: order.userEmail,
           role: "customer",
@@ -267,6 +373,15 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
         payload.paymentStatus = "Paid";
       }
 
+      // The 72h delivery clock is measured against deliveredAt, so every path
+      // that completes an order has to stamp it — previously only the
+      // delivery-partner screen did, leaving seller-completed orders with no
+      // completion time at all. serverTimestamp() is required: firestore.rules
+      // accepts deliveredAt only when it equals request.time.
+      if (status === "Delivered" && order.status !== "Delivered") {
+        payload.deliveredAt = serverTimestamp();
+      }
+
       await updateDoc(
 
         doc(
@@ -296,7 +411,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
     "Order Status Updated",
 
   message:
-    `Your order ${id.slice(0,8)} is now ${status}`,
+    `Your order ${id.slice(0,8)} is now ${fulfilmentStageLabel(status)}`,
 
   userId:
     order.userId,
@@ -333,6 +448,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
 }
 finally{ setSaving(false);} };
+
   if(loading){
 
     return(
@@ -698,208 +814,165 @@ finally{ setSaving(false);} };
 
             </div>
 
-            <div className="
-  mt-6
-  flex
-  flex-wrap
-  gap-2
-">
+            {/* Product Fulfilment — the source of truth.
+                Both order-wide progress strips that stood here are gone: with
+                per-item fulfilment they were misleading, because three
+                products can sit at three different stages. Each row below
+                carries its own stage strip and its own button, and advancing
+                one never touches another. */}
 
-  {[
+            <div className="bg-white rounded-3xl shadow p-6 mt-6">
 
-    "Packed",
+              <h2 className="text-2xl font-bold mb-2">
 
-    "Shipped",
-
-    "Out For Delivery",
-
-    "Delivered"
-
-  ].map((step)=>(
-
-    <span
-
-      key={step}
-
-      className={`
-
-        px-4
-
-        py-2
-
-        rounded-full
-
-        text-sm
-
-        ${
-
-          [
-
-            "Packed",
-
-            "Shipped",
-
-            "Out For Delivery",
-
-            "Delivered"
-
-          ].indexOf(step)
-
-          <=
-
-          [
-
-            "Pending",
-
-            "Confirmed",
-
-            "Packed",
-
-            "Shipped",
-
-            "Out For Delivery",
-
-            "Delivered"
-
-          ].indexOf(status)
-
-          ?
-
-          "bg-green-600 text-white"
-
-          :
-
-          "bg-gray-200"
-
-        }
-
-      `}
-
-    >
-
-      {step}
-
-    </span>
-
-  ))}
-
-</div>
-
-            {/* Timeline */}
-
-            <div className="
-              bg-white
-              rounded-3xl
-              shadow
-              p-6
-            ">
-
-              <h2 className="
-                text-2xl
-                font-bold
-                mb-6
-              ">
-
-                Order Progress
+                Product Fulfilment
 
               </h2>
 
-              <div className="
-                flex
-                flex-wrap
-                gap-3
-              ">
+              {sellerRecord ? (
 
-                {[
+                <>
 
-                  "Pending",
+                  <p className="text-gray-600 text-sm mb-5">
 
-                  "Confirmed",
+                    Each product moves through Confirmed → Accept → Ready for
+                    Delivery → Handed Over to Courier → Final Delivery on its
+                    own.
 
-                  "Packed",
+                  </p>
 
-                  "Shipped",
+                  <div className="space-y-3">
 
-                  "Out For Delivery",
+                    {(sellerRecord.items || []).map((line, index) => {
 
-                  "Delivered"
+                      const key = line.itemKey || `i${index}`;
+                      const stage =
+                        sellerRecord.itemFulfilment?.[key]?.status ?? "Confirmed";
+                      const next = nextItemStage(String(stage));
+                      const busy = busyItemKey === key;
 
-                ].map((step,index)=>(
+                      return (
 
-                  <div
+                        <div
+                          key={key}
+                          className="border rounded-2xl p-4"
+                        >
 
-                    key={index}
+                          <div className="flex flex-wrap items-start justify-between gap-3">
 
-                    className={`
+                            <div className="min-w-0">
 
-                      px-4
+                              <p className="font-semibold">{line.name}</p>
 
-                      py-2
+                              <p className="text-sm text-gray-600">
 
-                      rounded-full
+                                Qty {line.qty}
+                                {line.size ? ` · ${line.size}` : ""}
+                                {line.color ? ` · ${line.color}` : ""}
 
-                      text-sm
+                              </p>
 
-                      font-semibold
+                            </div>
 
-                      ${
+                            {next ? (
 
-                        [
+                              <button
+                                onClick={() => advanceItem(key)}
+                                disabled={busy}
+                                className="bg-green-600 hover:bg-green-700 disabled:opacity-60 transition text-white px-4 py-2 rounded-xl text-sm font-semibold"
+                              >
 
-                          "Pending",
+                                {busy
+                                  ? "Saving..."
+                                  : fulfilmentActionLabel(next)}
 
-                          "Confirmed",
+                              </button>
 
-                          "Packed",
+                            ) : (
 
-                          "Shipped",
+                              <span className="text-sm text-gray-400">
 
-                          "Out For Delivery",
+                                Complete
 
-                          "Delivered"
+                              </span>
 
-                        ].indexOf(step)
+                            )}
 
-                        <=
+                          </div>
 
-                        [
+                          {/* Stage strip for THIS product. Starts at
+                              Confirmed — Pending is not a seller stage — and
+                              Confirmed stays neutral because the seller has
+                              done nothing yet. Packed — shown as "Accept" —
+                              is the first green. */}
+                          <div className="flex flex-wrap gap-2 mt-3">
 
-                          "Pending",
+                            {ITEM_FULFILMENT_STAGES.map((step) => (
 
-                          "Confirmed",
+                              <span
+                                key={step}
+                                className={`px-3 py-1.5 rounded-full text-xs ${
+                                  isStageComplete(step, String(stage))
+                                    ? "bg-green-600 text-white"
+                                    : "bg-gray-200"
+                                }`}
+                              >
 
-                          "Packed",
+                                {fulfilmentStageLabel(step)}
 
-                          "Shipped",
+                              </span>
 
-                          "Out For Delivery",
+                            ))}
 
-                          "Delivered"
+                          </div>
 
-                        ].indexOf(status)
+                          {!!sellerRecord.itemFulfilment?.[key]?.deliveredAt && (
 
-                        ?
+                            <p className="text-xs text-green-700 mt-2">
 
-                        "bg-green-600 text-white"
+                              Final Delivery{" "}
+                              {formatIst(
+                                sellerRecord.itemFulfilment[key].deliveredAt
+                              )}
 
-                        :
+                            </p>
 
-                        "bg-gray-200"
+                          )}
 
-                      }
+                        </div>
 
-                    `}
+                      );
 
-                  >
-
-                    {step}
+                    })}
 
                   </div>
 
-                ))}
+                  <p className="text-xs text-gray-500 mt-4">
 
-              </div>
-             </div>
+                    Overall (summary only):{" "}
+                    {fulfilmentStageLabel(
+                      deriveFulfilmentStage(sellerRecord.itemFulfilment)
+                    )}
+                    {" · Deliver by "}
+                    {formatIst(sellerRecord.deliveryDeadlineAt)}
+
+                  </p>
+
+                </>
+
+              ) : (
+
+                <p className="text-gray-500 text-sm">
+
+                  No fulfilment record for this order yet. Records are created
+                  when an admin confirms the order.
+
+                </p>
+
+              )}
+
+            </div>
+
 
             </div>
                       {/* RIGHT */}
@@ -1046,7 +1119,7 @@ finally{ setSaving(false);} };
                 mb-5
               ">
 
-                Update Status
+                Cancel Order
 
               </h2>
 
@@ -1064,7 +1137,7 @@ finally{ setSaving(false);} };
 
                 }
 
-                disabled={(NEXT_STATUSES[order.status] || []).length === 0}
+                disabled={!CANCELLABLE_BY_SELLER.includes(order.status)}
 
                 className="
                   w-full
@@ -1079,19 +1152,15 @@ finally{ setSaving(false);} };
 
                 <option value={order.status}>
 
-                  {order.status}
+                  {fulfilmentStageLabel(order.status)}
 
                 </option>
 
-                {(NEXT_STATUSES[order.status] || []).map((next) => (
+                {CANCELLABLE_BY_SELLER.includes(order.status) && (
 
-                  <option key={next} value={next}>
+                  <option value="Cancelled">Cancelled</option>
 
-                    {next}
-
-                  </option>
-
-                ))}
+                )}
 
               </select>
 

@@ -14,6 +14,28 @@ import Link from "next/link";
 import { logAdminAction } from "@/lib/auditLog";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { verifyDeliveryPayment } from "@/lib/deliveryPayment";
+import {
+  confirmationTiming,
+  deliveryTiming,
+  formatIst,
+  relativeToNow,
+} from "@/lib/orderTiming";
+import {
+  deriveFulfilmentStage,
+  fulfilmentStageLabel,
+  stageCounts,
+  type ItemFulfilmentMap,
+} from "@/lib/itemFulfilment";
+import {
+  CONFIRMATION_SLA_TEXT,
+  CONFIRMATION_SLA_TONE,
+  DELIVERY_SLA_TEXT,
+  DELIVERY_SLA_TONE,
+  formatRemaining,
+  orderSlaRow,
+  shortOrderLabel,
+  type SlaTone,
+} from "@/lib/orderSla";
 
 type Order = {
   id: string;
@@ -54,12 +76,158 @@ type Order = {
   refundAmountDue?: number;
   refundedAmount?: number;
   refundTransactionId?: string;
+  // Timing. Clock A runs from createdAt and is derived on read (createdAt is
+  // on every order, including legacy ones); confirmedLate and
+  // adminConfirmDeadlineAt are recorded by app/api/confirm-order for the
+  // audit trail. Clock B runs from confirmedAt and is stored as
+  // deliveryDeadlineAt. See lib/orderTiming.ts.
+  vendorIds?: string[];
+  confirmedAt?: unknown;
+  confirmedBy?: string;
+  confirmedLate?: boolean;
+  adminConfirmDeadlineAt?: unknown;
+  deliveryDeadlineAt?: unknown;
+  deliveredAt?: unknown;
+};
+
+// Every seller on the order, listed separately with their own fulfilment
+// state — a multi-seller order is never collapsed into one status.
+function SellerFulfilmentList({
+  records,
+}: {
+  records?: SellerFulfilment[];
+}) {
+  if (!records || records.length === 0) {
+    return (
+      <span className="text-xs text-gray-500">
+        No seller records (unconfirmed)
+      </span>
+    );
+  }
+
+  return (
+    <ul className="space-y-1.5">
+      {records.map((record) => {
+        // Derived, never stored — the least advanced item in the record.
+        const stage = deriveFulfilmentStage(record.itemFulfilment) ?? "—";
+        const counts = stageCounts(record.itemFulfilment);
+        const lines = record.items || [];
+
+        return (
+          <li key={record.id} className="text-xs">
+            <span className="font-mono" title={record.vendorId}>
+              {record.vendorId.slice(0, 8)}
+            </span>{" "}
+            <SlaBadge
+              tone={stage === "Delivered" ? "ok" : "running"}
+              text={fulfilmentStageLabel(stage)}
+            />
+            <span className="text-gray-400"> (summary)</span>
+
+            <span className="block text-gray-500 mt-0.5">
+              ₹{Number(record.vendorEarning || 0).toLocaleString("en-IN")}
+              {record.trackingNumber ? ` · ${record.trackingNumber}` : ""}
+              {" · "}
+              {Object.entries(counts)
+                .map(([k, n]) => `${n} ${fulfilmentStageLabel(k)}`)
+                .join(", ")}
+            </span>
+
+            {/* Each product tracked separately — the seller-level badge above
+                is only a roll-up of these. */}
+            <ul className="mt-1 ml-3 space-y-0.5 border-l pl-2">
+              {lines.map((item, index) => {
+                const key = item.itemKey || `${index}`;
+                const entry = record.itemFulfilment?.[key];
+
+                return (
+                  <li key={key} className="text-[11px] text-gray-700">
+                    {String(item.name ?? "item")} × {String(item.qty ?? 1)} —{" "}
+                    <span
+                      className={
+                        entry?.status === "Delivered"
+                          ? "text-green-700 font-semibold"
+                          : "text-blue-700 font-semibold"
+                      }
+                    >
+                      {fulfilmentStageLabel(entry?.status)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function SlaBadge({ tone, text }: { tone: SlaTone; text: string }) {
+  const cls =
+    tone === "breach"
+      ? "bg-red-100 text-red-800 border-red-300"
+      : tone === "ok"
+      ? "bg-green-100 text-green-800 border-green-300"
+      : tone === "running"
+      ? "bg-blue-100 text-blue-800 border-blue-300"
+      : "bg-gray-100 text-gray-700 border-gray-300";
+
+  return (
+    <span
+      className={`inline-block border rounded-full px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${cls}`}
+    >
+      {text}
+    </span>
+  );
+}
+
+type SellerFulfilment = {
+  id: string;
+  orderId: string;
+  vendorId: string;
+  /** Per line item — the source of truth. The seller-level stage is derived. */
+  itemFulfilment?: ItemFulfilmentMap;
+  items?: { itemKey?: string; name?: unknown; qty?: unknown }[];
+  itemCount?: number;
+  vendorEarning?: number;
+  courierPartner?: string;
+  trackingNumber?: string;
+  dispatchDate?: string;
+  expectedDelivery?: string;
+  confirmedAt?: unknown;
+  deliveryDeadlineAt?: unknown;
+  deliveredAt?: unknown;
 };
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+
+  // The SLA table is a separate view rather than a second table always on the
+  // page: its countdowns need a ticking clock, and running that behind the
+  // order-management table would re-render it every second for nothing.
+  // Per-seller fulfilment records, grouped by their parent orderId. Admin
+  // reads the whole collection; firestore.rules restricts every other caller
+  // to their own vendorId.
+  const [sellerRecords, setSellerRecords] = useState<
+    Record<string, SellerFulfilment[]>
+  >({});
+
+  const [view, setView] = useState<"orders" | "sla">("orders");
+  const [nowTick, setNowTick] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    if (view !== "sla") return;
+
+    // No synchronous setState here — the first interval tick refreshes the
+    // clock a second later, which is invisible against hour/minute
+    // countdowns and avoids a cascading render on view switch.
+    const id = setInterval(() => setNowTick(new Date()), 1000);
+
+    return () => clearInterval(id);
+  }, [view]);
 
   useEffect(() => {
     loadOrders();
@@ -83,6 +251,22 @@ export default function AdminOrdersPage() {
           paymentStatus: data.paymentStatus || "",
           status: data.status || "Pending",
           createdAt: data.createdAt || null,
+          // Timing fields the confirm API (app/api/confirm-order) stamps.
+          // Without carrying these through, orderSlaRow() receives an order
+          // with createdAt but no confirmedAt and reads a genuinely confirmed
+          // order as "confirmed before the feature existed": Confirmed shows
+          // "—", Clock A reads "No placement time", Clock B reads "Awaiting
+          // Confirmation". They are read-only here — no clock is recomputed,
+          // no field is duplicated; this just hands the SLA page the data the
+          // Order type already declares.
+          confirmedAt: data.confirmedAt || null,
+          confirmedBy: data.confirmedBy || "",
+          // Absent (not false) on an order confirmed on time; orderSlaRow
+          // tests === true, so it is carried through as written, not defaulted.
+          confirmedLate: data.confirmedLate,
+          adminConfirmDeadlineAt: data.adminConfirmDeadlineAt || null,
+          deliveryDeadlineAt: data.deliveryDeadlineAt || null,
+          deliveredAt: data.deliveredAt || null,
           courierName: data.courierName || "",
           trackingNumber: data.trackingNumber || "",
           expectedDelivery: data.expectedDelivery || "",
@@ -107,6 +291,29 @@ export default function AdminOrdersPage() {
       // so leave insertion order; admin can search/filter.
      items.sort((a, b) =>(b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0) );
 setOrders(items);
+
+      // Per-seller fulfilment records for the SLA view. Nested so a failure
+      // here — the collection may not exist yet on a project where nothing
+      // has been confirmed since this shipped — cannot lose the orders.
+      try {
+        const sellerSnap = await getDocs(collection(db, "sellerOrders"));
+        const grouped: Record<string, SellerFulfilment[]> = {};
+
+        sellerSnap.forEach((docSnap) => {
+          const data = docSnap.data() as Omit<SellerFulfilment, "id">;
+          if (!data.orderId) return;
+
+          (grouped[data.orderId] ||= []).push({ id: docSnap.id, ...data });
+        });
+
+        for (const list of Object.values(grouped)) {
+          list.sort((a, b) => a.vendorId.localeCompare(b.vendorId));
+        }
+
+        setSellerRecords(grouped);
+      } catch (sellerError) {
+        console.error("Failed to load seller fulfilment records:", sellerError);
+      }
     } catch (error) {
       console.error("Failed to load orders:", error);
     } finally {
@@ -138,7 +345,38 @@ setOrders(items);
       // than silently restoring stock for goods already delivered.
       //
       // Every other status transition below is unchanged.
-      if (status === "Cancelled") {
+      // Confirmation is server-authoritative because it is what starts the
+      // seller's two clocks. /api/confirm-order stamps ONE confirmedAt and
+      // derives both the 24h response deadline and the 72h packing ceiling
+      // from it, inside a transaction. Writing status straight from here
+      // would confirm the order with no deadlines at all, and the seller
+      // could then never respond — the rules require all three fields.
+      if (status === "Confirmed" && previousStatus === "Pending") {
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          alert("Please sign in again.");
+          return;
+        }
+
+        const idToken = await currentUser.getIdToken();
+
+        const response = await fetch("/api/confirm-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ orderId }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(data?.error || "Couldn't confirm this order.");
+          return;
+        }
+      } else if (status === "Cancelled") {
         const currentUser = auth.currentUser;
 
         if (!currentUser) {
@@ -164,7 +402,15 @@ setOrders(items);
           return;
         }
       } else {
-        await updateDoc(doc(db, "orders", orderId), { status });
+        // The 72h delivery clock is measured against deliveredAt, so the
+        // admin path stamps it too — previously only the delivery-partner
+        // screen did.
+        await updateDoc(doc(db, "orders", orderId), {
+          status,
+          ...(status === "Delivered" && previousStatus !== "Delivered"
+            ? { deliveredAt: serverTimestamp() }
+            : {}),
+        });
       }
 
       await logAdminAction("order_status_change", orderId, {
@@ -188,18 +434,22 @@ setOrders(items);
           userId: currentOrder.userId,
           role: "customer",
           title: "📦 Order Updated",
-          message: `Your order is now ${status}.`,
+          message: `Your order is now ${fulfilmentStageLabel(status)}.`,
           type: "order",
           read: false,
           createdAt: serverTimestamp(),
         });
       }
 
-      setOrders(
-        orders.map((order) =>
-          order.id === orderId ? { ...order, status } : order
-        )
-      );
+      // Re-pull from Firestore rather than patching { ...order, status }
+      // locally. Confirmation stamps confirmedAt, adminConfirmDeadlineAt,
+      // deliveryDeadlineAt and confirmedLate server-side, and marking
+      // Delivered stamps deliveredAt; a status-only optimistic patch would
+      // leave the SLA row reading a just-confirmed order as untimed
+      // (Confirmed "—", Clock A "No placement time", Clock B "Awaiting
+      // Confirmation"). Reloading uses the authoritative timestamps the API
+      // wrote instead of reconstructing them here.
+      await loadOrders();
     } catch (error) {
       console.error(error);
     }
@@ -296,7 +546,7 @@ setOrders(items);
     const due = Number(order.refundAmountDue || order.finalTotal || 0);
 
     const amountInput = prompt(
-      `Amount actually refunded for order ${order.id.slice(0, 8)} (₹).\n\nAmount owed: ₹${due.toLocaleString(
+      `Amount actually refunded for order ${shortOrderLabel(order.id)} (₹).\n\nAmount owed: ₹${due.toLocaleString(
         "en-IN"
       )}`,
       String(due)
@@ -459,6 +709,29 @@ const filtered = orders.filter(
           </div>
         </div>
 
+        <div className="flex flex-wrap gap-2 mb-6">
+          <button
+            onClick={() => setView("orders")}
+            className={`px-5 py-2.5 rounded-2xl font-semibold transition ${
+              view === "orders"
+                ? "bg-green-600 text-white shadow"
+                : "bg-white text-gray-700 shadow-sm hover:bg-gray-50"
+            }`}
+          >
+            Order Management
+          </button>
+          <button
+            onClick={() => setView("sla")}
+            className={`px-5 py-2.5 rounded-2xl font-semibold transition ${
+              view === "sla"
+                ? "bg-green-600 text-white shadow"
+                : "bg-white text-gray-700 shadow-sm hover:bg-gray-50"
+            }`}
+          >
+            Order Timing / SLA
+          </button>
+        </div>
+
         <input
           type="text"
           placeholder="Search Order ID, Customer, Email or Tracking Number..."
@@ -470,6 +743,186 @@ const filtered = orders.filter(
         {loading ? (
           <div className="bg-white rounded-3xl shadow p-10 text-center">
             <p className="text-lg text-gray-500">Loading Orders...</p>
+          </div>
+        ) : view === "sla" ? (
+          <div className="bg-white rounded-2xl shadow p-4 sm:p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold">Order Timing / SLA</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Two independent clocks.{" "}
+                <span className="font-semibold">Clock A — Admin Confirmation</span>{" "}
+                runs 24h from order placement.{" "}
+                <span className="font-semibold">Clock B — Delivery</span> runs
+                72h from admin confirmation. Monitoring only: a passed deadline
+                never blocks a status change.
+              </p>
+            </div>
+
+            {/* Desktop */}
+            <div className="hidden lg:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-100 border-b text-left">
+                    <th className="py-3 px-2">Order</th>
+                    <th className="py-3 px-2">Placed</th>
+                    <th className="py-3 px-2">Confirm by (24h)</th>
+                    <th className="py-3 px-2">Confirmed</th>
+                    <th className="py-3 px-2">Clock A</th>
+                    <th className="py-3 px-2">Deliver by (72h)</th>
+                    <th className="py-3 px-2">Delivered</th>
+                    <th className="py-3 px-2">Clock B</th>
+                    <th className="py-3 px-2">Seller Fulfilment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((order) => {
+                    const row = orderSlaRow(order, nowTick);
+
+                    return (
+                      <tr key={order.id} className="border-b align-top">
+                        <td className="py-3 px-2 font-mono text-xs" title={order.id}>
+                          {row.label}
+                        </td>
+                        <td className="py-3 px-2">{formatIst(row.createdAt)}</td>
+                        <td className="py-3 px-2">
+                          {formatIst(row.confirmDeadlineAt)}
+                          {row.confirmationRemainingMs !== null && (
+                            <div
+                              className={`text-xs mt-0.5 ${
+                                row.confirmationRemainingMs < 0
+                                  ? "text-red-700 font-semibold"
+                                  : "text-gray-600"
+                              }`}
+                            >
+                              {formatRemaining(row.confirmationRemainingMs)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">{formatIst(row.confirmedAt)}</td>
+                        <td className="py-3 px-2">
+                          <SlaBadge
+                            tone={CONFIRMATION_SLA_TONE[row.confirmation]}
+                            text={CONFIRMATION_SLA_TEXT[row.confirmation]}
+                          />
+                        </td>
+                        <td className="py-3 px-2">
+                          {row.deliveryDeadlineAt ? formatIst(row.deliveryDeadlineAt) : "—"}
+                          {row.deliveryRemainingMs !== null && (
+                            <div
+                              className={`text-xs mt-0.5 ${
+                                row.deliveryRemainingMs < 0
+                                  ? "text-red-700 font-semibold"
+                                  : "text-gray-600"
+                              }`}
+                            >
+                              {formatRemaining(row.deliveryRemainingMs)}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-2">{formatIst(row.deliveredAt)}</td>
+                        <td className="py-3 px-2">
+                          <SlaBadge
+                            tone={DELIVERY_SLA_TONE[row.delivery]}
+                            text={DELIVERY_SLA_TEXT[row.delivery]}
+                          />
+                        </td>
+                        <td className="py-3 px-2">
+                          <SellerFulfilmentList
+                            records={sellerRecords[order.id]}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile / tablet: one card per order rather than a squeezed table */}
+            <div className="lg:hidden space-y-4">
+              {filtered.map((order) => {
+                const row = orderSlaRow(order, nowTick);
+
+                return (
+                  <div key={order.id} className="border rounded-2xl p-4">
+                    <p className="font-mono text-xs text-gray-600 break-all" title={order.id}>
+                      {row.label}
+                    </p>
+
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <SlaBadge
+                        tone={CONFIRMATION_SLA_TONE[row.confirmation]}
+                        text={CONFIRMATION_SLA_TEXT[row.confirmation]}
+                      />
+                      <SlaBadge
+                        tone={DELIVERY_SLA_TONE[row.delivery]}
+                        text={DELIVERY_SLA_TEXT[row.delivery]}
+                      />
+                    </div>
+
+                    <dl className="mt-3 text-sm space-y-1">
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-500">Placed</dt>
+                        <dd className="text-right">{formatIst(row.createdAt)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-500">Confirm by (24h)</dt>
+                        <dd className="text-right">
+                          {formatIst(row.confirmDeadlineAt)}
+                          {row.confirmationRemainingMs !== null && (
+                            <span
+                              className={`block text-xs ${
+                                row.confirmationRemainingMs < 0
+                                  ? "text-red-700 font-semibold"
+                                  : "text-gray-600"
+                              }`}
+                            >
+                              {formatRemaining(row.confirmationRemainingMs)}
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-500">Confirmed</dt>
+                        <dd className="text-right">{formatIst(row.confirmedAt)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-500">Deliver by (72h)</dt>
+                        <dd className="text-right">
+                          {row.deliveryDeadlineAt ? formatIst(row.deliveryDeadlineAt) : "—"}
+                          {row.deliveryRemainingMs !== null && (
+                            <span
+                              className={`block text-xs ${
+                                row.deliveryRemainingMs < 0
+                                  ? "text-red-700 font-semibold"
+                                  : "text-gray-600"
+                              }`}
+                            >
+                              {formatRemaining(row.deliveryRemainingMs)}
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-500">Delivered</dt>
+                        <dd className="text-right">{formatIst(row.deliveredAt)}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="mt-3 pt-3 border-t">
+                      <p className="text-xs font-semibold text-gray-500 mb-1">
+                        Seller Fulfilment
+                      </p>
+                      <SellerFulfilmentList records={sellerRecords[order.id]} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {filtered.length === 0 && (
+              <p className="text-center text-gray-500 py-8">No orders match.</p>
+            )}
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow p-6 overflow-x-auto">
@@ -501,7 +954,14 @@ const filtered = orders.filter(
                       key={order.id}
                       className="border-b hover:bg-gray-50 transition align-top"
                     >
-                      <td className="py-4 px-2">{order.id.slice(0, 8)}</td>
+                      {/* id.slice(0, 8) showed the CUSTOMER uid prefix for
+                          pay-on-delivery orders (ids are
+                          `${customerUid}_${idempotencyKey}`), so every order
+                          by one customer rendered identically. The full id is
+                          on the title attribute. */}
+                      <td className="py-4 px-2" title={order.id}>
+                        {shortOrderLabel(order.id)}
+                      </td>
                       <td>{order.customerName}</td>
                       <td>
                         ₹
@@ -521,8 +981,88 @@ const filtered = orders.filter(
                               : "bg-yellow-100 text-yellow-700"
                           }`}
                         >
-                          {order.status}
+                          {fulfilmentStageLabel(order.status)}
                         </span>
+
+                        {/* Order timing. Two independent clocks — see
+                            lib/orderTiming.ts. Both are observational: an
+                            overdue order is never blocked or auto-cancelled,
+                            and an admin can always still confirm. */}
+                        {(() => {
+                          const confirmation = confirmationTiming(order);
+                          const delivery = deliveryTiming(order);
+
+                          if (
+                            confirmation.state === "not-applicable" &&
+                            delivery.state === "not-started"
+                          ) {
+                            return null;
+                          }
+
+                          const breached =
+                            confirmation.breached || delivery.breached;
+
+                          return (
+                            <div
+                              className={`mt-2 border rounded-lg p-2 ${
+                                breached
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-blue-300 bg-blue-50"
+                              }`}
+                            >
+                              <p
+                                className={`text-xs font-bold ${
+                                  breached ? "text-red-800" : "text-blue-900"
+                                }`}
+                              >
+                                Order Timing
+                              </p>
+
+                              <ul
+                                className={`text-[11px] mt-1 space-y-0.5 ${
+                                  breached ? "text-red-900" : "text-blue-900"
+                                }`}
+                              >
+                                {confirmation.deadlineAt && (
+                                  <li>
+                                    Confirm by (24h from placement):{" "}
+                                    {formatIst(confirmation.deadlineAt)}
+                                    {confirmation.state === "awaiting" &&
+                                      " · " +
+                                        relativeToNow(confirmation.deadlineAt)}
+                                    {confirmation.state === "overdue" &&
+                                      " · CONFIRMATION OVERDUE"}
+                                    {confirmation.state === "late" &&
+                                      " · confirmed late"}
+                                    {confirmation.state === "on-time" &&
+                                      " · confirmed on time"}
+                                  </li>
+                                )}
+
+                                {delivery.deadlineAt && (
+                                  <li>
+                                    Deliver by (72h from confirmation):{" "}
+                                    {formatIst(delivery.deadlineAt)}
+                                    {delivery.state === "on-track" &&
+                                      " · " + relativeToNow(delivery.deadlineAt)}
+                                    {delivery.state === "overdue" &&
+                                      " · DELIVERY OVERDUE"}
+                                    {delivery.state === "met" &&
+                                      " · delivered on time"}
+                                    {delivery.state === "late" &&
+                                      " · delivered late"}
+                                  </li>
+                                )}
+
+                                {delivery.deliveredAt && (
+                                  <li>
+                                    Delivered: {formatIst(delivery.deliveredAt)}
+                                  </li>
+                                )}
+                              </ul>
+                            </div>
+                          );
+                        })()}
 
                         {order.needsReview === true && (
                           <div className="mt-2 border border-amber-300 bg-amber-50 rounded-lg p-2">
@@ -659,13 +1199,23 @@ const filtered = orders.filter(
   }}
                           className="border p-2 rounded-lg mt-2"
                         >
-                          <option>Pending</option>
-                          <option>Confirmed</option>
-                          <option>Packed</option>
-                          <option>Shipped</option>
-                          <option>Out For Delivery</option>
-                          <option>Delivered</option>
-                          <option>Cancelled</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Confirmed">
+                            {fulfilmentStageLabel("Confirmed")}
+                          </option>
+                          <option value="Packed">
+                            {fulfilmentStageLabel("Packed")}
+                          </option>
+                          <option value="Shipped">
+                            {fulfilmentStageLabel("Shipped")}
+                          </option>
+                          <option value="Out For Delivery">
+                            {fulfilmentStageLabel("Out For Delivery")}
+                          </option>
+                          <option value="Delivered">
+                            {fulfilmentStageLabel("Delivered")}
+                          </option>
+                          <option value="Cancelled">Cancelled</option>
                         </select>
                       </td>
                       <td>{order.createdAt ? order.createdAt.toDate().toLocaleDateString("en-IN"): "-"}</td>

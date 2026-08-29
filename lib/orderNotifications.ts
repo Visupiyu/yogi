@@ -14,21 +14,15 @@ import { Timestamp } from "firebase-admin/firestore";
 // Nothing here is read from a request body: the caller passes values it has
 // already derived from the order document it just wrote.
 
-export type OrderNotificationItem = {
-  vendorId?: string | null;
-  name?: string | null;
-};
-
 export async function emitOrderPlacedNotifications(
   db: Firestore,
   params: {
     customerName: string;
     customerUid: string;
     orderTotal: number;
-    items: OrderNotificationItem[];
   }
 ): Promise<void> {
-  const { customerName, customerUid, orderTotal, items } = params;
+  const { customerName, customerUid, orderTotal } = params;
 
   // Admin. No userId by design — the admin feed queries on role alone.
   await db.collection("notifications").add({
@@ -40,21 +34,16 @@ export async function emitOrderPlacedNotifications(
     createdAt: Timestamp.now(),
   });
 
-  // One per vendor line, addressed to that vendor. Cross-user by design: the
-  // customer's order is what the seller needs to be told about.
-  for (const item of items || []) {
-    if (!item?.vendorId) continue;
-
-    await db.collection("notifications").add({
-      userId: item.vendorId,
-      role: "seller",
-      title: "🛒 New Order",
-      message: `${customerName} ordered ${item.name || "an item"}`,
-      type: "order",
-      read: false,
-      createdAt: Timestamp.now(),
-    });
-  }
+  // The seller notification that stood here has moved to
+  // app/api/confirm-order (see lib/sellerOrderNotifications.ts).
+  //
+  // A new order is Pending until an admin confirms it, and firestore.rules
+  // hides Pending orders from every seller read and query. Announcing one
+  // here therefore told the seller about an order they are forbidden to open
+  // — the notification bell was a side channel straight around that rule.
+  //
+  // Admin and customer notifications are unchanged: both are entitled to
+  // know the moment the order exists.
 
   // Customer's own confirmation.
   await db.collection("notifications").add({

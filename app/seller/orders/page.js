@@ -2,40 +2,47 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  doc,
-  updateDoc,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import {
+  ITEM_FULFILMENT_STAGES,
+  deriveFulfilmentStage,
+  fulfilmentActionLabel,
+  fulfilmentStageLabel,
+  isStageComplete,
+  nextItemStage,
+} from "@/lib/itemFulfilment";
+import { requestItemAdvance } from "@/lib/sellerFulfilmentClient";
+import { deliveryTiming, formatIst, relativeToNow } from "@/lib/orderTiming";
+import { shortOrderLabel } from "@/lib/orderSla";
 
-// Mirrors isLegalOrderStatusTransition in firestore.rules — used here
-// only to keep the dropdown from offering a move the rule would reject.
-const NEXT_STATUSES = {
-  Pending: ["Confirmed", "Cancelled"],
-  Confirmed: ["Packed", "Cancelled"],
-  Packed: ["Shipped", "Cancelled"],
-  Shipped: ["Out For Delivery"],
-  "Out For Delivery": ["Delivered"],
-  Delivered: [],
-  Cancelled: [],
-};
+// Seller Orders — backed by the seller's own `sellerOrders` records.
+//
+// Fulfilment is per LINE ITEM, held in each record's itemFulfilment map, and
+// that map is the source of truth. The parent orders.status is not consulted
+// here at all: it is the customer-facing order state, not this seller's work.
+//
+// Two consequences worth knowing:
+//
+//   * Pending orders cannot appear. A record only exists once an admin has
+//     confirmed the order (app/api/confirm-order creates it in the
+//     confirmation transaction), so there is nothing to filter out.
+//
+//   * The query is a plain equality on vendorId. The old
+//     array-contains + status != 'Pending' query against `orders` needed a
+//     composite index; this one needs none, and firestore.rules independently
+//     restricts every record to its own vendor.
+//
+// Customer contact details (phone, email, address) live on the parent order
+// and are shown on the order detail page, which still reads it.
 
-// The ONLY paymentMethod a vendor may mark Paid by themselves. Kept as an
-// explicit allow-list so an unrecognised or newly-added method is refused
-// by default rather than silently permitted.
-const VENDOR_SELF_PAID_METHODS = ["COD"];
 export default function SellerOrdersPage() {
   const router = useRouter();
-  const [orders, setOrders] = useState([]);
+  const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [busyKey, setBusyKey] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -45,34 +52,25 @@ export default function SellerOrdersPage() {
       }
 
       try {
-        const vendorId = firebaseUser.uid;
-
-        // Scoped by the rules (vendor must be in vendorIds). No orderBy here,
-        // so no composite index is required — we sort in code below.
-        const q = query(
-          collection(db, "orders"),
-          where("vendorIds", "array-contains", vendorId)
+        const snapshot = await getDocs(
+          query(
+            collection(db, "sellerOrders"),
+            where("vendorId", "==", firebaseUser.uid)
+          )
         );
 
-        const snapshot = await getDocs(q);
-        const sellerOrders = [];
-
+        const list = [];
         snapshot.forEach((docSnap) => {
-          const order = { ...docSnap.data(), id: docSnap.id };
-          const myItems = (order.items || []).filter(
-            (item) => item.vendorId === vendorId
-          );
-          if (myItems.length > 0) {
-            sellerOrders.push({ ...order, items: myItems });
-          }
+          list.push({ id: docSnap.id, ...docSnap.data() });
         });
 
-        // Newest first
-        sellerOrders.sort(
-          (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+        // Newest first. Sorted in code so no orderBy index is needed.
+        list.sort(
+          (a, b) =>
+            (b.confirmedAt?.seconds || 0) - (a.confirmedAt?.seconds || 0)
         );
 
-        setOrders(sellerOrders);
+        setRecords(list);
       } catch (error) {
         console.error("Failed to load seller orders:", error);
       } finally {
@@ -83,142 +81,52 @@ export default function SellerOrdersPage() {
     return () => unsub();
   }, [router]);
 
-  const updateStatus = async (orderId, newStatus) => {
+  // Advancing goes through the server so the parent order's derived status is
+  // recalculated in the same transaction. A direct write is refused by the
+  // rules — itemFulfilment is server-only.
+  const advanceItem = async (record, itemKey) => {
+    if (!nextItemStage(String(record.itemFulfilment?.[itemKey]?.status))) return;
+
+    const user = auth.currentUser;
+    if (!user) return;
+
+    setBusyKey(`${record.id}:${itemKey}`);
+
     try {
-      const currentOrder = orders.find((order) => order.id === orderId);
+      const result = await requestItemAdvance({
+        idToken: await user.getIdToken(),
+        recordId: record.id,
+        itemKey,
+      });
 
-      // Cancellation is server-authoritative — /api/cancel-order is the single
-      // implementation, the same one app/orders (customer) already calls.
-      //
-      // This path used to set status and restore stock from the browser and
-      // nothing else, so a seller-cancelled order left the customer's reward
-      // points credited for an order that never happened AND their coupon
-      // still consumed. Which button was pressed silently changed the
-      // financial outcome. The route re-reads the order, authorizes the
-      // caller against it (vendorIds branch), and does status + stock/sales +
-      // reward reversal + coupon release in one Admin SDK transaction.
-      //
-      // Every other status transition below is unchanged.
-      if (newStatus === "Cancelled") {
-        const currentUser = auth.currentUser;
-
-        if (!currentUser) {
-          alert("Please login first");
-          router.push("/vendor-login");
-          return;
-        }
-
-        const idToken = await currentUser.getIdToken();
-
-        const response = await fetch("/api/cancel-order", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ orderId }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          alert(data?.error || "Couldn't cancel this order.");
-          return;
-        }
-
-        // The route does not write notifications, so this stays here —
-        // same wording and shape as before.
-        if (currentOrder?.userId) {
-          await addDoc(collection(db, "notifications"), {
-            userId: currentOrder.userId,
-            role: "customer",
-            title: "📦 Order Updated",
-            message: `Your order is now ${newStatus}.`,
-            type: "order",
-            read: false,
-            createdAt: serverTimestamp(),
-          });
-        }
-
-        setOrders((prev) =>
-          prev.map((order) =>
-            order.id === orderId ? { ...order, status: newStatus } : order
-          )
-        );
-
+      if (!result.ok) {
+        alert(result.error);
         return;
       }
 
-      const payload = {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-      };
-
-      // Legacy cash-COD orders collect payment on delivery — mark it paid
-      // in the same write, matching what the Firestore rule allows a
-      // seller to do.
-      //
-      // ALLOW-LIST, not a deny-list. This previously excluded only
-      // "ONLINE" and "PAY_ON_DELIVERY_UPI", so every other value defaulted
-      // to permitted — and production carries four distinct paymentMethod
-      // values, including "UPI" and the display string
-      // "Pay on Delivery (UPI Only)". That let a vendor self-certify
-      // payment on orders whose money had not been verified, which with
-      // the fulfilled+paid payout gate also unlocks their own earnings.
-      //
-      // "COD" is the only value that legitimately settles in cash at the
-      // door with no second party to verify it (see PaymentMethod in
-      // lib/payment.ts). Everything else — known or unknown, now or later
-      // — is blocked by default: Pay on Delivery (UPI Only) moves to Paid
-      // only via the delivery partner's transaction-reference write plus
-      // admin verification, and ONLINE is already Paid at creation.
-      if (
-        newStatus === "Delivered" &&
-        VENDOR_SELF_PAID_METHODS.includes(currentOrder?.paymentMethod) &&
-        currentOrder?.paymentStatus !== "Paid"
-      ) {
-        payload.paymentStatus = "Paid";
-      }
-
-      await updateDoc(doc(db, "orders", orderId), payload);
-
-      // The client-side stock/sales restore that stood here is gone —
-      // cancellation returns above, and /api/cancel-order performs the
-      // restoration inside the same transaction as the status change, so a
-      // failed write can no longer leave stock and status disagreeing.
-
-      if (currentOrder?.userId) {
-        await addDoc(collection(db, "notifications"), {
-          userId: currentOrder.userId,
-          role: "customer",
-          title: "📦 Order Updated",
-          message: `Your order is now ${newStatus}.`,
-          type: "order",
-          read: false,
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      await addDoc(collection(db, "notifications"), {
-        role: "seller",
-        userId: auth.currentUser?.uid,
-        title: "✅ Order Status Changed",
-        message: `Order ${orderId.slice(0, 8)} updated to ${newStatus}.`,
-        type: "order",
-        read: false,
-        createdAt: serverTimestamp(),
-      });
-
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, status: newStatus } : order
+      setRecords((prev) =>
+        prev.map((r) =>
+          r.id === record.id
+            ? {
+                ...r,
+                itemFulfilment: {
+                  ...r.itemFulfilment,
+                  [itemKey]: {
+                    status: result.itemStatus,
+                    updatedAt: new Date(),
+                  },
+                },
+              }
+            : r
         )
       );
 
-      alert("Status Updated");
-    } catch (err) {
-      console.error("Failed to update order:", err);
-      alert("Error Updating Status");
+      alert(
+        `Marked ${fulfilmentStageLabel(result.itemStatus)} · order is now ` +
+          fulfilmentStageLabel(result.parentStatus)
+      );
+    } finally {
+      setBusyKey(null);
     }
   };
 
@@ -226,19 +134,10 @@ export default function SellerOrdersPage() {
     return <div className="p-5">Loading...</div>;
   }
 
-  const steps = [
-    "Pending",
-    "Confirmed",
-    "Packed",
-    "Shipped",
-    "Out For Delivery",
-    "Delivered",
-  ];
-
-  const filteredOrders = orders.filter(
-    (order) =>
-      order.id.toLowerCase().includes(search.toLowerCase()) ||
-      order.customerName?.toLowerCase().includes(search.toLowerCase())
+  const filtered = records.filter(
+    (record) =>
+      record.orderId?.toLowerCase().includes(search.toLowerCase()) ||
+      record.customerName?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -246,12 +145,13 @@ export default function SellerOrdersPage() {
       <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 rounded-3xl mb-6">
         <h1 className="text-4xl font-bold">Seller Orders</h1>
         <p className="opacity-90">
-          Manage customer orders and delivery status
+          Each product moves through Confirmed → Accept → Ready for Delivery →
+          Handed Over to Courier → Final Delivery on its own.
         </p>
       </div>
 
       <div className="mb-6 bg-white p-4 rounded-2xl shadow">
-        <p className="text-lg font-semibold">Total Orders: {orders.length}</p>
+        <p className="text-lg font-semibold">Total Orders: {records.length}</p>
       </div>
 
       <input
@@ -262,145 +162,139 @@ export default function SellerOrdersPage() {
         className="w-full border p-4 rounded-2xl mb-6"
       />
 
-      {orders.length === 0 ? (
+      {records.length === 0 ? (
         <div className="bg-white p-10 rounded-3xl text-center shadow">
-          <p className="text-gray-500 text-lg">No orders available yet.</p>
+          <p className="text-gray-500 text-lg">
+            No orders available yet. Orders appear here once an admin confirms
+            them.
+          </p>
         </div>
       ) : (
         <div className="space-y-5">
-          {filteredOrders.map((order) => (
-            <div
-              key={order.id}
-              className="bg-white border rounded-xl p-5 shadow"
-            >
-              <h2 className="font-bold text-lg">
-                Order ID: {order.id.slice(0, 8)}
-              </h2>
+          {filtered.map((record) => {
+            // Derived summary only — the per-product rows below are the truth.
+            const stage = deriveFulfilmentStage(record.itemFulfilment) ?? "—";
+            const timing = deliveryTiming({
+              status: stage,
+              confirmedAt: record.confirmedAt,
+              deliveryDeadlineAt: record.deliveryDeadlineAt,
+            });
 
-              <p>Customer: {order.customerName}</p>
+            return (
+              <div
+                key={record.id}
+                className="bg-white border rounded-xl p-5 shadow"
+              >
+                <h2 className="font-bold text-lg" title={record.orderId}>
+                  Order ID: {shortOrderLabel(record.orderId || "")}
+                </h2>
 
-              <p>
-                Date:{" "}
-                {order.createdAt?.toDate
-                  ? order.createdAt.toDate().toLocaleDateString()
-                  : "-"}
-              </p>
+                <p>Customer: {record.customerName || "Customer"}</p>
 
-              <p>Phone: {order.phone}</p>
-              <p>Email: {order.userEmail}</p>
-              <p>Address: {order.address}</p>
+                <p>Confirmed: {formatIst(record.confirmedAt)}</p>
 
-              <p>
-                Payment:{" "}
-                <span
-                  className={
-                    order.paymentStatus === "Paid"
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }
-                >
-                  {order.paymentStatus || "Pending"}
-                </span>
-              </p>
+                <p>
+                  Deliver by: {formatIst(record.deliveryDeadlineAt)}
+                  {timing.deadlineAt && (
+                    <span
+                      className={
+                        timing.state === "overdue"
+                          ? " text-red-700 font-semibold"
+                          : " text-gray-600"
+                      }
+                    >
+                      {" "}
+                      ({relativeToNow(timing.deadlineAt)})
+                    </span>
+                  )}
+                </p>
 
-              <p>Method: {order.paymentMethod || "Pay on Delivery (UPI Only)"}</p>
-              <p>
-                Seller Earnings: ₹
-                {(() => {
-                  // order.sellerEarning is the WHOLE order's earnings —
-                  // wrong for a multi-vendor order. order.items here is
-                  // already filtered to just this seller's own items.
-                  const subtotal = order.items.reduce(
-                    (sum, item) => sum + (item.price || 0) * (item.qty || 0),
-                    0
-                  );
-                  return (subtotal - Math.round(subtotal * 0.1)).toLocaleString("en-IN");
-                })()}
-              </p>
+                <p className="mt-1">
+                  Your earnings: ₹
+                  {Number(record.vendorEarning || 0).toLocaleString("en-IN")}
+                </p>
 
-              <div className="mt-4">
-                <p className="font-semibold mb-2">
-                  Status:{" "}
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                      order.status === "Delivered"
-                        ? "bg-green-100 text-green-700"
-                        : order.status === "Cancelled"
-                        ? "bg-red-100 text-red-700"
-                        : order.status === "Out For Delivery"
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-yellow-100 text-yellow-700"
-                    }`}
-                  >
-                    {order.status}
+                <p className="mt-2 text-sm">
+                  <span className="text-gray-500">Overall (summary): </span>
+                  <span className="font-semibold">
+                    {fulfilmentStageLabel(stage)}
                   </span>
                 </p>
 
-                {NEXT_STATUSES[order.status]?.length > 0 ? (
-                  <select
-                    value={order.status}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (
-                        value === "Delivered" &&
-                        !confirm("Mark this order as Delivered?")
-                      ) {
-                        return;
-                      }
-                      updateStatus(order.id, value);
-                    }}
-                    className="border p-2 rounded-lg"
-                  >
-                    <option value={order.status}>{order.status}</option>
-                    {NEXT_STATUSES[order.status].map((next) => (
-                      <option key={next} value={next}>
-                        {next}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    No further status changes available.
-                  </p>
-                )}
-              </div>
+                <hr className="my-4" />
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {steps.map((step, index) => (
-                  <div
-                    key={index}
-                    className={`px-3 py-1 rounded-full text-xs ${
-                      steps.indexOf(step) <= steps.indexOf(order.status)
-                        ? "bg-green-600 text-white"
-                        : "bg-gray-200"
-                    }`}
-                  >
-                    {step}
-                  </div>
-                ))}
-              </div>
+                {/* One row per product. Advancing one never touches another. */}
+                <div className="space-y-2">
+                  {(record.items || []).map((item, index) => {
+                    const key = item.itemKey || `i${index}`;
+                    const status =
+                      record.itemFulfilment?.[key]?.status ?? "Confirmed";
+                    const next = nextItemStage(String(status));
+                    const busy = busyKey === `${record.id}:${key}`;
 
-              <hr className="my-4" />
+                    return (
+                      <div
+                        key={key}
+                        className="border rounded-xl p-3 flex flex-wrap items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold">{item.name}</p>
+                          <p className="text-sm text-gray-600">
+                            ₹{item.price} × {item.qty} = ₹
+                            {(item.price || 0) * (item.qty || 0)}
+                          </p>
+                        </div>
 
-              {order.items.map((item, index) => (
-                <div key={index} className="mb-3">
-                  <p className="font-semibold">{item.name}</p>
-                  <p>
-                    ₹{item.price} × {item.qty} = ₹{item.price * item.qty}
-                  </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Stage strip, per product. Starts at Confirmed —
+                              Pending is not a seller stage — and Confirmed
+                              stays neutral because the seller has not done
+                              anything yet. */}
+                          <div className="flex flex-wrap gap-1">
+                            {ITEM_FULFILMENT_STAGES.map((step) => (
+                              <span
+                                key={step}
+                                className={`px-2 py-1 rounded-full text-[11px] ${
+                                  isStageComplete(step, status)
+                                    ? "bg-green-600 text-white"
+                                    : "bg-gray-200"
+                                }`}
+                              >
+                                {fulfilmentStageLabel(step)}
+                              </span>
+                            ))}
+                          </div>
+
+                          {next ? (
+                            <button
+                              onClick={() => advanceItem(record, key)}
+                              disabled={busy}
+                              className="bg-green-600 hover:bg-green-700 disabled:opacity-60 transition text-white px-3 py-1.5 rounded-lg text-xs font-semibold"
+                            >
+                              {busy ? "Saving..." : fulfilmentActionLabel(next)}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-400">
+                              Complete
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
 
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href={`/seller/orders/${order.id}`}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  View Details
-                </Link>
+                <div className="mt-4">
+                  <Link
+                    href={`/seller/orders/${record.orderId}`}
+                    className="bg-blue-600 hover:bg-blue-700 transition text-white px-4 py-2 rounded-lg inline-block"
+                  >
+                    View Details
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

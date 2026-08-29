@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ORDER_STEPS, TOTAL_STEPS, getStep } from "@/lib/orderTracking";
+import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 
 // Guest order tracking.
 //
@@ -179,7 +180,7 @@ export default function TrackOrderPage() {
                       : "bg-blue-100 text-blue-700"
                   }`}
                 >
-                  {result.status}
+                  {fulfilmentStageLabel(result.status)}
                 </span>
               </div>
 

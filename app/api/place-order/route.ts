@@ -447,7 +447,6 @@ export async function POST(request: Request) {
         customerName,
         customerUid: requester.uid,
         orderTotal: pricing.finalTotal,
-        items: pricing.items,
       });
     } catch (error) {
       console.error("place-order: notification failed:", error);

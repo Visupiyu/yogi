@@ -11,6 +11,7 @@ import Image from "next/image";
 const navItems = [
   { href: "/seller", label: "Dashboard", icon: "📊" },
   { href: "/seller/orders", label: "Orders", icon: "📦" },
+  { href: "/seller/fulfilment", label: "Fulfilment", icon: "🚚" },
   { href: "/seller#add-product", label: "Add Product", icon: "➕" },
   { href: "/seller#products", label: "Products", icon: "🏷️" },
   { href: "/seller/inventory", label: "Inventory", icon: "📋" },
@@ -36,6 +37,7 @@ const SELLER_ROUTE_SEGMENTS = new Set([
   "assistant",
   "chat",
   "edit",
+  "fulfilment",
   "inventory",
   "invoice",
   "notifications",

@@ -58,7 +58,14 @@ export default function SellerPage() {
       const ordersSnap = await getDocs(
         query(
           collection(db, "orders"),
-          where("vendorIds", "array-contains", vendorId)
+          where("vendorIds", "array-contains", vendorId),
+          // Sellers must never see a Pending order: it belongs to them only once
+          // an admin confirms it. firestore.rules enforces this on the orders
+          // read rule, and the rules engine REJECTS this entire query unless it
+          // carries a filter proving the constraint - an unfiltered
+          // array-contains query returns permission-denied. Load-bearing, not
+          // cosmetic. Needs the orders vendorIds+status composite index.
+          where("status", "!=", "Pending")
         )
       );
 
@@ -78,7 +85,12 @@ export default function SellerPage() {
 
         if (sellerItems.length > 0) {
           ordersCount++;
-          if (order.status === "Pending") pendingCount++;
+          // Was a count of status "Pending". Sellers can no longer read
+          // Pending orders at all, so that counter could only ever be 0 -
+          // which would read as "nothing needs your attention" while
+          // confirmed orders sat unpacked. Confirmed is the state that
+          // genuinely awaits the seller.
+          if (order.status === "Confirmed") pendingCount++;
 
           const share = computeVendorShare(order, vendorId);
 

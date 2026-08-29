@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 
 import { auth, db } from "@/lib/firebase";
+import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 import { onAuthStateChanged } from "firebase/auth";
 
 import * as XLSX from "xlsx";
@@ -58,7 +59,14 @@ export default function SellerReportsPage(){
 
           query(
             collection(db, "orders"),
-            where("vendorIds", "array-contains", vendorUid)
+            where("vendorIds", "array-contains", vendorUid),
+            // Sellers must never see a Pending order: it belongs to them only once
+            // an admin confirms it. firestore.rules enforces this on the orders
+            // read rule, and the rules engine REJECTS this entire query unless it
+            // carries a filter proving the constraint - an unfiltered
+            // array-contains query returns permission-denied. Load-bearing, not
+            // cosmetic. Needs the orders vendorIds+status composite index.
+            where("status", "!=", "Pending")
           )
 
         );
@@ -238,7 +246,7 @@ data.sort(
 
               "₹"+o.amount,
 
-              o.status,
+              fulfilmentStageLabel(o.status),
 
               o.date
 
@@ -465,7 +473,7 @@ const totalRevenue = orders.reduce(
                   </td>
 
                   <td>
-                    {order.status}
+                    {fulfilmentStageLabel(order.status)}
                   </td>
 
                   <td>

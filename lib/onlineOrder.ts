@@ -360,7 +360,6 @@ export async function finalizeOnlineOrder(params: {
         customerName: intent.customerName,
         customerUid: intent.uid,
         orderTotal: outcome.finalTotal,
-        items: pricing.items,
       });
     } catch (error) {
       console.error("finalizeOnlineOrder: notification failed:", error);

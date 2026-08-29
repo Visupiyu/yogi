@@ -18,6 +18,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
+import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -400,7 +401,7 @@ export default function ProfilePage() {
                         order.status
                       )}`}
                     >
-                      {order.status}
+                      {fulfilmentStageLabel(order.status)}
                     </span>
                   </div>
                 </Link>

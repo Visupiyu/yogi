@@ -12,16 +12,26 @@
 //
 // Deliberately dependency-free — no Firebase import of any kind — so the guest
 // tracker can use it without pulling the client SDK, exactly like
-// lib/shippingRules.ts.
+// lib/shippingRules.ts. lib/itemFulfilment.ts is dependency-free for the same
+// reason, so importing the display labels from it keeps that property.
 
-/** The six tracked statuses, in order. Index + 1 is the step number. */
+import { FULFILMENT_STAGE_LABELS } from "@/lib/itemFulfilment";
+
+/**
+ * The six tracked steps, in order. Index + 1 is the step number.
+ *
+ * The wording after the emoji comes from FULFILMENT_STAGE_LABELS so the
+ * customer tracker, the seller stage strip and the admin badges cannot drift
+ * apart. "Pending" has no fulfilment stage behind it — nothing is being
+ * fulfilled yet — so it is spelled out here.
+ */
 export const ORDER_STEPS = [
   "📦 Pending",
-  "✅ Confirmed",
-  "📦 Packed",
-  "🚚 Shipped",
-  "🚚 Out For Delivery",
-  "🎉 Delivered",
+  `✅ ${FULFILMENT_STAGE_LABELS.Confirmed}`,
+  `📦 ${FULFILMENT_STAGE_LABELS.Packed}`,
+  `🚚 ${FULFILMENT_STAGE_LABELS.Shipped}`,
+  `🚚 ${FULFILMENT_STAGE_LABELS["Out For Delivery"]}`,
+  `🎉 ${FULFILMENT_STAGE_LABELS.Delivered}`,
 ] as const;
 
 export const TOTAL_STEPS = ORDER_STEPS.length;
@@ -29,9 +39,10 @@ export const TOTAL_STEPS = ORDER_STEPS.length;
 /**
  * Which step a stored order status corresponds to, 1-based.
  *
- * Labels in ORDER_STEPS match the stored status values exactly — step 1 is
- * "Pending", not "Placed" — so the tracker and the status chip on the same
- * page can never disagree.
+ * The switch below is on the STORED status value, which is unchanged by the
+ * display relabelling — ORDER_STEPS carries the customer-facing wording, this
+ * function carries the data. Step 1 is stored "Pending", never "Placed", so
+ * the tracker and the status chip on the same page can never disagree.
  *
  * Unknown and terminal-but-untracked statuses ("Cancelled") fall back to 1.
  * Those surfaces render their own notice instead of the tracker, so the value

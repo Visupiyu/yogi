@@ -425,6 +425,30 @@ service cloud.firestore {
         ]);
     }
 
+    // deliveredAt is what YOMICO's 72h delivery clock is measured against, so
+    // a client must not be able to choose its value. It may only appear as
+    // part of a genuine transition to Delivered, and only as request.time —
+    // which serverTimestamp() resolves to and a hand-written Timestamp cannot
+    // match. Non-Delivered writes may clear it to null (the delivery-partner
+    // screen does this when moving an order back), and any write that leaves
+    // it alone is unaffected.
+    function isTrustedDeliveredAt() {
+      return unchanged('deliveredAt')
+        || (
+          request.resource.data.status == 'Delivered'
+          // Only on the TRANSITION into Delivered. Without this a seller
+          // could re-stamp an already-delivered order and walk its recorded
+          // completion time forward, which is exactly what the 72h delivery
+          // clock is measured against.
+          && resource.data.status != 'Delivered'
+          && request.resource.data.deliveredAt == request.time
+        )
+        || (
+          request.resource.data.status != 'Delivered'
+          && request.resource.data.deliveredAt == null
+        );
+    }
+
     match /orders/{orderId} {
       // isAssignedDeliveryPartner() added here as a genuine bug fix, not
       // scope creep: app/delivery/[id]/page.tsx's loadOrder() has always
@@ -436,9 +460,22 @@ service cloud.firestore {
       // payment section — silently fails to load for a real partner
       // account, so leaving it broken would make Step 2's delivery-partner
       // UI unreachable in production.
+      // The vendor branch excludes Pending. An order belongs to the seller
+      // only once an admin has confirmed it — before that it may still be
+      // cancelled, and the seller has no work to do on it.
+      //
+      // Enforced here rather than in the UI on purpose. Every seller query
+      // against orders must carry where('status','!=','Pending') or the
+      // rules engine rejects it outright, so a query that forgets the filter
+      // fails loudly instead of leaking. The customer, admin and
+      // delivery-partner branches are untouched.
       allow read: if isAdmin()
         || isOwnerUid(resource.data.userId)
-        || (isSignedIn() && request.auth.uid in resource.data.vendorIds)
+        || (
+          isSignedIn()
+          && request.auth.uid in resource.data.vendorIds
+          && resource.data.status != 'Pending'
+        )
         || isAssignedDeliveryPartner();
 
       // Order creation is now SERVER-ONLY, for both payment methods.
@@ -473,17 +510,34 @@ service cloud.firestore {
         || (
           isSignedIn()
           && request.auth.uid in resource.data.vendorIds
+          // A seller cannot move an order OUT of Pending. Confirmation is an
+          // admin action performed by app/api/confirm-order, which is what
+          // stamps confirmedAt and starts the 72h delivery clock. Without
+          // this line a seller could write Pending -> Confirmed against a
+          // known order id despite not being able to read it, producing a
+          // Confirmed order with no confirmedAt and therefore no deadline.
+          && resource.data.status != 'Pending'
           // Sellers update status together with shipping/tracking
           // details in one save — all of these must be allowed together,
           // not just status, or every save touching tracking info fails.
+          // 'status' and 'deliveredAt' are deliberately absent.
+          //
+          // orders.status is now DERIVED from item fulfilment: the least
+          // advanced item across every seller on the order. A seller sets it
+          // by advancing their own product through
+          // app/api/seller/advance-item, never by writing it. Leaving it
+          // writable here would be the bypass — one seller could type
+          // "Delivered" onto an order whose other products have not shipped.
+          //
+          // deliveredAt goes with it: the route stamps it when the LAST item
+          // is delivered, which is what the 72h delivery clock measures.
+          //
+          // Cancellation is unaffected — it runs through /api/cancel-order
+          // with the Admin SDK.
           && affectedKeysOnly([
-            'status', 'updatedAt', 'trackingNumber', 'courierPartner',
+            'updatedAt', 'trackingNumber', 'courierPartner',
             'dispatchDate', 'expectedDelivery', 'sellerNotes', 'paymentStatus'
           ])
-          && (
-            unchanged('status')
-            || isLegalOrderStatusTransition(resource.data.status, request.resource.data.status)
-          )
           // A seller may only ever move paymentStatus to 'Paid', and only
           // in the same write that marks the order Delivered — this
           // self-mark-paid path is reserved for the legacy cash-COD flow.
@@ -507,7 +561,11 @@ service cloud.firestore {
             unchanged('paymentStatus')
             || (
               request.resource.data.paymentStatus == 'Paid'
-              && request.resource.data.status == 'Delivered'
+              // Reads the order's CURRENT status rather than the incoming
+              // one, because a seller can no longer send a status at all.
+              // Same guarantee: cash-COD is only self-certifiable once the
+              // order has actually been delivered.
+              && resource.data.status == 'Delivered'
               && resource.data.paymentMethod == 'COD'
             )
           )
@@ -518,6 +576,7 @@ service cloud.firestore {
           // financial or ownership-related.
           isAssignedDeliveryPartner()
           && affectedKeysOnly(['status', 'deliveryNotes', 'proofImage', 'deliveredAt', 'updatedAt'])
+          && isTrustedDeliveredAt()
           && (
             unchanged('status')
             || isLegalOrderStatusTransition(resource.data.status, request.resource.data.status)
@@ -526,6 +585,82 @@ service cloud.firestore {
         || isValidDeliveryPaymentSubmission();
 
       allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // sellerOrders — one per-seller fulfilment record per (order, vendor).
+    //
+    // Created ONLY by app/api/confirm-order, inside the confirmation
+    // transaction, via the Admin SDK. Client creation is denied outright, so
+    // a record cannot come into existence from a customer placing an order —
+    // only from an admin confirming one.
+    //
+    // A record holds exactly one vendor's line items and one vendor's share
+    // of the money, so per-seller isolation is a property of the data, not a
+    // filter applied at read time. The read rule then makes it a boundary: a
+    // seller can only ever address their own records.
+    // ---------------------------------------------------------
+
+    // ---- per-ITEM fulfilment ----
+    //
+    // itemFulfilment is written ONLY by app/api/seller/advance-item, through
+    // the Admin SDK, which bypasses these rules. It advances one item and
+    // recalculates the parent orders.status in the same transaction, so the
+    // summary can never lag the items it summarises.
+    //
+    // The client-side validators that used to live here are gone with the
+    // client write path. The seller update rule below simply omits
+    // itemFulfilment from its allow-list, which denies any direct attempt.
+    //
+    // The forward-only chain itself is enforced by the route, using
+    // isLegalItemTransition() in lib/itemFulfilment.ts — a single definition
+    // rather than one here and one there that can drift apart.
+
+    match /sellerOrders/{recordId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.vendorId == request.auth.uid);
+
+      // Server-only. The Admin SDK bypasses rules, so the confirmation
+      // transaction is unaffected by this.
+      allow create, delete: if false;
+
+      // itemFulfilment is off-limits to EVERY client, admins included. An
+      // admin browser writing it would advance an item without running the
+      // roll-up in app/api/seller/advance-item, leaving orders.status behind
+      // the items it summarises. Admins keep every other field.
+      allow update: if (isAdmin() && unchanged('itemFulfilment'))
+        || (
+          isSignedIn()
+          && resource.data.vendorId == request.auth.uid
+          // Ownership, the parent link, the money, the line items and the
+          // timing are all server-owned and immutable from here. items being
+          // unchanged is what keeps the itemFulfilment keys meaningful.
+          && unchanged('vendorId')
+          && unchanged('orderId')
+          && unchanged('items')
+          && unchanged('vendorSubtotal')
+          && unchanged('vendorCommission')
+          && unchanged('vendorEarning')
+          && unchanged('confirmedAt')
+          && unchanged('deliveryDeadlineAt')
+          && unchanged('createdAt')
+          // No record-level status or deliveredAt: both are DERIVED from the
+          // item map on read, so there is nowhere for a summary to drift
+          // from the items it summarises.
+          // itemFulfilment is NOT in this list. Advancing an item now goes
+          // through app/api/seller/advance-item, which moves the item and
+          // rolls the parent orders.status up in one transaction. Letting a
+          // client write the map directly would let a seller advance a
+          // product while leaving the parent summary behind — the roll-up
+          // could simply be skipped. The Admin SDK bypasses these rules, so
+          // the route is unaffected.
+          //
+          // What a seller may still write here is their own shipping detail.
+          && affectedKeysOnly([
+            'courierPartner', 'trackingNumber', 'dispatchDate',
+            'expectedDelivery', 'sellerNotes', 'updatedAt'
+          ])
+        );
     }
 
     // ---------------------------------------------------------

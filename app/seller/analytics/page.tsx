@@ -72,7 +72,14 @@ export default function SellerAnalyticsPage() {
       const orderSnap = await getDocs(
         query(
           collection(db, "orders"),
-          where("vendorIds", "array-contains", vendorUid)
+          where("vendorIds", "array-contains", vendorUid),
+          // Sellers must never see a Pending order: it belongs to them only once
+          // an admin confirms it. firestore.rules enforces this on the orders
+          // read rule, and the rules engine REJECTS this entire query unless it
+          // carries a filter proving the constraint - an unfiltered
+          // array-contains query returns permission-denied. Load-bearing, not
+          // cosmetic. Needs the orders vendorIds+status composite index.
+          where("status", "!=", "Pending")
         )
       );
       const orderList: any[] = [];

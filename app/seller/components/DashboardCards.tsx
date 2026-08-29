@@ -31,7 +31,10 @@ export default function DashboardCards({
       icon: "📋",
     },
     {
-      title: "Pending",
+      // Counts Confirmed orders - see app/seller/page.tsx. "Pending" would
+      // now be a permanently-zero card, since sellers never see orders in
+      // that state.
+      title: "To Pack",
       value: pendingOrders,
       color: "bg-yellow-500",
       icon: "⏳",
