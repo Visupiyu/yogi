@@ -475,7 +475,7 @@ function RequestInner() {
     const refundAmount =
       typeof existing.refund?.amount === "number" ? existing.refund.amount : 0;
     const creditedOn = fmtDateTime(existing.refund?.creditedAt);
-    const pickupOn = fmtDate(existing.pickup?.scheduledAt);
+    const pickupOn = fmtDateTime(existing.pickup?.scheduledAt);
 
     return (
       <Shell>

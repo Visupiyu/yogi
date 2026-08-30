@@ -52,6 +52,9 @@ export default function AdminReturnsPage() {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<"All" | "return" | "replace">("All");
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Admin's chosen pickup datetime per request (datetime-local value), sent to
+  // the transition API when scheduling a pickup.
+  const [pickupInputs, setPickupInputs] = useState<Record<string, string>>({});
   // Bumped to force a reload after a transition, so the fetch (and its
   // setState calls) stay inside the effect rather than a called-out function.
   const [reloadKey, setReloadKey] = useState(0);
@@ -97,7 +100,11 @@ export default function AdminReturnsPage() {
 
   // Every itemRequests change goes through the transition route (Admin SDK):
   // it validates the move, credits refunds and reserves replacement stock.
-  const transition = async (requestId: string, toStatus: string) => {
+  const transition = async (
+    requestId: string,
+    toStatus: string,
+    pickupAt?: string
+  ) => {
     const user = auth.currentUser;
     if (!user) {
       alert("Please sign in again.");
@@ -112,7 +119,11 @@ export default function AdminReturnsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ requestId, toStatus }),
+        body: JSON.stringify({
+          requestId,
+          toStatus,
+          ...(pickupAt ? { pickupAt } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -246,15 +257,49 @@ export default function AdminReturnsPage() {
                     </span>
 
                     {!isTerminal(status) && (
-                      <div className="flex flex-wrap gap-2">
-                        {next && (
-                          <button
-                            disabled={busy}
-                            onClick={() => transition(r.id, next)}
-                            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"
-                          >
-                            {busy ? "..." : `Mark ${statusLabel(type, next)}`}
-                          </button>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {next === "PICKUP_SCHEDULED" ? (
+                          <div className="flex flex-wrap gap-2 items-center">
+                            <input
+                              type="datetime-local"
+                              value={pickupInputs[r.id] || ""}
+                              onChange={(e) =>
+                                setPickupInputs((p) => ({
+                                  ...p,
+                                  [r.id]: e.target.value,
+                                }))
+                              }
+                              className="text-xs border rounded-lg px-2 py-1"
+                            />
+                            <button
+                              disabled={busy}
+                              onClick={() => {
+                                const v = pickupInputs[r.id];
+                                if (!v) {
+                                  alert("Choose a pickup date and time.");
+                                  return;
+                                }
+                                transition(
+                                  r.id,
+                                  next,
+                                  new Date(v).toISOString()
+                                );
+                              }}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"
+                            >
+                              {busy ? "..." : "Schedule pickup"}
+                            </button>
+                          </div>
+                        ) : (
+                          next && (
+                            <button
+                              disabled={busy}
+                              onClick={() => transition(r.id, next)}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"
+                            >
+                              {busy ? "..." : `Mark ${statusLabel(type, next)}`}
+                            </button>
+                          )
                         )}
                         {canReject && (
                           <button

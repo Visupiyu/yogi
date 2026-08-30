@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       );
     }
 
-    let body: { requestId?: unknown; toStatus?: unknown };
+    let body: { requestId?: unknown; toStatus?: unknown; pickupAt?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -89,6 +89,26 @@ export async function POST(request: Request) {
         { error: "Missing request id or target status." },
         { status: 400 }
       );
+    }
+
+    // Scheduling a pickup REQUIRES a valid date/time from the admin. Validated
+    // here (cheap 400) before the transaction; stored below as
+    // itemRequests.pickup.scheduledAt. `pickupAt` is an ISO datetime string or
+    // epoch millis (the client combines its date + time inputs into one).
+    let pickupScheduledAt: Date | null = null;
+    if (toStatus === "PICKUP_SCHEDULED") {
+      const raw = body.pickupAt;
+      const parsed =
+        typeof raw === "string" || typeof raw === "number"
+          ? new Date(raw)
+          : null;
+      if (!parsed || Number.isNaN(parsed.getTime())) {
+        return Response.json(
+          { error: "A valid pickup date and time is required." },
+          { status: 400 }
+        );
+      }
+      pickupScheduledAt = parsed;
     }
 
     const db = getAdminDb();
@@ -111,6 +131,7 @@ export async function POST(request: Request) {
         item?: { qty?: number; name?: string };
         refund?: { amount?: number; credited?: boolean };
         replacement?: Record<string, unknown>;
+        pickup?: Record<string, unknown>;
         history?: unknown[];
       };
 
@@ -210,6 +231,15 @@ export async function POST(request: Request) {
           credited: true,
           creditedAt: now,
           ...(refundNumber ? { refundNumber } : {}),
+        };
+      }
+
+      // ---- PICKUP: admin-scheduled date/time on PICKUP_SCHEDULED ----
+      if (toStatus === "PICKUP_SCHEDULED" && pickupScheduledAt) {
+        update.pickup = {
+          ...(req.pickup || {}),
+          scheduledAt: Timestamp.fromDate(pickupScheduledAt),
+          scheduledBy: "admin",
         };
       }
 
