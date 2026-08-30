@@ -34,6 +34,13 @@ export interface Product {
   discount?: number;
   currency: string;
 
+  // Tax / GST classification (per product — never assumed). hsn is the HSN/SAC
+  // code; gstRate is the applicable slab (%). Set at listing and snapshotted
+  // onto orders at confirmation so later edits never change historical
+  // invoices.
+  hsn?: string;
+  gstRate?: number;
+
   // Inventory
 stock: number;
 minStock: number;

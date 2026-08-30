@@ -328,9 +328,12 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if true;
 
-      allow create: if isSignedIn()
-        && request.resource.data.vendorId == request.auth.uid
-        && isValidProduct();
+      // Server-only: products are created by app/api/seller/create-product,
+      // which mints the productNumber (PCT…) from an atomic counter in the
+      // same transaction. The Admin SDK bypasses these rules, so denying
+      // client create is what guarantees every product gets a number and no
+      // browser can invent one. Update/read below are unchanged.
+      allow create: if false;
 
       allow update: if isAdmin()
         || (
@@ -690,6 +693,13 @@ service cloud.firestore {
           && unchanged('totalOrders')
           && unchanged('totalRevenue')
           && unchanged('pendingPayout')
+          // Tax/GST profile and its verification are written ONLY by
+          // app/api/seller/tax-profile (validated) and set VERIFIED only by an
+          // admin — never by the seller editing their own vendor doc. sellerNumber
+          // is likewise server-minted.
+          && unchanged('taxProfile')
+          && unchanged('taxVerificationStatus')
+          && unchanged('sellerNumber')
         );
 
       allow delete: if isAdmin();
@@ -1123,6 +1133,42 @@ service cloud.firestore {
           || (unchanged('orderId') && isValidRefundAmount(resource.data.orderId))
         );
       allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // itemRequests — per-item Return / Replace requests.
+    //
+    // A NEW collection alongside the legacy order-level `returns` (which is
+    // left untouched and keeps working). Every mutation is SERVER-ONLY: the
+    // customer creates a request through app/api/item-request, and the admin /
+    // seller advance it and run refund crediting / replacement fulfilment
+    // through its transition route, all on the Admin SDK — where the refund
+    // amount, the item->order->seller binding, per-item eligibility and the
+    // state machine can actually be enforced. Because create/update/delete are
+    // all denied to clients, no refund amount or status can ever be written
+    // from a browser, so there is nothing client-authored to bound here.
+    //
+    // Reads: the owning customer, the vendor whose item it concerns (a seller
+    // therefore sees ONLY their own items — a list must filter by vendorId and
+    // an unfiltered query is refused), and admin. One seller can never read
+    // another seller's request.
+    // ---------------------------------------------------------
+    match /itemRequests/{requestId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.userId == request.auth.uid)
+        || (isSignedIn() && resource.data.vendorId == request.auth.uid);
+      allow create, update, delete: if false;
+    }
+
+    // ---------------------------------------------------------
+    // counters — atomic sequence sources for human-readable numbers
+    // (order/invoice/seller/product/shipment/return/replacement/refund/
+    // payment/payout). Written ONLY by server routes via lib/humanIds inside
+    // the creating entity's transaction. Fully server-only: the Admin SDK
+    // bypasses these rules, and no client may read or move a counter.
+    // ---------------------------------------------------------
+    match /counters/{counterId} {
+      allow read, write: if false;
     }
 
     match /withdrawals/{withdrawalId} {

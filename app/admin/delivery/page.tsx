@@ -17,6 +17,7 @@ import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 
 type Delivery = {
   id: string;
+  orderNumber?: string;
   customerName: string;
   phone?: string;
   address?: string;
@@ -51,6 +52,7 @@ export default function AdminDeliveryPage() {
         const data: any = docSnap.data();
         items.push({
           id: docSnap.id,
+          orderNumber: data.orderNumber || "",
           customerName: data.customerName || "Customer",
           phone: data.phone || "",
           address: data.address || "",
@@ -254,7 +256,7 @@ export default function AdminDeliveryPage() {
                         {order.customerName}
                       </h2>
                     </Link>
-                    <p className="text-gray-500">Order #{order.id.slice(0, 8)}</p>
+                    <p className="text-gray-500">Order #{order.orderNumber || order.id.slice(0, 8)}</p>
                     <div className="mt-2 flex gap-2 flex-wrap">
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${

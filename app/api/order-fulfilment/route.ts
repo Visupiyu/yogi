@@ -25,6 +25,13 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 type TrackedItem = {
   /** The product this line is for — the customer already sees it. */
   productId: string | null;
+  /**
+   * The line's stable fulfilment key (i{vendorIndex}_{productId}). NOT
+   * sensitive — no vendor id, no money — and it is what lets the customer's
+   * order page join a line to its status and to any return/replace request.
+   * Null on a legacy record that predates itemKey.
+   */
+  itemKey: string | null;
   name: string;
   qty: number;
   size: string | null;
@@ -113,6 +120,7 @@ export async function POST(request: Request) {
 
         items.push({
           productId: typeof item.id === "string" ? item.id : null,
+          itemKey: typeof item.itemKey === "string" ? item.itemKey : null,
           name: typeof item.name === "string" ? item.name : "Item",
           qty: Number(item.qty) || 1,
           size: typeof item.size === "string" && item.size ? item.size : null,

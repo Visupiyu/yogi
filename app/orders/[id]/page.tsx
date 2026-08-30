@@ -19,10 +19,13 @@ import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { ORDER_STEPS, TOTAL_STEPS, getStep } from "@/lib/orderTracking";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 import {
-  RETURN_WINDOW_DAYS,
-  canRequestReturn,
-  returnWindowEndsAt,
-} from "@/lib/returnEligibility";
+  isTerminal,
+  itemKeyForOrderIndex,
+  itemRequestEligibility,
+  statusLabel,
+  statusTone,
+  type ItemRequestType,
+} from "@/lib/itemRequests";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -31,6 +34,14 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
   Pending: "Pending",
   AwaitingVerification: "Awaiting Verification",
   Paid: "Paid",
+};
+
+// Badge colours for a return/replace request status, by its tone.
+const REQUEST_BADGE_TONE: Record<string, string> = {
+  ok: "bg-green-100 text-green-800 border-green-300",
+  bad: "bg-red-100 text-red-700 border-red-300",
+  running: "bg-blue-100 text-blue-800 border-blue-300",
+  idle: "bg-amber-100 text-amber-800 border-amber-300",
 };
 
 export default function OrderDetailsPage() {
@@ -45,8 +56,21 @@ export default function OrderDetailsPage() {
   // /api/order-fulfilment — a projection that verifies order ownership and
   // returns product + quantity + status only.
   const [itemStatuses, setItemStatuses] = useState<
-    { productId: string | null; qty: number; status: string }[]
+    {
+      productId: string | null;
+      itemKey: string | null;
+      qty: number;
+      status: string;
+      deliveredAt: string | null;
+    }[]
   >([]);
+
+  // The customer's return/replace requests for this order, keyed by itemKey,
+  // so each product line can show its request status instead of offering a
+  // duplicate action. Readable by the owner (firestore.rules: userId == uid).
+  const [itemRequests, setItemRequests] = useState<
+    Record<string, { type: ItemRequestType; status: string }>
+  >({});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -94,6 +118,35 @@ export default function OrderDetailsPage() {
         } catch (fulfilmentError) {
           // Tracking detail is additive — the page still works without it.
           console.error("Fulfilment status unavailable:", fulfilmentError);
+        }
+
+        // Existing return/replace requests for this order, keyed by itemKey.
+        try {
+          const rq = await getDocs(
+            query(
+              collection(db, "itemRequests"),
+              where("userId", "==", user.uid)
+            )
+          );
+          const map: Record<string, { type: ItemRequestType; status: string }> =
+            {};
+          rq.docs.forEach((d) => {
+            const r = d.data() as {
+              orderId?: string;
+              itemKey?: string;
+              type?: ItemRequestType;
+              status?: string;
+            };
+            if (r.orderId === orderId && r.itemKey) {
+              map[r.itemKey] = {
+                type: r.type === "replace" ? "replace" : "return",
+                status: r.status || "REQUESTED",
+              };
+            }
+          });
+          setItemRequests(map);
+        } catch (requestsError) {
+          console.error("Return/replace requests unavailable:", requestsError);
         }
       } catch (err) {
         console.error("Order page error:", err);
@@ -232,7 +285,7 @@ export default function OrderDetailsPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold">Order Details</h1>
-            <p className="text-gray-500 mt-2">Order #{order.id.slice(0, 8)}</p>
+            <p className="text-gray-500 mt-2">Order #{order.orderNumber || order.id.slice(0, 8)}</p>
           </div>
           <Link
             href="/orders"
@@ -527,16 +580,20 @@ export default function OrderDetailsPage() {
                       these advance independently, so two lines can sit at
                       different stages. */}
                   {(() => {
-                    const matches = itemStatuses.filter(
-                      (s) => s.productId === item.id
-                    );
-                    const tracked = matches[
-                      order.items
-                        .slice(0, index)
-                        .filter(
-                          (prev: { id?: string }) => prev.id === item.id
-                        ).length
-                    ];
+                    // Prefer the stable itemKey; fall back to the
+                    // productId-occurrence match for legacy records with no key.
+                    const itemKey =
+                      itemKeyForOrderIndex(order, index)?.itemKey ?? null;
+                    const tracked =
+                      (itemKey &&
+                        itemStatuses.find((s) => s.itemKey === itemKey)) ||
+                      itemStatuses.filter((s) => s.productId === item.id)[
+                        order.items
+                          .slice(0, index)
+                          .filter(
+                            (prev: { id?: string }) => prev.id === item.id
+                          ).length
+                      ];
 
                     if (!tracked) return null;
 
@@ -582,6 +639,70 @@ export default function OrderDetailsPage() {
                       </>
                     )}
                   </div>
+
+                  {/* Per-item return/replace. Shows the existing request status
+                      when one exists (never a duplicate action), otherwise the
+                      actions — but only when this specific line is eligible
+                      (delivered + inside the window), judged from its own
+                      fulfilment entry via the same rule the server enforces. */}
+                  {(() => {
+                    const itemKey =
+                      itemKeyForOrderIndex(order, index)?.itemKey ?? null;
+                    if (!itemKey) return null;
+
+                    const existing = itemRequests[itemKey];
+                    if (existing) {
+                      const tone = statusTone(existing.status);
+                      return (
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`text-xs font-semibold px-3 py-1 rounded-full border ${REQUEST_BADGE_TONE[tone]}`}
+                          >
+                            {existing.type === "replace"
+                              ? "Replacement"
+                              : "Return"}
+                            : {statusLabel(existing.type, existing.status)}
+                          </span>
+                          {!isTerminal(existing.status) && (
+                            <Link
+                              href={`/returns?orderId=${order.id}&item=${index}&type=${existing.type}`}
+                              className="text-xs font-semibold text-blue-600 underline"
+                            >
+                              Track
+                            </Link>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    const entry = itemStatuses.find(
+                      (s) => s.itemKey === itemKey
+                    );
+                    const eligible = entry
+                      ? itemRequestEligibility(
+                          { itemFulfilment: { [itemKey]: entry } },
+                          itemKey
+                        ).eligible
+                      : false;
+                    if (!eligible) return null;
+
+                    return (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Link
+                          href={`/returns?orderId=${order.id}&item=${index}&type=return`}
+                          className="text-sm font-semibold px-4 py-2 rounded-xl border border-orange-300 text-orange-700 hover:bg-orange-50 transition"
+                        >
+                          Return Item
+                        </Link>
+                        <Link
+                          href={`/returns?orderId=${order.id}&item=${index}&type=replace`}
+                          className="text-sm font-semibold px-4 py-2 rounded-xl border border-blue-300 text-blue-700 hover:bg-blue-50 transition"
+                        >
+                          Replace Item
+                        </Link>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="text-right">
@@ -642,7 +763,7 @@ export default function OrderDetailsPage() {
         <p className="text-gray-600 mt-1">
           Your refund of ₹
           {Number(order.refundAmountDue || 0).toLocaleString("en-IN")} has been
-          initiated. Banks usually take 5–7 business days.
+          initiated. It may take a short while to be completed.
         </p>
       </div>
     )}
@@ -672,32 +793,19 @@ export default function OrderDetailsPage() {
               🎉 Order Delivered Successfully
             </h2>
             <p className="mt-3 text-gray-700">
-            Thank you for shopping with YOMICO.
+              Thank you for shopping with YOMICO.
             </p>
-            {/* Return action only while eligible. Delivered-only behaviour is
-                preserved — this block already required it — with the 7-day
-                window added on top. canRequestReturn() is the same rule
-                /api/request-return enforces server-side. */}
-            {canRequestReturn(order) ? (
-              <Link
-                href={`/returns?orderId=${order.id}`}
-                className="inline-flex mt-6 px-6 py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold"
-              >
-                Request Return
-              </Link>
-            ) : (
-              <p className="mt-6 text-sm text-gray-600">
-                {returnWindowEndsAt(order)
-                  ? `The ${RETURN_WINDOW_DAYS}-day return window closed on ${returnWindowEndsAt(
-                      order
-                    )!.toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}.`
-                  : `The ${RETURN_WINDOW_DAYS}-day return window has closed.`}
-              </p>
-            )}
+            {/* Returns and replacements are now per item — each eligible
+                product above carries its own Return / Replace action and, once
+                requested, its own status. Eligibility is judged per item from
+                that line's delivered date, so this section no longer offers a
+                single order-wide return. */}
+            <p className="mt-4 text-sm text-gray-600">
+              Need to return or replace something? Use the{" "}
+              <span className="font-semibold">Return Item</span> /{" "}
+              <span className="font-semibold">Replace Item</span> button on the
+              product above.
+            </p>
           </div>
         )}
         </div>

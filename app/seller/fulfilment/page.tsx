@@ -42,6 +42,7 @@ type FulfilmentItem = {
 type SellerOrderRecord = {
   id: string;
   orderId: string;
+  orderNumber?: string;
   vendorId: string;
   items: FulfilmentItem[];
   itemFulfilment: ItemFulfilmentMap;
@@ -187,7 +188,7 @@ export default function SellerFulfilmentPage() {
                     <p className="font-bold">
                       Order{" "}
                       <span className="font-mono text-sm" title={record.orderId}>
-                        {shortOrderLabel(record.orderId)}
+                        {record.orderNumber || shortOrderLabel(record.orderId)}
                       </span>
                     </p>
                     <p className="text-sm text-gray-600">

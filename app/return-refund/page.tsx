@@ -95,9 +95,8 @@ export default function ReturnRefundPolicyPage() {
             <p>
 
               Once a returned product has been received and verified,
-              eligible refunds will be processed using the original payment
-              method or another approved method, depending on the payment
-              option used.
+              eligible refunds are credited to your YOMICO Reward Points
+              balance, which you can use towards future purchases on YOMICO.
 
             </p>
             <div>
@@ -107,9 +106,9 @@ export default function ReturnRefundPolicyPage() {
   </h2>
 
   <p>
-    Once a refund is approved, it is typically processed within
-    5–10 business days. The exact time may vary depending on your
-    payment method and financial institution.
+    Reward Points for an approved return are credited to your YOMICO
+    account after the returned item has been received and verified. They
+    may take a short while to appear in your balance.
   </p>
 
 </div>

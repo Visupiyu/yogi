@@ -17,7 +17,7 @@ import {validateProduct} from "@/lib/products/validation";
 import { findDuplicateVariantGroups } from "@/lib/products/variantSelection";
 import { auth, db, storage } from "@/lib/firebase";
 import { productImagePath } from "@/lib/storagePaths";
-import { collection,addDoc,doc,updateDoc,serverTimestamp,} from "firebase/firestore";
+import { doc,updateDoc,serverTimestamp,} from "firebase/firestore";
 import {ref,uploadBytes,getDownloadURL,} from "firebase/storage";
 import { useRouter } from "next/navigation";
 
@@ -80,6 +80,9 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
     discount: 0,
 
     currency: "INR",
+
+    // Tax / GST — the seller must classify each product (no 18% default).
+    hsn: "",
 
     // Inventory
 
@@ -463,6 +466,12 @@ const handleSubmit = async (
     return;
   }
 
+  // GST classification is required per product — the seller must pick a slab.
+  if (![0, 5, 12, 18, 28].includes(Number(product.gstRate))) {
+    setError("Select the product's GST rate.");
+    return;
+  }
+
   // Two variants with identical values on every dimension cannot be told
   // apart by a customer, and the order would not record which one was
   // bought. Refused rather than merged: merging would silently discard the
@@ -601,10 +610,30 @@ const handleSubmit = async (
       const { id: _unusedId, ...newProductPayload } = finalProduct as typeof finalProduct & {
         id?: string;
       };
-      await addDoc(
-        collection(db, "products"),
-        { ...newProductPayload, createdAt: serverTimestamp() }
-      );
+      // Server-authoritative creation: the productNumber (PCT…) is minted
+      // server-side in the same transaction that writes the product. The
+      // browser can no longer create a product directly (firestore.rules).
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        setError("Please sign in again.");
+        setLoading(false);
+        return;
+      }
+      const idToken = await currentUser.getIdToken();
+      const response = await fetch("/api/seller/create-product", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ product: newProductPayload }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data?.error || "Failed to save product.");
+        setLoading(false);
+        return;
+      }
 
       // Remember these values so the next Add Product form starts from
       // them. saveLastUpload strips the image fields — the next product
@@ -1095,6 +1124,39 @@ className="w-full rounded-lg border p-3"
 
 />
 
+</div>
+
+{/* GST rate + HSN — per-product classification (no assumed rate). */}
+<div>
+  <label className="block mb-1 font-semibold">GST Rate (%)</label>
+  <select
+    value={product.gstRate ?? ""}
+    onChange={(e) =>
+      setProduct({
+        ...product,
+        gstRate: e.target.value === "" ? undefined : Number(e.target.value),
+      })
+    }
+    className="w-full rounded-lg border p-3"
+  >
+    <option value="">Select GST rate</option>
+    {[0, 5, 12, 18, 28].map((r) => (
+      <option key={r} value={r}>
+        {r}%
+      </option>
+    ))}
+  </select>
+</div>
+
+<div>
+  <label className="block mb-1 font-semibold">HSN / SAC Code</label>
+  <input
+    type="text"
+    value={product.hsn || ""}
+    onChange={(e) => setProduct({ ...product, hsn: e.target.value })}
+    className="w-full rounded-lg border p-3"
+    placeholder="e.g. 6109"
+  />
 </div>
 
 {/* Selling Price */}

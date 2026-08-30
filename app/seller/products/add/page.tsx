@@ -2,13 +2,18 @@
 
 import ProductForm from "../../components/ProductForm";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs, query, where } from "firebase/firestore";
+import { sellerListingBlockReason } from "@/lib/sellerTax";
 
 export default function AddProductPage() {
  const [vendorId, setVendorId] = useState("");
 const [vendorName, setVendorName] = useState("");
+// GST listing gate — server-enforced by /api/seller/create-product; surfaced
+// here so the seller sees WHY they can't list before filling in the form.
+const [blockReason, setBlockReason] = useState<string | null>(null);
 
 // ProductForm reads the previous upload's values once, when it mounts, and
 // they are stored per seller. Mounting it before auth resolves would hand
@@ -42,6 +47,15 @@ useEffect(() => {
       if (!vendorSnap.empty) {
         const data = vendorSnap.docs[0].data();
         setVendorName(data.businessName || data.fullName || "");
+        setBlockReason(
+          sellerListingBlockReason({
+            gstStatus: data.taxProfile?.gstStatus,
+            gstin: data.taxProfile?.gstin,
+            taxVerificationStatus: data.taxVerificationStatus,
+          })
+        );
+      } else {
+        setBlockReason("Complete your GST / tax profile to start selling.");
       }
 
     } catch (error) {
@@ -69,15 +83,28 @@ useEffect(() => {
           Create a new product for your YOMICO store.
         </p>
       </div>
-      {authReady ? (
+      {!authReady ? (
+        <div className="p-10 text-center text-gray-500">
+          Loading...
+        </div>
+      ) : blockReason ? (
+        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-8">
+          <h2 className="text-xl font-bold text-amber-800">
+            You can&apos;t list products yet
+          </h2>
+          <p className="mt-2 text-gray-700">{blockReason}</p>
+          <Link
+            href="/seller/tax"
+            className="inline-flex mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold"
+          >
+            Go to Tax &amp; GST Profile
+          </Link>
+        </div>
+      ) : (
         <ProductForm
           vendorId={vendorId}
           vendorName={vendorName}
         />
-      ) : (
-        <div className="p-10 text-center text-gray-500">
-          Loading...
-        </div>
       )}
     </div>
   );

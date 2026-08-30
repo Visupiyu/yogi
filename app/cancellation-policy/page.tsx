@@ -98,16 +98,14 @@ export default function CancellationPolicyPage() {
              <p>
 
               If an order is cancelled after successful payment,
-              eligible refunds will be processed according to the
-              YOMICO Return & Refund Policy and the payment provider's
-              processing timelines.
+              eligible refunds will be processed in accordance with the
+              YOMICO Return & Refund Policy.
 
             </p>
 
             <p className="mt-3">
-  Eligible refunds are generally initiated within 5–7 business days after
-  cancellation approval. The actual credit timeline may vary depending on
-  your payment method and financial institution.
+  Eligible refunds are processed after the cancellation has been approved.
+  The exact time for the credit to appear may vary.
 </p>
 
           </div>

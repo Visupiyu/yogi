@@ -186,7 +186,7 @@ export default function SellerOrdersPage() {
                 className="bg-white border rounded-xl p-5 shadow"
               >
                 <h2 className="font-bold text-lg" title={record.orderId}>
-                  Order ID: {shortOrderLabel(record.orderId || "")}
+                  Order ID: {record.orderNumber || shortOrderLabel(record.orderId || "")}
                 </h2>
 
                 <p>Customer: {record.customerName || "Customer"}</p>

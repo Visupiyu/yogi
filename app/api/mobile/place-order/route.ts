@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRequestUser } from "@/lib/serverAuth";
+import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -404,7 +405,14 @@ export async function POST(request: Request) {
         });
       }
 
+      const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
+        { kind: "daily", daily: "order", at: new Date() },
+        { kind: "seq", counter: "payment" },
+      ]);
+
       tx.set(orderRef, {
+        orderNumber,
+        paymentNumber,
         userId: requester.uid,
         customerName,
         customerEmail: requester.email || "",

@@ -315,8 +315,8 @@ export default function TrackOrderPage() {
                   Refund in progress
                 </p>
                 <p className="text-gray-600 mt-1 text-sm">
-                  Your refund has been initiated. Banks usually take 5–7
-                  business days.
+                  Your refund has been initiated. It may take a short while to
+                  be completed.
                 </p>
               </div>
             )}

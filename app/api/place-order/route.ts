@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { computeOrderPricing, type PricedItemInput } from "@/lib/orderPricing";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
+import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -327,11 +328,20 @@ export async function POST(request: Request) {
         });
       }
 
+      // Human-readable numbers, minted after all reads above, before this
+      // first write. Display only — orderRef.id stays the document key.
+      const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
+        { kind: "daily", daily: "order", at: new Date() },
+        { kind: "seq", counter: "payment" },
+      ]);
+
       // Field-for-field the document buildOrderData() produced, with every
       // monetary value replaced by its server-computed equivalent. Seller
       // orders, analytics, invoices, wallet, payouts and computeVendorShare()
       // all read this exact shape.
       tx.set(orderRef, {
+        orderNumber,
+        paymentNumber,
         customerName,
         phone,
         address,

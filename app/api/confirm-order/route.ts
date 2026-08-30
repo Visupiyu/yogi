@@ -1,6 +1,8 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
+import { mintNumbers } from "@/lib/humanIds";
+import { computeLineTaxSnapshot } from "@/lib/sellerTax";
 import {
   ADMIN_CONFIRM_HOURS,
   MAX_DELIVERY_HOURS,
@@ -159,6 +161,56 @@ export async function POST(request: Request) {
         sellerRefs.map((ref) => tx.get(ref))
       );
 
+      // ---- tax-snapshot reads (still before any write) ----
+      // Each line's GST classification is read from the product AS IT IS NOW,
+      // and each seller's GST status from their profile NOW, so the snapshot is
+      // immutable against later product or profile edits.
+      const orderItems: Record<string, unknown>[] = Array.isArray(order.items)
+        ? (order.items as Record<string, unknown>[])
+        : [];
+      const productIds = [
+        ...new Set(
+          orderItems
+            .map((i) => (typeof i?.id === "string" ? i.id : ""))
+            .filter(Boolean)
+        ),
+      ];
+      const productSnaps = await Promise.all(
+        productIds.map((id) => tx.get(db.collection("products").doc(id)))
+      );
+      const productTax: Record<string, { gstRate: number; hsn: string }> = {};
+      productSnaps.forEach((s, i) => {
+        const d = (s.data() || {}) as { gstRate?: unknown; hsn?: unknown };
+        productTax[productIds[i]] = {
+          gstRate: Number(d.gstRate) || 0,
+          hsn: typeof d.hsn === "string" ? d.hsn : "",
+        };
+      });
+
+      const vendorIds = seeds.map((seed) => seed.vendorId);
+      const vendorQuerySnaps = await Promise.all(
+        vendorIds.map((vid) =>
+          tx.get(db.collection("vendors").where("uid", "==", vid).limit(1))
+        )
+      );
+      const sellerTaxByVendor: Record<
+        string,
+        { gstStatus: string; gstin: string }
+      > = {};
+      vendorQuerySnaps.forEach((qs, i) => {
+        const d = (qs.docs[0]?.data() || {}) as {
+          taxProfile?: { gstStatus?: unknown; gstin?: unknown };
+        };
+        sellerTaxByVendor[vendorIds[i]] = {
+          gstStatus:
+            typeof d.taxProfile?.gstStatus === "string"
+              ? d.taxProfile.gstStatus
+              : "UNKNOWN",
+          gstin:
+            typeof d.taxProfile?.gstin === "string" ? d.taxProfile.gstin : "",
+        };
+      });
+
       // ONE instant for every stamp on this order.
       const confirmedAt = Timestamp.now();
 
@@ -175,6 +227,46 @@ export async function POST(request: Request) {
       const confirmedLate = adminConfirmDeadlineAt
         ? confirmedAt.toMillis() > adminConfirmDeadlineAt.toMillis()
         : false;
+
+      // Human-readable invoice + shipment numbers, minted once at confirmation
+      // (this route only runs on a Pending→Confirmed transition). Batched so
+      // all counter reads precede all writes; the invoice date is the
+      // confirmation date; the order's doc id is unchanged.
+      const [invoiceNumber, shipmentNumber] = await mintNumbers(tx, db, [
+        { kind: "daily", daily: "invoice", at: confirmedAt.toDate() },
+        { kind: "seq", counter: "shipment" },
+      ]);
+
+      // Immutable per-line tax snapshot. GST is extracted from the (inclusive)
+      // line price, so the order total is UNCHANGED — this only records the tax
+      // component for the invoice/record. Frozen at confirmation from the
+      // product + seller data read above.
+      const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+      const snapshotItems = orderItems.map((it) => {
+        const pid = typeof it?.id === "string" ? it.id : "";
+        const pt = productTax[pid] || { gstRate: 0, hsn: "" };
+        const line = computeLineTaxSnapshot(
+          Number(it?.price) || 0,
+          Number(it?.qty) || 0,
+          pt.gstRate,
+          pt.hsn
+        );
+        return {
+          productId: pid || null,
+          vendorId: typeof it?.vendorId === "string" ? it.vendorId : null,
+          name: typeof it?.name === "string" ? it.name : "",
+          qty: Number(it?.qty) || 0,
+          ...line,
+        };
+      });
+      const taxSnapshot = {
+        capturedAt: confirmedAt,
+        totalGst: round2(
+          snapshotItems.reduce((sum, i) => sum + (i.gstAmount || 0), 0)
+        ),
+        items: snapshotItems,
+        sellers: sellerTaxByVendor,
+      };
 
       // One record per vendor, sharing the confirmation instant so no second
       // timing system is introduced. Any that somehow already exist are left
@@ -195,6 +287,9 @@ export async function POST(request: Request) {
         status: "Confirmed",
         confirmedAt,
         confirmedBy: requester.uid,
+        invoiceNumber,
+        shipmentNumber,
+        taxSnapshot,
 
         // Clock A, recorded for accountability. Confirmation is NEVER refused
         // because of it.

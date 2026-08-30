@@ -388,7 +388,7 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-between border rounded-2xl p-4 hover:shadow-md transition">
                     <div>
                       <p className="font-semibold">
-                        Order #{order.id.slice(0, 8)}
+                        Order #{order.orderNumber || order.id.slice(0, 8)}
                       </p>
                      <p className="text-sm text-gray-500">
   ₹

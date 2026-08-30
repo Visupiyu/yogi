@@ -5,6 +5,7 @@ import {
   computeVendorPayable,
   evaluateWithdrawalRequest,
 } from "@/lib/vendorPayable";
+import { mintSequential } from "@/lib/humanIds";
 
 // ---------------------------------------------------------------------------
 // The single authoritative path for requesting a payout.
@@ -159,6 +160,13 @@ export async function POST(request: Request) {
       );
     }
 
+    // Human-readable payout number, minted atomically in its own counter
+    // transaction. A burned number on a later failure is an acceptable gap —
+    // numbers must never DUPLICATE or be REUSED, which the counter guarantees.
+    const payoutNumber = await db.runTransaction((tx) =>
+      mintSequential(tx, db, "payout")
+    );
+
     // create() rather than set(): if two requests race past the existence
     // check above, the second fails instead of overwriting the first.
     try {
@@ -166,6 +174,7 @@ export async function POST(request: Request) {
         vendorId: requester.uid,
         vendorEmail: requester.email || "",
         vendorName: businessName,
+        payoutNumber,
         // Server-decided. The figure in the request body only ever narrows
         // this, never widens it — anything above `payable` was refused above.
         amount: verdict.amount,

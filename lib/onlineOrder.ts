@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
+import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import type { OrderPricing } from "@/lib/orderPricing";
 import { sendOrderConfirmationEmail } from "@/lib/orderConfirmationEmail";
@@ -205,7 +206,15 @@ export async function finalizeOnlineOrder(params: {
     // all keep reading exactly what they expect.
     const capturedRupees = Math.round(capturedAmountPaise) / 100;
 
+    // Human-readable numbers, minted after all reads, before this first write.
+    const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
+      { kind: "daily", daily: "order", at: new Date() },
+      { kind: "seq", counter: "payment" },
+    ]);
+
     tx.set(orderRef, {
+      orderNumber,
+      paymentNumber,
       customerName: intent.customerName,
       phone: intent.phone,
       address: intent.address,

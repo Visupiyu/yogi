@@ -28,15 +28,15 @@ export default function InvoiceInfo({
             </td>
 
             <td className="border border-black p-1">
-              {order.id}
+              {order.invoiceNumber || order.id}
             </td>
 
             <td className="border border-black p-1 font-semibold w-1/6">
-              Order ID
+              Order No
             </td>
 
             <td className="border border-black p-1">
-              {order.id}
+              {order.orderNumber || order.id}
             </td>
 
           </tr>

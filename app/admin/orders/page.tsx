@@ -45,6 +45,7 @@ type Order = {
   total: number;
   finalTotal?: number;
   status: string;
+  orderNumber?: string;
   paymentMethod?: string;
   paymentStatus?: string;
   vendorId?: string;
@@ -241,6 +242,7 @@ export default function AdminOrdersPage() {
         const data = docSnap.data();
         items.push({
           id: docSnap.id,
+          orderNumber: data.orderNumber || "",
           customerName: data.customerName || "Customer",
           userId: data.userId || "",
           userEmail: data.userEmail || "",
@@ -960,7 +962,7 @@ const filtered = orders.filter(
                           by one customer rendered identically. The full id is
                           on the title attribute. */}
                       <td className="py-4 px-2" title={order.id}>
-                        {shortOrderLabel(order.id)}
+                        {order.orderNumber || shortOrderLabel(order.id)}
                       </td>
                       <td>{order.customerName}</td>
                       <td>

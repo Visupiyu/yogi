@@ -4,9 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
-import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp} from "firebase/firestore";
+import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp,getDocs,query,where} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import {
+  itemRequestEligibility,
+  itemReturnWindowEndsAt,
+  statusLabel,
+  statusTone,
+  type ItemRequestType,
+} from "@/lib/itemRequests";
 import ShippingLabel from "@/components/ShippingLabel";
 import Invoice from "@/components/invoice/Invoice";
 import { computeVendorShare } from "@/lib/vendorEarnings";
@@ -51,6 +58,22 @@ type SellerFulfilmentRecord = {
 // explicit allow-list so an unrecognised or newly-added method is refused
 // by default rather than silently permitted.
 const VENDOR_SELF_PAID_METHODS: string[] = ["COD"];
+
+// Badge colours for a customer's return/replace request status, by tone.
+const REQUEST_TONE_BADGE: Record<string, string> = {
+  ok: "bg-green-100 text-green-700 border-green-300",
+  bad: "bg-red-100 text-red-700 border-red-300",
+  running: "bg-blue-100 text-blue-700 border-blue-300",
+  idle: "bg-amber-100 text-amber-700 border-amber-300",
+};
+
+// A customer's return/replace request as the SELLER sees it (read-only).
+type SellerVisibleRequest = {
+  type: ItemRequestType;
+  status: string;
+  createdAt?: unknown;
+};
+
 export default function SellerOrderDetailsPage(){
 
   const params = useParams();
@@ -72,6 +95,12 @@ export default function SellerOrderDetailsPage(){
   const [sellerRecord,setSellerRecord] =
     useState<SellerFulfilmentRecord | null>(null);
   const [busyItemKey,setBusyItemKey] = useState<string | null>(null);
+
+  // Customer return/replace requests on THIS seller's items, keyed by itemKey.
+  // Read-only visibility; scoped to this vendor by firestore.rules.
+  const [itemRequests, setItemRequests] = useState<
+    Record<string, SellerVisibleRequest>
+  >({});
   const invoiceRef = useRef<HTMLDivElement>(null);
 const shippingLabelRef = useRef<HTMLDivElement>(null);
    
@@ -140,6 +169,39 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
           }
         } catch (recordError) {
           console.error("Fulfilment record unavailable:", recordError);
+        }
+
+        // Customer return/replace requests for this seller's items on this
+        // order. Query is a plain equality on vendorId — firestore.rules
+        // restricts every itemRequests read to the owning vendor, so another
+        // seller's requests can never be loaded — then filtered to this order.
+        try {
+          const requestSnap = await getDocs(
+            query(
+              collection(db, "itemRequests"),
+              where("vendorId", "==", vendorUid)
+            )
+          );
+          const map: Record<string, SellerVisibleRequest> = {};
+          requestSnap.forEach((docSnap) => {
+            const r = docSnap.data() as {
+              orderId?: string;
+              itemKey?: string;
+              type?: ItemRequestType;
+              status?: string;
+              createdAt?: unknown;
+            };
+            if (r.orderId === id && r.itemKey) {
+              map[r.itemKey] = {
+                type: r.type === "replace" ? "replace" : "return",
+                status: r.status || "REQUESTED",
+                createdAt: r.createdAt,
+              };
+            }
+          });
+          setItemRequests(map);
+        } catch (requestError) {
+          console.error("Return/replace requests unavailable:", requestError);
         }
 
         setStatus(
@@ -938,6 +1000,75 @@ finally{ setSaving(false);} };
                             </p>
 
                           )}
+
+                          {/* Customer Return / Replace visibility — READ ONLY.
+                              Shown only once THIS item is delivered, so an
+                              undelivered line never shows a return window. The
+                              seller has no approve/reject controls here;
+                              returns are the admin's, replacement fulfilment is
+                              handled on the seller Returns page. */}
+                          {stage === "Delivered" &&
+                            (() => {
+                              const req = itemRequests[key];
+                              const elig = itemRequestEligibility(
+                                { itemFulfilment: sellerRecord.itemFulfilment },
+                                key
+                              );
+                              const windowEnd = itemReturnWindowEndsAt(
+                                { itemFulfilment: sellerRecord.itemFulfilment },
+                                key
+                              );
+                              return (
+                                <div className="mt-3 border-t pt-3 text-xs space-y-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-gray-500">
+                                      7-day return / replace window:
+                                    </span>
+                                    <span
+                                      className={
+                                        elig.eligible
+                                          ? "font-semibold text-green-700"
+                                          : "font-semibold text-gray-500"
+                                      }
+                                    >
+                                      {elig.eligible ? "Open" : "Closed"}
+                                    </span>
+                                    {elig.eligible && windowEnd && (
+                                      <span className="text-gray-400">
+                                        · closes {formatIst(windowEnd)}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    {req ? (
+                                      <span className="inline-flex flex-wrap items-center gap-2">
+                                        <span
+                                          className={`inline-block px-2 py-0.5 rounded-full border font-semibold ${
+                                            REQUEST_TONE_BADGE[
+                                              statusTone(req.status)
+                                            ]
+                                          }`}
+                                        >
+                                          {req.type === "replace"
+                                            ? "Replace"
+                                            : "Return"}
+                                          : {statusLabel(req.type, req.status)}
+                                        </span>
+                                        {req.createdAt ? (
+                                          <span className="text-gray-400">
+                                            requested {formatIst(req.createdAt)}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-500">
+                                        No Return/Replace request
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                         </div>
 

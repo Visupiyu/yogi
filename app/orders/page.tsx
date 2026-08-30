@@ -14,11 +14,6 @@ import { toast } from "sonner";
 import { addToCart } from "@/lib/cart";
 import { ORDER_STEPS, getStep } from "@/lib/orderTracking";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
-import {
-  RETURN_WINDOW_DAYS,
-  canRequestReturn,
-  returnWindowEndsAt,
-} from "@/lib/returnEligibility";
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
@@ -419,7 +414,7 @@ export default function OrdersPage() {
     <p className="text-gray-600 mt-1">
       Your refund of ₹
       {Number(order.refundAmountDue || 0).toLocaleString("en-IN")} has been
-      initiated. Banks usually take 5–7 business days.
+      initiated. It may take a short while to be completed.
     </p>
   </div>
 )}
@@ -922,43 +917,16 @@ export default function OrdersPage() {
 
       </p>
 
-      {/* Return action only while eligible. Delivered-only behaviour is
-          preserved — this whole block already required it — with the 7-day
-          window added on top. canRequestReturn() is the same rule
-          /api/request-return enforces server-side; this is only what the
-          customer sees. */}
-      {canRequestReturn(order) ? (
-        <a
-          href={`/returns?orderId=${order.id}`}
-          className="
-            inline-flex
-            mt-5
-            bg-orange-500
-            hover:bg-orange-600
-            text-white
-            px-6
-            py-3
-            rounded-xl
-            font-semibold
-          "
-        >
-
-          Request Return
-
-        </a>
-      ) : (
-        <p className="mt-5 text-sm text-gray-600">
-          {returnWindowEndsAt(order)
-            ? `The ${RETURN_WINDOW_DAYS}-day return window closed on ${returnWindowEndsAt(
-                order
-              )!.toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })}.`
-            : `The ${RETURN_WINDOW_DAYS}-day return window has closed.`}
-        </p>
-      )}
+      {/* Returns and replacements are per item. The customer picks the
+          specific product on Order Details, where each eligible line carries
+          its own Return / Replace action and, once requested, its own status.
+          The old order-wide "Request Return" button is intentionally gone. */}
+      <a
+        href={`/orders/${order.id}`}
+        className="inline-flex mt-5 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold"
+      >
+        Return or Replace an item
+      </a>
 
     </div>
 

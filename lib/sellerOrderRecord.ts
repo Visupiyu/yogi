@@ -69,6 +69,8 @@ export type SellerOrderItem = {
 
 export type SellerOrderRecordSeed = {
   orderId: string;
+  /** The parent order's human-readable number, for display; null on legacy. */
+  orderNumber: string | null;
   vendorId: string;
   items: SellerOrderItem[];
   /** Keyed by itemKey. Every line starts at Confirmed, independently. */
@@ -84,6 +86,7 @@ export type SellerOrderRecordSeed = {
 type ParentOrder = {
   vendorIds?: unknown;
   items?: unknown;
+  orderNumber?: unknown;
   customerName?: unknown;
   deliveryDate?: unknown;
   total?: number;
@@ -153,6 +156,8 @@ export function buildSellerOrderSeed(
 
   return {
     orderId,
+    orderNumber:
+      typeof order?.orderNumber === "string" ? order.orderNumber : null,
     vendorId,
     items,
     itemFulfilment,

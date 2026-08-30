@@ -40,6 +40,23 @@ setVendors(items);
     }
   };
 
+  // Admin-only GST verification. Sets taxVerificationStatus on the vendor
+  // (the vendor rule allows an admin to write it; sellers cannot). This is the
+  // only path to VERIFIED.
+  const updateTaxVerification = async (id: string, status: string) => {
+    try {
+      await updateDoc(doc(db, "vendors", id), { taxVerificationStatus: status });
+      await logAdminAction("tax_verification_change", id, { newStatus: status });
+      setVendors(
+        vendors.map((vendor) =>
+          vendor.id === id ? { ...vendor, taxVerificationStatus: status } : vendor
+        )
+      );
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const updateKYC = async (id: string, status: string) => {
     try {
       const previous = vendors.find((vendor) => vendor.id === id);
@@ -92,6 +109,7 @@ setVendors(items);
                 <tr className="bg-gray-100 border-b">
                   <th className="text-left py-4 px-3">Vendor</th>
                   <th className="text-left">GST</th>
+                  <th className="text-left">GST Status / Verify</th>
                   <th className="text-left">PAN</th>
                   <th className="text-left">Aadhaar</th>
                   <th className="text-left">Email</th>
@@ -107,6 +125,34 @@ setVendors(items);
                   >
                     <td className="py-4 px-3">{vendor.businessName || "-"}</td>
                     <td>{vendor.gstNumber || "-"}</td>
+                    <td>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-gray-600">
+                          {vendor.taxProfile?.gstStatus || "—"}
+                          {vendor.taxVerificationStatus
+                            ? ` · ${vendor.taxVerificationStatus}`
+                            : ""}
+                        </span>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() =>
+                              updateTaxVerification(vendor.id, "VERIFIED")
+                            }
+                            className="text-xs px-2 py-1 rounded bg-green-600 text-white"
+                          >
+                            Verify
+                          </button>
+                          <button
+                            onClick={() =>
+                              updateTaxVerification(vendor.id, "REJECTED")
+                            }
+                            className="text-xs px-2 py-1 rounded border border-red-300 text-red-700"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </td>
                     <td>{vendor.panNumber || "-"}</td>
                     <td>{vendor.aadhaarNumber || "-"}</td>
                     <td>{vendor.email || "-"}</td>

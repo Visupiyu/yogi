@@ -1,6 +1,7 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
+import { mintSequential } from "@/lib/humanIds";
 
 // ---------------------------------------------------------------------------
 // Emits the "New Vendor Registration" admin notification.
@@ -83,6 +84,18 @@ export async function POST(request: Request) {
       typeof vendor?.businessName === "string" && vendor.businessName.trim()
         ? vendor.businessName.trim().slice(0, 120)
         : "A new vendor";
+
+    // Server finalization: mint the human-readable sellerNumber (SELLER…) onto
+    // the vendor document, once. The vendor doc itself is created by the
+    // registration form; this authoritative server step assigns its number
+    // atomically. Idempotent — a vendor that already has one is left alone, so
+    // a retried finalize never mints a second.
+    if (!vendor?.sellerNumber) {
+      const sellerNumber = await db.runTransaction((tx) =>
+        mintSequential(tx, db, "seller")
+      );
+      await vendorDoc.ref.update({ sellerNumber });
+    }
 
     // Idempotent: one registration notification per vendor application, so a
     // retried or replayed submit cannot flood the admin feed.
