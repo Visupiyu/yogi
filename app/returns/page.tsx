@@ -70,7 +70,12 @@ type ItemRequestDoc = {
   orderId?: string;
   reason?: string;
   refund?: { amount?: number; destination?: string; creditedAt?: unknown };
-  pickup?: { scheduledAt?: unknown };
+  pickup?: {
+    scheduledAt?: unknown;
+    requestedAt?: unknown;
+    requestedBy?: unknown;
+    partner?: unknown;
+  };
 };
 
 type OrderItem = {
@@ -225,6 +230,9 @@ function RequestInner() {
 
   const [reason, setReason] = useState("");
   const [comments, setComments] = useState("");
+  // Customer's PREFERRED pickup datetime (datetime-local value) — a preference
+  // only; admin confirms the actual appointment.
+  const [preferredPickup, setPreferredPickup] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -339,7 +347,18 @@ function RequestInner() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ orderId, parentIndex, type, reason, comments }),
+        body: JSON.stringify({
+          orderId,
+          parentIndex,
+          type,
+          reason,
+          comments,
+          // Preferred pickup applies to returns only (a replacement is
+          // delivered, not picked up). Optional.
+          ...(type === "return" && preferredPickup
+            ? { preferredPickupAt: new Date(preferredPickup).toISOString() }
+            : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -475,7 +494,10 @@ function RequestInner() {
     const refundAmount =
       typeof existing.refund?.amount === "number" ? existing.refund.amount : 0;
     const creditedOn = fmtDateTime(existing.refund?.creditedAt);
-    const pickupOn = fmtDateTime(existing.pickup?.scheduledAt);
+    const pickupOn = fmtDateTime(existing.pickup?.scheduledAt); // admin-confirmed
+    const pickupRequestedOn = fmtDateTime(existing.pickup?.requestedAt); // customer preference
+    const pickupPartner =
+      typeof existing.pickup?.partner === "string" ? existing.pickup.partner : "";
 
     return (
       <Shell>
@@ -524,18 +546,31 @@ function RequestInner() {
               </p>
             )}
 
-          {/* Pickup info while a return is in the pickup phase — req 7 & 8.
-              A specific date is shown only if the backend actually scheduled
-              one; no slots are invented. */}
+          {/* Pickup — shows the customer's PREFERRED time and, once the team
+              sets it, the CONFIRMED appointment. The confirmed one is labelled
+              clearly so the two are never confused. */}
           {exType === "return" &&
             !isTerminal(exStatus) &&
-            (exStatus === "APPROVED" || exStatus === "PICKUP_SCHEDULED") && (
+            (exStatus === "APPROVED" ||
+              exStatus === "PICKUP_SCHEDULED" ||
+              pickupRequestedOn) && (
               <div className="mt-4 rounded-2xl border p-4 text-sm">
                 <p className="font-semibold mb-1">Pickup</p>
-                {pickupOn ? (
-                  <p className="text-gray-700">Scheduled for {pickupOn}.</p>
-                ) : (
+
+                {pickupRequestedOn && (
                   <p className="text-gray-600">
+                    Your preferred time: {pickupRequestedOn}
+                    {!pickupOn && " (awaiting confirmation)"}
+                  </p>
+                )}
+
+                {pickupOn ? (
+                  <p className="text-green-700 font-semibold mt-1">
+                    ✓ Confirmed pickup: {pickupOn}
+                    {pickupPartner ? ` · ${pickupPartner}` : ""}
+                  </p>
+                ) : (
+                  <p className="text-gray-600 mt-1">
                     {exStatus === "PICKUP_SCHEDULED"
                       ? "A pickup has been scheduled — our courier will contact you to confirm the time."
                       : "A pickup will be arranged shortly."}
@@ -714,6 +749,30 @@ function RequestInner() {
                 className="w-full border p-3 rounded-xl disabled:bg-gray-100"
               />
             </div>
+
+            {/* Preferred pickup — returns only, and a PREFERENCE (our team
+                confirms the actual appointment). */}
+            {type === "return" && (
+              <div className="mb-6">
+                <label className="block mb-2 font-semibold">
+                  Preferred pickup date &amp; time{" "}
+                  <span className="text-xs font-normal text-gray-400">
+                    (optional)
+                  </span>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={preferredPickup}
+                  onChange={(e) => setPreferredPickup(e.target.value)}
+                  disabled={!eligibility.eligible}
+                  className="w-full border p-3 rounded-xl disabled:bg-gray-100"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  We&apos;ll try to honour this; our team confirms the final
+                  pickup time.
+                </p>
+              </div>
+            )}
 
             {/* Address (req 7). */}
             {AddressBlock}

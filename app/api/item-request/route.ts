@@ -84,6 +84,7 @@ export async function POST(request: Request) {
       type?: unknown;
       reason?: unknown;
       comments?: unknown;
+      preferredPickupAt?: unknown;
     };
     try {
       body = await request.json();
@@ -125,6 +126,33 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    // Customer's PREFERRED pickup date/time — optional, and never treated as a
+    // confirmed appointment (admin confirms that separately in the transition
+    // route as pickup.scheduledAt). Validated only when provided.
+    let preferredPickupAt: Date | null = null;
+    const rawPref = body.preferredPickupAt;
+    if (rawPref !== undefined && rawPref !== null && rawPref !== "") {
+      // Pickup only applies to returns; a replacement ships a new item, so a
+      // preferred pickup on a replacement is a client error, not stored silently.
+      if (type !== "return") {
+        return Response.json(
+          { error: "A preferred pickup time only applies to a return." },
+          { status: 400 }
+        );
+      }
+      const parsed =
+        typeof rawPref === "string" || typeof rawPref === "number"
+          ? new Date(rawPref)
+          : null;
+      if (!parsed || Number.isNaN(parsed.getTime())) {
+        return Response.json(
+          { error: "Please choose a valid preferred pickup date and time." },
+          { status: 400 }
+        );
+      }
+      preferredPickupAt = parsed;
+    }
+
     if (comments.length > 2000) {
       return Response.json(
         { error: "Comments are too long." },
@@ -249,6 +277,17 @@ export async function POST(request: Request) {
 
         ...(type === "replace"
           ? { replacement: { fulfilmentRecordId: null } }
+          : {}),
+
+        // Customer's preferred pickup — a PREFERENCE, not a confirmed slot.
+        // Admin's confirmed pickup is written separately as pickup.scheduledAt.
+        ...(preferredPickupAt
+          ? {
+              pickup: {
+                requestedAt: Timestamp.fromDate(preferredPickupAt),
+                requestedBy: "customer",
+              },
+            }
           : {}),
 
         // Flagged when eligible but no delivered date was on record.

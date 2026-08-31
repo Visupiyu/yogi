@@ -41,8 +41,36 @@ type ItemRequest = {
   needsReview?: boolean;
   item?: { name?: string; image?: string; qty?: number };
   refund?: { amount?: number };
+  pickup?: {
+    requestedAt?: { seconds?: number; toDate?: () => Date };
+    scheduledAt?: { seconds?: number; toDate?: () => Date };
+    requestedBy?: string;
+    partner?: string;
+  };
   createdAt?: { seconds?: number };
 };
+
+// Format a Firestore Timestamp-like value as an IST date + time.
+function fmtWhen(
+  ts: { seconds?: number; toDate?: () => Date } | undefined
+): string {
+  const d =
+    ts && typeof ts.toDate === "function"
+      ? ts.toDate()
+      : ts && typeof ts.seconds === "number"
+      ? new Date(ts.seconds * 1000)
+      : null;
+  return d
+    ? d.toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+    : "";
+}
 
 export default function AdminReturnsPage() {
   const [requests, setRequests] = useState<ItemRequest[]>([]);
@@ -55,6 +83,8 @@ export default function AdminReturnsPage() {
   // Admin's chosen pickup datetime per request (datetime-local value), sent to
   // the transition API when scheduling a pickup.
   const [pickupInputs, setPickupInputs] = useState<Record<string, string>>({});
+  // Admin's confirmed pickup partner per request, sent when scheduling.
+  const [partnerInputs, setPartnerInputs] = useState<Record<string, string>>({});
   // Bumped to force a reload after a transition, so the fetch (and its
   // setState calls) stay inside the effect rather than a called-out function.
   const [reloadKey, setReloadKey] = useState(0);
@@ -103,7 +133,8 @@ export default function AdminReturnsPage() {
   const transition = async (
     requestId: string,
     toStatus: string,
-    pickupAt?: string
+    pickupAt?: string,
+    pickupPartner?: string
   ) => {
     const user = auth.currentUser;
     if (!user) {
@@ -123,6 +154,7 @@ export default function AdminReturnsPage() {
           requestId,
           toStatus,
           ...(pickupAt ? { pickupAt } : {}),
+          ...(pickupPartner ? { pickupPartner } : {}),
         }),
       });
       const data = await res.json();
@@ -247,6 +279,17 @@ export default function AdminReturnsPage() {
                         ⚠ No delivery date on record — verify eligibility.
                       </p>
                     )}
+                    {r.pickup?.requestedAt && (
+                      <p className="mt-1 text-blue-700 text-xs">
+                        Customer preferred pickup: {fmtWhen(r.pickup.requestedAt)}
+                      </p>
+                    )}
+                    {r.pickup?.scheduledAt && (
+                      <p className="mt-1 text-green-700 text-xs font-semibold">
+                        ✓ Confirmed pickup: {fmtWhen(r.pickup.scheduledAt)}
+                        {r.pickup.partner ? ` · ${r.pickup.partner}` : ""}
+                      </p>
+                    )}
                   </div>
 
                   <div className="lg:w-64 flex flex-col gap-2">
@@ -271,6 +314,18 @@ export default function AdminReturnsPage() {
                               }
                               className="text-xs border rounded-lg px-2 py-1"
                             />
+                            <input
+                              type="text"
+                              placeholder="Pickup partner"
+                              value={partnerInputs[r.id] || ""}
+                              onChange={(e) =>
+                                setPartnerInputs((p) => ({
+                                  ...p,
+                                  [r.id]: e.target.value,
+                                }))
+                              }
+                              className="text-xs border rounded-lg px-2 py-1"
+                            />
                             <button
                               disabled={busy}
                               onClick={() => {
@@ -282,7 +337,8 @@ export default function AdminReturnsPage() {
                                 transition(
                                   r.id,
                                   next,
-                                  new Date(v).toISOString()
+                                  new Date(v).toISOString(),
+                                  partnerInputs[r.id]?.trim() || undefined
                                 );
                               }}
                               className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"

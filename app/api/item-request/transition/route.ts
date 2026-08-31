@@ -72,7 +72,12 @@ export async function POST(request: Request) {
       );
     }
 
-    let body: { requestId?: unknown; toStatus?: unknown; pickupAt?: unknown };
+    let body: {
+      requestId?: unknown;
+      toStatus?: unknown;
+      pickupAt?: unknown;
+      pickupPartner?: unknown;
+    };
     try {
       body = await request.json();
     } catch {
@@ -110,6 +115,13 @@ export async function POST(request: Request) {
       }
       pickupScheduledAt = parsed;
     }
+
+    // Optional confirmed pickup partner (courier), set by admin alongside the
+    // scheduled time. Trimmed and length-capped; never trusted for identity.
+    const pickupPartner =
+      typeof body.pickupPartner === "string"
+        ? body.pickupPartner.trim().slice(0, 120)
+        : "";
 
     const db = getAdminDb();
     const reqRef = db.collection("itemRequests").doc(requestId);
@@ -234,12 +246,15 @@ export async function POST(request: Request) {
         };
       }
 
-      // ---- PICKUP: admin-scheduled date/time on PICKUP_SCHEDULED ----
+      // ---- PICKUP: admin-CONFIRMED date/time on PICKUP_SCHEDULED ----
+      // Spreads the existing pickup map, so the customer's requestedAt /
+      // requestedBy preference is preserved alongside the admin's confirmation.
       if (toStatus === "PICKUP_SCHEDULED" && pickupScheduledAt) {
         update.pickup = {
           ...(req.pickup || {}),
           scheduledAt: Timestamp.fromDate(pickupScheduledAt),
           scheduledBy: "admin",
+          ...(pickupPartner ? { partner: pickupPartner } : {}),
         };
       }
 
