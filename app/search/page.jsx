@@ -75,16 +75,53 @@ const [quickColor, setQuickColor] = useState("");
         const snapshot = await getDocs(
           firestoreQuery(collection(db, "products"), limit(300))
         );
+
+        // An exact category-NAME query ("Grocery", "Men Fashion", …) is
+        // resolved to its catalog node and matched against the product's stored
+        // categoryId / subCategoryId — the SAME authoritative resolution the
+        // category dropdown below and the category page already use — instead of
+        // being treated as product-name text (which matched category names only
+        // by coincidence, so Electronics/Grocery/Men/Women Fashion returned 0).
+        // CATEGORIES maps the customer label to the catalog node name
+        // ("Men Fashion" -> "Men"); findNodeByName resolves the actual node.
+        // Any non-category query keeps the existing product-text search.
+        const trimmed = query.trim();
+        const lower = trimmed.toLowerCase();
+        const categoryEntry = trimmed
+          ? CATEGORIES.find(
+              (c) =>
+                c.label.toLowerCase() === lower ||
+                c.value.toLowerCase() === lower
+            )
+          : undefined;
+        const categoryNode = categoryEntry
+          ? findNodeByName(categoryEntry.value)
+          : undefined;
+
         const items = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
           // Admin-blocked products must not appear in search results.
           if (!isStorefrontVisible(data)) return;
+
+          // Exact category-name search: match on the resolved catalog id, never
+          // on product-name/description text.
+          if (categoryNode) {
+            const matchesCategory = isTopLevelCategory(categoryNode)
+              ? data.categoryId === categoryNode.id
+              : data.subCategoryId === categoryNode.id ||
+                data.leafCategoryId === categoryNode.id;
+            if (matchesCategory) {
+              items.push(toLegacyProduct(doc.id, data));
+            }
+            return;
+          }
+
           const searchText = `${data.title || data.name || ""} ${
             data.shortTitle || ""
           } ${data.brand || ""} ${data.description || ""}`.toLowerCase();
 
-          if (searchText.includes(query.trim().toLowerCase())) {
+          if (searchText.includes(lower)) {
             items.push(toLegacyProduct(doc.id, data));
           }
         });
