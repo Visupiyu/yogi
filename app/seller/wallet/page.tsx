@@ -5,7 +5,6 @@ import {collection,   getDocs,   addDoc,   query,   where,   serverTimestamp,} f
 
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { computeVendorShare } from "@/lib/vendorEarnings";
 
 export default function SellerWalletPage() {
 
@@ -61,62 +60,31 @@ async(vendorUid: string, vendorEmailArg: string)=>{
 
   try{
 
-    // Live earnings from this seller's orders — vendor.pendingPayout on
-    // the vendors doc is never actually written by any admin/order flow,
-    // so it can't be trusted as a balance source.
-    const ordersSnapshot = await getDocs(
-
-      query(
-        collection(db, "orders"),
-        where("vendorIds", "array-contains", vendorUid),
-        // Sellers must never see a Pending order: it belongs to them only once
-        // an admin confirms it. firestore.rules enforces this on the orders
-        // read rule, and the rules engine REJECTS this entire query unless it
-        // carries a filter proving the constraint - an unfiltered
-        // array-contains query returns permission-denied. Load-bearing, not
-        // cosmetic. Needs the orders vendorIds+status composite index.
-        where("status", "!=", "Pending")
-      )
-
-    );
-
-    let totalEarnings = 0;
-
-    ordersSnapshot.forEach((docSnap) => {
-
-      const order:any = docSnap.data();
-
-      // Money becomes withdrawable only once the order is actually
-      // fulfilled AND the money has actually arrived. Both conditions are
-      // required because the two payment methods reach them in opposite
-      // order: a Pay-on-Delivery (UPI Only) order is Delivered before the
-      // customer transfers, and only reaches Paid after the delivery
-      // partner submits a transaction reference and an admin verifies it
-      // against YOMICO's own account; a Razorpay order is Paid at
-      // creation and Delivered much later. Checking one alone would pay a
-      // vendor for goods not delivered, or for money not received.
-      //
-      // This also subsumes the previous Cancelled check — a Cancelled
-      // order can never satisfy it.
-      // An order flagged needsReview was PAID but could not be fulfilled as
-      // priced — short stock, a coupon already spent, or a reward balance
-      // that moved (see lib/onlineOrder.ts). Its items[] still carry the
-      // full requested quantities, so computeVendorShare() would credit the
-      // vendor for units that were never in stock. Excluded until an admin
-      // resolves the flag; the Delivered + Paid gate alone cannot see it.
-      if (
-        order.status !== "Delivered" ||
-        order.paymentStatus !== "Paid" ||
-        order.needsReview === true
-      )
-        return;
-
-      const share = computeVendorShare(order, vendorUid);
-      if (share) {
-        totalEarnings += share.vendorEarning;
+    // Authoritative Available Balance from the server — the SAME payable
+    // /api/request-withdrawal enforces. It must include active RETURN
+    // deductions, which sum over the `returns` collection that
+    // firestore.rules make unreadable to a seller, so it cannot be computed
+    // in the browser (that omission was exactly why the displayed balance
+    // used to run higher than what a withdrawal was allowed). /api/seller/payable
+    // recomputes it with the Admin SDK via lib/vendorPayable — the one shared
+    // calc the withdrawal + settlement routes use — and returns only this
+    // seller's own figure. Identity comes from the verified token, never a
+    // vendorId sent from here.
+    let available = 0;
+    try {
+      const idToken = await auth.currentUser?.getIdToken();
+      if (idToken) {
+        const res = await fetch("/api/seller/payable", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await res.json();
+        if (res.ok && typeof data?.available === "number") {
+          available = data.available;
+        }
       }
-
-    });
+    } catch (balanceError) {
+      console.log(balanceError);
+    }
 
     const q = query(
 
@@ -234,15 +202,11 @@ setTotalWithdrawn(
   withdrawn
 );
 
-// Available balance = earned so far, minus what's already been paid
-// out, minus what's already tied up in a pending/approved request —
-// so a seller can't request more than what's genuinely left.
-setWalletBalance(
-  Math.max(
-    0,
-    totalEarnings - withdrawn - pending
-  )
-);
+// Available balance = the server-authoritative payable fetched above. It
+// already nets off admin payouts, every paid/pending/approved withdrawal
+// AND active return deductions, so a seller can never be shown (or request)
+// more than what the withdrawal API will actually allow.
+setWalletBalance(available);
 
   }catch(error){
 
