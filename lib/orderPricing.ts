@@ -271,13 +271,27 @@ export async function computeOrderPricing(
       };
     }
 
-    // Pricing is deliberately unchanged: still the product's sellingPrice.
-    // Per-variant price exists on the model but is always 0 and has never
-    // been charged, so honouring it here would change what customers pay.
-    const price =
+    // Effective unit price — the single authoritative rule, applied here on
+    // the SERVER from the seller's own Firestore product document, never from
+    // anything the client sent:
+    //   - a resolved variant with a numeric price > 0  -> that variant's price
+    //   - otherwise (no variant, or variant price 0/absent) -> sellingPrice
+    // The `> 0` fallback is deliberate: the Color+Size seller flow stores
+    // variant.price = 0 and relies on the main sellingPrice, so a zero must
+    // never charge zero. resolvedVariant is already validated above (a stale/
+    // unknown variantId was refused), so this only ever reads a real variant.
+    const sellingPrice =
       typeof product.sellingPrice === "number"
         ? product.sellingPrice
         : Number(product.price || 0);
+    const variantPrice = resolvedVariant
+      ? Number((resolvedVariant as { price?: unknown }).price)
+      : NaN;
+    const effectiveUnitPrice =
+      Number.isFinite(variantPrice) && variantPrice > 0
+        ? variantPrice
+        : sellingPrice;
+    const price = effectiveUnitPrice;
 
     subtotal += price * qty;
 

@@ -333,6 +333,20 @@ questionSnap.forEach((d) => {
   // is incomplete, impossible, or ambiguous.
   const selectedVariant = resolveVariant(variantList, selection);
 
+  // Effective unit price for the current selection — the SAME rule the server
+  // applies in lib/orderPricing.ts: a resolved variant priced > 0 is
+  // authoritative, otherwise the main sellingPrice (product.price). The `> 0`
+  // fallback is deliberate — the Color+Size seller flow stores variant.price
+  // = 0 and relies on the main price. Drives the displayed price and the cart
+  // line; the server re-derives and charges this same figure from the product
+  // document, so this is UX only and never trusted for the final charge.
+  const effectiveUnitPrice =
+    selectedVariant &&
+    typeof selectedVariant.price === "number" &&
+    selectedVariant.price > 0
+      ? selectedVariant.price
+      : product?.price ?? 0;
+
   // Legacy path, unchanged: products predating variants carry a comma-joined
   // `color` string and a `sizes` array. Only used when there are no variants.
   const colors = hasVariants
@@ -417,6 +431,10 @@ questionSnap.forEach((d) => {
     // Identity and the full dimension set for everything else.
     ...(selectedVariant?.id ? { variantId: selectedVariant.id } : {}),
     ...(hasVariants ? { attributes } : {}),
+    // Effective unit price for this selection (variant price > 0, else the
+    // main sellingPrice). Display state only — the server re-prices from the
+    // product document at checkout, so a tampered value can never be charged.
+    unitPrice: effectiveUnitPrice,
   });
 };
   const addToCart = () => {
@@ -715,9 +733,22 @@ questionSnap.forEach((d) => {
   }
 
   const mrp = product.mrp ?? 0;
-const price = product.price ?? 0;
+// The price shown is the effective unit price for the current selection
+// (variant price > 0, else sellingPrice) — computed once above and reused so
+// the display can never contradict what the server will charge.
+const price = effectiveUnitPrice;
 
-const hasDiscount = mrp > price;
+// MRP / discount / savings are modelled only at the product level — there is
+// no per-variant MRP. When a distinct per-variant price is driving the
+// display, striking the product-level MRP against it (e.g. the 5 kg MRP over a
+// 1 kg pack's price) would be misleading and internally inconsistent with the
+// stored discount %, so the strike-through and savings are suppressed and only
+// the clean effective price is shown. When the effective price IS the base
+// sellingPrice (no variant, variant price 0, or variant == base) the existing
+// discount UI renders exactly as before.
+const usingVariantPrice = price !== (product.price ?? 0);
+
+const hasDiscount = !usingVariantPrice && mrp > price;
 
 const discountPercent =
   hasDiscount
@@ -1004,7 +1035,7 @@ if (product.stock > 20) {
   <div className="flex items-center gap-3 flex-wrap">
 
     <span className="text-green-700 text-4xl md:text-5xl font-extrabold">
-      ₹{product.price?.toLocaleString("en-IN")}
+      ₹{price.toLocaleString("en-IN")}
     </span>
 
     {hasDiscount && (
@@ -1049,7 +1080,7 @@ if (product.stock > 20) {
     </span>
 
     <span className="font-semibold">
-      ₹{Number(product.price).toLocaleString("en-IN")}
+      ₹{price.toLocaleString("en-IN")}
     </span>
 
   </div>
@@ -1075,7 +1106,7 @@ if (product.stock > 20) {
     </span>
 
     <span className="text-2xl font-bold text-green-600">
-      ₹{(Number(product.price) * quantity).toLocaleString("en-IN")}
+      ₹{(price * quantity).toLocaleString("en-IN")}
     </span>
 
   </div>

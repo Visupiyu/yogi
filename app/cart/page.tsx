@@ -5,6 +5,7 @@ import Link from "next/link";
 import ProductRecommendations from "@/components/ProductRecommendations";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { findVariantById } from "@/lib/products/variantSelection";
 import {
   getCartItems,
   updateCartQuantity,
@@ -52,13 +53,47 @@ export default function CartPage() {
       const updated = await Promise.all(
         items.map(async (item: any) => {
           const snap = await getDoc(doc(db, "products", item.id));
-          return snap.exists()
-            ? { ...item, stock: Number(snap.data().stock ?? 0) }
-            : item;
+          if (!snap.exists()) return item;
+
+          const data: any = snap.data();
+
+          // Self-heal the displayed unit price to the current effective price,
+          // using the SAME rule the server charges by (lib/orderPricing.ts): a
+          // resolved variant priced > 0 is authoritative, otherwise the
+          // product's sellingPrice. This corrects an old/pre-fix cart line that
+          // stored the main price for a differently-priced variant. variantId /
+          // attributes / qty are preserved; only stock and price are refreshed.
+          const sellingPrice =
+            typeof data.sellingPrice === "number"
+              ? data.sellingPrice
+              : Number(data.price ?? item.price ?? 0);
+
+          const variant = item.variantId
+            ? findVariantById(
+                Array.isArray(data.variants) ? data.variants : [],
+                item.variantId
+              )
+            : null;
+
+          const variantPrice = variant ? Number((variant as any).price) : NaN;
+          const effectivePrice =
+            Number.isFinite(variantPrice) && variantPrice > 0
+              ? variantPrice
+              : sellingPrice;
+
+          return {
+            ...item,
+            stock: Number(data.stock ?? 0),
+            price: effectivePrice,
+          };
         })
       );
 
       setCart(updated);
+      // Persist the self-healed prices so the corrected figure survives a
+      // reload and feeds checkoutItems consistently. The server still re-prices
+      // authoritatively at checkout regardless of what is stored here.
+      localStorage.setItem("cart", JSON.stringify(updated));
     } catch (error) {
       console.error("Failed to refresh cart stock:", error);
     }

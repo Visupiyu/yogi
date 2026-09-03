@@ -31,6 +31,15 @@ export interface AddToCartOptions {
   color?: string;
   variantId?: string;
   attributes?: Record<string, string>;
+
+  // The effective unit price the caller resolved for this selection — a
+  // positive per-variant price when one applies, otherwise the product's
+  // sellingPrice (the same rule the server enforces in lib/orderPricing.ts).
+  // Optional and display-only: when omitted the line falls back to the
+  // product's own price, so existing call sites and stored carts are
+  // unaffected. The server ALWAYS re-prices authoritatively from the product
+  // document at checkout — this value is never trusted for the final charge.
+  unitPrice?: number;
 }
 
 /**
@@ -94,7 +103,13 @@ export function addToCart(
     cart.push({
       id: product.id,
       name: product.name ?? "",
-      price: product.price ?? 0,
+      // Prefer the caller-resolved effective unit price; fall back to the
+      // product's own price for callers that don't pass one. Display state
+      // only — the server re-prices from the product document at checkout.
+      price:
+        typeof options.unitPrice === "number" && options.unitPrice > 0
+          ? options.unitPrice
+          : product.price ?? 0,
       mrp: product.mrp,
       image: product.image,
       stock: product.stock ?? 0,
