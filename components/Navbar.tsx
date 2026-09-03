@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { getCartCount } from "@/lib/cart";
+import AccountMenu from "@/components/AccountMenu";
 
 type ProductSuggestion = {
   id: string;
@@ -433,15 +434,21 @@ useEffect(() => {
               )}
             </Link>
 
-            {/* PROFILE / LOGIN — vendors and admins have no /profile (that's
-                the customer account area), so those sessions route to their
-                own area instead; customer/logged-out behavior is unchanged. */}
-            <Link href={isAdmin ? "/admin" : isVendor ? "/seller/settings" : "/profile"}>
-              <div className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white px-4 py-2 rounded-full transition">
-                <User size={18} />
-                <span className="hidden md:block">{userLabel}</span>
-              </div>
-            </Link>
+            {/* PROFILE / ACCOUNT — vendors and admins have no /profile (that's
+                the customer account area), so those sessions keep a direct link
+                to their own dashboard. Customers and logged-out visitors get the
+                account dropdown (AccountMenu), which reuses this same
+                localStorage-derived user state. */}
+            {isAdmin || isVendor ? (
+              <Link href={isAdmin ? "/admin" : "/seller/settings"}>
+                <div className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white px-4 py-2 rounded-full transition">
+                  <User size={18} />
+                  <span className="hidden md:block">{userLabel}</span>
+                </div>
+              </Link>
+            ) : (
+              <AccountMenu user={user} />
+            )}
           </div>
         </div>
       </div>
