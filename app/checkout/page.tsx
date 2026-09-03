@@ -41,6 +41,24 @@ export default function CheckoutPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  // Saved structured addresses (source of truth: the `addresses` collection).
+  // `name`/`phone`/`address` above are derived from the SELECTED one and remain
+  // the snapshot sent to the order — the existing order API contract is unchanged.
+  type SavedAddress = {
+    id: string;
+    fullName?: string;
+    phone?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    landmark?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    type?: string;
+    isDefault?: boolean;
+  };
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
   const [coupon, setCoupon] = useState("");
   const [shipping, setShipping] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState(PAY_ON_DELIVERY_METHOD);
@@ -79,7 +97,7 @@ export default function CheckoutPage() {
     setName(userData.name || "");
 setPhone(userData.phone || "");
 setAddress(userData.address || "");
-    loadDefaultAddress();
+    loadAddresses();
 
     // Reward balance must come from Firestore, not the cached localStorage
     // value — that's trivially editable client-side and was never actually
@@ -203,54 +221,67 @@ setAddress(userData.address || "");
       alert("Coupon check failed");
     }
   };
-  async function loadDefaultAddress() {
-
-  try {
-
-    const user = JSON.parse(
-      localStorage.getItem("user") || "{}"
-    );
-
-    if (!user.email) return;
-
-    const q = query(
-      collection(db, "addresses"),
-      where("userEmail", "==", user.email),
-      where("isDefault", "==", true),
-      limit(1)
-    );
-
-    const snapshot = await getDocs(q);
-
-    if (!snapshot.empty) {
-
-      const data = snapshot.docs[0].data();
-
-      setName(data.fullName || "");
-      setPhone(data.phone || "");
-
-      const fullAddress = [
-        data.addressLine1,
-        data.addressLine2,
-        data.landmark,
-        data.city,
-        data.state,
-        data.pincode,
-      ]
-        .filter(Boolean)
-        .join(", ");
-
-      setAddress(fullAddress);
-
-    }
-
-  } catch (error) {
-
-    console.error(error);
-
+  // Flatten a structured address into the single string the order API expects.
+  function flattenAddress(a: SavedAddress) {
+    return [
+      a.addressLine1,
+      a.addressLine2,
+      a.landmark,
+      a.city,
+      a.state,
+      a.pincode,
+    ]
+      .filter(Boolean)
+      .join(", ");
   }
 
-}
+  // Apply a chosen address to the order snapshot fields (name/phone/address).
+  function applyAddress(a: SavedAddress) {
+    setName(a.fullName || "");
+    setPhone(a.phone || "");
+    setAddress(flattenAddress(a));
+  }
+
+  function selectAddress(id: string) {
+    const a = savedAddresses.find((x) => x.id === id);
+    if (!a) return;
+    setSelectedAddressId(id);
+    applyAddress(a);
+  }
+
+  // Loads ALL of the customer's saved addresses (single-field userEmail query —
+  // no composite index) and preselects one: an address just added from checkout
+  // (?newAddress=<id>), else the default, else the first.
+  async function loadAddresses() {
+    try {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      if (!user.email) return;
+
+      const snapshot = await getDocs(
+        query(collection(db, "addresses"), where("userEmail", "==", user.email))
+      );
+      const list: SavedAddress[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<SavedAddress, "id">),
+      }));
+      setSavedAddresses(list);
+      if (list.length === 0) return;
+
+      const paramId =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("newAddress")
+          : null;
+      const chosen =
+        (paramId && list.find((a) => a.id === paramId)) ||
+        list.find((a) => a.isDefault) ||
+        list[0];
+
+      setSelectedAddressId(chosen.id);
+      applyAddress(chosen);
+    } catch (error) {
+      console.error(error);
+    }
+  }
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -896,50 +927,78 @@ setAddress(userData.address || "");
 
 </div>
 <p className="text-gray-500 mb-6">
-Please enter your shipping details.
+Select a delivery address for this order.
 </p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">
-                 👤 Full Name
-                  </label>
-                  <input
-  type="text"
-  autoComplete="name"
-  placeholder="Enter your full name"
-  value={name}
-  onChange={(e) => setName(e.target.value)}
-  className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
-/>
+              {savedAddresses.length === 0 ? (
+                <div className="text-center border border-dashed border-gray-300 rounded-2xl py-8 px-4">
+                  <p className="text-gray-500 mb-4">
+                    You have no saved addresses yet.
+                  </p>
+                  <Link
+                    href="/addresses/add?returnTo=checkout"
+                    className="inline-block bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold"
+                  >
+                    + Add New Address
+                  </Link>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">
-                 📞 Phone Number
-                  </label>
-                  <input
-  type="tel"
-  maxLength={10}
-  inputMode="numeric"
-  placeholder="10 digit mobile number"
-  value={phone}
-  onChange={(e) => setPhone(e.target.value)}
-  className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
-/>
+              ) : (
+                <div className="space-y-3">
+                  {savedAddresses.map((a) => {
+                    const selected = a.id === selectedAddressId;
+                    return (
+                      <label
+                        key={a.id}
+                        className={`flex gap-3 p-4 rounded-2xl border cursor-pointer transition ${
+                          selected
+                            ? "border-green-600 bg-green-50"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="checkout-address"
+                          value={a.id}
+                          checked={selected}
+                          onChange={() => selectAddress(a.id)}
+                          className="mt-1 accent-green-600 w-4 h-4 shrink-0"
+                        />
+                        <div className="min-w-0 text-sm">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold">
+                              {a.type || "Address"}
+                            </span>
+                            {a.isDefault && (
+                              <span className="text-[11px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
+                                DEFAULT
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-medium text-gray-800 mt-1">
+                            {a.fullName}
+                          </p>
+                          <p className="text-gray-600">{a.phone}</p>
+                          <p className="text-gray-600 break-words">
+                            {[a.addressLine1, a.addressLine2, a.landmark]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </p>
+                          <p className="text-gray-600">
+                            {[a.city, a.state].filter(Boolean).join(", ")}
+                            {a.pincode ? ` - ${a.pincode}` : ""}
+                          </p>
+                        </div>
+                      </label>
+                    );
+                  })}
+
+                  <Link
+                    href="/addresses/add?returnTo=checkout"
+                    className="inline-block text-green-700 font-semibold hover:underline mt-1"
+                  >
+                    + Add New Address
+                  </Link>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">
-                 🏠 Delivery Address
-                  </label>
-                  <textarea
-  placeholder="House no, street, area, city, state, PIN"
-  value={address}
-  autoComplete="street-address"
-  onChange={(e) => setAddress(e.target.value)}
-  rows={4}
-  className="w-full border rounded-xl px-5 py-3.5 outline-none focus:ring-2 focus:ring-green-500 transition"
-/>
-                </div>
-              </div>
+              )}
             </div>
  
             {/* PAYMENT METHOD */}

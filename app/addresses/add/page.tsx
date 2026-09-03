@@ -49,7 +49,7 @@ export default function AddAddressPage() {
       return;
     }
 
-    await addDoc(
+    const ref = await addDoc(
       collection(db, "addresses"),
       {
         userEmail: auth.currentUser.email,
@@ -76,7 +76,18 @@ export default function AddAddressPage() {
 
     alert("Address saved successfully!");
 
-    router.push("/addresses");
+    // When launched from checkout (?returnTo=checkout), return there with the
+    // new address's id so checkout can preselect it. Otherwise go to the list.
+    const returnTo =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("returnTo")
+        : null;
+
+    if (returnTo === "checkout") {
+      router.push(`/checkout?newAddress=${ref.id}`);
+    } else {
+      router.push("/addresses");
+    }
 
   } catch (error) {
 

@@ -28,7 +28,12 @@ export default function ProfilePage() {
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  // Legacy free-text address: still loaded and saved UNCHANGED (preserved for
+  // compatibility / migration) — it is no longer edited from this page.
   const [address, setAddress] = useState("");
+  // Count of structured saved addresses (the `addresses` collection is the
+  // source of truth) — drives the summary card below.
+  const [savedAddressCount, setSavedAddressCount] = useState(0);
   const [rewardPoints, setRewardPoints] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -56,6 +61,20 @@ export default function ProfilePage() {
           setAddress(data.address || "");
           setRewardPoints(Number(data.rewardPoints || 0));
         }
+      } catch (error) {
+        console.error(error);
+      }
+
+      // Count structured saved addresses for the summary card. Single-field
+      // query (userEmail) — no composite index needed.
+      try {
+        const addrSnap = await getDocs(
+          query(
+            collection(db, "addresses"),
+            where("userEmail", "==", firebaseUser.email)
+          )
+        );
+        setSavedAddressCount(addrSnap.size);
       } catch (error) {
         console.error(error);
       }
@@ -339,14 +358,28 @@ export default function ProfilePage() {
 
             <div className="md:col-span-2">
               <label className="block text-sm text-gray-500 mb-1">
-                Delivery Address
+                Saved Addresses
               </label>
-              <textarea
-                value={address} autoComplete="street-address"
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="House no, street, city, state, PIN"
-                className="w-full p-3.5 border rounded-xl h-28 outline-none focus:ring-2 focus:ring-green-500 transition"
-              />
+              <div className="w-full p-4 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-800">
+                    {savedAddressCount > 0
+                      ? `${savedAddressCount} address${
+                          savedAddressCount === 1 ? "" : "es"
+                        } saved`
+                      : "No saved addresses"}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Manage your delivery addresses for faster checkout.
+                  </p>
+                </div>
+                <Link
+                  href={savedAddressCount > 0 ? "/addresses" : "/addresses/add"}
+                  className="shrink-0 self-start sm:self-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap text-center"
+                >
+                  {savedAddressCount > 0 ? "Manage Addresses" : "Add Address"}
+                </Link>
+              </div>
             </div>
           </div>
 

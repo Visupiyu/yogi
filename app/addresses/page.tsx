@@ -6,13 +6,11 @@ import { useRouter } from "next/navigation";
 
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
-  getDoc,
   query,
-  updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 
 import { onAuthStateChanged } from "firebase/auth";
@@ -93,9 +91,21 @@ async function deleteAddress(id: string) {
 
   try {
 
-    await deleteDoc(
-      doc(db, "addresses", id)
-    );
+    // Delete, and — if the one removed was the default and others remain —
+    // promote exactly one remaining address (the first in the current list)
+    // to default, all in a single atomic batch so the customer is never left
+    // without a default or with two. Deleting a non-default just deletes it.
+    const target = addresses.find((a) => a.id === id);
+    const remaining = addresses.filter((a) => a.id !== id);
+
+    const batch = writeBatch(db);
+    batch.delete(doc(db, "addresses", id));
+
+    if (target?.isDefault && remaining.length > 0) {
+      batch.update(doc(db, "addresses", remaining[0].id), { isDefault: true });
+    }
+
+    await batch.commit();
 
     loadAddresses();
 
@@ -112,30 +122,18 @@ async function setDefaultAddress(id: string) {
 
   try {
 
-    const q = query(
-      collection(db, "addresses"),
-      where("userEmail", "==", userEmail)
-    );
+    // One atomic batch: the chosen address becomes default and every other
+    // address for this customer becomes non-default, so multiple defaults can
+    // never result from an interleaved sequence of independent writes. Only
+    // the signed-in customer's own addresses are touched (the loaded list),
+    // and firestore.rules independently enforces per-owner update access.
+    const batch = writeBatch(db);
 
-    const snapshot = await getDocs(q);
-
-    for (const document of snapshot.docs) {
-
-      await updateDoc(
-        doc(db, "addresses", document.id),
-        {
-          isDefault: false,
-        }
-      );
-
+    for (const a of addresses) {
+      batch.update(doc(db, "addresses", a.id), { isDefault: a.id === id });
     }
 
-    await updateDoc(
-      doc(db, "addresses", id),
-      {
-        isDefault: true,
-      }
-    );
+    await batch.commit();
 
     loadAddresses();
 
