@@ -94,6 +94,7 @@ type ConfirmOutcome =
       sellerRecords: number;
     }
   | { kind: "already"; status: string }
+  | { kind: "needs-review" }
   | { kind: "error"; status: number; error: string };
 
 export async function POST(request: Request) {
@@ -146,6 +147,21 @@ export async function POST(request: Request) {
       // delivery clock and hand the order a fresh 72 hours.
       if (status !== "Pending") {
         return { kind: "already", status };
+      }
+
+      // An order flagged for review (a Razorpay order whose captured quantity
+      // could not be fully reserved — see lib/onlineOrder.ts) must NOT be
+      // confirmed: doing so would create sellerOrders for the full requested
+      // quantity and expose fulfilment for units that do not exist. The flag is
+      // read here ONLY from the stored order document inside the transaction —
+      // never from the request — so it cannot be spoofed by a client. It stays
+      // Pending until an admin resolves the shortfall and clears the flag via
+      // the existing markReviewed action (app/admin/orders), after which this
+      // guard passes. No sellerOrders are created and no writes happen on this
+      // path. Earnings were already blocked while needsReview is set; this
+      // additionally keeps the order out of the fulfilment pipeline.
+      if (order.needsReview === true) {
+        return { kind: "needs-review" };
       }
 
       // ---- ALL READS BEFORE ANY WRITE (Firestore transaction rule) ----
@@ -312,6 +328,16 @@ export async function POST(request: Request) {
 
     if (outcome.kind === "error") {
       return Response.json({ error: outcome.error }, { status: outcome.status });
+    }
+
+    if (outcome.kind === "needs-review") {
+      return Response.json(
+        {
+          error:
+            "This order needs review before it can be confirmed. Resolve the stock shortfall and mark it reviewed first.",
+        },
+        { status: 409 }
+      );
     }
 
     if (outcome.kind === "already") {
