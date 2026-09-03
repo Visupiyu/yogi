@@ -4,6 +4,11 @@ import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { computeOrderPricing, type PricedItemInput } from "@/lib/orderPricing";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { mintNumbers } from "@/lib/humanIds";
+import {
+  planVariantDecrements,
+  sumVariantStock,
+  type VariantStockEntry,
+} from "@/lib/products/inventory";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -244,6 +249,23 @@ export async function POST(request: Request) {
         if (!nameByProduct.has(line.id)) nameByProduct.set(line.id, line.name);
       }
 
+      // Per-(product, variant) demand — Strategy 1. A product is decremented
+      // per variant (and its product.stock DERIVED from the variant totals)
+      // only when it actually has variants AND every ordered line for it
+      // carries a variantId. A product with no variants, or any line lacking a
+      // variantId (a legacy cart), keeps the product-level path unchanged.
+      const variantDemandByProduct = new Map<string, Map<string, number>>();
+      const productHasNonVariantLine = new Set<string>();
+      for (const line of pricing.items) {
+        if (line.variantId) {
+          let m = variantDemandByProduct.get(line.id);
+          if (!m) { m = new Map(); variantDemandByProduct.set(line.id, m); }
+          m.set(line.variantId, (m.get(line.variantId) || 0) + line.qty);
+        } else {
+          productHasNonVariantLine.add(line.id);
+        }
+      }
+
       const productIds = [...qtyByProduct.keys()];
       const productRefs = productIds.map((id) => db.collection("products").doc(id));
       const productSnaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
@@ -256,6 +278,13 @@ export async function POST(request: Request) {
       const couponSnap = couponRef ? await tx.get(couponRef) : null;
 
       // ---- Validation against the state just read ----
+      // Products that took the variant-authoritative path keep their computed
+      // decrement plan here, so the write loop below applies the exact same
+      // plan derived from the exact same snapshot (one read, atomic).
+      const variantPlanByProduct = new Map<
+        string,
+        ReturnType<typeof planVariantDecrements>
+      >();
       for (let i = 0; i < productIds.length; i++) {
         const id = productIds[i];
         const snap = productSnaps[i];
@@ -270,7 +299,11 @@ export async function POST(request: Request) {
           };
         }
 
-        const product = snap.data() as { active?: unknown; stock?: unknown };
+        const product = snap.data() as {
+          active?: unknown;
+          stock?: unknown;
+          variants?: VariantStockEntry[];
+        };
 
         if (product.active === false) {
           return {
@@ -280,15 +313,39 @@ export async function POST(request: Request) {
           };
         }
 
-        const stock = Number(product.stock ?? 0);
+        const variantDemand = variantDemandByProduct.get(id);
+        const useVariantPath =
+          Array.isArray(product.variants) &&
+          product.variants.length > 0 &&
+          !!variantDemand &&
+          !productHasNonVariantLine.has(id);
 
-        // Compared against the SUM across every line for this product.
-        if (stock < wanted) {
-          return {
-            kind: "error",
-            status: 409,
-            error: `${label} has only ${stock} item(s) left in stock.`,
-          };
+        if (useVariantPath) {
+          // Selected-variant stock is authoritative. Reject if any chosen
+          // variant lacks the requested quantity — the check and the decrement
+          // below run on the same transactional snapshot, so two concurrent
+          // orders for the last unit cannot both pass.
+          const plan = planVariantDecrements(product.variants!, variantDemand!);
+          if (!plan.allSatisfied) {
+            const sf = plan.shortfalls[0];
+            return {
+              kind: "error",
+              status: 409,
+              error: `${label} has only ${sf.available} left in the option you chose.`,
+            };
+          }
+          variantPlanByProduct.set(id, plan);
+        } else {
+          // No variants, or a legacy line without a variantId: unchanged
+          // product-level check against the SUM across every line.
+          const stock = Number(product.stock ?? 0);
+          if (stock < wanted) {
+            return {
+              kind: "error",
+              status: 409,
+              error: `${label} has only ${stock} item(s) left in stock.`,
+            };
+          }
         }
       }
 
@@ -316,16 +373,27 @@ export async function POST(request: Request) {
       }
 
       // ---- WRITES ----
-      // Exactly one update per product document, carrying the aggregated
-      // quantity. stock and sales move in equal and opposite directions,
-      // conserving stock + sales exactly as firestore.rules'
-      // isStockTransfer() requires of the client path.
+      // Exactly one update per product document. A variant-path product writes
+      // the decremented variants[] array AND a product.stock DERIVED from the
+      // new variant totals together, so the two ledgers can never drift. A
+      // product-level product moves stock/sales in equal and opposite
+      // directions as before, conserving stock + sales for the legacy shape.
       for (let i = 0; i < productIds.length; i++) {
-        const wanted = qtyByProduct.get(productIds[i]) || 0;
-        tx.update(productRefs[i], {
-          stock: FieldValue.increment(-wanted),
-          sales: FieldValue.increment(wanted),
-        });
+        const id = productIds[i];
+        const wanted = qtyByProduct.get(id) || 0;
+        const plan = variantPlanByProduct.get(id);
+        if (plan) {
+          tx.update(productRefs[i], {
+            variants: plan.newVariants,
+            stock: sumVariantStock(plan.newVariants),
+            sales: FieldValue.increment(plan.totalTaken),
+          });
+        } else {
+          tx.update(productRefs[i], {
+            stock: FieldValue.increment(-wanted),
+            sales: FieldValue.increment(wanted),
+          });
+        }
       }
 
       // Human-readable numbers, minted after all reads above, before this

@@ -30,6 +30,7 @@ import {
   findVariantById,
   variantAttributes,
 } from "@/lib/products/variantSelection";
+import { planVariantDecrements } from "@/lib/products/inventory";
 
 // size/color are variant intent, not money — the only client-supplied
 // fields that survive into the order line, and neither affects pricing.
@@ -190,6 +191,12 @@ export async function computeOrderPricing(
   // the advisory pre-flight into line with them so the customer is not told
   // an order is fine that the authoritative check will refuse.
   const qtyByProduct = new Map<string, number>();
+  // Per-(product, variant) demand for the advisory variant-stock check below —
+  // mirrors the authoritative order-path rule (Strategy 1). Advisory only: the
+  // real check + decrement happen in the order transaction; this just keeps the
+  // customer from being told an order is fine that the transaction will refuse.
+  const variantDemandByProduct = new Map<string, Map<string, number>>();
+  const productHasNonVariantLine = new Set<string>();
 
   for (const item of items) {
     if (!item.id || !(Number(item.qty) > 0)) {
@@ -200,6 +207,14 @@ export async function computeOrderPricing(
       item.id,
       (qtyByProduct.get(item.id) || 0) + Number(item.qty)
     );
+
+    if (item.variantId) {
+      let m = variantDemandByProduct.get(item.id);
+      if (!m) { m = new Map(); variantDemandByProduct.set(item.id, m); }
+      m.set(item.variantId, (m.get(item.variantId) || 0) + Number(item.qty));
+    } else {
+      productHasNonVariantLine.add(item.id);
+    }
   }
 
   // ---- Pass 2: one read per product, checked against the aggregate ----
@@ -229,8 +244,27 @@ export async function computeOrderPricing(
       };
     }
 
-    // totalQty, not the individual line's qty — the whole point of the fix.
-    if ((product.stock ?? 0) < totalQty) {
+    const variantDemand = variantDemandByProduct.get(productId);
+    const useVariantPath =
+      Array.isArray(product.variants) &&
+      product.variants.length > 0 &&
+      !!variantDemand &&
+      !productHasNonVariantLine.has(productId);
+
+    if (useVariantPath) {
+      // Selected-variant stock is authoritative — check each chosen variant,
+      // not just the product aggregate, so a 0-stock variant on an otherwise
+      // in-stock product is caught here too.
+      const plan = planVariantDecrements(product.variants, variantDemand!);
+      if (!plan.allSatisfied) {
+        return {
+          ok: false,
+          error: `${product.title || "A product"} is out of stock in the option you chose`,
+          status: 409,
+        };
+      }
+    } else if ((product.stock ?? 0) < totalQty) {
+      // totalQty, not the individual line's qty — the whole point of the fix.
       return {
         ok: false,
         error: `${product.title || "A product"} has insufficient stock`,

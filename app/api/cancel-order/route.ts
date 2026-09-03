@@ -6,6 +6,11 @@ import {
   Timestamp,
   type Transaction,
 } from "firebase-admin/firestore";
+import {
+  applyVariantRestores,
+  sumVariantStock,
+  type VariantStockEntry,
+} from "@/lib/products/inventory";
 
 // ---------------------------------------------------------------------------
 // Single server-authoritative cancellation path.
@@ -59,7 +64,7 @@ async function isWithinCancelRateLimit(uid: string): Promise<boolean> {
   });
 }
 
-type OrderItem = { id?: unknown; qty?: unknown };
+type OrderItem = { id?: unknown; qty?: unknown; variantId?: unknown };
 
 type OrderRecord = {
   userId?: unknown;
@@ -210,8 +215,21 @@ export async function POST(request: Request) {
           ? (order.items as OrderItem[])
           : [];
 
-        const restorable: { ref: FirebaseFirestore.DocumentReference; qty: number }[] =
-          [];
+        // Aggregate restock per PRODUCT (one write per product doc), capturing
+        // per-variant restore quantities when the order line carries a
+        // variantId — Strategy 1. A product read once; the same snapshot's
+        // variants[] are restored and product.stock re-derived together at
+        // write time so the two ledgers cannot drift. A historical line with no
+        // variantId (or a product with no variants) keeps the product-level
+        // restore, and a variantId no longer present on the product falls back
+        // to product-level for that quantity rather than inventing a variant.
+        type RestockPlan = {
+          ref: FirebaseFirestore.DocumentReference;
+          variants: VariantStockEntry[] | null;
+          productLevelQty: number; // restored via product.stock increment
+          variantRestore: Map<string, number>; // variantId -> qty (variant path)
+        };
+        const restockByProduct = new Map<string, RestockPlan>();
 
         for (const item of items) {
           const id = item?.id;
@@ -219,13 +237,36 @@ export async function POST(request: Request) {
           if (typeof id !== "string" || !id || !Number.isFinite(qty) || qty <= 0) {
             continue;
           }
-          const ref = db.collection("products").doc(id);
-          const snap = await tx.get(ref);
-          // Skip products that no longer exist rather than aborting the
-          // whole cancellation — matches the previous per-item best-effort
-          // tolerance, while keeping everything that does exist atomic.
-          if (!snap.exists) continue;
-          restorable.push({ ref, qty });
+          let plan = restockByProduct.get(id);
+          if (!plan) {
+            const ref = db.collection("products").doc(id);
+            const snap = await tx.get(ref);
+            // Skip products that no longer exist rather than aborting the whole
+            // cancellation — matches the previous best-effort tolerance.
+            if (!snap.exists) continue;
+            const data = snap.data() as { variants?: VariantStockEntry[] };
+            const variants = Array.isArray(data.variants) ? data.variants : null;
+            plan = { ref, variants, productLevelQty: 0, variantRestore: new Map() };
+            restockByProduct.set(id, plan);
+          }
+
+          const variantId =
+            typeof item?.variantId === "string" ? item.variantId : "";
+          const variantExists =
+            !!variantId &&
+            !!plan.variants &&
+            plan.variants.some((v) => v?.id === variantId);
+
+          if (variantExists) {
+            plan.variantRestore.set(
+              variantId,
+              (plan.variantRestore.get(variantId) || 0) + qty
+            );
+          } else {
+            // No variantId, product has no variants, or the variant was
+            // deleted since purchase: restore at product level, never guess.
+            plan.productLevelQty += qty;
+          }
         }
 
         const orderUserId =
@@ -305,14 +346,31 @@ export async function POST(request: Request) {
             : {}),
         });
 
-        for (const { ref, qty } of restorable) {
-          // stock and sales move in opposite directions by the same amount,
-          // so stock + sales is conserved exactly as checkout's decrement
-          // established it.
-          tx.update(ref, {
-            stock: FieldValue.increment(qty),
-            sales: FieldValue.increment(-qty),
-          });
+        for (const plan of restockByProduct.values()) {
+          if (plan.variants && plan.variantRestore.size > 0) {
+            // Variant path: add each unit back to its own variant and DERIVE
+            // product.stock from the new variant totals. Any product-level
+            // remainder (a line whose variant was deleted since purchase) is
+            // added on top rather than assigned to a nonexistent variant.
+            const { newVariants, restoredToVariants } = applyVariantRestores(
+              plan.variants,
+              plan.variantRestore
+            );
+            const totalRestored = restoredToVariants + plan.productLevelQty;
+            tx.update(plan.ref, {
+              variants: newVariants,
+              stock: sumVariantStock(newVariants) + plan.productLevelQty,
+              sales: FieldValue.increment(-totalRestored),
+            });
+          } else if (plan.productLevelQty > 0) {
+            // Product-level path (no variants, or historical line without a
+            // variantId): unchanged — stock and sales move in equal and
+            // opposite directions, conserving stock + sales as before.
+            tx.update(plan.ref, {
+              stock: FieldValue.increment(plan.productLevelQty),
+              sales: FieldValue.increment(-plan.productLevelQty),
+            });
+          }
         }
 
         if (adjustsPoints && userRef) {
@@ -337,7 +395,7 @@ export async function POST(request: Request) {
 
         return {
           kind: "cancelled",
-          restockedItems: restorable.length,
+          restockedItems: restockByProduct.size,
           earnedPoints,
           redeemedValue,
           orderUserId,

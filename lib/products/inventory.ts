@@ -161,3 +161,107 @@ export function canPurchase(
   return availableStock >= quantity;
 
 }
+
+// ------------------------------------------
+// Per-variant stock — Strategy 1
+// ------------------------------------------
+//
+// Under Strategy 1 the per-variant `stock` on a product's `variants[]` array is
+// the authoritative available quantity, and the top-level product.stock is
+// DERIVED from the variant totals. These helpers are pure (no Firestore, no
+// side effects) so the exact same logic runs in every server order/restock
+// transaction — one definition rather than several inline copies that drift.
+
+export type VariantStockEntry = {
+  id?: string;
+  stock?: unknown;
+  [key: string]: unknown;
+};
+
+/** The derived product.stock: the sum of every variant's (numeric, >=0) stock. */
+export function sumVariantStock(variants: VariantStockEntry[]): number {
+  if (!Array.isArray(variants)) return 0;
+  return variants.reduce((sum, v) => {
+    const n = Number(v?.stock);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+}
+
+/**
+ * Plan per-variant decrements for a set of demands against the current variants.
+ *
+ * Returns a NEW variants array with each demanded variant reduced by up to its
+ * own available stock (never below 0), the shortfalls, the total actually taken,
+ * and whether every demand was fully satisfiable. Pure — computes only, writes
+ * nothing.
+ *
+ *   - Callers that MUST reject on shortage (COD /api/place-order) check
+ *     `allSatisfied` and refuse when false, discarding `newVariants`.
+ *   - Callers that must NEVER reject because money is already captured
+ *     (Razorpay finalize) use `newVariants` + `shortfalls` as-is, taking what
+ *     exists and flagging the rest for review.
+ *
+ * A variantId absent from the array is a shortfall with available 0 (a stale or
+ * deleted variant) — never invented.
+ */
+export function planVariantDecrements(
+  variants: VariantStockEntry[],
+  demand: Map<string, number>
+): {
+  newVariants: VariantStockEntry[];
+  shortfalls: { variantId: string; wanted: number; available: number }[];
+  totalTaken: number;
+  allSatisfied: boolean;
+} {
+  const working = (Array.isArray(variants) ? variants : []).map((v) => ({ ...v }));
+  const shortfalls: { variantId: string; wanted: number; available: number }[] = [];
+  let totalTaken = 0;
+  let allSatisfied = true;
+
+  for (const [variantId, wantedRaw] of demand) {
+    const wanted = Number(wantedRaw) > 0 ? Number(wantedRaw) : 0;
+    const idx = working.findIndex((v) => v?.id === variantId);
+    if (idx < 0) {
+      allSatisfied = false;
+      shortfalls.push({ variantId, wanted, available: 0 });
+      continue;
+    }
+    const cur = Number(working[idx].stock);
+    const available = Number.isFinite(cur) && cur > 0 ? cur : 0;
+    const take = Math.min(available, wanted);
+    if (take < wanted) {
+      allSatisfied = false;
+      shortfalls.push({ variantId, wanted, available });
+    }
+    working[idx] = { ...working[idx], stock: available - take };
+    totalTaken += take;
+  }
+
+  return { newVariants: working, shortfalls, totalTaken, allSatisfied };
+}
+
+/**
+ * Add stock back to variants (order cancellation / restock). Returns a NEW
+ * variants array and how much was actually restored to variants. A variantId no
+ * longer present in the array is ignored (the variant was deleted since
+ * purchase) rather than invented — the caller decides what to do with the
+ * un-restorable remainder. Pure.
+ */
+export function applyVariantRestores(
+  variants: VariantStockEntry[],
+  restore: Map<string, number>
+): { newVariants: VariantStockEntry[]; restoredToVariants: number } {
+  const working = (Array.isArray(variants) ? variants : []).map((v) => ({ ...v }));
+  let restoredToVariants = 0;
+  for (const [variantId, qtyRaw] of restore) {
+    const qty = Number(qtyRaw) > 0 ? Number(qtyRaw) : 0;
+    if (qty === 0) continue;
+    const idx = working.findIndex((v) => v?.id === variantId);
+    if (idx < 0) continue; // deleted variant — do not invent stock
+    const cur = Number(working[idx].stock);
+    const base = Number.isFinite(cur) && cur > 0 ? cur : 0;
+    working[idx] = { ...working[idx], stock: base + qty };
+    restoredToVariants += qty;
+  }
+  return { newVariants: working, restoredToVariants };
+}

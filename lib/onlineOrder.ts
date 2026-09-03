@@ -3,6 +3,11 @@ import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import type { OrderPricing } from "@/lib/orderPricing";
+import {
+  planVariantDecrements,
+  sumVariantStock,
+  type VariantStockEntry,
+} from "@/lib/products/inventory";
 import { sendOrderConfirmationEmail } from "@/lib/orderConfirmationEmail";
 
 // SERVER-ONLY.
@@ -140,6 +145,21 @@ export async function finalizeOnlineOrder(params: {
       if (!nameByProduct.has(line.id)) nameByProduct.set(line.id, line.name);
     }
 
+    // Per-(product, variant) demand — Strategy 1, same shape the COD path uses.
+    // Variant-authoritative only when the product has variants AND every line
+    // for it carries a variantId; otherwise the product-level path is kept.
+    const variantDemandByProduct = new Map<string, Map<string, number>>();
+    const productHasNonVariantLine = new Set<string>();
+    for (const line of pricing.items) {
+      if (line.variantId) {
+        let m = variantDemandByProduct.get(line.id);
+        if (!m) { m = new Map(); variantDemandByProduct.set(line.id, m); }
+        m.set(line.variantId, (m.get(line.variantId) || 0) + line.qty);
+      } else {
+        productHasNonVariantLine.add(line.id);
+      }
+    }
+
     const productIds = [...qtyByProduct.keys()];
     const productRefs = productIds.map((id) => db.collection("products").doc(id));
     const productSnaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
@@ -150,8 +170,15 @@ export async function finalizeOnlineOrder(params: {
     const couponSnap = couponRef ? await tx.get(couponRef) : null;
 
     // ---- Assess, but never reject: the money is already taken ----
+    // A product-level decrement (legacy shape). A variant-path product records
+    // its full decremented variants[] plan instead, applied at write time.
     const shortfalls: Shortfall[] = [];
     const decrements: { ref: FirebaseFirestore.DocumentReference; qty: number }[] = [];
+    const variantWrites: {
+      ref: FirebaseFirestore.DocumentReference;
+      newVariants: VariantStockEntry[];
+      taken: number;
+    }[] = [];
 
     for (let i = 0; i < productIds.length; i++) {
       const id = productIds[i];
@@ -164,7 +191,28 @@ export async function finalizeOnlineOrder(params: {
         continue;
       }
 
-      const available = Number((snap.data() as { stock?: unknown })?.stock ?? 0);
+      const data = snap.data() as { stock?: unknown; variants?: VariantStockEntry[] };
+      const variantDemand = variantDemandByProduct.get(id);
+      const useVariantPath =
+        Array.isArray(data.variants) &&
+        data.variants.length > 0 &&
+        !!variantDemand &&
+        !productHasNonVariantLine.has(id);
+
+      if (useVariantPath) {
+        // Take what each chosen variant has; a shortage is recorded and the
+        // order flagged for review — never rejected, because the payment is
+        // already captured. product.stock is derived from the new variant
+        // totals at write time.
+        const plan = planVariantDecrements(data.variants!, variantDemand!);
+        for (const sf of plan.shortfalls) {
+          shortfalls.push({ id, name: label, wanted: sf.wanted, available: sf.available });
+        }
+        variantWrites.push({ ref: productRefs[i], newVariants: plan.newVariants, taken: plan.totalTaken });
+        continue;
+      }
+
+      const available = Number(data.stock ?? 0);
 
       if (available < wanted) {
         // Decrement what there is rather than nothing, so inventory still
@@ -195,6 +243,15 @@ export async function finalizeOnlineOrder(params: {
       tx.update(ref, {
         stock: FieldValue.increment(-qty),
         sales: FieldValue.increment(qty),
+      });
+    }
+    // Variant-path products: write the decremented variants[] and the derived
+    // product.stock together, so the two ledgers stay consistent.
+    for (const { ref, newVariants, taken } of variantWrites) {
+      tx.update(ref, {
+        variants: newVariants,
+        stock: sumVariantStock(newVariants),
+        sales: FieldValue.increment(taken),
       });
     }
 

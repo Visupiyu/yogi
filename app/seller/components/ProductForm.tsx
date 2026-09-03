@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Product } from "@/lib/products/product";
 import { generateSKU, generateSlug } from "@/lib/products/helpers";
 import {
@@ -278,8 +278,27 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
   // Stock" always matches what VariantSelector's per-size stock inputs
   // actually add up to, instead of being a second, separately-editable
   // number that could drift out of sync.
+  // Guards the derive-product.stock-from-variants effect below against
+  // overwriting a stored live stock the moment an EDIT form hydrates its
+  // variants. Under Strategy 1 variants[].stock is the authoritative per-variant
+  // ledger and product.stock is derived, but the stored product.stock is the
+  // LIVE remaining quantity (sales have decremented it since listing). Deriving
+  // it from the loaded variant values on hydration would silently resurrect or
+  // reduce inventory — exactly the corruption this must prevent. See Phase 1/2A
+  // audit of this file.
+  const variantStockHydratedRef = useRef(false);
+
   useEffect(() => {
     if (product.variants.length === 0) return;
+
+    // On an EDIT, the first time variants populate is hydration from the stored
+    // document — do NOT overwrite the stored (live) product.stock then. Only a
+    // genuine seller change to the variants afterwards re-derives it. On CREATE
+    // there is no stored stock to protect, so derive from the first variant on.
+    if (isEditing && !variantStockHydratedRef.current) {
+      variantStockHydratedRef.current = true;
+      return;
+    }
 
     const total = product.variants.reduce(
       (sum, variant) => sum + (Number(variant.stock) || 0),
