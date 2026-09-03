@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ProductRecommendations from "@/components/ProductRecommendations";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -610,6 +611,13 @@ Popular Categories
               </div>
             </div>
           </div>
+        )}
+
+        {cart.length > 0 && (
+          <ProductRecommendations
+            heading="Related Products"
+            excludeIds={cart.map((item: { id: string }) => item.id)}
+          />
         )}
     </section>
   );

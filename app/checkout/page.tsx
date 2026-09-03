@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import ProductRecommendations from "@/components/ProductRecommendations";
 import {
   collection,
   addDoc,
@@ -1241,6 +1242,10 @@ Easy Returns
           </div>
         </div>
         
+        <ProductRecommendations
+          heading="You May Also Like"
+          excludeIds={items.map((item: { id: string }) => item.id)}
+        />
       </div>
     </section>
   );
