@@ -762,7 +762,11 @@ finally{ setSaving(false);} };
                 space-y-5
               ">
 
-                {order.items?.map(
+                {/* Seller-scoped: render ONLY this authenticated seller's own
+                    line items (vendorOrderItems, filtered by vendorUid above),
+                    never the full multi-vendor order.items — otherwise a seller
+                    would see co-vendors' products on a shared order. */}
+                {vendorOrderItems.map(
 
                   (item:any,index:number)=>(
 
