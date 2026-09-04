@@ -1501,6 +1501,38 @@ finally{ setSaving(false);} };
 
   </h2>
 
+  {/* Real delivery assignment made by YOMICO Admin (Delivery Company ->
+      Delivery Person -> Order). Read straight off the parent order this
+      seller is already authorized to load — order-level fields only, so no
+      other seller's items/earnings/customer data are exposed. Rendered only
+      when present, so legacy orders without these fields are unaffected. The
+      seller's own Courier/Tracking fields below are left untouched. */}
+  {(order.deliveryCompanyName ||
+    order.deliveryPartnerName ||
+    order.shipmentNumber) && (
+    <div className="mb-4 pb-4 border-b border-blue-200">
+      <p className="font-semibold mb-2">YOMICO Delivery Assignment</p>
+      {order.deliveryCompanyName && (
+        <p>
+          <strong>Delivery Company:</strong> {order.deliveryCompanyName}
+        </p>
+      )}
+      {order.deliveryPartnerName && (
+        <p>
+          <strong>Delivery Person:</strong> {order.deliveryPartnerName}
+        </p>
+      )}
+      {order.shipmentNumber && (
+        <p>
+          <strong>Tracking Number:</strong> {order.shipmentNumber}
+        </p>
+      )}
+      <p>
+        <strong>Status:</strong> {fulfilmentStageLabel(order.status)}
+      </p>
+    </div>
+  )}
+
   <p>
 
     <strong>Courier:</strong>
