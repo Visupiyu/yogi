@@ -5,6 +5,7 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { mintSequential } from "@/lib/humanIds";
 import {
   SELLER_REPLACE_TARGETS,
+  SELLER_RETURN_TARGETS,
   isLegalTransition,
   statusLabel,
   type ItemRequestType,
@@ -18,7 +19,13 @@ import {
 //
 //   - WHO: admin may drive any legal transition; the seller who owns the item
 //     may drive ONLY the replacement FULFILMENT stages (SELLER_PREPARING ->
-//     READY_FOR_DELIVERY -> HANDED_OVER_TO_COURIER -> DELIVERED) on a replace.
+//     READY_FOR_DELIVERY -> HANDED_OVER_TO_COURIER -> DELIVERED) on a replace,
+//     or the SELLER_INSPECTION step on a return. The customer's pickup accept /
+//     counter is a separate route (app/api/item-request/respond) — never here.
+//   - PICKUP: a return's pickup is a negotiation. Admin PROPOSES a slot
+//     (PICKUP_PROPOSED, requires a date/time), the customer accepts or counters
+//     via the respond route, admin may RE-PROPOSE after a counter, then ASSIGNS
+//     a partner (requires one) only once the slot is confirmed.
 //   - WHAT: every move is checked against the state machine
 //     (lib/itemRequests.isLegalTransition) — one step forward, or reject/cancel
 //     from an early stage. No skipping, no rewinding, no leaving a terminal.
@@ -96,16 +103,22 @@ export async function POST(request: Request) {
       );
     }
 
-    // Scheduling a pickup REQUIRES a valid date/time from the admin. Validated
-    // here (cheap 400) before the transaction; stored below as
-    // itemRequests.pickup.scheduledAt. `pickupAt` is an ISO datetime string or
-    // epoch millis (the client combines its date + time inputs into one).
-    let pickupScheduledAt: Date | null = null;
-    if (toStatus === "PICKUP_SCHEDULED") {
-      const raw = body.pickupAt;
+    // Proposing (or re-proposing) a pickup slot REQUIRES a valid date/time from
+    // the admin. `pickupAt` is an ISO datetime string or epoch millis (the
+    // client combines its date + time inputs into one). Parsed here (cheap 400)
+    // before the transaction; the enforcement that a slot MUST accompany a
+    // PICKUP_PROPOSED move happens inside the transaction, once `from`/`to` and
+    // the request type are known.
+    let pickupProposedAt: Date | null = null;
+    const rawPickupAt = body.pickupAt;
+    if (
+      rawPickupAt !== undefined &&
+      rawPickupAt !== null &&
+      rawPickupAt !== ""
+    ) {
       const parsed =
-        typeof raw === "string" || typeof raw === "number"
-          ? new Date(raw)
+        typeof rawPickupAt === "string" || typeof rawPickupAt === "number"
+          ? new Date(rawPickupAt)
           : null;
       if (!parsed || Number.isNaN(parsed.getTime())) {
         return Response.json(
@@ -113,11 +126,12 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      pickupScheduledAt = parsed;
+      pickupProposedAt = parsed;
     }
 
-    // Optional confirmed pickup partner (courier), set by admin alongside the
-    // scheduled time. Trimmed and length-capped; never trusted for identity.
+    // Delivery partner (courier), set by admin when ASSIGNING the pickup after
+    // the customer has confirmed the slot. Trimmed and length-capped; never
+    // trusted for identity.
     const pickupPartner =
       typeof body.pickupPartner === "string"
         ? body.pickupPartner.trim().slice(0, 120)
@@ -134,18 +148,36 @@ export async function POST(request: Request) {
       }
 
       const req = snap.data() as {
-        type?: ItemRequestType;
-        status?: string;
-        vendorId?: string;
-        userId?: string;
-        userEmail?: string;
-        productId?: string;
-        item?: { qty?: number; name?: string };
-        refund?: { amount?: number; credited?: boolean };
-        replacement?: Record<string, unknown>;
-        pickup?: Record<string, unknown>;
-        history?: unknown[];
-      };
+  type?: ItemRequestType;
+  status?: string;
+  vendorId?: string;
+  userId?: string;
+
+  pickup?: {
+    requestedAt?: Timestamp;
+    requestedBy?: string;
+    proposedAt?: Timestamp;
+    proposedBy?: string;
+    customerResponse?: string;
+    respondedAt?: Timestamp;
+    counterAt?: Timestamp;
+    counterCount?: number;
+    confirmedAt?: Timestamp;
+    scheduledAt?: Timestamp;
+    scheduledBy?: string;
+    partner?: string;
+    assignedAt?: Timestamp;
+    pickedUpAt?: Timestamp;
+    receivedAt?: Timestamp;
+  };
+
+  userEmail?: string;
+  productId?: string;
+  item?: { qty?: number; name?: string };
+  refund?: { amount?: number; credited?: boolean };
+  replacement?: Record<string, unknown>;
+  history?: unknown[];
+};
 
       const type: ItemRequestType = req.type === "replace" ? "replace" : "return";
       const from = req.status || "REQUESTED";
@@ -158,7 +190,17 @@ export async function POST(request: Request) {
       }
 
       // ---- WHAT (state machine) ----
-      if (!isLegalTransition(type, from, toStatus)) {
+      // Admin may RE-PROPOSE a pickup slot after the customer counters: a
+      // same-state move (PICKUP_PROPOSED -> PICKUP_PROPOSED) that the
+      // forward-only isLegalTransition deliberately rejects, so it is allowed
+      // here as an explicit, admin-only exception on returns.
+      const isRepropose =
+        isAdmin &&
+        type === "return" &&
+        from === "PICKUP_PROPOSED" &&
+        toStatus === "PICKUP_PROPOSED";
+
+      if (!isRepropose && !isLegalTransition(type, from, toStatus)) {
         return {
           kind: "error",
           status: 409,
@@ -166,15 +208,45 @@ export async function POST(request: Request) {
         };
       }
 
-      // A seller may only run replacement fulfilment stages.
+      // A seller may only run the stages their role owns: replacement
+      // fulfilment on a replace, or the seller-inspection step on a return.
       if (!isAdmin) {
-        if (type !== "replace" || !SELLER_REPLACE_TARGETS.includes(toStatus)) {
+        const sellerTargets =
+          type === "replace" ? SELLER_REPLACE_TARGETS : SELLER_RETURN_TARGETS;
+        if (!sellerTargets.includes(toStatus)) {
           return {
             kind: "error",
             status: 403,
-            error: "Sellers can only progress replacement fulfilment.",
+            error:
+              type === "replace"
+                ? "Sellers can only progress replacement fulfilment."
+                : "Sellers can only confirm the return inspection.",
           };
         }
+      }
+
+      // ---- PICKUP negotiation guards ----
+      if (
+        type === "return" &&
+        toStatus === "PICKUP_PROPOSED" &&
+        !pickupProposedAt
+      ) {
+        return {
+          kind: "error",
+          status: 400,
+          error: "A valid pickup date and time is required.",
+        };
+      }
+      if (
+        type === "return" &&
+        toStatus === "PICKUP_ASSIGNED" &&
+        !pickupPartner
+      ) {
+        return {
+          kind: "error",
+          status: 400,
+          error: "A delivery partner is required to assign the pickup.",
+        };
       }
 
       const qtyNum = Number(req.item?.qty);
@@ -246,16 +318,44 @@ export async function POST(request: Request) {
         };
       }
 
-      // ---- PICKUP: admin-CONFIRMED date/time on PICKUP_SCHEDULED ----
-      // Spreads the existing pickup map, so the customer's requestedAt /
-      // requestedBy preference is preserved alongside the admin's confirmation.
-      if (toStatus === "PICKUP_SCHEDULED" && pickupScheduledAt) {
-        update.pickup = {
-          ...(req.pickup || {}),
-          scheduledAt: Timestamp.fromDate(pickupScheduledAt),
-          scheduledBy: "admin",
-          ...(pickupPartner ? { partner: pickupPartner } : {}),
-        };
+      // ---- PICKUP: negotiation + logistics writes ----
+      // Every branch spreads the existing pickup map, so earlier fields
+      // (the customer's counter, the confirmed slot, the partner) are preserved
+      // as the request advances. The customer's own accept/counter is written
+      // by the separate respond route; here are only the admin/seller steps.
+      if (type === "return") {
+        if (toStatus === "PICKUP_PROPOSED" && pickupProposedAt) {
+          // Admin proposes, or re-proposes after a customer counter. Resets the
+          // response to pending — a fresh acceptance is required for the new slot.
+          update.pickup = {
+            ...(req.pickup || {}),
+            proposedAt: Timestamp.fromDate(pickupProposedAt),
+            proposedBy: "admin",
+            customerResponse: "pending",
+          };
+        } else if (toStatus === "PICKUP_CONFIRMED") {
+          // Admin override-confirm (the customer's own accept goes through the
+          // respond route). The agreed appointment is the proposed slot.
+          update.pickup = {
+            ...(req.pickup || {}),
+            confirmedAt: now,
+            scheduledBy: "admin",
+            customerResponse: "accepted",
+            ...(req.pickup?.proposedAt
+              ? { scheduledAt: req.pickup.proposedAt }
+              : {}),
+          };
+        } else if (toStatus === "PICKUP_ASSIGNED" && pickupPartner) {
+          update.pickup = {
+            ...(req.pickup || {}),
+            partner: pickupPartner,
+            assignedAt: now,
+          };
+        } else if (toStatus === "PICKED_UP") {
+          update.pickup = { ...(req.pickup || {}), pickedUpAt: now };
+        } else if (toStatus === "RECEIVED_BY_YOMICO") {
+          update.pickup = { ...(req.pickup || {}), receivedAt: now };
+        }
       }
 
       // ---- STOCK write for replace approval ----
@@ -268,6 +368,34 @@ export async function POST(request: Request) {
           ...(req.replacement || {}),
           approvedAt: now,
           stockDecremented: true,
+        };
+      }
+
+      // ---- STOCK reversal for a replace rejected/cancelled AFTER approval ----
+      // Approving a replace reserved a unit (stock down, sales up) and set
+      // replacement.stockDecremented. Moving it to a terminal REJECTED/CANCELLED
+      // state must return that reservation, or the unit is silently lost and
+      // `sales` stays inflated. Fires ONLY for a replace that actually
+      // decremented (the flag), restoring the exact stored qty the approval
+      // used — no client-supplied quantity — and clears the flag so it can
+      // never reverse twice. REJECTED/CANCELLED are terminal, so isLegalTransition
+      // refuses any re-transition; combined with the cleared flag, a retry can
+      // perform no second reversal. Return requests are unaffected.
+      if (
+        type === "replace" &&
+        (toStatus === "REJECTED" || toStatus === "CANCELLED") &&
+        req.replacement?.stockDecremented === true &&
+        typeof req.productId === "string" &&
+        req.productId
+      ) {
+        tx.update(db.collection("products").doc(req.productId), {
+          stock: FieldValue.increment(qty),
+          sales: FieldValue.increment(-qty),
+        });
+        update.replacement = {
+          ...(req.replacement || {}),
+          stockDecremented: false,
+          stockRestoredAt: now,
         };
       }
 
