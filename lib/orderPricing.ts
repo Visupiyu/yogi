@@ -34,7 +34,10 @@ import {
   findVariantById,
   variantAttributes,
 } from "@/lib/products/variantSelection";
-import { planVariantDecrements } from "@/lib/products/inventory";
+import {
+  hasStockBearingVariants,
+  planVariantDecrements,
+} from "@/lib/products/inventory";
 
 // size/color are variant intent, not money — the only client-supplied
 // fields that survive into the order line, and neither affects pricing.
@@ -259,6 +262,33 @@ export async function computeOrderPricing(
         ok: false,
         error: "One or more products are currently unavailable",
         status: 400,
+      };
+    }
+
+    // ---- Strategy 1 invariant: variant products are variant-ordered ONLY ----
+    //
+    // If the product's stock lives on its variants, every line for it must name
+    // a variantId. Previously a line without one silently fell through to the
+    // product-level branch below, which decrements product.stock and leaves the
+    // variants untouched — and because the variant path SETS product.stock to
+    // the variant sum, the next variant purchase overwrote (restored) that
+    // decrement, so units could be sold twice.
+    //
+    // Refused here, in the one pricing pass BOTH pre-payment web entry points
+    // share (app/api/place-order for COD and app/api/create-order for Razorpay),
+    // so it is rejected before any stock mutation or order write, and before a
+    // card is ever charged. finalizeOnlineOrder deliberately does NOT re-price
+    // (it uses the stored intent snapshot), so this can never strand a captured
+    // payment.
+    if (
+      hasStockBearingVariants(product.variants) &&
+      productHasNonVariantLine.has(productId)
+    ) {
+      return {
+        ok: false,
+        error:
+          "Please choose an option (such as size or colour) for every item in your cart before checking out.",
+        status: 409,
       };
     }
 

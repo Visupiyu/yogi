@@ -178,6 +178,34 @@ export type VariantStockEntry = {
   [key: string]: unknown;
 };
 
+/**
+ * Whether this product carries STOCK-BEARING variants — the Strategy 1 model,
+ * where each entry has its own `id` and `stock`, and planVariantDecrements()
+ * matches on that id.
+ *
+ * The test is deliberately "at least one entry with a non-empty string id",
+ * not "variants is non-empty": the mobile catalogue stores a DIFFERENT,
+ * non-stock-bearing shape on the same field ({label, options[]}, no per-entry
+ * id — see app/api/mobile/place-order). Treating those as variant stock would
+ * refuse every mobile order for such a product.
+ *
+ * This is the guard for the Strategy 1 invariant: a product whose stock lives
+ * on its variants may only be ordered through the variant path. Mixing paths
+ * silently loses units, because the variant path SETS product.stock to the
+ * variant sum while the product-level path DECREMENTS it — so a later variant
+ * purchase overwrites (and thereby restores) an earlier product-level
+ * decrement.
+ */
+export function hasStockBearingVariants(variants: unknown): boolean {
+  return (
+    Array.isArray(variants) &&
+    variants.some((v) => {
+      const id = (v as VariantStockEntry | null)?.id;
+      return typeof id === "string" && id.length > 0;
+    })
+  );
+}
+
 /** The derived product.stock: the sum of every variant's (numeric, >=0) stock. */
 export function sumVariantStock(variants: VariantStockEntry[]): number {
   if (!Array.isArray(variants)) return 0;
