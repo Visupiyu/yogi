@@ -6,13 +6,11 @@ import ProductRecommendations from "@/components/ProductRecommendations";
 import {
   collection,
   addDoc,
-  Timestamp,
   doc,
   getDocs, getDoc,
   query,
   where,
   limit,
-  runTransaction,
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -312,8 +310,6 @@ setAddress(userData.address || "");
     // too. Sending again from here would mean two emails per order.
     skipConfirmationEmail: boolean = false
   ) => {
-    const earnedPoints = Math.floor(grandTotal / 100);
-
       // Notifications moved SERVER-SIDE.
       //
       // This browser used to write the admin, seller and customer notifications
@@ -351,62 +347,31 @@ setAddress(userData.address || "");
       console.error("Order email failed:", e);
     }
 
-    // Reward points: read-modify-write against Firestore atomically, not
-    // just localStorage — the cached value is trivially editable and was
-    // never actually the source of truth, and a plain read-then-write here
-    // would let two concurrent orders both redeem against the same stale
-    // balance. Re-clamps the redemption against the REAL current balance
-    // at write time, not just what the page happened to load with.
-    let actualRedeemed = 0;
-    if (!rewardsAlreadyApplied) try {
-      await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, "users", firebaseUser.uid);
-        const userSnap = await transaction.get(userRef);
-        const currentPoints = userSnap.exists()
-          ? Number(userSnap.data().rewardPoints || 0)
-          : 0;
-
-        actualRedeemed = Math.min(rewardValue, currentPoints);
-        const newBalance = Math.max(
-          0,
-          currentPoints + earnedPoints - actualRedeemed
-        );
-
-        transaction.set(
-          userRef,
-          { rewardPoints: newBalance },
-          { merge: true }
-        );
-      });
-    } catch (error) {
-      console.error("Failed to update reward points:", error);
-    }
+    // Reward points are SERVER-AUTHORITATIVE — nothing is written here.
+    //
+    // Both callers already pass rewardsAlreadyApplied = true, so the browser
+    // transaction that used to live here was dead code in every live path;
+    // it is removed rather than left as a second, competing reward mechanism.
+    // It also computed `earnedPoints` itself and credited them immediately,
+    // which contradicts the deferred rule the server implements.
+    //
+    // What replaces it, all with the Admin SDK:
+    //   REDEEM  app/api/place-order (Pay on Delivery) and lib/onlineOrder
+    //           (Razorpay) move the balance inside the SAME transaction as
+    //           the order, re-clamped against the real stored balance, and
+    //           write the "Redeemed" ledger row.
+    //   EARN    the order is stamped rewardPointsStatus: "pending"; points
+    //           are credited only once it is delivered, paid and past its
+    //           return window, by lib/rewardCreditServer via
+    //           /api/credit-reward-points (and its cron), which writes the
+    //           "Earned" ledger row.
+    //
+    // firestore.rules now forbids any client write to users.rewardPoints, so
+    // re-adding a browser write here would simply be denied.
 
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     user.name = name; user.phone = phone; user.address = address;
     localStorage.setItem("user", JSON.stringify(user));
-
-    // Reward transactions (must include userId to satisfy Firestore rules)
-    if (!rewardsAlreadyApplied) {
-    await addDoc(collection(db, "rewardTransactions"), {
-      userId: firebaseUser.uid,
-      userEmail: firebaseUser.email,
-      type: "Earned",
-      points: earnedPoints,
-      orderTotal: grandTotal,
-      createdAt: Timestamp.now(),
-    });
-
-    if (actualRedeemed > 0) {
-      await addDoc(collection(db, "rewardTransactions"), {
-        userId: firebaseUser.uid,
-        userEmail: firebaseUser.email,
-        type: "Redeemed",
-        points: actualRedeemed,
-        createdAt: Timestamp.now(),
-      });
-    }
-    }
 
     // couponRedemptions is claimed server-side, inside the order transaction
     // (/api/place-order for Pay on Delivery, lib/onlineOrder.ts for Razorpay),
