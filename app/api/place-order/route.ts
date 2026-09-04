@@ -5,6 +5,7 @@ import { computeOrderPricing, type PricedItemInput } from "@/lib/orderPricing";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { mintNumbers } from "@/lib/humanIds";
 import {
+  hasStockBearingVariants,
   planVariantDecrements,
   sumVariantStock,
   type VariantStockEntry,
@@ -310,6 +311,23 @@ export async function POST(request: Request) {
             kind: "error",
             status: 409,
             error: `${label} is currently unavailable.`,
+          };
+        }
+
+        // Strategy 1 invariant, enforced again on the authoritative snapshot:
+        // a product whose stock lives on its variants may only be ordered
+        // through the variant path. computeOrderPricing already refused this
+        // earlier in the request; repeating it here means the guarantee holds
+        // on the transactional read that actually governs the write, and this
+        // runs before every product/order mutation below.
+        if (
+          hasStockBearingVariants(product.variants) &&
+          productHasNonVariantLine.has(id)
+        ) {
+          return {
+            kind: "error",
+            status: 409,
+            error: `Please choose an option (such as size or colour) for ${label} before checking out.`,
           };
         }
 
