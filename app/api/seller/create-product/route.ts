@@ -58,6 +58,12 @@ export async function POST(request: Request) {
     }
 
     // Never trust a client-supplied number, id, vendorId, or moderation flags.
+    // The analytics/social-proof counters (sales, rating, reviewCount, views,
+    // wishlistCount) are SERVER-OWNED too: they accrue only through the
+    // rules-guarded increment paths (checkout sales, review aggregation, view
+    // bumps), so a crafted create request must not be able to seed a product
+    // with fake ratings or best-seller numbers. Stripped here and re-seeded to
+    // 0 below, matching the product model's defaults.
     const {
       productNumber: _n,
       id: _id,
@@ -65,6 +71,11 @@ export async function POST(request: Request) {
       approved: _a,
       featured: _f,
       createdAt: _c,
+      sales: _sales,
+      rating: _rating,
+      reviewCount: _reviewCount,
+      views: _views,
+      wishlistCount: _wishlistCount,
       ...productFields
     } = body.product as Record<string, unknown>;
     void _n;
@@ -73,6 +84,11 @@ export async function POST(request: Request) {
     void _a;
     void _f;
     void _c;
+    void _sales;
+    void _rating;
+    void _reviewCount;
+    void _views;
+    void _wishlistCount;
 
     const db = getAdminDb();
 
@@ -94,9 +110,24 @@ export async function POST(request: Request) {
     }
 
     const vendor = vendorSnap.docs[0].data() as {
+      status?: string;
       taxProfile?: { gstStatus?: string; gstin?: string };
       taxVerificationStatus?: string;
     };
+
+    // Seller-account status is enforced HERE, server-side — the seller
+    // dashboard's own status gate (app/seller/layout.js) is client-only and a
+    // valid token can reach this route directly. Only an admin-Approved vendor
+    // may list; a Pending, Rejected, Blocked, or status-less account is refused
+    // even if it still carries a previously admin-VERIFIED GST profile. The GST
+    // eligibility check below is kept unchanged and applies on top of this.
+    if (vendor.status !== "Approved") {
+      return Response.json(
+        { error: "Your seller account is not approved for listing products." },
+        { status: 403 }
+      );
+    }
+
     const listingProfile = {
       gstStatus: vendor.taxProfile?.gstStatus,
       gstin: vendor.taxProfile?.gstin,
