@@ -1320,6 +1320,31 @@ finally{ setSaving(false);} };
 
               </h2>
 
+              {/* When YOMICO Admin has assigned a Delivery Company + Person,
+                  that assignment (shown above) is authoritative. The inputs
+                  below are the seller's own legacy/optional fields, kept
+                  functional but clarified so the blank fields aren't misread
+                  as required. Only shown when an assignment exists. */}
+              {(order.deliveryCompanyName ||
+                order.deliveryPartnerName ||
+                order.shipmentNumber) && (
+                <div className="mb-4 rounded-xl bg-blue-50 border border-blue-200 p-3 text-sm">
+                  <p>
+                    <strong>Delivery assigned by YOMICO:</strong>{" "}
+                    {[order.deliveryCompanyName, order.deliveryPartnerName]
+                      .filter(Boolean)
+                      .join(" · ") || "Assigned"}
+                    {order.shipmentNumber
+                      ? ` · Tracking ${order.shipmentNumber}`
+                      : ""}
+                    .
+                  </p>
+                  <p className="text-gray-500">
+                    The fields below are legacy/optional.
+                  </p>
+                </div>
+              )}
+
               <div className="
                 space-y-4
               ">
@@ -1539,7 +1564,9 @@ finally{ setSaving(false);} };
 
     {" "}
 
-    {courierPartner || "-"}
+    {/* Prefer the authoritative YOMICO delivery-person assignment; fall back
+        to the seller's legacy free-text courier only when unassigned. */}
+    {order.deliveryPartnerName || courierPartner || "-"}
 
   </p>
 
@@ -1549,7 +1576,9 @@ finally{ setSaving(false);} };
 
     {" "}
 
-    {trackingNumber || "-"}
+    {/* Authoritative YOMICO tracking number (shipmentNumber) when present;
+        legacy free-text tracking otherwise. */}
+    {order.shipmentNumber || trackingNumber || "-"}
 
   </p>
 
