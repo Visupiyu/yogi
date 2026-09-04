@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { mintNumbers } from "@/lib/humanIds";
+import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -377,6 +378,15 @@ export async function POST(request: Request) {
 
       const shipping = subtotal >= freeShippingThreshold ? 0 : standardShippingCharge;
 
+      // Delivery-cost snapshot (concepts B/C), matching the web paths so a
+      // mobile free-delivery order deducts the seller's delivery cost the same
+      // way. Distinct from `shipping` (customer charge, A).
+      const deliveryCost =
+        typeof settingsData?.deliveryCost === "number"
+          ? settingsData.deliveryCost
+          : DEFAULT_DELIVERY_COST;
+      const freeDeliveryApplied = subtotal >= freeShippingThreshold;
+
       let discountAmount = 0;
       let resolvedCouponCode: string | null = null;
 
@@ -427,6 +437,10 @@ export async function POST(request: Request) {
         items,
         subtotal,
         shipping,
+        // Delivery-cost snapshot (B/C) — see the web paths. Admin/server
+        // written only; the seller order-update rule cannot touch these.
+        deliveryCost,
+        freeDeliveryApplied,
         couponCode: resolvedCouponCode,
         discountAmount,
         total,

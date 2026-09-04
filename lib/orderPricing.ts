@@ -26,6 +26,10 @@ import {
   STANDARD_SHIPPING_CHARGE,
   calculateShippingCharge,
 } from "@/lib/shippingRules";
+// Seller-borne delivery-cost config (concept B). Dependency-free, same
+// sharing pattern as shippingRules — kept SEPARATE from the customer charge
+// (standardShippingCharge, concept A) on purpose.
+import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import {
   findVariantById,
   variantAttributes,
@@ -78,6 +82,14 @@ export type OrderPricing = {
   vendorIds: string[];
   subtotal: number;
   shipping: number;
+  // Delivery-cost snapshot (concepts B/C), additive and independent of
+  // `shipping` (the customer charge, A). `deliveryCost` is the actual/base
+  // delivery-company cost captured at order time so a later config change never
+  // rewrites history; `freeDeliveryApplied` records whether the order shipped
+  // free (the condition under which the seller — not the customer — bears
+  // deliveryCost). Seller responsibility itself is derived in lib/vendorPayable.
+  deliveryCost: number;
+  freeDeliveryApplied: boolean;
   couponDiscount: number;
   rewardValue: number;
   /** couponDiscount + rewardValue, clamped to subtotal + shipping. */
@@ -104,6 +116,7 @@ const FALLBACK_STANDARD_SHIPPING_CHARGE = STANDARD_SHIPPING_CHARGE;
 type GlobalSettings = {
   freeShippingThreshold: number;
   standardShippingCharge: number;
+  deliveryCost: number;
   commissionRate: number;
 };
 
@@ -137,6 +150,10 @@ async function readGlobalSettings(): Promise<GlobalSettings> {
         typeof data?.standardShippingCharge === "number"
           ? data.standardShippingCharge
           : FALLBACK_STANDARD_SHIPPING_CHARGE,
+      deliveryCost:
+        typeof data?.deliveryCost === "number"
+          ? data.deliveryCost
+          : DEFAULT_DELIVERY_COST,
       commissionRate,
     };
   } catch (error) {
@@ -147,6 +164,7 @@ async function readGlobalSettings(): Promise<GlobalSettings> {
     return {
       freeShippingThreshold: FALLBACK_FREE_SHIPPING_THRESHOLD,
       standardShippingCharge: FALLBACK_STANDARD_SHIPPING_CHARGE,
+      deliveryCost: DEFAULT_DELIVERY_COST,
       commissionRate: 0,
     };
   }
@@ -360,6 +378,13 @@ export async function computeOrderPricing(
 
   const shipping = calculateShippingCharge(subtotal, settings);
 
+  // Delivery-cost snapshot. `freeDeliveryApplied` is the exact condition under
+  // which the SELLER (not the customer) bears the forward delivery cost, and is
+  // recorded so historical seller payables never shift when ₹499/₹49 change.
+  // `deliveryCost` is the base cost (B) snapshotted from config at order time.
+  const freeDeliveryApplied = subtotal >= settings.freeShippingThreshold;
+  const deliveryCost = settings.deliveryCost;
+
   // ---- Coupon: percentage read from the coupon document itself ----
   // Mirrors app/checkout/page.tsx's applyCoupon() exactly, so a coupon the
   // customer legitimately applied prices the same here: coupons are created
@@ -464,6 +489,8 @@ export async function computeOrderPricing(
       vendorIds,
       subtotal,
       shipping,
+      deliveryCost,
+      freeDeliveryApplied,
       couponDiscount,
       rewardValue,
       discountAmount,

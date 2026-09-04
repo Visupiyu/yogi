@@ -425,6 +425,12 @@ export async function POST(request: Request) {
         paymentMethod,
         paymentStatus: "Pending",
         shippingCharge: pricing.shipping,
+        // Delivery-cost snapshot (concepts B/C), additive and distinct from
+        // shippingCharge (A). Seller responsibility is derived from these in
+        // lib/vendorPayable; they are admin/server-written only (the seller
+        // order-update rule's affectedKeysOnly allowlist excludes them).
+        deliveryCost: pricing.deliveryCost,
+        freeDeliveryApplied: pricing.freeDeliveryApplied,
         finalTotal: pricing.finalTotal,
         deliveryDate: deliveryDateString(),
         commission: pricing.commission,

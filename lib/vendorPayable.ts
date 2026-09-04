@@ -1,4 +1,5 @@
 import { computeVendorShare } from "@/lib/vendorEarnings";
+import { sellerForwardDeliveryForOrder } from "@/lib/deliveryRules";
 
 // ---------------------------------------------------------------------------
 // The SINGLE authoritative "how much may this vendor be paid right now" calc.
@@ -11,8 +12,24 @@ import { computeVendorShare } from "@/lib/vendorEarnings";
 //
 //   adjustedEarnings = Σ over the vendor's Delivered + Paid + !needsReview
 //                      orders of (vendorEarning - returnDeduction)
+//                      - sellerDeliveryDeduction
 //   commitments      = admin direct settlements (vendor_payouts)
 //                      + every Paid/Pending/Approved withdrawal
+//
+// SELLER DELIVERY COST reduces payable alongside returns (see lib/deliveryRules
+// for the A–E concept split). Two distinct legs, never double-counted:
+//   - FORWARD: on an order that shipped FREE (order.freeDeliveryApplied), the
+//     seller bears order.deliveryCost, allocated by the value of that seller's
+//     products in the order (rule 8). Below the free-delivery threshold the
+//     CUSTOMER paid delivery, so the seller bears nothing. Read from the per-
+//     order snapshot, so a later ₹499/₹49 change never rewrites history; orders
+//     placed before the feature carry no snapshot and deduct 0 (no migration).
+//   - RETURN / REPLACEMENT: the seller bears the return/replacement logistics
+//     cost recorded on the itemRequest (itemRequest.deliveryCost). This is the
+//     accounting seam only — until a real courier cost is recorded the field is
+//     absent and deducts 0 (no invented rate). Rejected/cancelled requests are
+//     excluded (no shipment happened). A forward leg and a return leg are
+//     different shipments, so summing both is correct, not double-counting.
 //
 // RETURNS reduce a seller's earning for the merchandise that came back, even
 // when the customer was refunded in reward points rather than cash — a seller
@@ -57,6 +74,10 @@ export type PayableOrder = {
   items?: unknown;
   total?: unknown;
   finalTotal?: unknown;
+  // Delivery-cost snapshot written at order creation (absent on pre-feature
+  // orders -> 0 seller delivery deduction).
+  deliveryCost?: unknown;
+  freeDeliveryApplied?: unknown;
   [key: string]: unknown;
 };
 
@@ -79,6 +100,9 @@ export type PayableItemRequest = {
   type?: unknown; // "return" | "replace"
   status?: unknown;
   item?: { unitPrice?: unknown; qty?: unknown };
+  // Seller-borne return/replacement logistics cost, recorded when a real
+  // courier cost becomes known. Absent today -> deducts 0 (no invented rate).
+  deliveryCost?: unknown;
 };
 
 // One legacy order-level return (the returns collection).
@@ -199,6 +223,9 @@ export function computeVendorAdjustedEarnings(params: {
   }
 
   let adjustedEarnings = 0;
+  // Seller-borne delivery cost, subtracted from earnings once at the end so it
+  // stays a clearly separate line from merchandise/returns (concepts B/C).
+  let deliveryDeduction = 0;
   for (const order of orders || []) {
     if (
       order?.status !== "Delivered" ||
@@ -209,6 +236,17 @@ export function computeVendorAdjustedEarnings(params: {
     }
     const share = computeVendorShare(order as never, vendorUid);
     if (!share) continue;
+
+    // FORWARD delivery — the seller bears it on free-delivery orders, allocated
+    // by this seller's product value in the order. Charged whenever the seller
+    // is on an eligible order (the goods shipped), independent of the per-order
+    // merchandise earning below. No-op on pre-feature orders (no snapshot).
+    deliveryDeduction += sellerForwardDeliveryForOrder(
+      order,
+      share.vendorRawSubtotal,
+      toNum(order?.total)
+    );
+
     const vendorEarning = share.vendorEarning;
     if (vendorEarning <= 0) continue;
 
@@ -224,7 +262,20 @@ export function computeVendorAdjustedEarnings(params: {
     adjustedEarnings += Math.max(0, vendorEarning - deduction);
   }
 
-  return adjustedEarnings;
+  // RETURN / REPLACEMENT logistics recorded on item requests (both types). An
+  // active (non rejected/cancelled) request whose deliveryCost has been set
+  // adds that seller cost; absent cost -> 0. This is a different shipment leg
+  // from the forward cost above, so the two never double-count.
+  for (const ir of itemRequests) {
+    if (ir?.vendorId !== vendorUid) continue;
+    if (INACTIVE_RETURN_STATUSES.has(String(ir?.status))) continue;
+    deliveryDeduction += toNum(ir?.deliveryCost);
+  }
+
+  // May go slightly negative when delivery costs outrun net merchandise
+  // earnings; computeVendorPayable already documents and handles a negative
+  // (recoverable-adjustment) result, and display callers clamp with max(0, …).
+  return adjustedEarnings - deliveryDeduction;
 }
 
 /**

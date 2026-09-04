@@ -8,6 +8,7 @@ import {
   FREE_SHIPPING_THRESHOLD as DEFAULT_FREE_SHIPPING_THRESHOLD,
   STANDARD_SHIPPING_CHARGE as DEFAULT_STANDARD_SHIPPING_CHARGE,
 } from "@/lib/shipping";
+import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import { logAdminAction } from "@/lib/auditLog";
 
 export default function AdminSettingsPage() {
@@ -19,6 +20,11 @@ export default function AdminSettingsPage() {
   const [standardShippingCharge, setStandardShippingCharge] = useState(
     DEFAULT_STANDARD_SHIPPING_CHARGE
   );
+  // Seller-borne delivery cost (concept B). Distinct from the customer-facing
+  // standardShippingCharge above: this is what a seller is charged for the
+  // forward delivery of a FREE-delivery order (and, later, returns), snapshotted
+  // onto each new order so changing it never rewrites historical payouts.
+  const [deliveryCost, setDeliveryCost] = useState(DEFAULT_DELIVERY_COST);
   // YOMICO's launch policy is zero commission until explicitly turned on —
   // both default to the "off" state until a settings doc says otherwise.
   const [commissionEnabled, setCommissionEnabled] = useState(false);
@@ -46,6 +52,9 @@ export default function AdminSettingsPage() {
           if (typeof data.standardShippingCharge === "number") {
             setStandardShippingCharge(data.standardShippingCharge);
           }
+          if (typeof data.deliveryCost === "number") {
+            setDeliveryCost(data.deliveryCost);
+          }
           setCommissionEnabled(data.commissionEnabled === true);
           if (
             typeof data.commissionRate === "number" &&
@@ -71,7 +80,11 @@ export default function AdminSettingsPage() {
   }, []);
 
   const save = async () => {
-    if (freeShippingThreshold < 0 || standardShippingCharge < 0) {
+    if (
+      freeShippingThreshold < 0 ||
+      standardShippingCharge < 0 ||
+      deliveryCost < 0
+    ) {
       toast.error("Values can't be negative.");
       return;
     }
@@ -93,6 +106,7 @@ export default function AdminSettingsPage() {
         {
           freeShippingThreshold,
           standardShippingCharge,
+          deliveryCost,
           commissionEnabled,
           commissionRate,
           upiEnabled,
@@ -106,6 +120,7 @@ export default function AdminSettingsPage() {
       await logAdminAction("settings_update", "global", {
         freeShippingThreshold,
         standardShippingCharge,
+        deliveryCost,
         commissionEnabled,
         commissionRate,
         upiEnabled,
@@ -175,6 +190,25 @@ export default function AdminSettingsPage() {
                   />
                   <p className="text-xs text-gray-400 mt-1">
                     Charged when the order is below the threshold above.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Seller delivery cost (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={deliveryCost}
+                    onChange={(e) => setDeliveryCost(Number(e.target.value))}
+                    className="w-full border rounded-lg px-3 py-2"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Delivery cost the seller bears on free-delivery orders (split
+                    across sellers by product value). Snapshotted per order, so
+                    changing it never alters past payouts. Placeholder until the
+                    delivery company&apos;s real pricing is set.
                   </p>
                 </div>
               </div>

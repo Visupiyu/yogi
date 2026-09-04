@@ -287,6 +287,11 @@ export async function finalizeOnlineOrder(params: {
       paymentMethod: "ONLINE",
       paymentStatus: "Paid",
       shippingCharge: pricing.shipping,
+      // Delivery-cost snapshot (concepts B/C), additive and distinct from
+      // shippingCharge (A). Seller responsibility is derived from these in
+      // lib/vendorPayable; admin/server-written only.
+      deliveryCost: pricing.deliveryCost,
+      freeDeliveryApplied: pricing.freeDeliveryApplied,
       finalTotal: capturedRupees,
       deliveryDate: intent.deliveryDate,
       commission: pricing.commission,
