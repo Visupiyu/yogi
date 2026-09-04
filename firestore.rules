@@ -1437,6 +1437,14 @@ service cloud.firestore {
       allow read: if isAdmin() || isOwnerUid(resource.data.uid);
       allow write: if isAdmin();
     }
+
+    match /deliveryCompanies/{docId} {
+      // Delivery companies group delivery partners. Managed only from the
+      // admin console (create/list/edit/activate), read only there too —
+      // partners and orders never need to query this collection.
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
 // ---------------------------------------------------------
     // Mobile app cart
     // ---------------------------------------------------------

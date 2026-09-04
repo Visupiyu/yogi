@@ -52,6 +52,15 @@ type Order = {
   createdAt: any;
   courierName?: string;
   trackingNumber?: string;
+  // Real delivery assignment written by Admin -> Delivery (the Delivery
+  // Company -> Delivery Person flow). Distinct from the legacy free-text
+  // courierName/trackingNumber below, which pre-date that flow.
+  deliveryCompanyName?: string;
+  deliveryPartnerName?: string;
+  deliveryPartnerId?: string;
+  // The persistent YOMICO tracking number, minted once at confirmation
+  // (app/api/confirm-order via the `shipment` counter, format TRCK######).
+  shipmentNumber?: string;
   expectedDelivery?: string;
   paymentAmount?: number;
   paymentTransactionId?: string;
@@ -271,6 +280,13 @@ export default function AdminOrdersPage() {
           deliveredAt: data.deliveredAt || null,
           courierName: data.courierName || "",
           trackingNumber: data.trackingNumber || "",
+          // Real assignment + confirmation-minted tracking number, so the
+          // table can show what was actually assigned rather than only the
+          // legacy free-text fields.
+          deliveryCompanyName: data.deliveryCompanyName || "",
+          deliveryPartnerName: data.deliveryPartnerName || "",
+          deliveryPartnerId: data.deliveryPartnerId || "",
+          shipmentNumber: data.shipmentNumber || "",
           expectedDelivery: data.expectedDelivery || "",
           paymentAmount: data.paymentAmount || 0,
           paymentTransactionId: data.paymentTransactionId || "",
@@ -670,6 +686,9 @@ const filtered = orders.filter(
       .toLowerCase()
       .includes(search.toLowerCase()) ||
     (order.trackingNumber || "")
+      .toLowerCase()
+      .includes(search.toLowerCase()) ||
+    (order.shipmentNumber || "")
       .toLowerCase()
       .includes(search.toLowerCase())
 );
@@ -1222,20 +1241,50 @@ const filtered = orders.filter(
                       </td>
                       <td>{order.createdAt ? order.createdAt.toDate().toLocaleDateString("en-IN"): "-"}</td>
                       <td>
-                        <input
-                          type="text"
-                          defaultValue={order.courierName || ""}
-                         onBlur={(e) => updateShipping( order.id, "courierName", e.target.value.trim() )}
-                          className="border p-2 rounded-lg w-32"
-                        />
+                        {order.deliveryPartnerName ? (
+                          // Real assignment from Admin -> Delivery. Show the
+                          // assigned person and their company (read-only) —
+                          // never the unrelated legacy free-text courierName.
+                          <div className="text-sm">
+                            <div className="font-medium">
+                              {order.deliveryPartnerName}
+                            </div>
+                            {order.deliveryCompanyName ? (
+                              <div className="text-gray-500">
+                                {order.deliveryCompanyName}
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          // No real assignment yet (e.g. legacy orders) — keep
+                          // the editable legacy courier field for backward
+                          // compatibility.
+                          <input
+                            type="text"
+                            defaultValue={order.courierName || ""}
+                            onBlur={(e) => updateShipping( order.id, "courierName", e.target.value.trim() )}
+                            className="border p-2 rounded-lg w-32"
+                          />
+                        )}
                       </td>
                       <td>
-                        <input
-                          type="text"
-                          defaultValue={order.trackingNumber || ""}
-                        onBlur={(e) => updateShipping(order.id,"trackingNumber", e.target.value.trim())}
-                          className="border p-2 rounded-lg w-40"
-                        />
+                        {order.shipmentNumber ? (
+                          // The persistent YOMICO tracking number minted at
+                          // confirmation. Read-only — never regenerated or
+                          // overwritten here.
+                          <span className="text-sm font-mono">
+                            {order.shipmentNumber}
+                          </span>
+                        ) : (
+                          // No shipment number yet (unconfirmed / legacy) —
+                          // keep the editable legacy tracking field.
+                          <input
+                            type="text"
+                            defaultValue={order.trackingNumber || ""}
+                            onBlur={(e) => updateShipping(order.id,"trackingNumber", e.target.value.trim())}
+                            className="border p-2 rounded-lg w-40"
+                          />
+                        )}
                       </td>
                       <td>
                         <input

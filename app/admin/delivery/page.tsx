@@ -22,6 +22,8 @@ type Delivery = {
   phone?: string;
   address?: string;
   courierPartner?: string;
+  deliveryCompanyId?: string;
+  deliveryCompanyName?: string;
   deliveryPartnerId?: string;
   deliveryPartnerName?: string;
   trackingNumber?: string;
@@ -37,6 +39,12 @@ export default function AdminDeliveryPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [partners, setPartners] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  // Per-order Step-1 company choice, so each card independently narrows its
+  // Step-2 person list. Keyed by order id; "" means "Unassigned (no company)".
+  const [companyByOrder, setCompanyByOrder] = useState<Record<string, string>>(
+    {}
+  );
 
   useEffect(() => {
     loadDeliveries();
@@ -57,6 +65,8 @@ export default function AdminDeliveryPage() {
           phone: data.phone || "",
           address: data.address || "",
           courierPartner: data.courierPartner || "Not Assigned",
+          deliveryCompanyId: data.deliveryCompanyId || "",
+          deliveryCompanyName: data.deliveryCompanyName || "",
           deliveryPartnerId: data.deliveryPartnerId || "",
           deliveryPartnerName: data.deliveryPartnerName || "",
           trackingNumber: data.trackingNumber || "-",
@@ -76,6 +86,18 @@ export default function AdminDeliveryPage() {
         partnerList.push({ id: docSnap.id, ...docSnap.data() })
       );
       setPartners(partnerList);
+
+      const companySnapshot = await getDocs(
+        collection(db, "deliveryCompanies")
+      );
+      const companyList: any[] = [];
+      companySnapshot.forEach((docSnap) =>
+        companyList.push({ id: docSnap.id, ...docSnap.data() })
+      );
+      companyList.sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""))
+      );
+      setCompanies(companyList);
     } catch (error) {
       console.error(error);
     } finally {
@@ -109,13 +131,23 @@ export default function AdminDeliveryPage() {
     return searchMatch && statusMatch;
   });
 
-  const assignPartner = async (orderId: string, partner: any) => {
+  const assignPartner = async (
+    orderId: string,
+    partner: any,
+    company: any | null
+  ) => {
     try {
       // Assigning a partner is orthogonal to fulfillment status — writing
       // "Assigned" into order.status overwrote the real Pending/Packed/
       // Shipped/etc value, which the customer's tracking bar doesn't
       // recognize and so visually reset back to step 1 ("Placed").
+      //
+      // deliveryPartnerId/deliveryPartnerName stay exactly as the /delivery
+      // dashboard expects (it queries deliveryPartnerId == partnerId). The
+      // company fields are additive context for admin screens only.
       await updateDoc(doc(db, "orders", orderId), {
+        deliveryCompanyId: company?.id || "",
+        deliveryCompanyName: company?.name || "",
         deliveryPartnerId: partner.id,
         deliveryPartnerName: partner.name,
         assignedAt: serverTimestamp(),
@@ -125,10 +157,9 @@ export default function AdminDeliveryPage() {
       await addDoc(collection(db, "notifications"), {
         role: "admin",
         title: "Delivery Assigned",
-        message: `${partner.name} has been assigned to Order ${orderId.slice(
-          0,
-          8
-        )}.`,
+        message: `${partner.name}${
+          company?.name ? ` (${company.name})` : ""
+        } has been assigned to Order ${orderId.slice(0, 8)}.`,
         type: "delivery",
         read: false,
         createdAt: serverTimestamp(),
@@ -283,33 +314,89 @@ export default function AdminDeliveryPage() {
 
                   <div className="text-right">
                     <p>🚚 {order.deliveryPartnerName || order.courierPartner || "Not Assigned"}</p>
+                    {order.deliveryCompanyName && (
+                      <p>🏢 {order.deliveryCompanyName}</p>
+                    )}
                     <p>📍 {order.trackingNumber}</p>
                   <p>📅{" "} {order.expectedDelivery &&  order.expectedDelivery !== "-"
                    ? new Date(order.expectedDelivery).toLocaleDateString("en-IN") : "-"} </p>
+                    {/* Step 1 — pick a delivery company (or Unassigned). */}
                     <select
-  className="mt-3 border rounded-lg p-2 w-full"
-  defaultValue=""
-  disabled={order.status === "Delivered"}
-  onChange={(e) => {
-    const partner = partners.find(
-      (p) => p.id === e.target.value
-    );
-
-    if (
-      partner &&
-      confirm(`Assign ${partner.name} to this order?`)
-    ) {
-      assignPartner(order.id, partner);
-    }
-  }}
->
-                      <option value="">Assign Delivery Partner</option>
-                      {partners.map((partner) => (
-                        <option key={partner.id} value={partner.id}>
-                          {partner.name}
-                        </option>
-                      ))}
+                      className="mt-3 border rounded-lg p-2 w-full"
+                      value={companyByOrder[order.id] ?? "__CHOOSE__"}
+                      disabled={order.status === "Delivered"}
+                      onChange={(e) =>
+                        setCompanyByOrder((prev) => ({
+                          ...prev,
+                          [order.id]: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="__CHOOSE__">1️⃣ Select Company</option>
+                      {companies
+                        .filter((c) => c.status === "Active")
+                        .map((company) => (
+                          <option key={company.id} value={company.id}>
+                            {company.name}
+                          </option>
+                        ))}
+                      <option value="">Unassigned (no company)</option>
                     </select>
+
+                    {/* Step 2 — pick a person from that company (only its
+                        Active partners appear). Shown once a company is chosen. */}
+                    {companyByOrder[order.id] !== undefined && (() => {
+                      const chosenCompanyId = companyByOrder[order.id];
+                      const eligible = partners.filter((p) => {
+                        if (p.status !== "Active") return false;
+                        return chosenCompanyId
+                          ? p.companyId === chosenCompanyId
+                          : !p.companyId;
+                      });
+                      const company =
+                        companies.find((c) => c.id === chosenCompanyId) || null;
+                      return (
+                        <select
+                          className="mt-2 border rounded-lg p-2 w-full"
+                          value=""
+                          disabled={order.status === "Delivered"}
+                          onChange={(e) => {
+                            const partner = partners.find(
+                              (p) => p.id === e.target.value
+                            );
+                            if (
+                              partner &&
+                              confirm(
+                                `Assign ${partner.name}${
+                                  company ? ` (${company.name})` : ""
+                                } to this order?`
+                              )
+                            ) {
+                              assignPartner(order.id, partner, company);
+                            }
+                          }}
+                        >
+                          <option value="">2️⃣ Select Delivery Person</option>
+                          {eligible.map((partner) => (
+                            <option key={partner.id} value={partner.id}>
+                              {partner.name}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+
+                    {companyByOrder[order.id] !== undefined &&
+                      partners.filter((p) => {
+                        if (p.status !== "Active") return false;
+                        return companyByOrder[order.id]
+                          ? p.companyId === companyByOrder[order.id]
+                          : !p.companyId;
+                      }).length === 0 && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          No active delivery persons in this company.
+                        </p>
+                      )}
                   </div>
                 </div>
               </div>
