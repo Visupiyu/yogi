@@ -45,6 +45,11 @@ export default function SellerProductsPage() {
           sku: product.sku || "",
           slug: product.slug || "",
           title: product.title || "Untitled Product",
+          // Concise customer-facing name, if the seller set one. Same field the
+          // storefront cards already display via toLegacyProduct; the seller
+          // table adopts the same precedence so long marketplace titles don't
+          // blow out the column. The full `title` is left untouched.
+          shortTitle: product.shortTitle || "",
           description: product.description || "",
           brand: product.brand || "",
           categoryId: product.categoryId || "",
@@ -389,9 +394,16 @@ export default function SellerProductsPage() {
                           )}
                         </div>
 
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-gray-900">
-                            {product.title}
+                        <div className="min-w-0 max-w-[240px]">
+                          {/* Prefer the concise shortTitle (same precedence the
+                              storefront cards use); fall back to the full title.
+                              Width-capped + truncated so a long marketplace title
+                              can't widen the column, with the full title on hover. */}
+                          <p
+                            className="truncate font-semibold text-gray-900"
+                            title={product.title}
+                          >
+                            {product.shortTitle || product.title}
                           </p>
 
                           <p className="mt-1 text-xs text-gray-500">
