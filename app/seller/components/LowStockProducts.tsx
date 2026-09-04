@@ -2,79 +2,29 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
-
-import { onAuthStateChanged } from "firebase/auth";
-
-import { auth, db } from "@/lib/firebase";
-
-export default function LowStockProducts() {
-
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-
-    const unsub = onAuthStateChanged(auth, async (user) => {
-
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-
-        const q = query(
-          collection(db, "products"),
-          where("vendorId", "==", user.uid)
-        );
-
-        const snapshot = await getDocs(q);
-
-        const items: any[] = [];
-
-        snapshot.forEach((docSnap) => {
-
-          const product: any = {
-  ...docSnap.data(),
-  id: docSnap.id,
+// Products are provided by the parent dashboard (app/seller/page.tsx), which
+// loads the seller's products ONCE and shares them. This component no longer
+// queries Firestore itself; the low-stock threshold (<= 10) filter and
+// ascending sort below are unchanged from when it fetched its own copy.
+type LowStockProductsProps = {
+  products: any[];
+  loading: boolean;
 };
 
-if ((product.stock ?? 0) <= 10) {
-  items.push(product);
-}
+export default function LowStockProducts({ products: allProducts, loading }: LowStockProductsProps) {
 
-        });
+  const products = useMemo(() => {
+    const items = (allProducts || []).filter(
+      (product: any) => (product.stock ?? 0) <= 10
+    );
 
-        items.sort(
-          (a, b) => (a.stock || 0) - (b.stock || 0)
-        );
-
-        setProducts(items);
-
-      } catch (err) {
-
-        console.error(err);
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
-    });
-
-    return () => unsub();
-
-  }, []);
+    return [...items].sort(
+      (a, b) => (a.stock || 0) - (b.stock || 0)
+    );
+  }, [allProducts]);
  return (
   <div className="rounded-2xl border bg-white p-6 shadow-sm">
 

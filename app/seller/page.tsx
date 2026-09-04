@@ -30,22 +30,38 @@ export default function SellerPage() {
     bestSeller: "None",
   });
 
+  // Fetched ONCE here and shared with the child widgets (SalesChart,
+  // RecentOrders, LowStockProducts) as props, so the seller's products and
+  // orders are each read a single time per dashboard load instead of the
+  // widgets re-querying the same seller-scoped data. Query semantics are
+  // unchanged; the children only consume this already-loaded, seller-scoped
+  // data and keep their own computations.
+  const [products, setProducts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
   useEffect(() => {
-    if (!vendorId) return;
+    if (!vendorId) {
+      setDataLoading(false);
+      return;
+    }
 
     const fetchDashboardData = async () => {
       // ---- Products (scoped by vendorId = uid) ----
       const productSnap = await getDocs(
         query(collection(db, "products"), where("vendorId", "==", vendorId))
       );
+      const productList = productSnap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as any),
+      }));
 
       let views = 0;
       let sales = 0;
       let topProduct = "";
       let topSales = 0;
 
-      productSnap.forEach((docSnap) => {
-        const product: any = docSnap.data();
+      productList.forEach((product: any) => {
         views += product.views || 0;
         sales += product.sales || 0;
         if ((product.sales || 0) > topSales) {
@@ -68,6 +84,10 @@ export default function SellerPage() {
           where("status", "!=", "Pending")
         )
       );
+      const orderList = ordersSnap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as any),
+      }));
 
       let ordersCount = 0;
       let pendingCount = 0;
@@ -75,8 +95,7 @@ export default function SellerPage() {
       let totalCommission = 0;
       let totalNetEarnings = 0;
 
-      ordersSnap.forEach((docSnap) => {
-        const order: any = docSnap.data();
+      orderList.forEach((order: any) => {
         if (order.status === "Cancelled") return;
 
         const sellerItems = (order.items || []).filter(
@@ -103,7 +122,7 @@ export default function SellerPage() {
       });
 
       setStats({
-        totalProducts: productSnap.size,
+        totalProducts: productList.length,
         totalOrders: ordersCount,
         pendingOrders: pendingCount,
         earnings: totalEarnings,
@@ -113,9 +132,16 @@ export default function SellerPage() {
         totalSales: sales,
         bestSeller: topProduct || "None",
       });
+
+      // Share the already-loaded, seller-scoped data with the child widgets.
+      setProducts(productList);
+      setOrders(orderList);
     };
 
-    fetchDashboardData().catch(console.error);
+    setDataLoading(true);
+    fetchDashboardData()
+      .catch(console.error)
+      .finally(() => setDataLoading(false));
   }, [vendorId]);
 
   if (vendorLoading) {
@@ -176,15 +202,23 @@ return (
       </div>
 
       <div className="mt-6">
-        <SalesChart />
+        <SalesChart
+          orders={orders}
+          vendorId={vendorId || ""}
+          loading={dataLoading}
+        />
       </div>
 
       <div className="mt-6">
-        <RecentOrders />
+        <RecentOrders
+          orders={orders}
+          vendorId={vendorId || ""}
+          loading={dataLoading}
+        />
       </div>
 
       <div className="mt-6">
-        <LowStockProducts />
+        <LowStockProducts products={products} loading={dataLoading} />
       </div>
 
       {/* SECONDARY STATS */}

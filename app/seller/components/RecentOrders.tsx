@@ -2,97 +2,48 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
-
-import { onAuthStateChanged } from "firebase/auth";
-
-import { auth, db } from "@/lib/firebase";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 
-export default function RecentOrders() {
+// Orders + vendorId are provided by the parent dashboard (app/seller/page.tsx),
+// which loads the seller's non-pending orders ONCE and shares them. This
+// component no longer queries Firestore itself; the per-seller amount, newest-
+// first sort and top-5 slice below are unchanged from when it fetched its own.
+type RecentOrdersProps = {
+  orders: any[];
+  vendorId: string;
+  loading: boolean;
+};
 
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function RecentOrders({ orders: allOrders, vendorId, loading }: RecentOrdersProps) {
 
-  useEffect(() => {
+  const orders = useMemo(() => {
+    const sellerOrders = (allOrders || []).map((source: any) => {
+      const order: any = { ...source };
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
-
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-
-        const q = query(
-          collection(db, "orders"),
-          where("vendorIds", "array-contains", user.uid),
-          // Sellers must never see a Pending order: it belongs to them only once
-          // an admin confirms it. firestore.rules enforces this on the orders
-          // read rule, and the rules engine REJECTS this entire query unless it
-          // carries a filter proving the constraint - an unfiltered
-          // array-contains query returns permission-denied. Load-bearing, not
-          // cosmetic. Needs the orders vendorIds+status composite index.
-          where("status", "!=", "Pending")
+      // order.finalTotal is the WHOLE order's total — in a
+      // multi-vendor order that would show other sellers' items as
+      // this seller's revenue. Show only this seller's own share.
+      order.vendorAmount = (order.items || [])
+        .filter((item: any) => item.vendorId === vendorId)
+        .reduce(
+          (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+          0
         );
 
-        const snapshot = await getDocs(q);
-
-        const sellerOrders: any[] = [];
-
-        snapshot.forEach((docSnap) => {
-
-          const order: any = {
-            ...docSnap.data(),
-            id: docSnap.id,
-          };
-
-          // order.finalTotal is the WHOLE order's total — in a
-          // multi-vendor order that would show other sellers' items as
-          // this seller's revenue. Show only this seller's own share.
-          order.vendorAmount = (order.items || [])
-            .filter((item: any) => item.vendorId === user.uid)
-            .reduce(
-              (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-              0
-            );
-
-          sellerOrders.push(order);
-
-        });
-
-        sellerOrders.sort(
-          (a, b) =>
-            (b.createdAt?.seconds || 0) -
-            (a.createdAt?.seconds || 0)
-        );
-
-        setOrders(sellerOrders.slice(0, 5));
-
-      } catch (err) {
-
-        console.error(err);
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
+      return order;
     });
 
-    return () => unsub();
+    sellerOrders.sort(
+      (a, b) =>
+        (b.createdAt?.seconds || 0) -
+        (a.createdAt?.seconds || 0)
+    );
 
-  }, []);
+    return sellerOrders.slice(0, 5);
+  }, [allOrders, vendorId]);
   return (
   <div className="rounded-2xl border bg-white p-6 shadow-sm">
 

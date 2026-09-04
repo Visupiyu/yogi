@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 
 import {
   ResponsiveContainer,
@@ -12,105 +12,58 @@ import {
   Tooltip,
 } from "recharts";
 
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
+// Orders + vendorId are provided by the parent dashboard (app/seller/page.tsx),
+// which loads the seller's non-pending orders ONCE and shares them. This
+// component no longer queries Firestore itself; the monthly aggregation below
+// is unchanged from when it fetched its own copy.
+type SalesChartProps = {
+  orders: any[];
+  vendorId: string;
+  loading: boolean;
+};
 
-import { onAuthStateChanged } from "firebase/auth";
+export default function SalesChart({ orders, vendorId, loading }: SalesChartProps) {
 
-import { auth, db } from "@/lib/firebase";
+  const chartData = useMemo(() => {
+    const monthly: Record<string, number> = {};
 
-export default function SalesChart() {
+    (orders || []).forEach((order: any) => {
 
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+      if (!order.createdAt) return;
 
-  useEffect(() => {
+      if (order.status === "Cancelled") return;
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
-
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-
-        const q = query(
-          collection(db, "orders"),
-          where("vendorIds", "array-contains", user.uid),
-          // Sellers must never see a Pending order: it belongs to them only once
-          // an admin confirms it. firestore.rules enforces this on the orders
-          // read rule, and the rules engine REJECTS this entire query unless it
-          // carries a filter proving the constraint - an unfiltered
-          // array-contains query returns permission-denied. Load-bearing, not
-          // cosmetic. Needs the orders vendorIds+status composite index.
-          where("status", "!=", "Pending")
+      // order.finalTotal is the WHOLE order's total — in a
+      // multi-vendor order that would count other sellers' items as
+      // this seller's revenue too. Sum only this seller's own items.
+      const vendorRevenue = (order.items || [])
+        .filter((item: any) => item.vendorId === vendorId)
+        .reduce(
+          (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
+          0
         );
 
-        const snapshot = await getDocs(q);
+      if (vendorRevenue === 0) return;
 
-        const monthly: Record<string, number> = {};
+      const date = order.createdAt.toDate();
 
-        snapshot.forEach((docSnap) => {
-
-          const order: any = docSnap.data();
-
-          if (!order.createdAt) return;
-
-          if (order.status === "Cancelled") return;
-
-          // order.finalTotal is the WHOLE order's total — in a
-          // multi-vendor order that would count other sellers' items as
-          // this seller's revenue too. Sum only this seller's own items.
-          const vendorRevenue = (order.items || [])
-            .filter((item: any) => item.vendorId === user.uid)
-            .reduce(
-              (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-              0
-            );
-
-          if (vendorRevenue === 0) return;
-
-          const date = order.createdAt.toDate();
-
-          const month =
-            date.toLocaleString("default", {
-              month: "short",
-            });
-
-          monthly[month] =
-            (monthly[month] || 0) + vendorRevenue;
-
+      const month =
+        date.toLocaleString("default", {
+          month: "short",
         });
 
-        const data = Object.entries(monthly).map(
-          ([month, revenue]) => ({
-            month,
-            revenue,
-          })
-        );
-
-        setChartData(data);
-
-      } catch (err) {
-
-        console.error(err);
-
-      } finally {
-
-        setLoading(false);
-
-      }
+      monthly[month] =
+        (monthly[month] || 0) + vendorRevenue;
 
     });
 
-    return () => unsub();
-
-  }, []);
+    return Object.entries(monthly).map(
+      ([month, revenue]) => ({
+        month,
+        revenue,
+      })
+    );
+  }, [orders, vendorId]);
  return (
   <div className="rounded-2xl border bg-white p-6 shadow-sm">
 
