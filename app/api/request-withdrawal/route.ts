@@ -94,83 +94,86 @@ export async function POST(request: Request) {
     const withdrawalId = withdrawalIdFor(requester.uid, idempotencyKey);
     const withdrawalRef = db.collection("withdrawals").doc(withdrawalId);
 
-    // Fast path: a retry of an already-accepted request must not reserve a
-    // second time. Mirrors app/api/place-order's idempotency handling.
-    const existing = await withdrawalRef.get();
-    if (existing.exists) {
-      return Response.json({
-        success: true,
-        alreadyRequested: true,
-        withdrawalId,
-        amount: Number(existing.data()?.amount || 0),
-      });
-    }
+    // The reservation is done in ONE transaction: read the idempotency doc, the
+    // vendor, and every collection the payable depends on; recompute payable;
+    // verify the amount fits; and create the withdrawal — all serialized. Two
+    // concurrent requests with DIFFERENT idempotency keys can no longer each see
+    // the full balance and each reserve it: the second transaction re-reads the
+    // first's just-created reservation (a committed Pending row) and recomputes
+    // a smaller payable. Same-key requests still collapse onto the one
+    // deterministic document (existence check + create()).
+    type TxResult =
+      | { kind: "already"; amount: number }
+      | { kind: "no-vendor" }
+      | { kind: "not-approved" }
+      | { kind: "invalid" }
+      | { kind: "exceeds"; payable: number }
+      | { kind: "created"; amount: number; remaining: number };
 
-    // The vendor profile supplies the display name only. Identity comes from
-    // the verified token, never from the profile or the request.
-    const vendorSnap = await db
-      .collection("vendors")
-      .where("uid", "==", requester.uid)
-      .limit(1)
-      .get();
-
-    if (vendorSnap.empty) {
-      return Response.json(
-        { error: "No seller account found for this login." },
-        { status: 403 }
-      );
-    }
-
-    const vendor = vendorSnap.docs[0].data();
-    const businessName =
-      typeof vendor?.businessName === "string" ? vendor.businessName : "";
-
-    // ---- What is actually payable, recomputed from source ----
-    const [orderSnap, payoutSnap, withdrawalSnap] = await Promise.all([
-      db.collection("orders").where("vendorIds", "array-contains", requester.uid).get(),
-      db.collection("vendor_payouts").where("vendorId", "==", requester.uid).get(),
-      db.collection("withdrawals").where("vendorId", "==", requester.uid).get(),
-    ]);
-
-    const payable = computeVendorPayable({
-      vendorUid: requester.uid,
-      orders: orderSnap.docs.map((d) => d.data()),
-      payouts: payoutSnap.docs.map((d) => d.data()),
-      withdrawals: withdrawalSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-    });
-
-    const verdict = evaluateWithdrawalRequest({ amount: body.amount, payable });
-
-    if (!verdict.ok) {
-      if (verdict.reason === "invalid-amount") {
-        return Response.json(
-          { error: "Enter a whole rupee amount greater than zero." },
-          { status: 400 }
-        );
+    const outcome = await db.runTransaction<TxResult>(async (tx) => {
+      // ---- ALL READS FIRST ----
+      const existing = await tx.get(withdrawalRef);
+      if (existing.exists) {
+        return { kind: "already", amount: Number(existing.data()?.amount || 0) };
       }
 
-      return Response.json(
-        {
-          error:
-            "That is more than you can withdraw right now. Available: ₹" +
-            Math.max(0, verdict.payable).toLocaleString("en-IN"),
-          payable: Math.max(0, verdict.payable),
-        },
-        { status: 409 }
+      // The vendor profile supplies the display name only. Identity comes from
+      // the verified token, never from the profile or the request.
+      const vendorSnap = await tx.get(
+        db.collection("vendors").where("uid", "==", requester.uid).limit(1)
       );
-    }
+      if (vendorSnap.empty) return { kind: "no-vendor" };
+      const vendor = vendorSnap.docs[0].data();
 
-    // Human-readable payout number, minted atomically in its own counter
-    // transaction. A burned number on a later failure is an acceptable gap —
-    // numbers must never DUPLICATE or be REUSED, which the counter guarantees.
-    const payoutNumber = await db.runTransaction((tx) =>
-      mintSequential(tx, db, "payout")
-    );
+      // Only an admin-Approved seller may withdraw. Status is read from the
+      // vendor document (by the verified uid), never from the request, so a
+      // Pending/Rejected/Blocked seller cannot self-withdraw already-earned
+      // payable through this API — any exceptional release is an admin process.
+      if (vendor?.status !== "Approved") {
+        return { kind: "not-approved" };
+      }
 
-    // create() rather than set(): if two requests race past the existence
-    // check above, the second fails instead of overwriting the first.
-    try {
-      await withdrawalRef.create({
+      const businessName =
+        typeof vendor?.businessName === "string" ? vendor.businessName : "";
+
+      const [orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap] =
+        await Promise.all([
+          tx.get(
+            db.collection("orders").where("vendorIds", "array-contains", requester.uid)
+          ),
+          tx.get(db.collection("vendor_payouts").where("vendorId", "==", requester.uid)),
+          tx.get(db.collection("withdrawals").where("vendorId", "==", requester.uid)),
+          tx.get(db.collection("itemRequests").where("vendorId", "==", requester.uid)),
+          tx.get(db.collection("returns").where("status", "==", "Refunded")),
+        ]);
+
+      const orders = orderSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const orderIds = new Set(orders.map((o) => o.id));
+      const legacyReturns = legacyReturnSnap.docs
+        .map((d) => d.data())
+        .filter((r) => orderIds.has(String((r as { orderId?: unknown })?.orderId || "")));
+
+      const payable = computeVendorPayable({
+        vendorUid: requester.uid,
+        orders,
+        payouts: payoutSnap.docs.map((d) => d.data()),
+        withdrawals: withdrawalSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+        itemRequests: itemReqSnap.docs.map((d) => d.data()),
+        legacyReturns,
+      });
+
+      const verdict = evaluateWithdrawalRequest({ amount: body.amount, payable });
+      if (!verdict.ok) {
+        if (verdict.reason === "invalid-amount") return { kind: "invalid" };
+        return { kind: "exceeds", payable };
+      }
+
+      // Human-readable payout number, minted in the SAME transaction (its
+      // counter read precedes every write here). A burned number on a retry is
+      // acceptable — numbers must never DUPLICATE, which the counter guarantees.
+      const payoutNumber = await mintSequential(tx, db, "payout");
+
+      tx.create(withdrawalRef, {
         vendorId: requester.uid,
         vendorEmail: requester.email || "",
         vendorName: businessName,
@@ -181,19 +184,57 @@ export async function POST(request: Request) {
         status: "Pending",
         createdAt: Timestamp.now(),
       });
-    } catch {
+
+      return {
+        kind: "created",
+        amount: verdict.amount,
+        remaining: payable - verdict.amount,
+      };
+    });
+
+    if (outcome.kind === "already") {
       return Response.json({
         success: true,
         alreadyRequested: true,
         withdrawalId,
+        amount: outcome.amount,
       });
+    }
+    if (outcome.kind === "no-vendor") {
+      return Response.json(
+        { error: "No seller account found for this login." },
+        { status: 403 }
+      );
+    }
+    if (outcome.kind === "not-approved") {
+      return Response.json(
+        { error: "Your seller account is not approved for withdrawals." },
+        { status: 403 }
+      );
+    }
+    if (outcome.kind === "invalid") {
+      return Response.json(
+        { error: "Enter a whole rupee amount greater than zero." },
+        { status: 400 }
+      );
+    }
+    if (outcome.kind === "exceeds") {
+      return Response.json(
+        {
+          error:
+            "That is more than you can withdraw right now. Available: ₹" +
+            Math.max(0, outcome.payable).toLocaleString("en-IN"),
+          payable: Math.max(0, outcome.payable),
+        },
+        { status: 409 }
+      );
     }
 
     return Response.json({
       success: true,
       withdrawalId,
-      amount: verdict.amount,
-      remaining: payable - verdict.amount,
+      amount: outcome.amount,
+      remaining: outcome.remaining,
     });
   } catch (error) {
     console.error("request-withdrawal failed:", error);
