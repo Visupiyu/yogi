@@ -123,6 +123,29 @@ export async function POST(request: Request) {
         return { kind: "error", status: 403, error: "Not authorized." };
       }
 
+      // Only an admin-Approved seller may advance fulfilment. Admin operations
+      // are intentionally unaffected (an admin has no vendor doc and is already
+      // authorized above). Status is read from the vendor document by the
+      // verified uid — never from the request — so a Pending/Rejected/Blocked
+      // seller is refused here even on their own record. This is a read, placed
+      // before any write, per the transaction's reads-first rule.
+      if (!requester.isAdmin) {
+        const vendorSnap = await tx.get(
+          db.collection("vendors").where("uid", "==", requester.uid).limit(1)
+        );
+        if (
+          vendorSnap.empty ||
+          (vendorSnap.docs[0].data() as { status?: unknown })?.status !==
+            "Approved"
+        ) {
+          return {
+            kind: "error",
+            status: 403,
+            error: "Your seller account is not approved for fulfilment.",
+          };
+        }
+      }
+
       const orderId = typeof record.orderId === "string" ? record.orderId : "";
 
       if (!orderId) {
