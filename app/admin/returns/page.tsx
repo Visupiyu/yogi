@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
-import { app, auth, db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { applyReturnStatusUpdate } from "@/lib/returns";
 import {
   REFUND_DESTINATION_LABEL,
@@ -95,37 +95,12 @@ export default function AdminReturnsPage() {
   useEffect(() => {
     let active = true;
     (async () => {
-      // ===== TEMPORARY DIAGNOSTIC — remove after root-cause investigation =====
-      // Non-sensitive: logs project id, the admin's email/verification state and
-      // the token's email_verified claim (NEVER the token itself), then reads
-      // the two collections SEPARATELY so we can see exactly which one Firestore
-      // denies. This does not change any business logic.
-      try {
-        const u = auth.currentUser;
-        const tokenRes = u ? await u.getIdTokenResult() : null;
-        console.log("[returns-diag] client projectId:", app.options.projectId);
-        console.log(
-          "[returns-diag] currentUser.email:",
-          u?.email,
-          "| emailVerified:",
-          u?.emailVerified
-        );
-        console.log(
-          "[returns-diag] token claims.email:",
-          tokenRes?.claims?.email,
-          "| claims.email_verified:",
-          tokenRes?.claims?.email_verified,
-          "| claims.aud(project):",
-          tokenRes?.claims?.aud
-        );
-      } catch (e) {
-        console.log("[returns-diag] could not read auth/token state:", e);
-      }
+      // The two collections are read separately so a failure in one cannot
+      // hide the other's data.
 
       // ---- itemRequests read (isolated) ----
       try {
         const reqSnap = await getDocs(collection(db, "itemRequests"));
-        console.log("[returns-diag] itemRequests read OK — docs:", reqSnap.size);
         if (active) {
           const items: ItemRequest[] = [];
           reqSnap.forEach((d) =>
@@ -137,13 +112,12 @@ export default function AdminReturnsPage() {
           setRequests(items);
         }
       } catch (error) {
-        console.error("[returns-diag] itemRequests read DENIED:", error);
+        console.error("Failed to load item requests:", error);
       }
 
       // ---- legacy returns read (isolated) ----
       try {
         const legacySnap = await getDocs(collection(db, "returns"));
-        console.log("[returns-diag] returns read OK — docs:", legacySnap.size);
         if (active) {
           const legacyItems: { id: string; [k: string]: unknown }[] = [];
           legacySnap.forEach((d) =>
@@ -159,11 +133,10 @@ export default function AdminReturnsPage() {
           setLegacy(legacyItems);
         }
       } catch (error) {
-        console.error("[returns-diag] returns read DENIED:", error);
+        console.error("Failed to load returns:", error);
       }
 
       if (active) setLoading(false);
-      // ===== END TEMPORARY DIAGNOSTIC =====
     })();
     return () => {
       active = false;
