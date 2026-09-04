@@ -1,6 +1,14 @@
 import crypto from "crypto";
 import Razorpay from "razorpay";
 import { verifyRequestUser } from "@/lib/serverAuth";
+import { isWithinRateLimit } from "@/lib/rateLimit";
+
+// A valid signature is required before Razorpay is contacted, so forged calls
+// already cost nothing externally. This bounds the remaining case: an
+// authenticated caller replaying a genuine signature to burn Razorpay API
+// quota.
+const RATE_LIMIT_MAX = 20;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST(
   req:Request
@@ -14,6 +22,25 @@ export async function POST(
       return Response.json(
         { success: false, message: "Please sign in to verify a payment." },
         { status: 401 }
+      );
+    }
+
+    // Keyed on the server-verified uid, before the signature check and the
+    // external Razorpay fetches below.
+    if (
+      !(await isWithinRateLimit(
+        "verify-payments",
+        requester.uid,
+        RATE_LIMIT_MAX,
+        RATE_LIMIT_WINDOW_MS
+      ))
+    ) {
+      return Response.json(
+        {
+          success: false,
+          message: "Too many requests. Please wait a few minutes and try again.",
+        },
+        { status: 429 }
       );
     }
 

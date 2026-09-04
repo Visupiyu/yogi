@@ -1,6 +1,15 @@
 import { Resend } from "resend";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { isWithinRateLimit } from "@/lib/rateLimit";
+
+// Sending is not idempotent — every call dispatches another email through
+// Resend — so looping this burns the shared transactional-email quota and can
+// damage sender reputation for every customer, not just the caller. A real
+// checkout sends one, plus the occasional retry; 10 per 10 minutes sits far
+// above legitimate use while still bounding the abuse.
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 
 const apiKey = process.env.RESEND_API_KEY;
 
@@ -31,6 +40,25 @@ export async function POST(
       return Response.json(
         { success: false, error: "Please sign in to send this email." },
         { status: 401 }
+      );
+    }
+
+    // Keyed on the server-verified uid, before the order read below, so a
+    // rejected caller costs neither an email nor a Firestore read.
+    if (
+      !(await isWithinRateLimit(
+        "send-order-email",
+        requester.uid,
+        RATE_LIMIT_MAX,
+        RATE_LIMIT_WINDOW_MS
+      ))
+    ) {
+      return Response.json(
+        {
+          success: false,
+          error: "Too many requests. Please wait a few minutes and try again.",
+        },
+        { status: 429 }
       );
     }
 

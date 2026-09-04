@@ -1,5 +1,12 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { isWithinRateLimit } from "@/lib/rateLimit";
+
+// Read-only, but every call costs one order read plus a sellerOrders query, so
+// an unbounded loop is Firestore read amplification. Generous by design: this
+// backs ordinary page loads on the order-detail and returns screens.
+const RATE_LIMIT_MAX = 60;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Per-item fulfilment status for the CUSTOMER who owns the order.
@@ -61,6 +68,21 @@ export async function POST(request: Request) {
 
     if (!requester) {
       return Response.json({ error: "Please sign in." }, { status: 401 });
+    }
+
+    // Keyed on the server-verified uid, before the Firestore reads below.
+    if (
+      !(await isWithinRateLimit(
+        "order-fulfilment",
+        requester.uid,
+        RATE_LIMIT_MAX,
+        RATE_LIMIT_WINDOW_MS
+      ))
+    ) {
+      return Response.json(
+        { error: "Too many requests. Please wait a few minutes and try again." },
+        { status: 429 }
+      );
     }
 
     let body: { orderId?: unknown } = {};
