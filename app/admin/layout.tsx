@@ -53,25 +53,38 @@ export default function AdminLayout({
         router.replace("/admin-login");
         return;
       }
-      // Force-refresh the ID token (and reload the user record) before
-      // authorizing, so a stale email_verified claim cannot let the panel
-      // render while every isAdmin() Firestore read is denied. The security
-      // rules require email_verified == true; the UI gate must match — an
-      // unverified admin is sent to /admin-login, which re-issues the
-      // verification email, rather than into a panel that silently fails.
+
+      // Force-refresh the ID token and reload the user record BEFORE
+      // authorizing. firestore.rules' isAdmin() requires
+      // token.email_verified == true, but that claim is cached in the ID
+      // token for up to an hour — so gating on the email alone let an
+      // unverified (or not-yet-refreshed) admin render the whole panel while
+      // every Firestore read behind it was denied, which looks like data
+      // loss rather than an auth problem. getIdToken(true) mints a token
+      // carrying the current claim; reload() refreshes user.emailVerified.
       try {
         await user.getIdToken(true);
         await user.reload();
       } catch {
-        // Refresh failed (e.g. offline) — treat as not-yet-authorized rather
-        // than admitting on a possibly stale token.
+        // FAIL CLOSED. If the refresh could not complete we do not know the
+        // real verification state, so never authorize on the cached one.
+        if (cancelled) return;
+        localStorage.removeItem("admin");
+        router.replace("/admin-login");
+        return;
       }
+
       if (cancelled) return;
+
+      // The UI gate now matches isAdmin(): an unverified admin goes to
+      // /admin-login, which re-issues the verification email, instead of
+      // into a panel that silently fails on every read.
       if (!user.emailVerified) {
         localStorage.removeItem("admin");
         router.replace("/admin-login");
         return;
       }
+
       // Keep the flag in sync for any legacy checks elsewhere
       localStorage.setItem("admin", JSON.stringify({ email: user.email }));
       setAuthorized(true);
