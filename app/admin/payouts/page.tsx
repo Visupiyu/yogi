@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { computeVendorShare } from "@/lib/vendorEarnings";
+import { computeVendorAdjustedEarnings } from "@/lib/vendorPayable";
 import { logAdminAction } from "@/lib/auditLog";
 
 export default function AdminPayoutsPage() {
@@ -24,25 +25,31 @@ export default function AdminPayoutsPage() {
 
   const loadPayouts = async () => {
     try {
-      const [vendorSnapshot, orderSnapshot, payoutSnapshot, withdrawalSnapshot, refundedReturnsSnapshot] =
-        await Promise.all([
-          getDocs(collection(db, "vendors")),
-          getDocs(collection(db, "orders")),
-          getDocs(collection(db, "vendor_payouts")),
-          getDocs(collection(db, "withdrawals")),
-          getDocs(query(collection(db, "returns"), where("status", "==", "Refunded"))),
-        ]);
+      const [
+        vendorSnapshot,
+        orderSnapshot,
+        payoutSnapshot,
+        withdrawalSnapshot,
+        refundedReturnsSnapshot,
+        itemRequestSnapshot,
+      ] = await Promise.all([
+        getDocs(collection(db, "vendors")),
+        getDocs(collection(db, "orders")),
+        getDocs(collection(db, "vendor_payouts")),
+        getDocs(collection(db, "withdrawals")),
+        getDocs(query(collection(db, "returns"), where("status", "==", "Refunded"))),
+        getDocs(collection(db, "itemRequests")),
+      ]);
 
-      // Keyed by orderId — at most one return per order (see
-      // app/api/request-return's deterministic doc id), so a plain map is
-      // safe here.
-      const refundByOrderId: Record<string, { status: string; refundAmount: number }> = {};
-      refundedReturnsSnapshot.forEach((docSnap) => {
-        const r: any = docSnap.data();
-        if (r.orderId) {
-          refundByOrderId[r.orderId] = { status: r.status, refundAmount: r.refundAmount };
-        }
-      });
+      // Refund-adjusted earnings use lib/vendorPayable — the SAME authoritative
+      // calc the withdrawal request + settlement routes use — so this screen no
+      // longer overstates what a vendor is owed by ignoring returns. It accounts
+      // for item-level itemRequests returns, legacy full refunds, and
+      // single-vendor legacy partial refunds. `orders` must carry the doc id so
+      // returns can be matched to their order.
+      const ordersWithId = orderSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const legacyReturns = refundedReturnsSnapshot.docs.map((d) => d.data());
+      const itemRequests = itemRequestSnapshot.docs.map((d) => d.data());
 
       // Sum already-paid amounts per vendor from the payouts ledger.
       // Keyed by the seller's auth uid — the same id order items use —
@@ -115,13 +122,22 @@ export default function AdminPayoutsPage() {
           )
             return;
 
-          const share = computeVendorShare(order, vendor.uid, refundByOrderId[orderDoc.id]);
+          // Sales and commission are the gross reporting figures (unaffected by
+          // refunds); earnings is computed refund-aware just below.
+          const share = computeVendorShare(order, vendor.uid);
 
           if (share) {
             sales += share.vendorRawSubtotal;
             commission += share.vendorCommission;
-            earnings += share.vendorEarning;
           }
+        });
+
+        // Refund-adjusted earnings — the withdrawable half, net of returns.
+        earnings = computeVendorAdjustedEarnings({
+          vendorUid: vendor.uid,
+          orders: ordersWithId,
+          itemRequests,
+          legacyReturns,
         });
 
         const paidPayout = paidByVendor[vendor.uid] || 0;

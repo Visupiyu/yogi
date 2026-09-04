@@ -8,7 +8,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
   isTerminal,
-  sellerNextReplaceStage,
+  sellerNextStage,
   statusLabel,
   statusTone,
   type ItemRequestType,
@@ -125,7 +125,7 @@ export default function SellerReturnsPage() {
     const type: ItemRequestType = r.type === "replace" ? "replace" : "return";
     const status = r.status || "REQUESTED";
     const tone = statusTone(status);
-    const sellerNext = sellerNextReplaceStage(type, status);
+    const sellerNext = sellerNextStage(type, status);
     const busy = busyId === r.id;
     const awaitingAdmin =
       type === "replace" &&
@@ -166,7 +166,11 @@ export default function SellerReturnsPage() {
               onClick={() => advance(r.id, sellerNext)}
               className="text-sm font-semibold px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"
             >
-              {busy ? "Saving..." : `Mark ${statusLabel(type, sellerNext)}`}
+              {busy
+                ? "Saving..."
+                : status === "SELLER_INSPECTION"
+                ? "Complete Seller Inspection"
+                : `Mark ${statusLabel(type, sellerNext)}`}
             </button>
           )}
           {actionable && awaitingAdmin && (
@@ -220,7 +224,7 @@ export default function SellerReturnsPage() {
               <h2 className="text-xl font-bold mb-4">
                 ↩️ Return requests
                 <span className="ml-2 text-sm font-normal text-gray-500">
-                  ({returnRequests.length}) · handled by admin
+                  ({returnRequests.length}) · inspect items returned to you
                 </span>
               </h2>
               {returnRequests.length === 0 ? (
@@ -230,7 +234,7 @@ export default function SellerReturnsPage() {
               ) : (
                 <div className="space-y-4">
                   {returnRequests.map((r) => (
-                    <Card key={r.id} r={r} actionable={false} />
+                    <Card key={r.id} r={r} actionable />
                   ))}
                 </div>
               )}

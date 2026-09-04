@@ -46,10 +46,12 @@ export const RETURN_STAGES = [
   "REQUESTED",
   "UNDER_REVIEW",
   "APPROVED",
-  "PICKUP_SCHEDULED",
+  "PICKUP_PROPOSED",
+  "PICKUP_CONFIRMED",
+  "PICKUP_ASSIGNED",
   "PICKED_UP",
-  "RECEIVED",
-  "INSPECTED",
+  "RECEIVED_BY_YOMICO",
+  "SELLER_INSPECTION",
   "REFUND_PENDING",
   "REFUNDED",
 ] as const;
@@ -105,18 +107,52 @@ export const SELLER_REPLACE_TARGETS: readonly string[] = [
   "DELIVERED",
 ];
 
+// The return stages a SELLER may drive. Once the item is physically back with
+// the seller, THEY carry it through inspection: entering SELLER_INSPECTION and
+// then completing it into REFUND_PENDING (which hands the refund decision to
+// admin). The refund itself (REFUNDED, where reward points are credited) and
+// all pickup scheduling stay admin-only — REFUNDED is deliberately absent here.
+export const SELLER_RETURN_TARGETS: readonly string[] = [
+  "SELLER_INSPECTION",
+  "REFUND_PENDING",
+];
+
+/** Every stage the owning seller may drive, by request type. */
+export function sellerTargetsFor(type: ItemRequestType): readonly string[] {
+  return type === "replace" ? SELLER_REPLACE_TARGETS : SELLER_RETURN_TARGETS;
+}
+
 /**
- * The next stage a SELLER may move a replace request to, or null when the next
- * step isn't the seller's to make (still awaiting admin review/approval, done,
- * or terminal). Returns null for returns — sellers never drive those.
+ * The next stage a SELLER may move a request to, or null when the next step
+ * isn't the seller's to make (still awaiting admin action, done, or terminal).
+ * Covers BOTH flows: replacement fulfilment and the return's seller-inspection.
+ */
+export function sellerNextStage(
+  type: ItemRequestType,
+  from: string
+): string | null {
+  const next = nextStage(type, from);
+  return next && sellerTargetsFor(type).includes(next) ? next : null;
+}
+
+/**
+ * Back-compat shim for callers that only handled replacements. Prefer
+ * sellerNextStage, which also covers the return seller-inspection step.
  */
 export function sellerNextReplaceStage(
   type: ItemRequestType,
   from: string
 ): string | null {
-  if (type !== "replace") return null;
-  const next = nextStage("replace", from);
-  return next && SELLER_REPLACE_TARGETS.includes(next) ? next : null;
+  return type === "replace" ? sellerNextStage(type, from) : null;
+}
+
+/**
+ * A request is waiting on the CUSTOMER to accept or counter a proposed pickup
+ * slot. The customer respond route (the only customer-driven mutation) is
+ * limited to exactly this state.
+ */
+export function isAwaitingCustomerPickup(status: string): boolean {
+  return status === "PICKUP_PROPOSED";
 }
 
 export function stagesFor(type: ItemRequestType): readonly string[] {
@@ -162,14 +198,19 @@ const RETURN_LABELS: Record<string, string> = {
   REQUESTED: "Requested",
   UNDER_REVIEW: "Under review",
   APPROVED: "Approved",
-  PICKUP_SCHEDULED: "Pickup scheduled",
+  PICKUP_PROPOSED: "Pickup time proposed",
+  PICKUP_CONFIRMED: "Pickup confirmed",
+  PICKUP_ASSIGNED: "Partner assigned",
   PICKED_UP: "Picked up",
-  RECEIVED: "Received by us",
-  INSPECTED: "Inspected",
+  RECEIVED_BY_YOMICO: "Received at YOMICO",
+  SELLER_INSPECTION: "Seller inspection",
   REFUND_PENDING: "Refund processing",
   REFUNDED: "Refunded",
   REJECTED: "Not approved",
   CANCELLED: "Cancelled",
+  // Legacy label kept so any request created before the negotiation flow still
+  // renders a name instead of a raw status enum.
+  PICKUP_SCHEDULED: "Pickup scheduled",
 };
 
 const REPLACE_LABELS: Record<string, string> = {

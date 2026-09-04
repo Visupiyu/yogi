@@ -64,6 +64,7 @@ type FulfilmentItem = {
 
 type ItemRequestDoc = {
   type?: ItemRequestType;
+  requestId?: string;
   requestNumber?: string;
   status?: string;
   itemKey?: string;
@@ -74,6 +75,11 @@ type ItemRequestDoc = {
     scheduledAt?: unknown;
     requestedAt?: unknown;
     requestedBy?: unknown;
+    proposedAt?: unknown;
+    proposedBy?: unknown;
+    customerResponse?: unknown;
+    counterAt?: unknown;
+    confirmedAt?: unknown;
     partner?: unknown;
   };
 };
@@ -230,12 +236,17 @@ function RequestInner() {
 
   const [reason, setReason] = useState("");
   const [comments, setComments] = useState("");
-  // Customer's PREFERRED pickup datetime (datetime-local value) — a preference
-  // only; admin confirms the actual appointment.
-  const [preferredPickup, setPreferredPickup] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  // Pickup-slot negotiation: the customer's counter time and in-flight state,
+  // plus a key bumped after a response so the request re-loads with its new
+  // status.
+  const [counterTime, setCounterTime] = useState("");
+  const [responding, setResponding] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     // Missing params render the "choose an item" state before the loading gate,
@@ -298,7 +309,7 @@ function RequestInner() {
     });
 
     return () => unsub();
-  }, [orderId, parentIndex, router]);
+  }, [orderId, parentIndex, router, reloadKey]);
 
   const items = Array.isArray(order?.items)
     ? (order!.items as OrderItem[])
@@ -353,11 +364,6 @@ function RequestInner() {
           type,
           reason,
           comments,
-          // Preferred pickup applies to returns only (a replacement is
-          // delivered, not picked up). Optional.
-          ...(type === "return" && preferredPickup
-            ? { preferredPickupAt: new Date(preferredPickup).toISOString() }
-            : {}),
         }),
       });
       const data = await res.json();
@@ -370,6 +376,58 @@ function RequestInner() {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Respond to a proposed pickup slot: accept it, or counter with a different
+  // time. The customer never writes the request directly — this calls the
+  // server respond route, which verifies ownership and enforces the state.
+  const respondToPickup = async (
+    action: "accept" | "counter",
+    when?: string
+  ) => {
+    setError("");
+    const user = auth.currentUser;
+    if (!user || !existing) return;
+    if (action === "counter") {
+      if (!when) {
+        setError("Please choose a pickup date and time.");
+        return;
+      }
+      const chosen = new Date(when);
+      if (Number.isNaN(chosen.getTime()) || chosen.getTime() <= Date.now()) {
+        setError("Please choose a valid future date and time.");
+        return;
+      }
+    }
+    try {
+      setResponding(true);
+      const token = await user.getIdToken();
+      const res = await fetch("/api/item-request/respond", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          requestId: existing.requestId,
+          action,
+          ...(action === "counter" && when
+            ? { counterAt: new Date(when).toISOString() }
+            : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error || "Couldn't submit your response.");
+        return;
+      }
+      setCounterTime("");
+      setReloadKey((k) => k + 1);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setResponding(false);
     }
   };
 
@@ -494,10 +552,17 @@ function RequestInner() {
     const refundAmount =
       typeof existing.refund?.amount === "number" ? existing.refund.amount : 0;
     const creditedOn = fmtDateTime(existing.refund?.creditedAt);
-    const pickupOn = fmtDateTime(existing.pickup?.scheduledAt); // admin-confirmed
-    const pickupRequestedOn = fmtDateTime(existing.pickup?.requestedAt); // customer preference
+    const pickupOn = fmtDateTime(existing.pickup?.scheduledAt); // agreed appointment
+    const pickupProposedOn = fmtDateTime(existing.pickup?.proposedAt); // admin's offer
+    const pickupCounterOn = fmtDateTime(existing.pickup?.counterAt); // customer's counter
     const pickupPartner =
       typeof existing.pickup?.partner === "string" ? existing.pickup.partner : "";
+    const customerResponse =
+      typeof existing.pickup?.customerResponse === "string"
+        ? existing.pickup.customerResponse
+        : "";
+    // The customer is asked to accept/counter only while a slot is proposed.
+    const awaitingCustomer = exStatus === "PICKUP_PROPOSED";
 
     return (
       <Shell>
@@ -546,37 +611,88 @@ function RequestInner() {
               </p>
             )}
 
-          {/* Pickup — shows the customer's PREFERRED time and, once the team
-              sets it, the CONFIRMED appointment. The confirmed one is labelled
-              clearly so the two are never confused. */}
+          {/* Pickup — a negotiation. When YOMICO proposes a slot the customer
+              accepts it or proposes a different time; once confirmed, the
+              agreed appointment is shown, then the partner once assigned.
+              The customer controls are gated on the STATUS (PICKUP_PROPOSED),
+              never on a formatted date, so they always appear while the backend
+              is awaiting the customer — even if the proposed time is missing. */}
           {exType === "return" &&
             !isTerminal(exStatus) &&
             (exStatus === "APPROVED" ||
-              exStatus === "PICKUP_SCHEDULED" ||
-              pickupRequestedOn) && (
+              awaitingCustomer ||
+              pickupProposedOn ||
+              pickupOn) && (
               <div className="mt-4 rounded-2xl border p-4 text-sm">
                 <p className="font-semibold mb-1">Pickup</p>
 
-                {pickupRequestedOn && (
-                  <p className="text-gray-600">
-                    Your preferred time: {pickupRequestedOn}
-                    {!pickupOn && " (awaiting confirmation)"}
-                  </p>
+                {/* Awaiting the customer's decision on a proposed slot. */}
+                {awaitingCustomer ? (
+                  <div>
+                    {pickupProposedOn ? (
+                      <p className="text-gray-800">
+                        Proposed pickup:{" "}
+                        <span className="font-semibold">{pickupProposedOn}</span>
+                      </p>
+                    ) : (
+                      <p className="text-gray-800">
+                        YOMICO has proposed a pickup time.
+                      </p>
+                    )}
+                    {customerResponse === "countered" && pickupCounterOn && (
+                      <p className="text-amber-700 mt-1">
+                        You asked for {pickupCounterOn} — awaiting a new proposal.
+                      </p>
+                    )}
+
+                    <div className="mt-3">
+                      <button
+                        disabled={responding}
+                        onClick={() => respondToPickup("accept")}
+                        className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold"
+                      >
+                        {responding ? "Saving…" : "Accept pickup time"}
+                      </button>
+                    </div>
+
+                    <div className="mt-3">
+                      <p className="text-gray-600 text-xs mb-1">
+                        Propose a different time
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="datetime-local"
+                          value={counterTime}
+                          onChange={(e) => setCounterTime(e.target.value)}
+                          className="border rounded-lg px-2 py-1 text-sm"
+                        />
+                        <button
+                          disabled={responding || !counterTime}
+                          onClick={() => respondToPickup("counter", counterTime)}
+                          className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-semibold"
+                        >
+                          {responding ? "Saving…" : "Submit new time"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Confirmed appointment (and partner once assigned). */
+                  <>
+                    {pickupOn ? (
+                      <p className="text-green-700 font-semibold">
+                        ✓ Confirmed pickup: {pickupOn}
+                        {pickupPartner ? ` · ${pickupPartner}` : ""}
+                      </p>
+                    ) : (
+                      <p className="text-gray-600">
+                        A pickup time will be proposed shortly.
+                      </p>
+                    )}
+                  </>
                 )}
 
-                {pickupOn ? (
-                  <p className="text-green-700 font-semibold mt-1">
-                    ✓ Confirmed pickup: {pickupOn}
-                    {pickupPartner ? ` · ${pickupPartner}` : ""}
-                  </p>
-                ) : (
-                  <p className="text-gray-600 mt-1">
-                    {exStatus === "PICKUP_SCHEDULED"
-                      ? "A pickup has been scheduled — our courier will contact you to confirm the time."
-                      : "A pickup will be arranged shortly."}
-                  </p>
-                )}
-                {address && <p className="text-gray-500 mt-1">{address}</p>}
+                {address && <p className="text-gray-500 mt-2">{address}</p>}
               </div>
             )}
 
@@ -749,30 +865,6 @@ function RequestInner() {
                 className="w-full border p-3 rounded-xl disabled:bg-gray-100"
               />
             </div>
-
-            {/* Preferred pickup — returns only, and a PREFERENCE (our team
-                confirms the actual appointment). */}
-            {type === "return" && (
-              <div className="mb-6">
-                <label className="block mb-2 font-semibold">
-                  Preferred pickup date &amp; time{" "}
-                  <span className="text-xs font-normal text-gray-400">
-                    (optional)
-                  </span>
-                </label>
-                <input
-                  type="datetime-local"
-                  value={preferredPickup}
-                  onChange={(e) => setPreferredPickup(e.target.value)}
-                  disabled={!eligibility.eligible}
-                  className="w-full border p-3 rounded-xl disabled:bg-gray-100"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  We&apos;ll try to honour this; our team confirms the final
-                  pickup time.
-                </p>
-              </div>
-            )}
 
             {/* Address (req 7). */}
             {AddressBlock}

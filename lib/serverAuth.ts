@@ -59,7 +59,11 @@ export async function verifyRequestUser(
     return {
       uid: user.localId,
       email: user.email ?? null,
-      isAdmin: user.email === ADMIN_EMAIL,
+      // Admin authorization must match firestore.rules' isAdmin(), which
+      // requires BOTH the admin email AND a verified email — otherwise the
+      // client and server disagree (a write route would admit an admin whose
+      // token the security rules reject on every read).
+      isAdmin: user.email === ADMIN_EMAIL && user.emailVerified === true,
       emailVerified: user.emailVerified === true,
     };
   } catch (error) {

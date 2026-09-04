@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { app, auth, db } from "@/lib/firebase";
 import { applyReturnStatusUpdate } from "@/lib/returns";
 import {
   REFUND_DESTINATION_LABEL,
@@ -43,8 +43,11 @@ type ItemRequest = {
   refund?: { amount?: number };
   pickup?: {
     requestedAt?: { seconds?: number; toDate?: () => Date };
+    proposedAt?: { seconds?: number; toDate?: () => Date };
+    counterAt?: { seconds?: number; toDate?: () => Date };
     scheduledAt?: { seconds?: number; toDate?: () => Date };
     requestedBy?: string;
+    customerResponse?: string;
     partner?: string;
   };
   createdAt?: { seconds?: number };
@@ -92,36 +95,75 @@ export default function AdminReturnsPage() {
   useEffect(() => {
     let active = true;
     (async () => {
+      // ===== TEMPORARY DIAGNOSTIC — remove after root-cause investigation =====
+      // Non-sensitive: logs project id, the admin's email/verification state and
+      // the token's email_verified claim (NEVER the token itself), then reads
+      // the two collections SEPARATELY so we can see exactly which one Firestore
+      // denies. This does not change any business logic.
       try {
-        const [reqSnap, legacySnap] = await Promise.all([
-          getDocs(collection(db, "itemRequests")),
-          getDocs(collection(db, "returns")),
-        ]);
-        if (!active) return;
-
-        const items: ItemRequest[] = [];
-        reqSnap.forEach((d) =>
-          items.push({ id: d.id, ...(d.data() as object) })
+        const u = auth.currentUser;
+        const tokenRes = u ? await u.getIdTokenResult() : null;
+        console.log("[returns-diag] client projectId:", app.options.projectId);
+        console.log(
+          "[returns-diag] currentUser.email:",
+          u?.email,
+          "| emailVerified:",
+          u?.emailVerified
         );
-        items.sort(
-          (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+        console.log(
+          "[returns-diag] token claims.email:",
+          tokenRes?.claims?.email,
+          "| claims.email_verified:",
+          tokenRes?.claims?.email_verified,
+          "| claims.aud(project):",
+          tokenRes?.claims?.aud
         );
-        setRequests(items);
-
-        const legacyItems: { id: string; [k: string]: unknown }[] = [];
-        legacySnap.forEach((d) => legacyItems.push({ id: d.id, ...d.data() }));
-        legacyItems.sort(
-          (a, b) =>
-            ((b as { createdAt?: { seconds?: number } }).createdAt?.seconds ||
-              0) -
-            ((a as { createdAt?: { seconds?: number } }).createdAt?.seconds || 0)
-        );
-        setLegacy(legacyItems);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        if (active) setLoading(false);
+      } catch (e) {
+        console.log("[returns-diag] could not read auth/token state:", e);
       }
+
+      // ---- itemRequests read (isolated) ----
+      try {
+        const reqSnap = await getDocs(collection(db, "itemRequests"));
+        console.log("[returns-diag] itemRequests read OK — docs:", reqSnap.size);
+        if (active) {
+          const items: ItemRequest[] = [];
+          reqSnap.forEach((d) =>
+            items.push({ id: d.id, ...(d.data() as object) })
+          );
+          items.sort(
+            (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+          );
+          setRequests(items);
+        }
+      } catch (error) {
+        console.error("[returns-diag] itemRequests read DENIED:", error);
+      }
+
+      // ---- legacy returns read (isolated) ----
+      try {
+        const legacySnap = await getDocs(collection(db, "returns"));
+        console.log("[returns-diag] returns read OK — docs:", legacySnap.size);
+        if (active) {
+          const legacyItems: { id: string; [k: string]: unknown }[] = [];
+          legacySnap.forEach((d) =>
+            legacyItems.push({ id: d.id, ...d.data() })
+          );
+          legacyItems.sort(
+            (a, b) =>
+              ((b as { createdAt?: { seconds?: number } }).createdAt?.seconds ||
+                0) -
+              ((a as { createdAt?: { seconds?: number } }).createdAt?.seconds ||
+                0)
+          );
+          setLegacy(legacyItems);
+        }
+      } catch (error) {
+        console.error("[returns-diag] returns read DENIED:", error);
+      }
+
+      if (active) setLoading(false);
+      // ===== END TEMPORARY DIAGNOSTIC =====
     })();
     return () => {
       active = false;
@@ -231,8 +273,9 @@ export default function AdminReturnsPage() {
               return (
                 <div
                   key={r.id}
-                  className="bg-white rounded-3xl shadow p-5 flex flex-col lg:flex-row gap-4"
+                  className="bg-white rounded-3xl shadow p-5 flex flex-col gap-4"
                 >
+                  <div className="flex flex-col lg:flex-row gap-4">
                   <div className="flex items-center gap-3 lg:w-1/3">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -279,9 +322,15 @@ export default function AdminReturnsPage() {
                         ⚠ No delivery date on record — verify eligibility.
                       </p>
                     )}
-                    {r.pickup?.requestedAt && (
+                    {r.pickup?.proposedAt && status === "PICKUP_PROPOSED" && (
                       <p className="mt-1 text-blue-700 text-xs">
-                        Customer preferred pickup: {fmtWhen(r.pickup.requestedAt)}
+                        Proposed pickup: {fmtWhen(r.pickup.proposedAt)}
+                        {r.pickup.customerResponse === "countered" &&
+                        r.pickup.counterAt
+                          ? ` · customer countered → ${fmtWhen(r.pickup.counterAt)}`
+                          : r.pickup.customerResponse === "pending"
+                          ? " · awaiting customer"
+                          : ""}
                       </p>
                     )}
                     {r.pickup?.scheduledAt && (
@@ -301,53 +350,13 @@ export default function AdminReturnsPage() {
 
                     {!isTerminal(status) && (
                       <div className="flex flex-wrap gap-2 items-center">
-                        {next === "PICKUP_SCHEDULED" ? (
-                          <div className="flex flex-wrap gap-2 items-center">
-                            <input
-                              type="datetime-local"
-                              value={pickupInputs[r.id] || ""}
-                              onChange={(e) =>
-                                setPickupInputs((p) => ({
-                                  ...p,
-                                  [r.id]: e.target.value,
-                                }))
-                              }
-                              className="text-xs border rounded-lg px-2 py-1"
-                            />
-                            <input
-                              type="text"
-                              placeholder="Pickup partner"
-                              value={partnerInputs[r.id] || ""}
-                              onChange={(e) =>
-                                setPartnerInputs((p) => ({
-                                  ...p,
-                                  [r.id]: e.target.value,
-                                }))
-                              }
-                              className="text-xs border rounded-lg px-2 py-1"
-                            />
-                            <button
-                              disabled={busy}
-                              onClick={() => {
-                                const v = pickupInputs[r.id];
-                                if (!v) {
-                                  alert("Choose a pickup date and time.");
-                                  return;
-                                }
-                                transition(
-                                  r.id,
-                                  next,
-                                  new Date(v).toISOString(),
-                                  partnerInputs[r.id]?.trim() || undefined
-                                );
-                              }}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"
-                            >
-                              {busy ? "..." : "Schedule pickup"}
-                            </button>
-                          </div>
-                        ) : (
-                          next && (
+                        {/* Forward step (approve, mark received, etc.). The
+                            pickup propose / confirm / assign controls live in
+                            their own labelled section below the row. */}
+                        {next &&
+                          next !== "PICKUP_PROPOSED" &&
+                          next !== "PICKUP_ASSIGNED" &&
+                          status !== "PICKUP_PROPOSED" && (
                             <button
                               disabled={busy}
                               onClick={() => transition(r.id, next)}
@@ -355,8 +364,8 @@ export default function AdminReturnsPage() {
                             >
                               {busy ? "..." : `Mark ${statusLabel(type, next)}`}
                             </button>
-                          )
-                        )}
+                          )}
+
                         {canReject && (
                           <button
                             disabled={busy}
@@ -374,6 +383,137 @@ export default function AdminReturnsPage() {
                       </p>
                     )}
                   </div>
+                  </div>
+
+                  {/* PICKUP NEGOTIATION — a full-width, clearly-labelled section
+                      so the admin always sees how to move an approved return
+                      forward. Returns only; the state machine is unchanged (a
+                      slot can only be proposed once the return is APPROVED). */}
+                  {type === "return" && !isTerminal(status) && (
+                    <div className="border-t pt-4">
+                      <p className="text-sm font-semibold text-gray-700 mb-2">
+                        Pickup
+                      </p>
+
+                      {/* Before approval, point the admin at the next step. */}
+                      {(status === "REQUESTED" || status === "UNDER_REVIEW") && (
+                        <p className="text-xs text-gray-400">
+                          Approve this return to propose a pickup date &amp; time.
+                        </p>
+                      )}
+
+                      {/* Propose a slot once the return is APPROVED. No partner
+                          is assigned at this stage. */}
+                      {next === "PICKUP_PROPOSED" && (
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <input
+                            type="datetime-local"
+                            value={pickupInputs[r.id] || ""}
+                            onChange={(e) =>
+                              setPickupInputs((p) => ({
+                                ...p,
+                                [r.id]: e.target.value,
+                              }))
+                            }
+                            className="text-sm border rounded-lg px-2 py-1"
+                          />
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              const v = pickupInputs[r.id];
+                              if (!v) {
+                                alert("Choose a pickup date and time.");
+                                return;
+                              }
+                              transition(
+                                r.id,
+                                "PICKUP_PROPOSED",
+                                new Date(v).toISOString()
+                              );
+                            }}
+                            className="text-sm font-semibold px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"
+                          >
+                            {busy ? "Saving…" : "Propose pickup"}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Awaiting the customer: re-propose after a counter, or
+                          confirm the slot on their behalf. */}
+                      {status === "PICKUP_PROPOSED" && (
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <input
+                            type="datetime-local"
+                            value={pickupInputs[r.id] || ""}
+                            onChange={(e) =>
+                              setPickupInputs((p) => ({
+                                ...p,
+                                [r.id]: e.target.value,
+                              }))
+                            }
+                            className="text-sm border rounded-lg px-2 py-1"
+                          />
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              const v = pickupInputs[r.id];
+                              if (!v) {
+                                alert("Choose a pickup date and time.");
+                                return;
+                              }
+                              transition(
+                                r.id,
+                                "PICKUP_PROPOSED",
+                                new Date(v).toISOString()
+                              );
+                            }}
+                            className="text-sm font-semibold px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"
+                          >
+                            {busy ? "Saving…" : "Re-propose slot"}
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => transition(r.id, "PICKUP_CONFIRMED")}
+                            className="text-sm font-semibold px-4 py-2 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-60"
+                          >
+                            Confirm on customer&apos;s behalf
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Assign a delivery partner once the slot is confirmed. */}
+                      {next === "PICKUP_ASSIGNED" && (
+                        <div className="flex flex-wrap gap-2 items-center">
+                          <input
+                            type="text"
+                            placeholder="Delivery partner"
+                            value={partnerInputs[r.id] || ""}
+                            onChange={(e) =>
+                              setPartnerInputs((p) => ({
+                                ...p,
+                                [r.id]: e.target.value,
+                              }))
+                            }
+                            className="text-sm border rounded-lg px-2 py-1"
+                          />
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              const p = partnerInputs[r.id]?.trim();
+                              if (!p) {
+                                alert("Enter a delivery partner.");
+                                return;
+                              }
+                              transition(r.id, "PICKUP_ASSIGNED", undefined, p);
+                            }}
+                            className="text-sm font-semibold px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white"
+                          >
+                            {busy ? "Saving…" : "Assign partner"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

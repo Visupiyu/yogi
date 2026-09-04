@@ -36,13 +36,59 @@ type ItemRequest = {
   reason?: string;
   item?: { name?: string; image?: string; qty?: number };
   refund?: { amount?: number };
+  pickup?: {
+    proposedAt?: unknown;
+    counterAt?: unknown;
+    scheduledAt?: unknown;
+    customerResponse?: unknown;
+    partner?: unknown;
+  };
   createdAt?: { seconds?: number };
 };
+
+/** Firestore Timestamp | ISO | epoch | {seconds} -> Date | null. */
+function toDate(v: unknown): Date | null {
+  if (!v) return null;
+  if (typeof v === "string" || typeof v === "number") {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const c = v as { toDate?: () => Date; seconds?: number };
+  if (typeof c.toDate === "function") {
+    try {
+      const d = c.toDate();
+      return Number.isNaN(d.getTime()) ? null : d;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof c.seconds === "number") return new Date(c.seconds * 1000);
+  return null;
+}
+
+function fmtDateTime(v: unknown): string {
+  const d = toDate(v);
+  return d
+    ? d.toLocaleString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+    : "";
+}
 
 export default function RefundsPage() {
   const [requests, setRequests] = useState<ItemRequest[]>([]);
   const [legacy, setLegacy] = useState<{ id: string; [k: string]: unknown }[]>([]);
   const [loading, setLoading] = useState(true);
+  // Pickup-slot negotiation (customer accept / counter). Keyed per request.
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [counterInputs, setCounterInputs] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -77,7 +123,64 @@ export default function RefundsPage() {
       }
     });
     return () => unsub();
-  }, []);
+  }, [reloadKey]);
+
+  // Respond to a proposed pickup slot: accept it, or counter with a different
+  // time. The customer never writes the request directly — this calls the
+  // existing server respond route, which verifies ownership and the state.
+  const respond = async (
+    requestId: string,
+    action: "accept" | "counter",
+    when?: string
+  ) => {
+    setError("");
+    const user = auth.currentUser;
+    if (!user) return;
+    if (action === "counter") {
+      if (!when) {
+        setError("Please choose a pickup date and time.");
+        return;
+      }
+      const chosen = new Date(when);
+      // Date.now() is read inside this async click handler (not during render),
+      // so this is a legitimate use; the purity lint only fires because respond
+      // is referenced from inside a .map() callback.
+      // eslint-disable-next-line react-hooks/purity
+      if (Number.isNaN(chosen.getTime()) || chosen.getTime() <= Date.now()) {
+        setError("Please choose a valid future date and time.");
+        return;
+      }
+    }
+    try {
+      setBusyId(requestId);
+      const token = await user.getIdToken();
+      const res = await fetch("/api/item-request/respond", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          requestId,
+          action,
+          ...(action === "counter" && when
+            ? { counterAt: new Date(when).toISOString() }
+            : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error || "Couldn't submit your response.");
+        return;
+      }
+      setCounterInputs((p) => ({ ...p, [requestId]: "" }));
+      setReloadKey((k) => k + 1);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
@@ -110,6 +213,15 @@ export default function RefundsPage() {
               const tone = statusTone(status);
               const stages = stagesFor(type);
               const idx = stages.indexOf(status);
+              // Pickup negotiation: the customer acts only while a slot is
+              // awaiting them (PICKUP_PROPOSED).
+              const isProposed = status === "PICKUP_PROPOSED";
+              const proposedOn = fmtDateTime(r.pickup?.proposedAt);
+              const counterOn = fmtDateTime(r.pickup?.counterAt);
+              const confirmedOn = fmtDateTime(r.pickup?.scheduledAt);
+              const partner =
+                typeof r.pickup?.partner === "string" ? r.pickup.partner : "";
+              const respondingThis = busyId === r.id;
               return (
                 <div key={r.id} className="bg-white rounded-3xl shadow p-5">
                   <div className="flex items-center gap-4">
@@ -156,6 +268,86 @@ export default function RefundsPage() {
                       Reason: {r.reason}
                     </p>
                   )}
+
+                  {/* Pickup negotiation — the customer accepts the proposed slot
+                      or proposes a different time. Gated on the STATUS
+                      (PICKUP_PROPOSED), driven entirely through the existing
+                      /api/item-request/respond route (no client Firestore
+                      writes). Returns only. */}
+                  {type === "return" && isProposed && (
+                    <div className="mt-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                      <p className="text-sm text-gray-800">
+                        {proposedOn ? (
+                          <>
+                            Proposed pickup:{" "}
+                            <span className="font-semibold">{proposedOn}</span>
+                          </>
+                        ) : (
+                          "YOMICO has proposed a pickup time."
+                        )}
+                      </p>
+                      {r.pickup?.customerResponse === "countered" &&
+                        counterOn && (
+                          <p className="text-xs text-amber-700 mt-1">
+                            You asked for {counterOn} — awaiting a new proposal.
+                          </p>
+                        )}
+
+                      <div className="mt-3">
+                        <button
+                          disabled={respondingThis}
+                          onClick={() => respond(r.id, "accept")}
+                          className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold"
+                        >
+                          {respondingThis ? "Saving…" : "Accept pickup time"}
+                        </button>
+                      </div>
+
+                      <div className="mt-3">
+                        <p className="text-gray-600 text-xs mb-1">
+                          Propose a different time
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            type="datetime-local"
+                            value={counterInputs[r.id] || ""}
+                            onChange={(e) =>
+                              setCounterInputs((p) => ({
+                                ...p,
+                                [r.id]: e.target.value,
+                              }))
+                            }
+                            className="border rounded-lg px-2 py-1 text-sm"
+                          />
+                          <button
+                            disabled={respondingThis || !counterInputs[r.id]}
+                            onClick={() =>
+                              respond(r.id, "counter", counterInputs[r.id])
+                            }
+                            className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-60 text-sm font-semibold"
+                          >
+                            {respondingThis ? "Saving…" : "Submit new time"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {error && (
+                        <p className="text-xs text-red-600 mt-2">{error}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Confirmed appointment once the customer (or admin) has
+                      confirmed the slot. */}
+                  {type === "return" &&
+                    !isProposed &&
+                    !isTerminal(status) &&
+                    confirmedOn && (
+                      <p className="mt-3 text-sm text-green-700 font-semibold">
+                        ✓ Confirmed pickup: {confirmedOn}
+                        {partner ? ` · ${partner}` : ""}
+                      </p>
+                    )}
                 </div>
               );
             })}

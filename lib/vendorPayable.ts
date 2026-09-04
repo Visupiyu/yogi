@@ -1,25 +1,62 @@
 import { computeVendorShare } from "@/lib/vendorEarnings";
 
-// How much a vendor may actually be paid right now.
+// ---------------------------------------------------------------------------
+// The SINGLE authoritative "how much may this vendor be paid right now" calc.
 //
-// Transcribed from app/admin/withdrawals' payableForWithdrawal(). That screen
-// still has its own copy — deliberately not refactored here, because it is a
-// working money path and this change is scoped to the REQUEST side. The two
-// must be kept in step.
+// Used by the seller withdrawal request route, the admin Mark-Paid settlement
+// route, the admin payouts screen and the seller wallet display, so there is
+// one formula rather than several hand-kept copies that drift.
 //
-// Deliberately takes plain arrays rather than Firestore handles: the admin page
-// reads them with the client SDK and the request route with the Admin SDK, and
-// neither variant belongs in this file.
+//   payable = adjustedEarnings - commitments
 //
-// Firestore security rules cannot express this at all — it is a sum across
-// three collections — which is exactly why the amount has to be settled by a
-// server route rather than by a rule.
+//   adjustedEarnings = Σ over the vendor's Delivered + Paid + !needsReview
+//                      orders of (vendorEarning - returnDeduction)
+//   commitments      = admin direct settlements (vendor_payouts)
+//                      + every Paid/Pending/Approved withdrawal
+//
+// RETURNS reduce a seller's earning for the merchandise that came back, even
+// when the customer was refunded in reward points rather than cash — a seller
+// must not keep earnings for goods that were returned. Deductions are per item
+// wherever the data allows it:
+//
+//   - itemRequests (the per-item Return/Replace system): each active (non
+//     rejected/cancelled) RETURN removes exactly that item's proportional share
+//     of the vendor's earning for its order. Replacements are NOT deducted — the
+//     seller reships goods, they are not refunded.
+//   - legacy order-level `returns`: a FULL refund (refundAmount >= the order
+//     grand total) removes the whole vendor earning for that order. A PARTIAL
+//     legacy refund is only attributable on a SINGLE-vendor order (the refund is
+//     unambiguously that vendor's) — there it is deducted proportionally. On a
+//     MULTI-vendor order a partial legacy refund carries no item/vendor
+//     breakdown, so it is left un-deducted rather than clawing back from a
+//     vendor whose goods were never returned (see the audit note / residual
+//     risk). Migrating remaining legacy returns to itemRequests, or adding an
+//     item breakdown to legacy returns, would close that gap.
+//
+// DOUBLE-COUNTING is prevented per order: if an order has any item-level return
+// (itemRequests), ONLY the item-level deductions apply for that order and the
+// legacy return doc is ignored — the same return is never counted from both
+// sources — and every order's total deduction is capped at its own
+// vendorEarning.
+//
+// POST-PAYOUT RECOVERY: the result may be NEGATIVE. That negative is the
+// recoverable adjustment — a return that landed after the seller was already
+// paid. It is never turned into an immediate clawback; it simply means nothing
+// is withdrawable until future eligible earnings first cover it. Callers show
+// max(0, payable) as the withdrawable figure and gate requests on it.
+//
+// Firestore rules cannot express any of this (it sums across four collections),
+// which is why the amount is settled by a server route, not by a rule.
+// ---------------------------------------------------------------------------
 
 export type PayableOrder = {
+  id?: string;
   status?: unknown;
   paymentStatus?: unknown;
   needsReview?: unknown;
   items?: unknown;
+  total?: unknown;
+  finalTotal?: unknown;
   [key: string]: unknown;
 };
 
@@ -35,11 +72,164 @@ export type PayablePayout = {
   amount?: unknown;
 };
 
+// One per-item Return/Replace request (the itemRequests collection).
+export type PayableItemRequest = {
+  orderId?: unknown;
+  vendorId?: unknown;
+  type?: unknown; // "return" | "replace"
+  status?: unknown;
+  item?: { unitPrice?: unknown; qty?: unknown };
+};
+
+// One legacy order-level return (the returns collection).
+export type PayableLegacyReturn = {
+  orderId?: unknown;
+  status?: unknown; // "Refunded" etc.
+  refundAmount?: unknown;
+};
+
 /** Withdrawal states that have already reserved or spent money. */
 const COMMITTED_STATUSES = ["Paid", "Pending", "Approved"];
 
+/** Return states that DON'T reduce earnings — the goods stayed with the buyer. */
+const INACTIVE_RETURN_STATUSES = new Set(["REJECTED", "CANCELLED"]);
+
+function toNum(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function orderGrandTotal(order: PayableOrder): number {
+  const ft = toNum(order?.finalTotal);
+  return ft > 0 ? ft : toNum(order?.total);
+}
+
 /**
- * earnings - commitments, for one vendor.
+ * The vendor-earning deduction for ONE order, given the returns that concern
+ * it. Item-level returns take precedence over the legacy order-level return so
+ * the same return is never counted twice; the result is capped at the order's
+ * own vendorEarning.
+ */
+function returnDeductionForOrder(params: {
+  order: PayableOrder;
+  vendorUid: string;
+  vendorEarning: number;
+  vendorRawSubtotal: number;
+  itemReqs: PayableItemRequest[];
+  legacyReturn: PayableLegacyReturn | null;
+}): number {
+  const { order, vendorUid, vendorEarning, vendorRawSubtotal, itemReqs, legacyReturn } =
+    params;
+  if (vendorEarning <= 0) return 0;
+
+  // --- Item-level returns win for this order (dedup vs legacy). ---
+  if (itemReqs.length > 0) {
+    let deduction = 0;
+    for (const ir of itemReqs) {
+      const line = toNum(ir?.item?.unitPrice) * toNum(ir?.item?.qty);
+      deduction +=
+        vendorRawSubtotal > 0 ? vendorEarning * (line / vendorRawSubtotal) : 0;
+    }
+    return Math.min(vendorEarning, Math.round(deduction));
+  }
+
+  // --- Legacy order-level return (only when no item-level return exists). ---
+  if (legacyReturn && String(legacyReturn.status) === "Refunded") {
+    const refundAmount = toNum(legacyReturn.refundAmount);
+    const grand = orderGrandTotal(order);
+    if (refundAmount > 0 && grand > 0) {
+      if (refundAmount >= grand) {
+        // Whole order refunded -> the vendor keeps nothing for it.
+        return vendorEarning;
+      }
+      // Partial refund. Attributable only when this vendor is the ONLY vendor
+      // on the order; otherwise the legacy doc can't tell us whose item came
+      // back, so we do not deduct (documented residual risk).
+      const items = Array.isArray(order?.items)
+        ? (order.items as { vendorId?: unknown }[])
+        : [];
+      const singleVendor =
+        items.length > 0 && items.every((it) => it?.vendorId === vendorUid);
+      if (singleVendor) {
+        return Math.min(
+          vendorEarning,
+          Math.round(vendorEarning * (refundAmount / grand))
+        );
+      }
+      return 0;
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * The vendor's refund-adjusted earnings — the earnings half of `payable`,
+ * before commitments. Exported so display screens can show a consistent
+ * "earned" figure without re-deriving the deduction logic.
+ */
+export function computeVendorAdjustedEarnings(params: {
+  vendorUid: string;
+  orders: PayableOrder[];
+  itemRequests?: PayableItemRequest[];
+  legacyReturns?: PayableLegacyReturn[];
+}): number {
+  const { vendorUid, orders, itemRequests = [], legacyReturns = [] } = params;
+  if (!vendorUid) return 0;
+
+  // Index active RETURN item-requests for this vendor by orderId.
+  const irByOrder = new Map<string, PayableItemRequest[]>();
+  for (const ir of itemRequests) {
+    if (ir?.vendorId !== vendorUid) continue;
+    if (String(ir?.type) !== "return") continue;
+    if (INACTIVE_RETURN_STATUSES.has(String(ir?.status))) continue;
+    const oid = String(ir?.orderId || "");
+    if (!oid) continue;
+    const list = irByOrder.get(oid) || [];
+    list.push(ir);
+    irByOrder.set(oid, list);
+  }
+
+  // Index legacy Refunded returns by orderId (deterministic id => one per order).
+  const legacyByOrder = new Map<string, PayableLegacyReturn>();
+  for (const lr of legacyReturns) {
+    if (String(lr?.status) !== "Refunded") continue;
+    const oid = String(lr?.orderId || "");
+    if (oid) legacyByOrder.set(oid, lr);
+  }
+
+  let adjustedEarnings = 0;
+  for (const order of orders || []) {
+    if (
+      order?.status !== "Delivered" ||
+      order?.paymentStatus !== "Paid" ||
+      order?.needsReview === true
+    ) {
+      continue;
+    }
+    const share = computeVendorShare(order as never, vendorUid);
+    if (!share) continue;
+    const vendorEarning = share.vendorEarning;
+    if (vendorEarning <= 0) continue;
+
+    const oid = String(order?.id || "");
+    const deduction = returnDeductionForOrder({
+      order,
+      vendorUid,
+      vendorEarning,
+      vendorRawSubtotal: share.vendorRawSubtotal,
+      itemReqs: irByOrder.get(oid) || [],
+      legacyReturn: legacyByOrder.get(oid) || null,
+    });
+    adjustedEarnings += Math.max(0, vendorEarning - deduction);
+  }
+
+  return adjustedEarnings;
+}
+
+/**
+ * earnings - commitments, for one vendor. May be NEGATIVE — the negative part
+ * is the recoverable post-payout adjustment (see file header).
  *
  * `excludeWithdrawalId` omits the request being settled or re-priced, so it is
  * not subtracted from the balance it is being checked against.
@@ -49,40 +239,35 @@ export function computeVendorPayable(params: {
   orders: PayableOrder[];
   payouts: PayablePayout[];
   withdrawals: PayableWithdrawal[];
+  itemRequests?: PayableItemRequest[];
+  legacyReturns?: PayableLegacyReturn[];
   excludeWithdrawalId?: string | null;
 }): number {
-  const { vendorUid, orders, payouts, withdrawals, excludeWithdrawalId } = params;
+  const {
+    vendorUid,
+    orders,
+    payouts,
+    withdrawals,
+    itemRequests = [],
+    legacyReturns = [],
+    excludeWithdrawalId,
+  } = params;
 
   if (!vendorUid) return 0;
 
-  let earnings = 0;
-
-  for (const order of orders || []) {
-    // The same fulfilled-and-paid gate the payouts page, the seller wallet and
-    // the admin settlement screen all use: money is payable only once the
-    // goods arrived AND the customer's payment landed. needsReview means the
-    // order was paid but could not be fulfilled as priced (short stock, a
-    // spent coupon, a moved reward balance), and its items[] still carry the
-    // full requested quantities — so crediting it would pay for units that
-    // were never in stock.
-    if (
-      order?.status !== "Delivered" ||
-      order?.paymentStatus !== "Paid" ||
-      order?.needsReview === true
-    ) {
-      continue;
-    }
-
-    const share = computeVendorShare(order as never, vendorUid);
-    if (share) earnings += share.vendorEarning;
-  }
+  const adjustedEarnings = computeVendorAdjustedEarnings({
+    vendorUid,
+    orders,
+    itemRequests,
+    legacyReturns,
+  });
 
   let committed = 0;
 
   // Direct admin settlements.
   for (const payout of payouts || []) {
     if (payout?.vendorId === vendorUid) {
-      committed += Number(payout?.amount || 0);
+      committed += toNum(payout?.amount);
     }
   }
 
@@ -91,10 +276,10 @@ export function computeVendorPayable(params: {
     if (excludeWithdrawalId && withdrawal?.id === excludeWithdrawalId) continue;
     if (!COMMITTED_STATUSES.includes(String(withdrawal?.status))) continue;
     if (withdrawal?.vendorId !== vendorUid) continue;
-    committed += Number(withdrawal?.amount || 0);
+    committed += toNum(withdrawal?.amount);
   }
 
-  return earnings - committed;
+  return adjustedEarnings - committed;
 }
 
 /** Whether a requested amount fits in what is left, with the reason if not. */
