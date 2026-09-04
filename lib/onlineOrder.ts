@@ -236,6 +236,23 @@ export async function finalizeOnlineOrder(params: {
     const actualRedeemed = Math.min(pricing.rewardValue, balance);
     const rewardShort = pricing.rewardValue - actualRedeemed;
 
+    // finalTotal is the amount Razorpay actually captured, not a recomputed
+    // figure — it is what the customer's card was debited. The rest of the
+    // breakdown comes from the server-derived snapshot the charge was based
+    // on. Field-for-field the shape the browser used to write, so seller
+    // orders, invoices, analytics, wallet, payouts and computeVendorShare()
+    // all keep reading exactly what they expect.
+    const capturedRupees = Math.round(capturedAmountPaise) / 100;
+
+    // Human-readable numbers, minted after all reads/validation above and
+    // BEFORE the first write below. mintNumbers reads its counters (tx.get)
+    // and then writes them, so it must run before any product/order write or
+    // Firestore rejects the transaction ("all reads before all writes").
+    const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
+      { kind: "daily", daily: "order", at: new Date() },
+      { kind: "seq", counter: "payment" },
+    ]);
+
     // ---- WRITES ----
     for (const { ref, qty } of decrements) {
       // stock and sales move in equal and opposite directions, conserving
@@ -254,20 +271,6 @@ export async function finalizeOnlineOrder(params: {
         sales: FieldValue.increment(taken),
       });
     }
-
-    // finalTotal is the amount Razorpay actually captured, not a recomputed
-    // figure — it is what the customer's card was debited. The rest of the
-    // breakdown comes from the server-derived snapshot the charge was based
-    // on. Field-for-field the shape the browser used to write, so seller
-    // orders, invoices, analytics, wallet, payouts and computeVendorShare()
-    // all keep reading exactly what they expect.
-    const capturedRupees = Math.round(capturedAmountPaise) / 100;
-
-    // Human-readable numbers, minted after all reads, before this first write.
-    const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
-      { kind: "daily", daily: "order", at: new Date() },
-      { kind: "seq", counter: "payment" },
-    ]);
 
     tx.set(orderRef, {
       orderNumber,

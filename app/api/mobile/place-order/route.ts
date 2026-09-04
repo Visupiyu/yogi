@@ -396,6 +396,15 @@ export async function POST(request: Request) {
 
       const total = subtotal + shipping + gstAmount - discountAmount;
 
+      // Human-readable numbers, minted after all reads/validation above and
+      // BEFORE the first write below. mintNumbers reads its counters (tx.get)
+      // and then writes them, so it must run before any product/order write or
+      // Firestore rejects the transaction ("all reads before all writes").
+      const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
+        { kind: "daily", daily: "order", at: new Date() },
+        { kind: "seq", counter: "payment" },
+      ]);
+
       // ---- WRITES ----
       for (let i = 0; i < productIds.length; i++) {
         const required = qtyByProduct.get(productIds[i]) || 0;
@@ -404,11 +413,6 @@ export async function POST(request: Request) {
           sales: FieldValue.increment(required),
         });
       }
-
-      const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
-        { kind: "daily", daily: "order", at: new Date() },
-        { kind: "seq", counter: "payment" },
-      ]);
 
       tx.set(orderRef, {
         orderNumber,

@@ -372,6 +372,16 @@ export async function POST(request: Request) {
         };
       }
 
+      // Human-readable numbers, minted after all reads/validation above and
+      // BEFORE the first write below. mintNumbers reads its counters (tx.get)
+      // and then writes them, so it must run before any product/order write or
+      // Firestore rejects the transaction ("all reads before all writes").
+      // Display only — orderRef.id stays the document key.
+      const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
+        { kind: "daily", daily: "order", at: new Date() },
+        { kind: "seq", counter: "payment" },
+      ]);
+
       // ---- WRITES ----
       // Exactly one update per product document. A variant-path product writes
       // the decremented variants[] array AND a product.stock DERIVED from the
@@ -395,13 +405,6 @@ export async function POST(request: Request) {
           });
         }
       }
-
-      // Human-readable numbers, minted after all reads above, before this
-      // first write. Display only — orderRef.id stays the document key.
-      const [orderNumber, paymentNumber] = await mintNumbers(tx, db, [
-        { kind: "daily", daily: "order", at: new Date() },
-        { kind: "seq", counter: "payment" },
-      ]);
 
       // Field-for-field the document buildOrderData() produced, with every
       // monetary value replaced by its server-computed equivalent. Seller
