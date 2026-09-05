@@ -176,7 +176,8 @@ export type DeliveryJob = {
   vendorId: string;
   vendorName: string;
   sellerOrderId: string; // == jobId; explicit link to sellerOrders
-  shipmentNumber: string; // permanent physical identity (from the order)
+  shipmentNumber: string; // this PARCEL's permanent tracking number (minted per job)
+  orderShipmentNumber: string; // audit ref to the order-level shipment number
   // Provider ownership. NULL at Created — no provider chosen yet. When set
   // later, the invariant is COMPANY => companyId != null, YOMICO => companyId
   // == null (see assertProviderInvariant in jobFactory).

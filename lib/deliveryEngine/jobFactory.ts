@@ -2,9 +2,11 @@
 //
 // Two layers:
 //   1. PURE builders + validators (no Firestore) — fully unit-testable.
-//   2. ONE transactional helper createJobAndInitialLeg() that a FUTURE server
-//      route/confirm-order hook will call. In Phase 2B-1 it is DORMANT: nothing
-//      in the codebase invokes it, so it performs no live writes.
+//   2. ONE transactional helper createJobAndInitialLeg(). As of Phase 2B-2 it
+//      is invoked ONLY by the admin-triggered materialization route
+//      (app/api/delivery/jobs/materialize), one job per (orderId,vendorId).
+//      confirm-order is deliberately NOT modified; job creation is a separate,
+//      explicitly admin-triggered step.
 //
 // Every field is derived server-side from the order + vendorId — providerType
 // and companyId are NEVER taken from a client, and are null at creation (no
@@ -17,6 +19,7 @@ import {
   deliveryLegId,
   deliveryJobCreatedEventId,
 } from "@/lib/deliveryEngine/jobIds";
+import { mintSequential } from "@/lib/humanIds";
 import type {
   DeliveryJob,
   DeliveryLeg,
@@ -30,7 +33,6 @@ import type {
 export type JobSourceItem = { name?: unknown; qty?: unknown };
 export type JobSourceOrder = {
   orderNumber?: unknown;
-  shipmentNumber?: unknown;
   customerName?: unknown;
   phone?: unknown;
   address?: unknown;
@@ -80,6 +82,37 @@ export function assertNoFinancialFields(obj: Record<string, unknown>): void {
   if (bad.length) throw new Error(`financial field(s) not allowed on delivery record: ${bad.join(", ")}`);
 }
 
+// ---- Materialization gate (pure) ----
+
+// Explicit WHITELIST of order lifecycle statuses for which a delivery job may
+// be materialized: the order is confirmed and currently in fulfilment. It is a
+// whitelist by design -- any status not listed here (Pending, Cancelled,
+// Delivered, an empty/missing status, or an unexpected value) is rejected, so a
+// status added elsewhere never silently becomes materializable.
+//
+// order.status is rolled forward Confirmed -> Packed -> Shipped -> Out For
+// Delivery -> Delivered by seller/advance-item, set to Cancelled by
+// cancel-order, and starts at Pending. Returns/refunds are item-level (tracked
+// off order.status) and are deliberately NOT gated here -- they can coexist
+// with an otherwise fulfillable order and are handled later in the job
+// lifecycle.
+//
+// Lives here (not in the route) because Next.js route files may only export
+// their HTTP handlers; keeping it in this pure module also makes it unit-testable.
+export const MATERIALIZABLE_STATUSES = [
+  "Confirmed",
+  "Packed",
+  "Shipped",
+  "Out For Delivery",
+] as const;
+
+/** Pure gate predicate: true only for a whitelisted status that is not under review. */
+export function canMaterializeStatus(status: unknown, needsReview: unknown): boolean {
+  if (needsReview === true) return false;
+  const s = typeof status === "string" ? status : "";
+  return (MATERIALIZABLE_STATUSES as readonly string[]).includes(s);
+}
+
 // ---- Pure builders ----
 
 export function buildDeliveryJob(args: {
@@ -88,9 +121,14 @@ export function buildDeliveryJob(args: {
   vendorName: string;
   order: JobSourceOrder;
   sellerName: string;
+  // This parcel's own tracking number, minted per (orderId,vendorId) by the
+  // transactional helper — NOT the order-level number.
+  shipmentNumber: string;
+  // The order-level shipment number, kept only as an audit reference.
+  orderShipmentNumber: string;
   now: Timestamp;
 }): DeliveryJob & { id: string } {
-  const { orderId, vendorId, vendorName, order, sellerName, now } = args;
+  const { orderId, vendorId, vendorName, order, sellerName, shipmentNumber, orderShipmentNumber, now } = args;
   const id = deliveryJobId(orderId, vendorId);
   const items: DeliveryParcelItem[] = Array.isArray(order.items)
     ? (order.items as JobSourceItem[])
@@ -105,7 +143,8 @@ export function buildDeliveryJob(args: {
     vendorId,
     vendorName: s(vendorName, 200),
     sellerOrderId: id,
-    shipmentNumber: s(order.shipmentNumber, 40),
+    shipmentNumber: s(shipmentNumber, 40), // this parcel's minted number
+    orderShipmentNumber: s(orderShipmentNumber, 40), // audit ref only
     providerType: null, // no provider chosen at Created
     companyId: null,
     status: "Created",
@@ -192,7 +231,9 @@ export function buildJobCreatedEvent(args: {
   return event;
 }
 
-// ---- Transactional creation helper (DORMANT in 2B-1: never invoked) ----
+// ---- Transactional creation helper ----
+// In 2B-2 this is invoked ONLY by the admin-triggered materialization route
+// (app/api/delivery/jobs/materialize), once per (orderId,vendorId).
 
 export type CreateJobArgs = {
   orderId: string;
@@ -200,29 +241,47 @@ export type CreateJobArgs = {
   vendorName: string;
   sellerName: string;
   order: JobSourceOrder;
+  // The order-level shipment number, kept on the job as an audit reference.
+  // The job's OWN parcel tracking number is minted inside the transaction.
+  orderShipmentNumber: string;
   actorUid: string;
 };
 
 /**
  * Create a DeliveryJob + its initial Pickup leg + a JobCreated event, atomically
- * and idempotently. Reads BEFORE writes. If the job already exists it is a
- * no-op (returns created:false) — deterministic ids make double creation
- * impossible. A future handoff route / confirm-order hook will call this; it is
- * intentionally uninvoked in Phase 2B-1, so it performs no live writes yet.
+ * and idempotently, and mint this parcel's own shipment number.
+ *
+ * Read/write order (Firestore forbids a read after a write):
+ *   READS  1. tx.get(deliveryJobs/{jobId})   — existence; if it exists, return
+ *             {created:false} with NO mint and NO write (so a re-run never
+ *             burns a shipment number).
+ *          2. tx.get(counters/shipment)       — inside mintSequential.
+ *   WRITES 3. tx.set(counters/shipment)       — inside mintSequential.
+ *          4. tx.set(deliveryJobs/{jobId})
+ *          5. tx.set(deliveryJobs/{jobId}/legs/{legId})
+ *          6. tx.set(deliveryEvents/{eventId})
+ *
+ * MUST be called one job per transaction: two jobs in a single transaction
+ * would either read-after-write on the second existence check or double-mint
+ * the same shipment counter. The materialization route runs one tx per vendor.
  */
 export async function createJobAndInitialLeg(
   tx: Transaction,
   db: Firestore,
   args: CreateJobArgs
-): Promise<{ created: boolean; jobId: string }> {
+): Promise<{ created: boolean; jobId: string; shipmentNumber?: string }> {
   const jobId = deliveryJobId(args.orderId, args.vendorId);
   const jobRef = db.collection("deliveryJobs").doc(jobId);
 
   // ---- READS FIRST ----
   const existing = await tx.get(jobRef);
   if (existing.exists) {
-    return { created: false, jobId }; // idempotent no-op
+    return { created: false, jobId }; // idempotent no-op — no mint, no write
   }
+
+  // Still a READ-then-WRITE, but every read above has completed: mint this
+  // parcel's own tracking number (counters/shipment -> TRCK######).
+  const shipmentNumber = await mintSequential(tx, db, "shipment");
 
   const now = Timestamp.now();
   const job = buildDeliveryJob({
@@ -231,6 +290,8 @@ export async function createJobAndInitialLeg(
     vendorName: args.vendorName,
     order: args.order,
     sellerName: args.sellerName,
+    shipmentNumber,
+    orderShipmentNumber: args.orderShipmentNumber,
     now,
   });
   const leg = buildInitialPickupLeg({
@@ -259,5 +320,5 @@ export async function createJobAndInitialLeg(
   tx.set(legRef, legData);
   tx.set(eventRef, eventData);
 
-  return { created: true, jobId };
+  return { created: true, jobId, shipmentNumber };
 }
