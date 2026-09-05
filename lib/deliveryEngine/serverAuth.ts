@@ -3,24 +3,37 @@
 // in Firestore via the Admin SDK.
 //
 // "Token-verified" means the caller holds a valid Firebase ID token — it does
-// NOT mean email_verified. Delivery persons are DELIBERATELY not gated on
-// email verification: both existing live delivery-person accounts are active
-// but unverified, and gating them here would lock them out. Only isAdmin (in
-// lib/serverAuth) requires email_verified; that is unchanged.
+// NOT mean email_verified. Delivery persons are DELIBERATELY not gated on email
+// verification: existing live delivery accounts are active but unverified, and
+// gating them here would lock them out. Only isAdmin (in lib/serverAuth)
+// requires email_verified; that is unchanged.
 //
-// Deliberately does NOT use custom claims / firebase-admin/auth: that pulls the
-// ESM-only jose chain that crashes on Vercel (see lib/serverAuth.ts). Ownership
-// is enforced by reading the authoritative Firestore docs each call — the same
-// approach firestore.rules' isAssignedDeliveryPartner() already relies on, but
-// centralised here so every delivery route enforces it identically.
+// Deliberately does NOT use custom claims / firebase-admin/auth (ESM/Vercel
+// crash — see lib/serverAuth.ts). Ownership is enforced by reading the
+// authoritative Firestore docs each call, centralised here.
 //
-// A user is a COMPANY if an Active deliveryCompanies doc has ownerUid == uid.
-// A user is a PERSON if an Active deliveryPersons doc has uid == uid AND its
-// company is Active. Company identity takes precedence if somehow both match.
-// Neither branch checks email_verified — a valid token + Active person + Active
-// company is sufficient for a delivery person.
+// Roles:
+//   COMPANY admin -> an Active deliveryCompanies doc has ownerUid == uid.
+//   PERSON        -> a deliveryPersons doc has uid == uid, is Active, AND:
+//                      providerType "COMPANY" -> its company must be Active;
+//                      providerType "YOMICO"  -> no company (companyId null),
+//                                                no company check.
+// Company identity takes precedence if somehow both match. Neither branch
+// checks email_verified.
 import { getAdminDb } from "@/lib/firebaseAdmin";
-import type { DeliveryActor, DeliveryCompany, DeliveryPerson } from "@/lib/deliveryEngine/types";
+import type {
+  DeliveryActor,
+  DeliveryCompany,
+  DeliveryPerson,
+  DeliveryProviderType,
+} from "@/lib/deliveryEngine/types";
+
+// Reads accountStatus, falling back to the deprecated `status` alias during the
+// one-phase transition. Active only.
+function isActiveAccount(p: DeliveryPerson): boolean {
+  if (p.accountStatus) return p.accountStatus === "Active";
+  return p.status === "Active";
+}
 
 export async function resolveDeliveryActor(
   uid: string,
@@ -40,8 +53,7 @@ export async function resolveDeliveryActor(
     if (company.status === "Active") {
       return { role: "company", uid, companyId: doc.id, company };
     }
-    // Company exists but not Active -> treat as no delivery role (fail closed).
-    return { role: "none", uid };
+    return { role: "none", uid }; // company exists but not Active -> fail closed
   }
 
   // ---- Delivery person? (by uid; email is a fallback for legacy docs) ----
@@ -51,7 +63,6 @@ export async function resolveDeliveryActor(
     personDoc = byUid.docs[0];
   } else if (email) {
     const byEmail = await db.collection("deliveryPersons").where("email", "==", email).limit(1).get();
-    // Only accept the email match if that doc's uid actually equals the caller.
     if (!byEmail.empty && (byEmail.docs[0].data() as DeliveryPerson).uid === uid) {
       personDoc = byEmail.docs[0];
     }
@@ -59,18 +70,41 @@ export async function resolveDeliveryActor(
 
   if (personDoc) {
     const person = { id: personDoc.id, ...(personDoc.data() as DeliveryPerson) };
-    if (person.status !== "Active" || !person.companyId) {
+    if (!isActiveAccount(person)) {
       return { role: "none", uid };
     }
-    // The owning company must itself be Active.
-    const compRef = await db.collection("deliveryCompanies").doc(person.companyId).get();
-    const comp = compRef.exists ? (compRef.data() as DeliveryCompany) : null;
-    if (!comp || comp.status !== "Active") {
-      return { role: "none", uid };
+    // providerType defaults to COMPANY for legacy/migrated docs written before
+    // this field existed (they always carry a companyId).
+    const providerType: DeliveryProviderType =
+      person.providerType === "YOMICO" ? "YOMICO" : "COMPANY";
+
+    if (providerType === "COMPANY") {
+      if (!person.companyId) return { role: "none", uid }; // COMPANY needs a company
+      const compRef = await db.collection("deliveryCompanies").doc(person.companyId).get();
+      const comp = compRef.exists ? (compRef.data() as DeliveryCompany) : null;
+      if (!comp || comp.status !== "Active") return { role: "none", uid };
+      // Accepted: valid token + Active COMPANY person + Active company.
+      return {
+        role: "person",
+        uid,
+        providerType,
+        companyId: person.companyId,
+        personId: personDoc.id,
+        person,
+      };
     }
-    // Accepted with a valid token + Active person + Active company.
-    // email_verified is intentionally NOT required for delivery persons.
-    return { role: "person", uid, companyId: person.companyId, personId: personDoc.id, person };
+
+    // YOMICO person: no company; a YOMICO person must NOT carry a companyId.
+    if (person.companyId) return { role: "none", uid }; // mixed provider -> fail closed
+    // Accepted: valid token + Active YOMICO person. email_verified not required.
+    return {
+      role: "person",
+      uid,
+      providerType,
+      companyId: null,
+      personId: personDoc.id,
+      person,
+    };
   }
 
   return { role: "none", uid };

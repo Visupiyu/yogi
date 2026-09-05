@@ -48,7 +48,13 @@ async function main() {
       continue;
     }
     const now = Timestamp.now();
+    // Existing partners migrate ONLY as COMPANY persons (locked decision 20) —
+    // never assume an existing person is YOMICO. providerType is set here, not
+    // trusted from source. accountStatus derives from the legacy status; the
+    // deprecated 'status' alias is kept in lockstep for one transition phase.
+    const active = p.status !== "Inactive";
     const doc = {
+      providerType: "COMPANY",
       companyId: p.companyId,
       uid: p.uid,
       name: p.name ?? "",
@@ -57,8 +63,10 @@ async function main() {
       vehicleType: p.vehicleType ?? "",
       vehicleNumber: p.vehicleNumber ?? "",
       serviceArea: p.serviceArea ?? "",
-      status: p.status === "Inactive" ? "Inactive" : "Active",
+      accountStatus: active ? "Active" : "Suspended",
+      availability: "Offline",
       createdBy: "admin-migrated",
+      status: active ? "Active" : "Inactive", // deprecated alias (one phase)
       createdAt: now,
       updatedAt: now,
     };

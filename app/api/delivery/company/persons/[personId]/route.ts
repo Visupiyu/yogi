@@ -6,10 +6,10 @@ import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
 import type { DeliveryPerson } from "@/lib/deliveryEngine/types";
 
 // PATCH /api/delivery/company/persons/[personId]
-// A company edits/activates/deactivates ONE of its OWN delivery persons.
-// Ownership is enforced by comparing the target doc's companyId to the caller's
-// resolved company — a company can never touch another company's person, and
-// companyId/uid/createdBy are immutable here.
+// A company edits/activates/suspends ONE of its OWN delivery persons. Ownership
+// is enforced by comparing the target doc's companyId to the caller's resolved
+// company — a company can never touch another company's (or a YOMICO) person.
+// providerType, companyId, uid, createdBy are immutable here.
 function str(v: unknown, max = 200): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
@@ -40,19 +40,23 @@ export async function PATCH(
   if (person.companyId !== actor.companyId)
     return Response.json({ error: "That delivery person belongs to another company." }, { status: 403 });
 
-  // Build an allow-listed update. companyId, uid, createdBy, createdAt are never
-  // writable here; status is constrained to the two legal values.
+  // Allow-listed update. providerType/companyId/uid/createdBy never writable.
   const update: Record<string, unknown> = { updatedAt: Timestamp.now() };
   if (body.name !== undefined) update.name = str(body.name);
   if (body.phone !== undefined) update.phone = str(body.phone, 20);
   if (body.vehicleType !== undefined) update.vehicleType = str(body.vehicleType, 40);
   if (body.vehicleNumber !== undefined) update.vehicleNumber = str(body.vehicleNumber, 40);
   if (body.serviceArea !== undefined) update.serviceArea = str(body.serviceArea);
-  if (body.status !== undefined) {
-    const s = str(body.status, 12);
-    if (s !== "Active" && s !== "Inactive")
-      return Response.json({ error: "status must be Active or Inactive." }, { status: 400 });
-    update.status = s;
+  if (body.city !== undefined) update.city = str(body.city, 80);
+
+  // accountStatus is the current field; `status` is accepted as the deprecated
+  // alias input and both are written in lockstep for one transition phase.
+  const rawStatus = body.accountStatus !== undefined ? body.accountStatus : body.status;
+  if (rawStatus !== undefined) {
+    const s = str(rawStatus, 12);
+    if (s === "Active") { update.accountStatus = "Active"; update.status = "Active"; }
+    else if (s === "Suspended" || s === "Inactive") { update.accountStatus = "Suspended"; update.status = "Inactive"; }
+    else return Response.json({ error: "accountStatus must be Active or Suspended." }, { status: 400 });
   }
 
   await ref.update(update);

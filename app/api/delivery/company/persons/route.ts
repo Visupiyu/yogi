@@ -7,16 +7,15 @@ import type { DeliveryPerson } from "@/lib/deliveryEngine/types";
 
 // Company-scoped delivery-person management. Admin does NOT manage delivery
 // people — a delivery COMPANY manages its own. Every operation is gated on the
-// caller resolving to an Active company, and is confined to that company's own
-// people (companyId is taken from the resolved caller, never from the body).
+// caller resolving to an Active company, and confined to that company's own
+// people: providerType ("COMPANY"), companyId and createdBy come from the
+// resolved caller, never from the body.
 //
 // Auth-user provisioning stays client-side (getSecondaryAuth +
-// createUserWithEmailAndPassword, the same mechanism admin uses today) so no
-// firebase-admin/auth is introduced. The client creates the Auth user, then
-// POSTs the resulting uid here; the server writes the deliveryPersons doc.
+// createUserWithEmailAndPassword) so no firebase-admin/auth is introduced. The
+// client creates the Auth user, then POSTs the uid here.
 
 const RL = { max: 60, windowMs: 10 * 60 * 1000 };
-
 function str(v: unknown, max = 200): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
 }
@@ -41,20 +40,22 @@ export async function GET(request: Request) {
     const p = d.data() as DeliveryPerson;
     return {
       id: d.id,
+      providerType: p.providerType ?? "COMPANY",
       name: p.name,
       phone: p.phone,
       email: p.email,
       vehicleType: p.vehicleType ?? "",
       vehicleNumber: p.vehicleNumber ?? "",
       serviceArea: p.serviceArea ?? "",
-      status: p.status,
+      accountStatus: p.accountStatus ?? (p.status === "Inactive" ? "Suspended" : "Active"),
+      availability: p.availability ?? "Offline",
     };
   });
   return Response.json({ companyId: actor.companyId, persons });
 }
 
 // POST — register a person the company has ALREADY created an Auth account for.
-// Body: { uid, name, phone, email, vehicleType?, vehicleNumber?, serviceArea? }
+// Body: { uid, name, phone, email, vehicleType?, vehicleNumber?, serviceArea?, city? }
 export async function POST(request: Request) {
   const requester = await verifyRequestUser(request);
   if (!requester) return Response.json({ error: "Please sign in." }, { status: 401 });
@@ -77,13 +78,14 @@ export async function POST(request: Request) {
 
   const db = getAdminDb();
 
-  // A uid can belong to exactly one delivery person, in exactly one company.
+  // A uid can belong to exactly one delivery person, in exactly one provider.
   const existing = await db.collection("deliveryPersons").where("uid", "==", uid).limit(1).get();
   if (!existing.empty)
     return Response.json({ error: "This account is already registered as a delivery person." }, { status: 409 });
 
   const now = Timestamp.now();
   const ref = await db.collection("deliveryPersons").add({
+    providerType: "COMPANY",             // server-owned: never from the body
     companyId: actor.companyId,          // from the caller, never the body
     uid,
     name,
@@ -92,8 +94,11 @@ export async function POST(request: Request) {
     vehicleType: str(body.vehicleType, 40),
     vehicleNumber: str(body.vehicleNumber, 40),
     serviceArea: str(body.serviceArea),
-    status: "Active",
+    city: str(body.city, 80),
+    accountStatus: "Active",             // company vouches for its own person
+    availability: "Offline",            // operational state; person toggles it
     createdBy: actor.uid,                // the company owner uid
+    status: "Active",                    // deprecated alias (one phase)
     createdAt: now,
     updatedAt: now,
   });
