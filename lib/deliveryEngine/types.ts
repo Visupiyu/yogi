@@ -106,3 +106,132 @@ export type DeliveryPersonInput = {
   serviceArea?: string;
   city?: string;
 };
+
+// ===========================================================================
+// Delivery Engine — Phase 2B-1 operational data model (types only).
+//
+// Distinct concepts, deliberately not merged:
+//   shipmentNumber  = permanent PHYSICAL shipment identity (TRCK…), minted once
+//                     at confirm-order; carried here, never regenerated.
+//   DeliveryJob     = YOMICO operational shipment record (one per order+vendor).
+//   DeliveryLeg     = ONE physical movement / custody segment of a job.
+//   DeliveryPerson  = the party responsible for a particular leg.
+// A job may contain multiple legs and multiple people over its lifetime.
+//
+// NO financial fields exist on any of these — no wallet, earnings, pricing,
+// commission, settlement, and (in 2B-1) no COD/payment fields yet. Customer
+// payment is never routed to a delivery company.
+// ===========================================================================
+
+// Full status set declared for forward-compat; 2B-1 only ever SETS "Created".
+export type DeliveryJobStatus =
+  | "Created"
+  | "OfferedToCompany"
+  | "AssignedToYomico"
+  | "InProgress"
+  | "Delivered"
+  | "RejectedByCompany"
+  | "DeliveryFailed"
+  | "Returned"
+  | "Cancelled";
+
+export type DeliveryLegType =
+  | "Pickup"
+  | "LineHaul"
+  | "HubIntake"
+  | "HubHandover"
+  | "FinalMile";
+
+export type DeliveryLegStatus =
+  | "LegCreated"
+  | "Assigned"
+  | "Started"
+  | "PickedUp"
+  | "InTransit"
+  | "ArrivedAtStage"
+  | "HandoverInitiated"
+  | "HandoverConfirmed"
+  | "OutForDelivery"
+  | "Delivered"
+  | "Failed"
+  | "Rescheduled";
+
+export type DeliveryEventRole = "admin" | "company" | "person" | "system";
+
+// Who currently holds custody responsibility for a job/leg. Null on a freshly
+// created job/leg (no provider assigned yet). providerType null == unassigned.
+export type ResponsibleParty = {
+  kind: DeliveryProviderType;
+  companyId: string | null;
+  personId: string | null;
+};
+
+// Minimal, non-financial parcel description (names + quantities only).
+export type DeliveryParcelItem = { name: string; qty: number };
+
+// Collection: deliveryJobs/{jobId}   jobId = `${orderId}_${vendorId}`
+export type DeliveryJob = {
+  orderId: string;
+  orderNumber: string;
+  vendorId: string;
+  vendorName: string;
+  sellerOrderId: string; // == jobId; explicit link to sellerOrders
+  shipmentNumber: string; // permanent physical identity (from the order)
+  // Provider ownership. NULL at Created — no provider chosen yet. When set
+  // later, the invariant is COMPANY => companyId != null, YOMICO => companyId
+  // == null (see assertProviderInvariant in jobFactory).
+  providerType: DeliveryProviderType | null;
+  companyId: string | null;
+  status: DeliveryJobStatus;
+  currentLegId: string | null;
+  currentStage: string; // e.g. "AwaitingHandoff" at Created
+  responsibleParty: ResponsibleParty | null;
+  lastEventId: string | null;
+  lastEventAt: unknown | null;
+  pickup: { sellerName: string; area: string };
+  drop: { customerName: string; phone: string; address: string; slot: string | null };
+  parcel: { items: DeliveryParcelItem[] };
+  attemptCount: number;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  // NO cod/payment fields (payment sub-phase), NO agreedCost/wallet/earnings/
+  // settlement/pricing/commission — ever.
+};
+
+// Collection: deliveryJobs/{jobId}/legs/{legId}
+export type DeliveryLeg = {
+  jobId: string;
+  shipmentNumber: string;
+  sequence: number; // 1 for the initial Pickup leg
+  type: DeliveryLegType;
+  providerType: DeliveryProviderType | null; // null until assigned
+  companyId: string | null;
+  assignedPersonId: string | null;
+  status: DeliveryLegStatus; // "LegCreated" at creation
+  from: { stage: string };
+  to: { stage: string };
+  handover: null; // populated in a later sub-phase
+  proof: null; // populated in a later sub-phase
+  exception: null; // populated in a later sub-phase
+  createdAt?: unknown;
+  updatedAt?: unknown;
+};
+
+// Collection: deliveryEvents/{eventId}  — append-only, server-write-only.
+export type DeliveryEvent = {
+  jobId: string;
+  legId: string | null;
+  shipmentNumber: string;
+  actorUid: string;
+  role: DeliveryEventRole;
+  providerType: DeliveryProviderType | null;
+  companyId: string | null;
+  action: string; // "JobCreated" in 2B-1
+  fromStage: string | null;
+  toStage: string;
+  at?: unknown;
+  geo?: { lat: number; lng: number } | null;
+  notes?: string | null;
+  photoPath?: string | null;
+  clientEventId?: string | null; // offline idempotency key for future scans
+};
