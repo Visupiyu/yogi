@@ -1419,6 +1419,43 @@ service cloud.firestore {
       allow read: if isAdmin() || isOwnerUid(resource.data.uid);
       allow write: if isAdmin();
     }
+
+    // =========================================================
+    // Delivery Engine (Phase 1 foundation) — ADDITIVE.
+    // The legacy deliveryPartners block above is left intact so the existing
+    // /admin/delivery(-partners) and /delivery workflows keep working unchanged
+    // during migration. All writes here are server-only (Admin SDK via
+    // /api/delivery/*), which is how role + ownership are enforced without
+    // custom claims. No money fields exist on these documents; customer payment
+    // is never routed to a delivery company.
+    // =========================================================
+
+    match /deliveryCompanies/{companyId} {
+      // Admin, or the company's own owner. Not public: the "delivered by"
+      // label customers/sellers see comes from denormalised order.deliveryCompanyName.
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
+      allow write: if false; // server-only (approval / provisioning)
+    }
+
+    match /deliveryPersons/{personId} {
+      // Admin, or the person themselves (own doc, for their app). A company
+      // reads its people via /api/delivery/company/persons, not directly.
+      allow read: if isAdmin() || isOwnerUid(resource.data.uid);
+      allow write: if false; // server-only (company-scoped API writes)
+    }
+
+    match /deliveryJobs/{jobId} {
+      // Later phase; fully server-mediated so no order PII is exposed through a
+      // client-readable job document.
+      allow read, write: if false;
+    }
+
+    match /deliveryPaymentEvents/{eventId} {
+      // Append-only COD-collection audit, written server-side. Admin-read.
+      allow read: if isAdmin();
+      allow write: if false;
+    }
 // ---------------------------------------------------------
     // Mobile app cart
     // ---------------------------------------------------------
