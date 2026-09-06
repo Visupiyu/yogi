@@ -165,6 +165,86 @@ export type DeliveryLegStatus =
 
 export type DeliveryEventRole = "admin" | "company" | "person" | "system";
 
+// ===========================================================================
+// Phase 2B-4 — physical execution & custody (types only).
+//
+// Custody is DISTINCT from assignment (2B-3) and from location evidence. A leg
+// can be "Assigned" with the parcel still at the seller; only a pickup SCAN
+// moves custody to a person. Custody changes ONLY via PICKUP, HANDOVER_CONFIRM
+// and DELIVER — never by editing assignedPersonId directly (decision M7).
+// Still NO money/inventory/earnings/settlement fields — ever.
+// ===========================================================================
+
+// Who physically holds/answers for the parcel right now.
+export type CustodyHolderKind = "SELLER" | "YOMICO" | "COMPANY" | "CUSTOMER";
+
+export type CustodyState = {
+  holderKind: CustodyHolderKind | null;
+  personId: string | null; // the delivery person holding it, when in a person's hands
+  companyId: string | null;
+  since?: unknown | null;
+  sinceEventId?: string | null; // the scan event that established this custody
+};
+
+// Physical scan actions the Delivery App may request.
+export type ExecutionAction =
+  | "PICKUP"
+  | "DEPART"
+  | "ARRIVE"
+  | "OUT_FOR_DELIVERY"
+  | "HANDOVER_INITIATE"
+  | "HANDOVER_CONFIRM"
+  | "DELIVER"
+  | "ATTEMPT_FAILED"
+  | "EXCEPTION";
+
+export type DeliveryExceptionCode =
+  | "SELLER_UNAVAILABLE"
+  | "CUSTOMER_UNAVAILABLE"
+  | "DAMAGED_PACKAGE"
+  | "WRONG_PACKAGE"
+  | "WRONG_SHIPMENT_SCAN"
+  | "FAILED_PICKUP"
+  | "FAILED_DELIVERY"
+  | "HANDOVER_TIMEOUT"
+  | "PERSON_UNAVAILABLE";
+
+// Proof captured at a custody-changing scan. scan+timestamp+actor+geo are the
+// core; photo/signature are optional/future; otpVerified gates final delivery.
+export type ProofRecord = {
+  eventId: string;
+  at: unknown;
+  actorUid: string;
+  geo?: { lat: number; lng: number } | null;
+  geoAccuracy?: number | null;
+  photoPath?: string | null;
+  signaturePath?: string | null;
+  otpVerified?: boolean;
+};
+
+// Two-sided custody handover between two delivery people (relay, or a future
+// inter-leg handover). Custody transfers only on Confirmed by the incoming party.
+export type LegHandover = {
+  state: "Initiated" | "Confirmed" | "Cancelled";
+  fromPersonId: string;
+  toKind: DeliveryProviderType;
+  toCompanyId: string | null;
+  toPersonId: string;
+  initiatedAt: unknown;
+  initiatedEventId: string;
+  confirmedAt?: unknown | null;
+  confirmedEventId?: string | null;
+};
+
+export type LegException = {
+  code: DeliveryExceptionCode;
+  state: "Open" | "Resolved";
+  at: unknown;
+  eventId: string;
+  notes?: string | null;
+  resolution?: string | null;
+};
+
 // Who currently holds custody responsibility for a job/leg. Null on a freshly
 // created job/leg (no provider assigned yet). providerType null == unassigned.
 export type ResponsibleParty = {
@@ -211,6 +291,19 @@ export type DeliveryJob = {
   assignedCompanyName?: string | null; // set on a COMPANY handoff/assignment
   assignedAt?: unknown | null;
   assignedBy?: string | null; // actor uid that performed the assignment
+  // 2B-4 execution/custody. scanToken is the opaque QR secret, minted once at
+  // job creation and stable for the shipment's life (all legs share it). It is
+  // server-only and MUST NOT be returned by ordinary job reads — only by the
+  // dedicated QR endpoint. custody mirrors the current leg's custody.
+  scanToken?: string;
+  custody?: CustodyState | null;
+  executionStartedAt?: unknown | null; // first pickup (custody acquired)
+  deliveredAt?: unknown | null;
+  failedAt?: unknown | null;
+  // Future-integration field: a customer OTP system will store the expected
+  // delivery OTP here; verifyDeliveryOtp checks against it. Unset => delivery
+  // cannot be confirmed (fails closed). NOT money.
+  deliveryOtp?: string | null;
   createdAt?: unknown;
   updatedAt?: unknown;
   // NO cod/payment fields (payment sub-phase), NO agreedCost/wallet/earnings/
@@ -233,9 +326,14 @@ export type DeliveryLeg = {
   assignedPersonName?: string | null;
   assignedAt?: unknown | null;
   assignedBy?: string | null;
-  handover: null; // populated in a later sub-phase
-  proof: null; // populated in a later sub-phase
-  exception: null; // populated in a later sub-phase
+  // 2B-4 execution/custody. custody is null (or SELLER) until pickup; then the
+  // holding person; then CUSTOMER on delivery. handover/proof/exception are
+  // populated by execution scans. attemptCount counts delivery attempts.
+  custody?: CustodyState | null;
+  handover?: LegHandover | null;
+  proof?: { pickup?: ProofRecord | null; delivery?: ProofRecord | null } | null;
+  exception?: LegException | null;
+  attemptCount?: number;
   createdAt?: unknown;
   updatedAt?: unknown;
 };
@@ -258,9 +356,17 @@ export type DeliveryEvent = {
   fromStatus?: string | null;
   toStatus?: string | null;
   personId?: string | null;
+  // 2B-4 execution evidence. `at` is the AUTHORITATIVE server timestamp;
+  // capturedAt is the device time (evidence only, may be offline/older).
+  capturedAt?: unknown | null;
+  geoAccuracy?: number | null; // metres; supporting evidence only
+  deviceId?: string | null;
+  handoverRole?: "outgoing" | "incoming" | null;
+  exceptionCode?: DeliveryExceptionCode | null;
+  custodyToKind?: CustodyHolderKind | null;
   at?: unknown;
   geo?: { lat: number; lng: number } | null;
   notes?: string | null;
   photoPath?: string | null;
-  clientEventId?: string | null; // offline idempotency key for future scans
+  clientEventId?: string | null; // offline idempotency key for scans
 };

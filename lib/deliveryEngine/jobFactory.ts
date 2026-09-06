@@ -20,6 +20,7 @@ import {
   deliveryJobCreatedEventId,
 } from "@/lib/deliveryEngine/jobIds";
 import { mintSequential } from "@/lib/humanIds";
+import { mintScanToken } from "@/lib/deliveryEngine/qr";
 import type {
   DeliveryJob,
   DeliveryLeg,
@@ -126,9 +127,12 @@ export function buildDeliveryJob(args: {
   shipmentNumber: string;
   // The order-level shipment number, kept only as an audit reference.
   orderShipmentNumber: string;
+  // Opaque per-shipment QR secret, minted once by the transactional helper and
+  // stable for the shipment's life (all legs share it).
+  scanToken: string;
   now: Timestamp;
 }): DeliveryJob & { id: string } {
-  const { orderId, vendorId, vendorName, order, sellerName, shipmentNumber, orderShipmentNumber, now } = args;
+  const { orderId, vendorId, vendorName, order, sellerName, shipmentNumber, orderShipmentNumber, scanToken, now } = args;
   const id = deliveryJobId(orderId, vendorId);
   const items: DeliveryParcelItem[] = Array.isArray(order.items)
     ? (order.items as JobSourceItem[])
@@ -162,6 +166,10 @@ export function buildDeliveryJob(args: {
     },
     parcel: { items }, // names + quantities only — no prices
     attemptCount: 0,
+    // 2B-4: permanent QR secret + initial custody (parcel is with the seller
+    // until a person scans pickup). NOT exposed by ordinary job reads.
+    scanToken,
+    custody: { holderKind: "SELLER", personId: null, companyId: null, since: now, sinceEventId: null },
     createdAt: now,
     updatedAt: now,
   };
@@ -190,9 +198,11 @@ export function buildInitialPickupLeg(args: {
     status: "LegCreated",
     from: { stage: sellerStage || "Seller" },
     to: { stage: "PickupComplete" },
+    custody: { holderKind: "SELLER", personId: null, companyId: null, since: now, sinceEventId: null },
     handover: null,
     proof: null,
     exception: null,
+    attemptCount: 0,
     createdAt: now,
     updatedAt: now,
   };
@@ -282,6 +292,9 @@ export async function createJobAndInitialLeg(
   // Still a READ-then-WRITE, but every read above has completed: mint this
   // parcel's own tracking number (counters/shipment -> TRCK######).
   const shipmentNumber = await mintSequential(tx, db, "shipment");
+  // Permanent opaque QR secret for this shipment (decision M4). No counter
+  // read/write, so it does not affect the reads-before-writes ordering.
+  const scanToken = mintScanToken();
 
   const now = Timestamp.now();
   const job = buildDeliveryJob({
@@ -292,6 +305,7 @@ export async function createJobAndInitialLeg(
     sellerName: args.sellerName,
     shipmentNumber,
     orderShipmentNumber: args.orderShipmentNumber,
+    scanToken,
     now,
   });
   const leg = buildInitialPickupLeg({
