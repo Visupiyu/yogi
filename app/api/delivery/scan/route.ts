@@ -4,6 +4,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
 import { parseQrPayload } from "@/lib/deliveryEngine/qr";
 import { applyScan, ExecutionError, type ScanArgs } from "@/lib/deliveryEngine/execution";
+import { reconcileDeliveredJob } from "@/lib/deliveryEngine/reconcile";
 import type { ExecutionAction } from "@/lib/deliveryEngine/types";
 
 // POST /api/delivery/scan
@@ -81,6 +82,22 @@ export async function POST(request: Request) {
     };
 
     const result = await db.runTransaction((tx) => applyScan(tx, db, scanArgs));
+
+    // Post-DELIVER commerce reconciliation (separate transaction, never the
+    // same cross-engine transaction). The DELIVER above is already durably
+    // committed (job.status="Delivered" + immutable event); this reflects it
+    // into the sellerOrder/order. It is idempotent, so if it fails here the
+    // job simply stays Delivered with commerceReconciledAt unset and the admin
+    // reconcile endpoint (or a later re-invocation) safely completes it — this
+    // is NOT best-effort-and-forget, the durable state guarantees retry.
+    if (result.action === "DELIVER" && result.jobStatus === "Delivered") {
+      try {
+        await db.runTransaction((tx) => reconcileDeliveredJob(tx, db, { jobId }));
+      } catch (reconcileError) {
+        console.error("post-DELIVER reconciliation deferred (retryable):", reconcileError);
+      }
+    }
+
     return Response.json({ success: true, ...result });
   } catch (error) {
     if (error instanceof ExecutionError) {

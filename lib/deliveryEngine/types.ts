@@ -300,6 +300,11 @@ export type DeliveryJob = {
   executionStartedAt?: unknown | null; // first pickup (custody acquired)
   deliveredAt?: unknown | null;
   failedAt?: unknown | null;
+  // 2B-5: set by the commerce-owned reconciliation (NOT by the Delivery Engine
+  // scan path) once a Delivered job has been reflected into its sellerOrder /
+  // order. Its presence is the idempotency/retry marker: unset on a Delivered
+  // job means reconciliation still owes a (safe, repeatable) retry.
+  commerceReconciledAt?: unknown | null;
   // Future-integration field: a customer OTP system will store the expected
   // delivery OTP here; verifyDeliveryOtp checks against it. Unset => delivery
   // cannot be confirmed (fails closed). NOT money.
