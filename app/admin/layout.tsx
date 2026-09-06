@@ -19,6 +19,7 @@ const navItems = [
   { href: "/admin/seller-inquiries", label: "Seller Inquiries", icon: "📨" },
   { href: "/admin/coupons", label: "Coupons", icon: "🎟" },
   { href: "/admin/delivery", label: "Delivery", icon: "🚚" },
+  { href: "/admin/delivery/control-tower", label: "Control Tower", icon: "🗼" },
   { href: "/admin/delivery-partners", label: "Delivery Partners", icon: "🛵" },
   { href: "/admin/notifications", label: "Notifications", icon: "🔔" },
   { href: "/admin/support", label: "Support", icon: "🎫" },
