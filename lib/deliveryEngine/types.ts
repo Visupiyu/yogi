@@ -123,11 +123,18 @@ export type DeliveryPersonInput = {
 // payment is never routed to a delivery company.
 // ===========================================================================
 
-// Full status set declared for forward-compat; 2B-1 only ever SETS "Created".
+// Full status set declared for forward-compat.
+//   2B-1/2B-2 SET only "Created". 2B-3 (provider assignment) additionally SETS
+//   "AssignedToYomico" (Admin assigned a YOMICO person), "OfferedToCompany"
+//   (Admin handed off; awaiting the company's own person), "AssignedToCompany"
+//   (the company assigned its own person) and "RejectedByCompany" (company
+//   declined a handoff). "InProgress" is reserved for the LATER physical
+//   execution phase and is NOT set by assignment — assignment is not custody.
 export type DeliveryJobStatus =
   | "Created"
   | "OfferedToCompany"
   | "AssignedToYomico"
+  | "AssignedToCompany"
   | "InProgress"
   | "Delivered"
   | "RejectedByCompany"
@@ -193,6 +200,17 @@ export type DeliveryJob = {
   drop: { customerName: string; phone: string; address: string; slot: string | null };
   parcel: { items: DeliveryParcelItem[] };
   attemptCount: number;
+  // 2B-3 assignment snapshot — denormalized so a reader (esp. YOMICO Admin
+  // viewing a COMPANY job) sees WHO currently holds the job without a second
+  // read. Written by the assignment helpers only; absent on a freshly created
+  // (unassigned) job. Cleared/overwritten on reassignment, handoff and reject.
+  // assignedPersonId mirrors the current leg's assignedPersonId.
+  assignedPersonId?: string | null;
+  assignedPersonName?: string | null;
+  assignedPersonPhone?: string | null;
+  assignedCompanyName?: string | null; // set on a COMPANY handoff/assignment
+  assignedAt?: unknown | null;
+  assignedBy?: string | null; // actor uid that performed the assignment
   createdAt?: unknown;
   updatedAt?: unknown;
   // NO cod/payment fields (payment sub-phase), NO agreedCost/wallet/earnings/
@@ -208,9 +226,13 @@ export type DeliveryLeg = {
   providerType: DeliveryProviderType | null; // null until assigned
   companyId: string | null;
   assignedPersonId: string | null;
-  status: DeliveryLegStatus; // "LegCreated" at creation
+  status: DeliveryLegStatus; // "LegCreated" at creation; "Assigned" once a person is set
   from: { stage: string };
   to: { stage: string };
+  // 2B-3 assignment snapshot on the leg (mirrors the job). Absent until assigned.
+  assignedPersonName?: string | null;
+  assignedAt?: unknown | null;
+  assignedBy?: string | null;
   handover: null; // populated in a later sub-phase
   proof: null; // populated in a later sub-phase
   exception: null; // populated in a later sub-phase
@@ -227,9 +249,15 @@ export type DeliveryEvent = {
   role: DeliveryEventRole;
   providerType: DeliveryProviderType | null;
   companyId: string | null;
-  action: string; // "JobCreated" in 2B-1
+  action: string; // "JobCreated" in 2B-1; assignment actions in 2B-3 (see below)
   fromStage: string | null;
   toStage: string;
+  // 2B-3 assignment audit: the status transition and the person involved.
+  // Assignment is NOT custody, so fromStage/toStage stay the current physical
+  // stage (unchanged); the status change is recorded here instead.
+  fromStatus?: string | null;
+  toStatus?: string | null;
+  personId?: string | null;
   at?: unknown;
   geo?: { lat: number; lng: number } | null;
   notes?: string | null;
