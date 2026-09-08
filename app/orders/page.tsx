@@ -547,7 +547,7 @@ export default function OrdersPage() {
 
   )}
 
-  {order.courierName && (
+  {(order.courierPartner || order.courierName) && (
 
     <p className="mb-2">
 
@@ -557,7 +557,7 @@ export default function OrdersPage() {
 
       <span className="font-semibold">
 
-        {order.courierName}
+        {order.courierPartner || order.courierName}
 
       </span>
 
