@@ -79,6 +79,21 @@ service firebase.storage {
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
+    // Delivery-partner freelancer KYC — Aadhaar card + bank cancelled cheque.
+    // Same locked model as vendor-kyc above: owner + admin read only, never
+    // public. The applicant (uid in the path) may upload/replace/remove ONLY
+    // their own documents; another applicant can neither read, write nor delete
+    // them. Admin (the reviewer) can read to verify. Bounded to 10MB and to
+    // image/PDF via the shared isKycDocument() gate (content type is
+    // client-declared, so this bounds abuse rather than proving format).
+    match /delivery-kyc/{uid}/{fileName} {
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
+      allow create, update: if isSignedIn() && request.auth.uid == uid
+        && request.resource.size < 10 * 1024 * 1024
+        && isKycDocument();
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
     // ---------------------------------------------------------------
     // Legacy flat paths — FROZEN (read-only)
     // ---------------------------------------------------------------

@@ -79,6 +79,8 @@ export default function Footer() {
             <li><Link href="/vendor-register" className="hover:text-green-600 transition">Become a Seller</Link></li>
             <li><Link href="/vendor-login" className="hover:text-green-600 transition">Seller Login</Link></li>
             <li><Link href="/seller-agreement" className="hover:text-green-600 transition">Seller Agreement</Link></li>
+            <li><Link href="/delivery-register" className="hover:text-green-600 transition">Become a Delivery Partner</Link></li>
+            <li><Link href="/delivery-company-register" className="hover:text-green-600 transition">Partner as a Delivery Company</Link></li>
           </ul>
         </div>
 

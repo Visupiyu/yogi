@@ -1445,6 +1445,117 @@ service cloud.firestore {
       allow write: if false; // server-only (company-scoped API writes)
     }
 
+    // ---------------------------------------------------------
+    // deliveryApplications — Phase 1 freelancer (YOMICO) registration.
+    //
+    // The applicant self-creates their own Firebase Auth account, uploads KYC
+    // to delivery-kyc/{uid}/... and submits ONE application. Approval is a
+    // SEPARATE admin action that provisions the deliveryPersons record via the
+    // server API — it is NOT this collection. The document id IS the applicant
+    // uid, which makes "one application per applicant" structural: a second
+    // create collides, and the applicant-update branch below forbids flipping
+    // their own review state. Holds document PATHS only — never public URLs,
+    // never an Aadhaar number, never a password/token.
+    // ---------------------------------------------------------
+    function isValidFreelancerApplication() {
+      let d = request.resource.data;
+      return d.uid == request.auth.uid
+        && d.status == 'Pending'
+        // Document references are Storage OBJECT PATHS, not URLs.
+        && d.aadhaarDocPath is string && d.aadhaarDocPath.size() > 0 && d.aadhaarDocPath.size() <= 500
+        && d.chequeDocPath is string && d.chequeDocPath.size() > 0 && d.chequeDocPath.size() <= 500
+        // Review fields are admin-only; an applicant can never forge them.
+        && !('reviewedBy' in d)
+        && !('reviewedAt' in d)
+        && !('rejectionReason' in d);
+    }
+
+    match /deliveryApplications/{appId} {
+      // Applicant reads only their own; admin reads all.
+      allow read: if isAdmin() || isOwnerUid(resource.data.uid);
+
+      // One application per applicant: the doc id must equal the caller's uid.
+      allow create: if isSignedIn()
+        && appId == request.auth.uid
+        && isValidFreelancerApplication();
+
+      // Admin may set review fields. The applicant may only edit their own
+      // application while it is Pending and may NOT change uid, status, the
+      // document paths, the review fields, or createdAt — so they cannot
+      // approve themselves, tamper with submitted documents, or rewrite history.
+      allow update: if isAdmin()
+        || (
+          isOwnerUid(resource.data.uid)
+          && resource.data.status == 'Pending'
+          && unchanged('uid')
+          && unchanged('status')
+          && unchanged('aadhaarDocPath')
+          && unchanged('chequeDocPath')
+          && unchanged('reviewedBy')
+          && unchanged('reviewedAt')
+          && unchanged('rejectionReason')
+          && unchanged('createdAt')
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // deliveryCompanyApplications — Phase 2 delivery-company registration.
+    //
+    // The authorised person self-creates ONE Firebase Auth account, uploads the
+    // bank proof (cancelled cheque) to delivery-kyc/{uid}/... and submits ONE
+    // application. Approval is a SEPARATE admin server action that creates the
+    // operational deliveryCompanies record (status Active) and ties ownerUid to
+    // this applicant uid via the existing owner-provisioning guardrails — it is
+    // NOT this collection. Doc id IS the applicant uid, so one application per
+    // applicant is structural. Holds the document PATH only — never a public
+    // URL, never a password/token. Bank/GST/address details live here for
+    // review only and are never copied into deliveryCompanies.
+    // ---------------------------------------------------------
+    function isValidCompanyApplication() {
+      let d = request.resource.data;
+      return d.uid == request.auth.uid
+        && d.status == 'Pending'
+        // Bank-proof reference is a Storage OBJECT PATH, not a URL.
+        && d.chequeDocPath is string && d.chequeDocPath.size() > 0 && d.chequeDocPath.size() <= 500
+        // Review / provisioning fields are admin-only; never forgeable by a client.
+        && !('reviewedBy' in d)
+        && !('reviewedAt' in d)
+        && !('rejectionReason' in d)
+        && !('createdCompanyId' in d);
+    }
+
+    match /deliveryCompanyApplications/{appId} {
+      // Applicant reads only their own; admin reads all.
+      allow read: if isAdmin() || isOwnerUid(resource.data.uid);
+
+      // One application per applicant: the doc id must equal the caller's uid.
+      allow create: if isSignedIn()
+        && appId == request.auth.uid
+        && isValidCompanyApplication();
+
+      // Admin may set review/provisioning fields. The applicant may only edit
+      // their own application while Pending and may NOT change uid, status, the
+      // document path, the review fields, the created-company link, or createdAt
+      // — so they cannot approve themselves, swap the bank proof, or rewrite
+      // history.
+      allow update: if isAdmin()
+        || (
+          isOwnerUid(resource.data.uid)
+          && resource.data.status == 'Pending'
+          && unchanged('uid')
+          && unchanged('status')
+          && unchanged('chequeDocPath')
+          && unchanged('reviewedBy')
+          && unchanged('reviewedAt')
+          && unchanged('createdCompanyId')
+          && unchanged('createdAt')
+        );
+
+      allow delete: if isAdmin();
+    }
+
     match /deliveryJobs/{jobId} {
       // Later phase; fully server-mediated so no order PII is exposed through a
       // client-readable job document.
