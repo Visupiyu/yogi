@@ -26,6 +26,7 @@ import {
   statusTone,
   type ItemRequestType,
 } from "@/lib/itemRequests";
+import DeliveryOtpNotice from "@/components/DeliveryOtpNotice";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -381,6 +382,10 @@ export default function OrderDetailsPage() {
             </div>
           </div>
         </div>
+
+        {/* Delivery OTP notice — visible only while a shipment is out for
+            delivery. Shows a "code sent" message + Resend; never the code. */}
+        <DeliveryOtpNotice orderId={orderId} />
 
         {/* CANCEL — same Pending-only condition the orders list uses, so a
             customer can cancel from the page they opened to look at the order

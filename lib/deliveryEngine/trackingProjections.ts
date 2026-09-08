@@ -25,6 +25,11 @@ export type CustomerShipment = {
   exceptionMessage: string | null;
   delivered: boolean;
   deliveredAt: string | null;
+  // Customer-safe flag (NOT the OTP): true while the parcel is out for delivery,
+  // so the owner UI can show "your delivery code was sent" + a Resend action.
+  // Carries no secret — the code itself only ever reaches the customer via the
+  // email / in-app notification channels.
+  outForDelivery: boolean;
 };
 
 function toIso(value: unknown): string | null {
@@ -145,6 +150,7 @@ export function buildCustomerShipment(job: DeliveryJob): CustomerShipment {
     exceptionMessage: exceptionMessage(job),
     delivered: job.status === "Delivered",
     deliveredAt: job.status === "Delivered" ? toIso(job.deliveredAt) : null,
+    outForDelivery: job.currentStage === "OutForDelivery",
   };
 }
 

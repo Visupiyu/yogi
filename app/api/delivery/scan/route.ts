@@ -5,6 +5,7 @@ import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
 import { parseQrPayload } from "@/lib/deliveryEngine/qr";
 import { applyScan, ExecutionError, type ScanArgs } from "@/lib/deliveryEngine/execution";
 import { reconcileDeliveredJob } from "@/lib/deliveryEngine/reconcile";
+import { ensureDeliveryOtp, deliverOtpToCustomer } from "@/lib/deliveryEngine/otpService";
 import type { ExecutionAction } from "@/lib/deliveryEngine/types";
 
 // POST /api/delivery/scan
@@ -82,6 +83,36 @@ export async function POST(request: Request) {
     };
 
     const result = await db.runTransaction((tx) => applyScan(tx, db, scanArgs));
+
+    // DELIVER with a bad/missing/expired/locked customer OTP: the shipment was
+    // NOT delivered (still OutForDelivery). Return a GENERIC 403 that reveals
+    // nothing about which case occurred and never echoes the OTP.
+    if (result.otpFailed) {
+      return Response.json({ error: "Customer OTP verification failed." }, { status: 403 });
+    }
+
+    // Post-OUT_FOR_DELIVERY: issue the customer delivery OTP (separate
+    // transaction; stores the HASH only) then notify the order owner AFTER the
+    // commit (never inside a transaction). Idempotent — a re-entry with an
+    // active OTP is a no-op. The plaintext never enters this route's response.
+    if (result.action === "OUT_FOR_DELIVERY" && result.applied) {
+      try {
+        const issue = await db.runTransaction((tx) => ensureDeliveryOtp(tx, db, { jobId }));
+        if (issue.issued) {
+          // Best-effort notification: a failure leaves the durable OTP intact
+          // (the customer can Resend); it must not fail the scan.
+          await deliverOtpToCustomer(db, {
+            userId: issue.userId,
+            userEmail: issue.userEmail,
+            customerName: issue.customerName,
+            shipmentNumber: issue.shipmentNumber,
+            code: issue.code,
+          });
+        }
+      } catch (otpError) {
+        console.error("delivery OTP issue/notify deferred (retryable via resend):", otpError);
+      }
+    }
 
     // Post-DELIVER commerce reconciliation (separate transaction, never the
     // same cross-engine transaction). The DELIVER above is already durably

@@ -20,7 +20,7 @@ import type {
   Firestore,
   DocumentReference,
 } from "firebase-admin/firestore";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, FieldValue } from "firebase-admin/firestore";
 import type {
   DeliveryJob,
   DeliveryLeg,
@@ -33,7 +33,7 @@ import type {
   CustodyState,
   CustodyHolderKind,
 } from "@/lib/deliveryEngine/types";
-import { verifyDeliveryOtp } from "@/lib/deliveryEngine/deliveryOtp";
+import { classifyDeliveryOtp } from "@/lib/deliveryEngine/deliveryOtp";
 
 export class ExecutionError extends Error {
   status: number;
@@ -74,6 +74,10 @@ export type ScanArgs = {
 export type ScanResult = {
   applied: boolean;
   idempotent?: boolean;
+  // DELIVER only: true when customer-OTP verification failed. The shipment is
+  // NOT delivered (stays OutForDelivery); only the attempt counter may have
+  // been incremented. The route translates this to a generic 403.
+  otpFailed?: boolean;
   action: ExecutionAction;
   jobId: string;
   legId: string;
@@ -114,6 +118,31 @@ const TRANSITIONS: Record<
 };
 
 const TERMINAL_LEG: ReadonlySet<string> = new Set(["Delivered"]);
+
+// Physical delivery model. DERIVED, not a new persisted field: YOMICO's own
+// workforce delivers direct (SELLER -> person -> CUSTOMER, no hub/transit),
+// while an external COMPANY runs the hub/transit model. An explicit
+// job.deliveryModel is honored if a future writer ever sets it; otherwise it is
+// derived from providerType (null only before assignment, before any
+// transit/handover action is reachable).
+type PhysicalDeliveryModel = "YOMICO_DIRECT" | "COMPANY_HUB";
+function deliveryModelOf(job: DeliveryJob): PhysicalDeliveryModel {
+  const explicit = (job as { deliveryModel?: unknown }).deliveryModel;
+  if (explicit === "YOMICO_DIRECT" || explicit === "COMPANY_HUB") return explicit;
+  return job.providerType === "COMPANY" ? "COMPANY_HUB" : "YOMICO_DIRECT";
+}
+
+// YOMICO Direct is a two-hop journey with ONE person holding custody from pickup
+// to the customer: no hub, no line-haul transit, and no handoff to a second
+// person. These actions are therefore never valid for it and are rejected
+// server-side (not merely hidden in the app). The COMPANY hub model is left
+// unrestricted for its future multi-leg journey.
+const YOMICO_DIRECT_FORBIDDEN: ReadonlySet<ExecutionAction> = new Set([
+  "DEPART",
+  "ARRIVE",
+  "HANDOVER_INITIATE",
+  "HANDOVER_CONFIRM",
+]);
 
 function sanitizeId(v: unknown): string {
   return typeof v === "string" ? v.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64) : "";
@@ -257,6 +286,14 @@ export async function applyScan(
     }
   }
 
+  // Physical-model restriction (enforced server-side, not just in the app): a
+  // YOMICO Direct job has no transit/hub/handover stages, so DEPART, ARRIVE and
+  // HANDOVER are never valid for it — a client cannot drive them regardless of
+  // its UI. The COMPANY hub model keeps the full action set.
+  if (deliveryModelOf(job) === "YOMICO_DIRECT" && YOMICO_DIRECT_FORBIDDEN.has(action)) {
+    throw new ExecutionError(`${action} is not valid for a YOMICO Direct delivery.`, 409);
+  }
+
   // State-transition legality.
   const now = Timestamp.now();
   let newLegStatus: DeliveryLegStatus = leg.status;
@@ -268,10 +305,30 @@ export async function applyScan(
     newLegStatus = t.to;
   }
 
-  // DELIVER requires customer OTP verification (fail-closed boundary).
+  // DELIVER requires customer OTP verification (fail-closed boundary). A genuine
+  // wrong guess against an active, unlocked OTP is counted DURABLY and the
+  // shipment stays OutForDelivery — we return a COMMITTED failure (not a throw)
+  // so ONLY the attempt counter persists and no DELIVER state is written (no
+  // event, no custody change, no status change, no reconciliation). Missing /
+  // expired / locked also fail but are not counted. The caller is never told
+  // which case occurred.
   if (action === "DELIVER") {
-    if (!verifyDeliveryOtp(job, args.otp)) {
-      throw new ExecutionError("Customer OTP verification failed.", 403);
+    const verdict = classifyDeliveryOtp(job, args.otp);
+    if (verdict !== "ok") {
+      if (verdict === "mismatch") {
+        tx.set(jobRef, { deliveryOtpAttempts: FieldValue.increment(1), updatedAt: now }, { merge: true });
+      }
+      return {
+        applied: false,
+        idempotent: false,
+        otpFailed: true,
+        action,
+        jobId: args.jobId,
+        legId,
+        legStatus: leg.status,
+        jobStatus: job.status,
+        custody: leg.custody ?? null,
+      };
     }
   }
 

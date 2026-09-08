@@ -305,10 +305,14 @@ export type DeliveryJob = {
   // order. Its presence is the idempotency/retry marker: unset on a Delivered
   // job means reconciliation still owes a (safe, repeatable) retry.
   commerceReconciledAt?: unknown | null;
-  // Future-integration field: a customer OTP system will store the expected
-  // delivery OTP here; verifyDeliveryOtp checks against it. Unset => delivery
-  // cannot be confirmed (fails closed). NOT money.
-  deliveryOtp?: string | null;
+  // Customer delivery-OTP (2B-5D). Stored HASHED ONLY (HMAC-SHA256 under a
+  // server-only secret) — the plaintext is never persisted. Issued when the
+  // parcel enters OutForDelivery, verified at DELIVER; unset => delivery cannot
+  // be confirmed (fails closed). These are NEVER returned by any API/projection
+  // (job/admin/seller/customer), never in the QR, and never reach Expo. NOT money.
+  deliveryOtpHash?: string | null;
+  deliveryOtpIssuedAt?: unknown | null;
+  deliveryOtpAttempts?: number | null;
   createdAt?: unknown;
   updatedAt?: unknown;
   // NO cod/payment fields (payment sub-phase), NO agreedCost/wallet/earnings/
