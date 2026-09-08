@@ -140,7 +140,7 @@ export async function POST(request: Request) {
       deliveryDate: asIsoString(order.deliveryDate),
       expectedDelivery: asIsoString(order.expectedDelivery),
       deliveredAt: asIsoString(order.deliveredAt),
-      courierName: asString(order.courierName),
+      courierName: asString(order.courierPartner) || asString(order.courierName),
       trackingNumber: asString(order.trackingNumber),
       refundStatus: asString(order.refundStatus),
     };

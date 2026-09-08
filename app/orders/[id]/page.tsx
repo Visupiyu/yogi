@@ -489,6 +489,7 @@ export default function OrderDetailsPage() {
         <div className="mt-8 bg-white rounded-3xl shadow border p-8">
           <h2 className="text-2xl font-bold mb-6">📦 Delivery Details</h2>
           {order.expectedDelivery ||
+          order.courierPartner ||
           order.courierName ||
           order.trackingNumber ? (
             <div className="space-y-4">
@@ -500,10 +501,10 @@ export default function OrderDetailsPage() {
                   </span>
                 </div>
               )}
-              {order.courierName && (
+              {(order.courierPartner || order.courierName) && (
                 <div className="flex justify-between">
                   <span>Courier Partner</span>
-                  <span className="font-semibold">{order.courierName}</span>
+                  <span className="font-semibold">{order.courierPartner || order.courierName}</span>
                 </div>
               )}
               {order.trackingNumber && (
