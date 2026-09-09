@@ -310,6 +310,14 @@ export type DeliveryJob = {
   // for the "at origin hub" milestone. Absent for YOMICO DIRECT jobs.
   currentHubId?: string | null;
   originHubIntakeAt?: unknown | null;
+  // COMPANY_HUB journey — transit / line-haul. Set by the transit-departure
+  // transition when the parcel leaves the origin hub into line-haul. originHubId
+  // preserves the origin hub after the parcel has left it (currentHubId becomes
+  // null while in transit — it is not AT any hub). transitStartedAt is the
+  // denormalised timestamp the customer tracking uses for the "in transit"
+  // milestone. Destination hub is intentionally NOT represented yet.
+  originHubId?: string | null;
+  transitStartedAt?: unknown | null;
   deliveredAt?: unknown | null;
   failedAt?: unknown | null;
   // 2B-5: set by the commerce-owned reconciliation (NOT by the Delivery Engine

@@ -115,6 +115,10 @@ function buildMilestones(job: DeliveryJob): { key: string; label: string; at: st
   // happened (persisted timestamp) — no transit/destination/final-mile invented.
   const atOriginHub = toIso(job.originHubIntakeAt);
   if (atOriginHub) out.push({ key: "at_origin_hub", label: "At origin hub", at: atOriginHub });
+  // COMPANY_HUB journey: departed the origin hub into transit. Present only when
+  // it actually happened (persisted timestamp). No destination/arrival invented.
+  const inTransit = toIso(job.transitStartedAt);
+  if (inTransit) out.push({ key: "in_transit", label: "In transit", at: inTransit });
   const delivered = toIso(job.deliveredAt);
   if (delivered) out.push({ key: "delivered", label: "Delivered", at: delivered });
   return out;
