@@ -27,6 +27,10 @@ const HIDE_CHROME_PREFIXES = [
   // covers /delivery-company and /delivery-company/* but NOT
   // /delivery-company-register (already listed above).
   "/delivery-company",
+  // The Delivery Person web app (login + person console) has its OWN shell;
+  // the customer chrome/verification banner must not appear inside it. Note
+  // "/delivery" above does NOT cover "/delivery-app" (whole-segment match).
+  "/delivery-app",
 ];
 
 // Vendor/delivery-partner auth pages hide the customer navbar (its Login

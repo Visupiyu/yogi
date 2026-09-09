@@ -14,6 +14,9 @@
 // Sensitive documents are stored as Storage OBJECT PATHS (via deliveryKycPath),
 // never as permanent getDownloadURL tokens. The password is used only to create
 // the account and is never stored, logged, or sent to any API.
+//
+// This revision is PRESENTATION ONLY (light-blue/white visual system) — the
+// application/KYC/submit logic and data requirements are unchanged.
 import Link from "next/link";
 import { useMemo, useState, type ChangeEvent } from "react";
 import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
@@ -200,15 +203,15 @@ export default function DeliveryRegisterPage() {
 
   if (submitted) {
     return (
-      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="max-w-md w-full rounded-3xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-2xl">✓</div>
-          <h1 className="text-xl font-black text-slate-900">Application submitted</h1>
+      <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-sky-50 to-blue-50 p-6">
+        <div className="w-full max-w-md rounded-2xl border border-blue-100 bg-white p-8 text-center shadow-xl shadow-blue-200/40">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl text-green-700">✓</div>
+          <h1 className="text-xl font-bold text-slate-900">Application submitted</h1>
           <p className="mt-2 text-sm text-slate-600">
             Your application has been submitted and is awaiting YOMICO Admin approval.
             You&apos;ll be able to sign in to the YOMICO Delivery Person app once it is approved.
           </p>
-          <Link href="/" className="mt-6 inline-block rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white">
+          <Link href="/" className="mt-6 inline-block rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">
             Back to YOMICO
           </Link>
         </div>
@@ -217,36 +220,38 @@ export default function DeliveryRegisterPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="bg-gradient-to-r from-teal-600 via-teal-600 to-emerald-600 text-white">
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="font-extrabold tracking-wide text-lg">YOMICO</Link>
-          <Link href="/delivery-app/login" className="text-sm font-semibold hover:underline">Already approved? Sign in →</Link>
+    <main className="min-h-screen bg-gradient-to-b from-sky-50 to-blue-50 text-slate-900">
+      {/* Slim professional top bar — no large marketing / dark hero section. */}
+      <header className="sticky top-0 z-10 border-b border-blue-100 bg-white/85 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
+          <Link href="/" className="text-lg font-extrabold tracking-wide text-slate-900">YOMICO</Link>
+          <Link href="/delivery-app/login" className="text-sm font-semibold text-blue-600 hover:underline">
+            Already registered? Sign in →
+          </Link>
         </div>
       </header>
 
-      <section className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white">
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 pb-10 pt-4">
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/15 border border-white/20 px-3 py-1 text-xs font-semibold">
-            YOMICO DELIVERY PARTNER
+      <section className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
+        {/* Compact intro (light, not a large coloured block) */}
+        <div className="text-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-700">
+            YOMICO Delivery Partner
           </span>
-          <h1 className="mt-4 text-3xl md:text-5xl font-black tracking-tight">Become a YOMICO delivery partner</h1>
-          <p className="mt-3 text-white/85 max-w-2xl">
+          <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Become a YOMICO delivery partner</h1>
+          <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-500">
             Apply as an independent delivery freelancer. Submit your details and documents — YOMICO reviews every
             application before approval.
           </p>
         </div>
-      </section>
 
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* Progress */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-bold text-slate-800">Application progress</span>
-            <span className="text-sm font-black text-teal-600">{progress}%</span>
+        <div className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-sm font-semibold text-slate-800">Application progress</span>
+            <span className="text-sm font-bold text-blue-600">{progress}%</span>
           </div>
-          <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-500" style={{ width: `${progress}%` }} />
+          <div className="h-2.5 overflow-hidden rounded-full bg-blue-50">
+            <div className="h-full rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
         </div>
 
@@ -257,7 +262,7 @@ export default function DeliveryRegisterPage() {
             <InputField label="Mobile number" required name="phone" type="tel" inputMode="numeric" maxLength={10} value={formData.phone} onChange={handleChange} placeholder="10 digit mobile" />
             <InputField label="Email" required type="email" name="email" autoComplete="email" value={formData.email} onChange={handleChange} placeholder="you@example.com" />
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">Password <span className="text-red-500">*</span></label>
+              <label className="mb-2 block text-sm font-medium text-slate-700">Password <span className="text-red-500">*</span></label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -266,13 +271,13 @@ export default function DeliveryRegisterPage() {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Create a password"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 pr-20 outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 pr-16 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
-                <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-teal-600">
+                <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-blue-600 hover:text-blue-800">
                   {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
-              <p className="text-xs text-slate-400 mt-2">Minimum 6 characters. You&apos;ll use this to sign in once approved.</p>
+              <p className="mt-2 text-xs text-slate-400">Minimum 6 characters. You&apos;ll use this to sign in once approved.</p>
             </div>
           </div>
         </Section>
@@ -321,22 +326,22 @@ export default function DeliveryRegisterPage() {
 
         {/* 6. Declaration */}
         <Section number="06" title="Declaration & Submit" description="Confirm and submit your application for review.">
-          <label className="flex items-start gap-3 rounded-2xl bg-slate-50 border border-slate-200 p-4 cursor-pointer">
-            <input type="checkbox" name="agreed" checked={formData.agreed} onChange={handleChange} className="mt-1 h-5 w-5 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
-            <span className="text-sm text-slate-700 leading-6">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+            <input type="checkbox" name="agreed" checked={formData.agreed} onChange={handleChange} className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+            <span className="text-sm leading-6 text-slate-700">
               I confirm the information and documents provided are accurate and mine, and I agree to YOMICO&apos;s
               delivery-partner terms. I understand my application will be reviewed before approval.
             </span>
           </label>
 
-          {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+          {error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
           <button
             type="button"
             onClick={submit}
             disabled={loading}
-            className={`mt-5 w-full rounded-2xl py-4 text-lg font-black text-white shadow-lg transition ${
-              loading ? "bg-slate-400 cursor-not-allowed" : "bg-gradient-to-r from-teal-600 to-emerald-600 hover:-translate-y-0.5"
+            className={`mt-5 w-full rounded-xl py-4 text-lg font-semibold text-white shadow-sm transition ${
+              loading ? "cursor-not-allowed bg-slate-400" : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
             {loading ? "Submitting application…" : "Submit application →"}
@@ -355,12 +360,12 @@ export default function DeliveryRegisterPage() {
 
 function Section({ number, title, description, children }: { number: string; title: string; description: string; children: React.ReactNode }) {
   return (
-    <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 md:p-8">
+    <section className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm md:p-8">
       <div className="mb-6 flex items-start gap-4">
-        <div className="w-10 h-10 shrink-0 rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-500 text-white flex items-center justify-center font-black shadow-md">{number}</div>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600 font-bold text-white shadow-sm">{number}</div>
         <div>
-          <h2 className="text-xl md:text-2xl font-black text-slate-900">{title}</h2>
-          <p className="text-sm text-slate-500 mt-1">{description}</p>
+          <h2 className="text-lg font-bold text-slate-900 md:text-xl">{title}</h2>
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
       </div>
       {children}
@@ -378,11 +383,11 @@ function InputField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-bold text-slate-700 mb-2">{label} {required && <span className="text-red-500">*</span>}</label>
+      <label className="mb-2 block text-sm font-medium text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>
       <input
         type={type} name={name} value={value} onChange={onChange} placeholder={placeholder}
         inputMode={inputMode} maxLength={maxLength} autoComplete={autoComplete}
-        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       />
     </div>
   );
@@ -396,10 +401,10 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="block text-sm font-bold text-slate-700 mb-2">{label} {required && <span className="text-red-500">*</span>}</label>
+      <label className="mb-2 block text-sm font-medium text-slate-700">{label} {required && <span className="text-red-500">*</span>}</label>
       <select
         name={name} value={value} onChange={onChange}
-        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100"
+        className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       >
         {placeholder && <option value="">{placeholder}</option>}
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -423,26 +428,26 @@ function FileUploadCard({
   const tooBig = file ? file.size >= MAX_DOC_BYTES : false;
   const badType = file ? !isAllowedDoc(file) : false;
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-      <div className="flex items-start justify-between gap-3 mb-3">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-bold text-slate-800">{title}</h3>
-          <p className={`text-xs mt-1 ${required ? "text-red-500" : "text-slate-400"}`}>{required ? "Required" : "Optional"}</p>
+          <h3 className="font-semibold text-slate-800">{title}</h3>
+          <p className={`mt-1 text-xs ${required ? "text-red-500" : "text-slate-400"}`}>{required ? "Required" : "Optional"}</p>
         </div>
-        <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center">📄</div>
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white">📄</div>
       </div>
 
       {!file ? (
-        <label className={`flex items-center justify-center w-full min-h-28 rounded-xl border-2 border-dashed border-slate-300 bg-white ${disabled ? "opacity-50" : "cursor-pointer hover:border-teal-400 hover:bg-teal-50"} transition`}>
-          <div className="text-center px-4">
+        <label className={`flex min-h-28 w-full items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white ${disabled ? "opacity-50" : "cursor-pointer hover:border-blue-400 hover:bg-blue-50"} transition`}>
+          <div className="px-4 text-center">
             <div className="text-2xl">⬆</div>
-            <p className="text-sm font-bold text-slate-700 mt-1">Choose document</p>
-            <p className="text-xs text-slate-400 mt-1">JPG, PNG or PDF · max 10 MB</p>
+            <p className="mt-1 text-sm font-semibold text-slate-700">Choose document</p>
+            <p className="mt-1 text-xs text-slate-400">JPG, PNG or PDF · max 10 MB</p>
           </div>
           <input type="file" accept="image/*,application/pdf" className="hidden" disabled={disabled} onChange={(e) => onChange(e.target.files?.[0] || null)} />
         </label>
       ) : (
-        <div className="rounded-xl bg-white border border-slate-200 p-3">
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-800">{file.name}</p>
@@ -458,11 +463,11 @@ function FileUploadCard({
             <p className="mt-2 text-xs text-red-600">{tooBig ? "File must be under 10 MB." : "Must be an image or PDF."}</p>
           )}
           {progress > 0 && progress < 100 && (
-            <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-              <div className="h-full rounded-full bg-teal-500 transition-all" style={{ width: `${progress}%` }} />
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-50">
+              <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
             </div>
           )}
-          {progress === 100 && <p className="mt-2 text-xs text-emerald-600">Uploaded ✓</p>}
+          {progress === 100 && <p className="mt-2 text-xs text-green-600">Uploaded ✓</p>}
         </div>
       )}
     </div>
@@ -471,10 +476,10 @@ function FileUploadCard({
 
 function InfoBox({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mt-5 rounded-2xl border border-teal-100 bg-teal-50 px-5 py-4">
+    <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 px-5 py-4">
       <div className="flex gap-3">
-        <span className="text-teal-600">ℹ</span>
-        <p className="text-sm text-teal-800 leading-6">{children}</p>
+        <span className="text-blue-600">ℹ</span>
+        <p className="text-sm leading-6 text-blue-800">{children}</p>
       </div>
     </div>
   );
