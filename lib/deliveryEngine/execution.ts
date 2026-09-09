@@ -108,7 +108,15 @@ const TRANSITIONS: Record<
   DEPART: { from: ["PickedUp", "HandoverConfirmed"], to: "InTransit" },
   ARRIVE: { from: ["InTransit"], to: "ArrivedAtStage" },
   OUT_FOR_DELIVERY: {
-    from: ["PickedUp", "InTransit", "ArrivedAtStage", "HandoverConfirmed", "Failed"],
+    // "Assigned" supports the COMPANY_HUB final-mile leg, which is created by the
+    // dispatcher's final-mile assignment with status "Assigned" AND custody
+    // already on the rider (a hybrid state no scan produces). It is DIRECT-safe:
+    // OUT_FOR_DELIVERY changes no custody and is gated below by
+    // `leg.custody?.personId === actor.personId`, so any ordinary "Assigned" leg
+    // (custody.personId === null until a PICKUP/HANDOVER_CONFIRM scan, which both
+    // leave "Assigned") is still rejected — only the final-mile leg, which holds
+    // rider custody at "Assigned", can use this source.
+    from: ["Assigned", "PickedUp", "InTransit", "ArrivedAtStage", "HandoverConfirmed", "Failed"],
     to: "OutForDelivery",
   },
   HANDOVER_INITIATE: { from: ["PickedUp", "InTransit", "ArrivedAtStage"], to: "HandoverInitiated" },
