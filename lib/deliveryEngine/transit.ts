@@ -1,28 +1,31 @@
-// SERVER-ONLY. COMPANY_HUB journey — origin hub → transit / line-haul.
+// SERVER-ONLY. COMPANY_HUB journey — origin hub → COMPANY-MANAGED transit.
 //
-//   … → ORIGIN HUB → [TRANSIT / LINE-HAUL]   ← this transition
+//   … → ORIGIN HUB → [COMPANY TRANSIT / LINE-HAUL]   ← this transition
 //
-// A company line-haul delivery person departs the origin hub carrying the parcel
-// into transit. This is a PHYSICAL custody transition: custody moves from the
-// origin hub (company, no person) to the acting company PERSON who now carries
-// it. It is NOT part of applyScan (keeps the person-scan FSM, and therefore the
-// YOMICO DIRECT path, byte-for-byte unchanged) and is atomic: completing the
-// hub-intake leg, creating the LineHaul leg, advancing currentLegId, moving
-// custody, and appending the event all happen in the caller's single transaction.
+// The company dispatches the shipment from its origin hub into its OWN internal
+// bulk / inter-city transport. This is COMPANY-MANAGED movement, NOT a YOMICO
+// rider delivery task: custody stays at the COMPANY level (holderKind COMPANY,
+// personId null) — it is never assigned to an individual delivery person, and no
+// rider is made "Busy" or responsible for line-haul. It simply leaves the origin
+// hub (hubId null = in company transport, not parked at a hub).
 //
-// The destination hub is NOT known or fabricated here — this represents "in
-// transit from the origin hub". Destination-hub receipt / final-mile are later
-// slices. Authorization is checked BEFORE any idempotent success (mirrors the
-// origin-hub-intake slice): an unauthorized or non-original actor never gets a
-// successful no-op merely because the event exists.
-import type { Transaction, Firestore, DocumentReference } from "firebase-admin/firestore";
+// It is a company DISPATCHER action (role "company"), not a rider scan, so it is
+// deliberately NOT part of applyScan — the person-scan FSM and the YOMICO DIRECT
+// path stay byte-for-byte unchanged. It is atomic: stamping the hub-intake leg,
+// creating the company-transit leg, advancing currentLegId, moving custody to the
+// in-transit company state, and appending the event all happen in the caller's
+// single transaction. The destination hub is not known/fabricated here.
+//
+// Authorization is company ownership, checked BEFORE any idempotent success: only
+// the owning company may dispatch its own shipment, and another company never
+// gets a successful no-op merely because the event exists.
+import type { Transaction, Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import { ExecutionError } from "@/lib/deliveryEngine/execution";
 import { deliveryLegId } from "@/lib/deliveryEngine/jobIds";
 import type {
   DeliveryJob,
   DeliveryLeg,
-  DeliveryPerson,
   DeliveryEvent,
   CustodyState,
 } from "@/lib/deliveryEngine/types";
@@ -42,7 +45,9 @@ function isCompanyHub(job: DeliveryJob): boolean {
   return job.providerType === "COMPANY";
 }
 
-export type TransitDepartureActor = { uid: string; companyId: string; personId: string };
+// The actor is the company DISPATCHER (role "company"): uid + the company it owns.
+// It has NO personId — company transit is not a person's custody.
+export type TransitDepartureActor = { uid: string; companyId: string };
 
 export type TransitDepartureResult = {
   ok: true;
@@ -66,25 +71,14 @@ export async function applyTransitDeparture(
   const job = jobSnap.data() as DeliveryJob;
 
   // Ownership (provider/company) — never from the client body. Rejects another
-  // company's job BEFORE any idempotent success.
+  // company's job BEFORE any idempotent success. This is the authorization for a
+  // COMPANY-MANAGED movement: the owning company dispatches its own shipment.
   if (job.providerType !== "COMPANY" || job.companyId !== actor.companyId) {
     throw new ExecutionError("This shipment belongs to another company.", 403);
   }
-  // Physical model: DIRECT can never enter transit.
+  // Physical model: DIRECT can never enter company transit.
   if (!isCompanyHub(job)) {
     throw new ExecutionError("Transit is not valid for this delivery model.", 409);
-  }
-
-  // PHYSICAL-CUSTODY AUTHORIZATION (before idempotency): the acting person must
-  // be the job's SERVER-ASSIGNED company delivery person — persisted evidence
-  // written only by the sanctioned company assignment flow (assignCompanyPerson,
-  // which also survives pickup/intake unchanged). Being the same company + Active
-  // + providerType COMPANY is NOT sufficient: an arbitrary company person can
-  // never acquire transit custody without this assignment. (A future slice may
-  // add per-leg line-haul (re)assignment; until then the assigned person carries
-  // the shipment through pickup → origin hub → transit.)
-  if (!job.assignedPersonId || job.assignedPersonId !== actor.personId) {
-    throw new ExecutionError("You are not the assigned delivery person for this shipment.", 403);
   }
 
   const currentLegId = job.currentLegId;
@@ -94,17 +88,12 @@ export async function applyTransitDeparture(
   if (!legSnap.exists) throw new ExecutionError("Current leg not found.", 409);
   const leg = legSnap.data() as DeliveryLeg;
 
-  // Idempotency — authorized, never unconditional. Only the ORIGINAL line-haul
-  // person who departed (recorded as event.personId) may receive the no-op
-  // success. A different same-company person is rejected here; other-company /
-  // DIRECT were already rejected above.
+  // Idempotency — authorized, never unconditional. Company ownership was already
+  // verified above (other-company / DIRECT rejected), so a replay by the owning
+  // company is a safe no-op; no per-person pin is needed (no person is involved).
   const eventRef = db.collection("deliveryEvents").doc(transitDepartureEventId(args.jobId));
   const eventSnap = await tx.get(eventRef);
   if (eventSnap.exists) {
-    const existing = eventSnap.data() as DeliveryEvent;
-    if (existing.personId !== actor.personId) {
-      throw new ExecutionError("You are not the line-haul person for this shipment.", 403);
-    }
     return {
       ok: true,
       idempotent: true,
@@ -114,8 +103,8 @@ export async function applyTransitDeparture(
     };
   }
 
-  // Precondition: the job must be AT THE ORIGIN HUB and not already advanced.
-  // (Rejects pre-intake states, already-in-transit, terminal/delivered, etc.)
+  // Precondition: the job must be AT THE ORIGIN HUB (company-held, no person) and
+  // not already advanced. (Rejects pre-intake states, already-in-transit, etc.)
   if (job.currentStage !== "AtOriginHub" || leg.type !== "HubIntake" || leg.status !== "ArrivedAtStage") {
     throw new ExecutionError("Shipment is not at the origin hub awaiting transit.", 409);
   }
@@ -126,19 +115,14 @@ export async function applyTransitDeparture(
   const originHubId = typeof job.currentHubId === "string" && job.currentHubId ? job.currentHubId : cust.hubId;
   const originHubName = typeof leg.from?.stage === "string" && leg.from.stage ? leg.from.stage : "Origin hub";
 
-  // Read the acting line-haul person (for the denormalised name + availability).
-  const personRef: DocumentReference = db.collection("deliveryPersons").doc(actor.personId);
-  const personSnap = await tx.get(personRef);
-  const person = personSnap.exists ? (personSnap.data() as DeliveryPerson) : null;
-
   // ---- WRITES (after all reads) ----
   const now = Timestamp.now();
 
-  // Custody now with the line-haul person, carrying it in transit (no hub holds
-  // it — it has LEFT the origin hub; destination hub is not yet known).
+  // Custody stays at the COMPANY level, now in company transport — it has LEFT
+  // the origin hub (hubId null) and is NOT held by any person (personId null).
   const custody: CustodyState = {
     holderKind: "COMPANY",
-    personId: actor.personId,
+    personId: null,
     companyId: actor.companyId,
     hubId: null,
     since: now,
@@ -149,8 +133,8 @@ export async function applyTransitDeparture(
   //    "ArrivedAtStage" at the origin hub remains true); just stamp updatedAt.
   tx.set(legRef, { updatedAt: now }, { merge: true });
 
-  // 2) Create the LineHaul leg: the transit segment, in transit, held by the
-  //    line-haul person. Destination stage is left blank (unknown, not faked).
+  // 2) Create the LineHaul leg: the COMPANY-MANAGED transit segment. No person is
+  //    assigned — this is the company's own bulk transport, not a rider task.
   const sequence = (typeof leg.sequence === "number" ? leg.sequence : 2) + 1;
   const newLegId = deliveryLegId(args.jobId, sequence);
   const newLeg: DeliveryLeg = {
@@ -160,11 +144,10 @@ export async function applyTransitDeparture(
     type: "LineHaul",
     providerType: "COMPANY",
     companyId: actor.companyId,
-    assignedPersonId: actor.personId,
+    assignedPersonId: null, // company-managed transport — NOT a rider responsibility
     status: "InTransit",
     from: { stage: originHubName }, // departed this origin hub
     to: { stage: "" }, // destination hub not yet known — never fabricated
-    assignedPersonName: person && typeof person.name === "string" ? person.name.slice(0, 200) : null,
     custody,
     handover: null,
     proof: null,
@@ -175,13 +158,14 @@ export async function applyTransitDeparture(
   };
   tx.set(jobRef.collection("legs").doc(newLegId), newLeg);
 
-  // 3) Append-only event (deterministic id → idempotent).
+  // 3) Append-only event (deterministic id → idempotent). Company (dispatcher)
+  //    actor; no person — company-managed movement.
   const event: DeliveryEvent = {
     jobId: args.jobId,
     legId: newLegId,
     shipmentNumber: job.shipmentNumber,
     actorUid: actor.uid,
-    role: "person",
+    role: "company",
     providerType: "COMPANY",
     companyId: actor.companyId,
     action: "TransitDeparture",
@@ -189,7 +173,7 @@ export async function applyTransitDeparture(
     toStage: "InTransit",
     fromStatus: job.status,
     toStatus: job.status, // stays InProgress — job ownership/status unchanged
-    personId: actor.personId,
+    personId: null, // company-managed transit is not a person's custody
     custodyToKind: "COMPANY",
     hubId: originHubId, // the hub departed FROM (audit)
     at: now,
@@ -200,12 +184,11 @@ export async function applyTransitDeparture(
   };
   tx.set(eventRef, event);
 
-  // 4) The line-haul person is now actively carrying the parcel → Busy (mirrors
-  //    execution.ts HANDOVER_CONFIRM: a person holding custody is Busy).
-  tx.set(personRef, { availability: "Busy", updatedAt: now }, { merge: true });
-
-  // 5) Advance the job: currentLegId → LineHaul leg, in-transit stage, custody
-  //    with the person; preserve the origin hub; it is no longer AT a hub.
+  // 4) Advance the job: currentLegId → LineHaul leg, in-transit stage, custody at
+  //    the COMPANY level (no person). The first-mile rider is no longer the
+  //    responsible/assigned party — clear the assignment mirror so no rider shows
+  //    as responsible during company-managed transit (final-mile assigns Rider 2
+  //    later). Preserve the origin hub; it is no longer AT a hub.
   tx.set(
     jobRef,
     {
@@ -215,6 +198,10 @@ export async function applyTransitDeparture(
       originHubId,
       currentHubId: null,
       transitStartedAt: now,
+      assignedPersonId: null,
+      assignedPersonName: null,
+      assignedPersonPhone: null,
+      responsibleParty: { kind: "COMPANY", companyId: actor.companyId, personId: null },
       lastEventId: eventRef.id,
       lastEventAt: now,
       updatedAt: now,

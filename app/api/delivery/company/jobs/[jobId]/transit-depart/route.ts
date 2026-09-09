@@ -7,16 +7,16 @@ import { ExecutionError } from "@/lib/deliveryEngine/execution";
 
 // POST /api/delivery/company/jobs/[jobId]/transit-depart
 //
-// COMPANY_HUB journey — origin hub → transit / line-haul. A COMPANY line-haul
-// delivery PERSON departs the origin hub carrying the parcel into transit. This
-// is a PHYSICAL custody action (custody moves from the hub to the acting person),
-// company-scoped and server-authoritative. The request body carries NOTHING:
-// the actor (uid + companyId + personId) is resolved SERVER-SIDE from the
-// verified token — personId/companyId/providerType/custody/status/leg ids are
-// never trusted from the client. resolveDeliveryActor returns role "person" only
-// for an ACTIVE person of an ACTIVE company. The whole leg advancement + custody
-// move + event is one atomic transaction. This never touches the YOMICO DIRECT
-// path and does not determine/fabricate a destination hub.
+// COMPANY_HUB journey — origin hub → COMPANY-MANAGED transit. The company
+// DISPATCHER (role "company") sends the shipment from its origin hub into the
+// company's OWN internal bulk / inter-city transport. This is a COMPANY-MANAGED
+// movement, NOT a rider task: custody stays at the company level (no person is
+// made responsible or given personal custody). The actor (uid + companyId) is
+// resolved SERVER-SIDE from the verified token — companyId/providerType/custody/
+// status/leg ids are never trusted from the client, and the request body carries
+// nothing. The whole leg advancement + custody move + event is one atomic
+// transaction. This never touches the YOMICO DIRECT path and never turns company
+// transit into a YOMICO rider delivery task.
 export async function POST(request: Request, ctx: { params: Promise<{ jobId: string }> }) {
   try {
     const requester = await verifyRequestUser(request);
@@ -24,17 +24,17 @@ export async function POST(request: Request, ctx: { params: Promise<{ jobId: str
     if (!(await isWithinRateLimit("delivery-transit-depart", requester.uid, 60, 10 * 60 * 1000)))
       return Response.json({ error: "Too many requests. Please try again shortly." }, { status: 429 });
 
-    // Active COMPANY delivery person only (owner resolves to role "company" and
-    // is rejected here — ownership alone never authorizes a custody transition).
+    // Company dispatcher only. Company transit is company-managed, so this is a
+    // role "company" action (a delivery person cannot dispatch company transport).
     const actor = await resolveDeliveryActor(requester.uid, requester.email);
-    if (actor.role !== "person" || actor.providerType !== "COMPANY" || !actor.companyId)
+    if (actor.role !== "company" || !actor.companyId)
       return Response.json(
-        { error: "Only a company delivery person can take this shipment into transit." },
+        { error: "Only the delivery company can dispatch this shipment into company transit." },
         { status: 403 }
       );
 
     // Capture narrowed (non-null) identity for use inside the transaction closure.
-    const transitActor = { uid: actor.uid, companyId: actor.companyId, personId: actor.personId };
+    const transitActor = { uid: actor.uid, companyId: actor.companyId };
 
     const { jobId } = await ctx.params;
     const db = getAdminDb();
@@ -47,6 +47,6 @@ export async function POST(request: Request, ctx: { params: Promise<{ jobId: str
       return Response.json({ error: error.message }, { status: error.status });
     }
     console.error("transit departure failed:", error);
-    return Response.json({ error: "Could not take this shipment into transit." }, { status: 500 });
+    return Response.json({ error: "Could not dispatch this shipment into company transit." }, { status: 500 });
   }
 }

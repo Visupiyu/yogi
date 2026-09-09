@@ -8,6 +8,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import JobActions from "@/app/delivery-company/_components/JobActions";
+import JobLifecycle from "@/app/delivery-company/_components/JobLifecycle";
+import FinalMileAssign from "@/app/delivery-company/_components/FinalMileAssign";
+import CompanyHubActions from "@/app/delivery-company/_components/CompanyHubActions";
 import {
   authedFetch,
   StatusBadge,
@@ -15,10 +18,15 @@ import {
   ErrorBox,
   stageLabel,
   itemsSummary,
+  companyLifecycle,
   COMPANY_ACTIONABLE_STATUSES,
   type CompanyJobDetail,
   type CompanyPerson,
 } from "@/app/delivery-company/_lib/console";
+
+// The persisted stage at which the company dispatcher assigns the final-mile
+// rider (server re-validates this precondition; the UI only gates visibility).
+const FINAL_MILE_STAGE = "AtDestinationHub";
 
 export default function DeliveryCompanyJobDetailPage() {
   const params = useParams<{ jobId: string }>();
@@ -66,9 +74,12 @@ export default function DeliveryCompanyJobDetailPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Lazily load people once the job is known to be actionable.
+  // Lazily load people once the job is actionable (assign/reject) OR the shipment
+  // is at the destination hub awaiting a company-selected final-mile rider.
   useEffect(() => {
-    if (job && COMPANY_ACTIONABLE_STATUSES.has(job.status) && persons === null && !personsLoading) {
+    const needsPeople =
+      !!job && (COMPANY_ACTIONABLE_STATUSES.has(job.status) || job.currentStage === FINAL_MILE_STAGE);
+    if (needsPeople && persons === null && !personsLoading) {
       void loadPersons();
     }
   }, [job, persons, personsLoading, loadPersons]);
@@ -107,6 +118,15 @@ export default function DeliveryCompanyJobDetailPage() {
             <p className="mt-1 text-lg font-semibold text-gray-900">{job.vendorName || "Seller"}</p>
             <p className="text-sm text-gray-500">Stage: {stageLabel(job.currentStage)}</p>
           </div>
+
+          {/* Company Job lifecycle — ONE shipment, Seller → Customer (visibility only) */}
+          <Card title="Company Job · Seller → Customer">
+            <p className="mb-3 text-xs text-gray-500">
+              This is one shipment your company delivers end to end. Each step below is a physical responsibility;
+              the rider steps are performed by your people in the Delivery App.
+            </p>
+            <JobLifecycle steps={companyLifecycle(job.currentStage, job.status)} />
+          </Card>
 
           {/* Shipment / job info */}
           <Card title="Shipment">
@@ -154,6 +174,30 @@ export default function DeliveryCompanyJobDetailPage() {
                 jobId={job.id}
                 status={job.status}
                 assignedPersonName={job.assignedPersonName}
+                persons={persons}
+                personsLoading={personsLoading}
+                personsError={personsError}
+                onReloadPersons={() => void loadPersons()}
+                onDone={() => void afterAction()}
+              />
+            </Card>
+          ) : job.currentStage === "AtOriginHub" ? (
+            <Card title="Company transit">
+              <CompanyHubActions jobId={job.id} currentStage={job.currentStage} onDone={() => void afterAction()} />
+            </Card>
+          ) : job.currentStage === "InTransit" ? (
+            <Card title="Destination hub">
+              <CompanyHubActions jobId={job.id} currentStage={job.currentStage} onDone={() => void afterAction()} />
+            </Card>
+          ) : job.currentStage === FINAL_MILE_STAGE ? (
+            <Card title="Assign final-mile rider">
+              <p className="mb-3 rounded bg-teal-50 px-3 py-2 text-sm text-teal-800">
+                This shipment is at the destination hub. Choose one of your active, available people to carry out the
+                final delivery to the customer. Assigning does not deliver the parcel — the rider goes Out for delivery
+                and confirms delivery in the Delivery App.
+              </p>
+              <FinalMileAssign
+                jobId={job.id}
                 persons={persons}
                 personsLoading={personsLoading}
                 personsError={personsError}

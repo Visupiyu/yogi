@@ -7,14 +7,13 @@ import { ExecutionError } from "@/lib/deliveryEngine/execution";
 
 // POST /api/delivery/company/jobs/[jobId]/destination-receipt
 //
-// COMPANY_HUB journey — transit / line-haul → destination hub. The COMPANY
-// line-haul delivery PERSON who is CARRYING the parcel in transit receives it
-// into the company's destination hub. This is a PHYSICAL custody action (custody
-// moves from the transit person to the hub), company-scoped and server-
-// authoritative. The actor (uid + companyId + personId) is resolved SERVER-SIDE
-// from the verified token — personId/companyId/providerType/custody/status/leg
-// ids are NEVER trusted from the client. resolveDeliveryActor returns role
-// "person" only for an ACTIVE person of an ACTIVE company.
+// COMPANY_HUB journey — COMPANY-MANAGED transit → destination hub. The company
+// DISPATCHER (role "company") receives the shipment — arriving via the company's
+// OWN internal transport — into one of its destination hubs. This is a COMPANY-
+// MANAGED receipt, NOT a rider task: custody was already at the company level in
+// transit (no person) and simply becomes parked at the destination hub. The actor
+// (uid + companyId) is resolved SERVER-SIDE from the verified token — companyId/
+// providerType/custody/status/leg ids are NEVER trusted from the client.
 //
 // The ONLY client-supplied value is `hubId`: the REQUESTED destination hub.
 // There is no persisted destination-routing source in the model, so the hub is
@@ -29,17 +28,17 @@ export async function POST(request: Request, ctx: { params: Promise<{ jobId: str
     if (!(await isWithinRateLimit("delivery-destination-receipt", requester.uid, 60, 10 * 60 * 1000)))
       return Response.json({ error: "Too many requests. Please try again shortly." }, { status: 429 });
 
-    // Active COMPANY delivery person only (owner resolves to role "company" and
-    // is rejected here — ownership alone never authorizes a custody transition).
+    // Company dispatcher only. Company transit / hub receipt is company-managed,
+    // so this is a role "company" action (a delivery person cannot perform it).
     const actor = await resolveDeliveryActor(requester.uid, requester.email);
-    if (actor.role !== "person" || actor.providerType !== "COMPANY" || !actor.companyId)
+    if (actor.role !== "company" || !actor.companyId)
       return Response.json(
-        { error: "Only a company delivery person can receive this shipment at a hub." },
+        { error: "Only the delivery company can receive this shipment at a destination hub." },
         { status: 403 }
       );
 
     // Capture narrowed (non-null) identity for use inside the transaction closure.
-    const receiptActor = { uid: actor.uid, companyId: actor.companyId, personId: actor.personId };
+    const receiptActor = { uid: actor.uid, companyId: actor.companyId };
 
     // The ONLY accepted body field is the requested destination hub id. Any other
     // field (personId/companyId/providerType/custody/status/leg ids) is ignored.

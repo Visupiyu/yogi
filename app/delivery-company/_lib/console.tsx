@@ -120,12 +120,59 @@ const STAGE_LABELS: Record<string, string> = {
   AwaitingHandoff: "Awaiting pickup",
   PickupComplete: "Picked up",
   PickedUp: "Picked up",
+  // Confirmed COMPANY_HUB stages (now part of the locked Company Job model, so
+  // these are truthful, not fabricated). YOMICO Direct never reaches them.
+  AtOriginHub: "At origin / local hub",
+  InTransit: "In company transport",
+  AtDestinationHub: "At destination hub",
+  FinalMileAssigned: "Final-mile rider assigned",
   OutForDelivery: "Out for delivery",
   Delivered: "Delivered",
 };
 export function stageLabel(stage?: string | null): string {
   if (!stage) return "—";
   return STAGE_LABELS[stage] ?? stage;
+}
+
+// ---- Company Job lifecycle (ONE shipment: Seller → Customer) ----
+// A single DeliveryJob's physical progression, derived ONLY from the persisted
+// currentStage (no fabrication). This exists purely for VISIBILITY — the Console
+// never executes these physical steps. The inter-city segment is the COMPANY's
+// own managed transport and is deliberately NOT framed as a YOMICO rider task.
+export type LifecycleState = "done" | "current" | "upcoming";
+export type LifecycleStep = { key: string; label: string; note?: string; state: LifecycleState };
+
+const LIFECYCLE: { key: string; label: string; note?: string }[] = [
+  { key: "handoff", label: "Handed to your company" },
+  { key: "pickup", label: "Picked up from seller", note: "First-mile rider · Delivery App" },
+  { key: "origin_hub", label: "At origin / local hub", note: "Received by the rider in the Delivery App" },
+  { key: "transit", label: "In company transport", note: "Inter-city — managed by your company (not a YOMICO rider task)" },
+  { key: "dest_hub", label: "At destination hub", note: "Received by the rider in the Delivery App" },
+  { key: "final_assigned", label: "Final-mile rider assigned" },
+  { key: "ofd", label: "Out for delivery", note: "Final-mile rider · Delivery App" },
+  { key: "delivered", label: "Delivered to customer" },
+];
+
+const STAGE_TO_INDEX: Record<string, number> = {
+  Created: 0, AwaitingHandoff: 0,
+  PickupComplete: 1, PickedUp: 1,
+  AtOriginHub: 2,
+  InTransit: 3,
+  AtDestinationHub: 4,
+  FinalMileAssigned: 5,
+  OutForDelivery: 6,
+  Delivered: 7,
+};
+
+// Ordered lifecycle steps with a done/current/upcoming state for each, from the
+// persisted currentStage + coarse status only. Terminal Delivered marks all done.
+export function companyLifecycle(currentStage?: string | null, status?: string): LifecycleStep[] {
+  const delivered = status === "Delivered" || currentStage === "Delivered";
+  const idx = currentStage && currentStage in STAGE_TO_INDEX ? STAGE_TO_INDEX[currentStage] : 0;
+  return LIFECYCLE.map((s, i) => {
+    const state: LifecycleState = delivered || i < idx ? "done" : i === idx ? "current" : "upcoming";
+    return { ...s, state };
+  });
 }
 
 /** A person eligible to RECEIVE an assignment: Active account AND Available. */
