@@ -1562,6 +1562,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    match /deliveryHubs/{hubId} {
+      // COMPANY_HUB journey — physical company hubs. Fully server-mediated: admin
+      // manages and company-side access happens through server APIs that scope by
+      // companyId. No direct client read/write, so one company can never reach
+      // another company's hubs through the client SDK.
+      allow read, write: if false;
+    }
+
     match /deliveryPaymentEvents/{eventId} {
       // Append-only COD-collection audit, written server-side. Admin-read.
       allow read: if isAdmin();

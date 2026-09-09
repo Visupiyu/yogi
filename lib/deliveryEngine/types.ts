@@ -182,6 +182,11 @@ export type CustodyState = {
   holderKind: CustodyHolderKind | null;
   personId: string | null; // the delivery person holding it, when in a person's hands
   companyId: string | null;
+  // Set only when the parcel is parked at a COMPANY hub (holderKind "COMPANY",
+  // personId null) — i.e. custody is at a physical hub location, not in a
+  // person's hands. Null in every other custody state. A hub is a custody
+  // LOCATION, never a human actor.
+  hubId?: string | null;
   since?: unknown | null;
   sinceEventId?: string | null; // the scan event that established this custody
 };
@@ -298,6 +303,13 @@ export type DeliveryJob = {
   scanToken?: string;
   custody?: CustodyState | null;
   executionStartedAt?: unknown | null; // first pickup (custody acquired)
+  // COMPANY_HUB journey (multi-leg). Set by the origin-hub-intake transition when
+  // the first-mile custody is received into the company's origin hub. currentHubId
+  // mirrors custody.hubId for the hub the parcel is currently parked at;
+  // originHubIntakeAt is the denormalised timestamp the customer tracking uses
+  // for the "at origin hub" milestone. Absent for YOMICO DIRECT jobs.
+  currentHubId?: string | null;
+  originHubIntakeAt?: unknown | null;
   deliveredAt?: unknown | null;
   failedAt?: unknown | null;
   // 2B-5: set by the commerce-owned reconciliation (NOT by the Delivery Engine
@@ -373,9 +385,34 @@ export type DeliveryEvent = {
   handoverRole?: "outgoing" | "incoming" | null;
   exceptionCode?: DeliveryExceptionCode | null;
   custodyToKind?: CustodyHolderKind | null;
+  // COMPANY_HUB journey: the hub a custody-to-hub transition (e.g. origin-hub
+  // intake) parked the parcel at. Audit only; null for non-hub events.
+  hubId?: string | null;
   at?: unknown;
   geo?: { lat: number; lng: number } | null;
   notes?: string | null;
   photoPath?: string | null;
   clientEventId?: string | null; // offline idempotency key for scans
+};
+
+// ===========================================================================
+// COMPANY_HUB journey — physical hub entity (a custody LOCATION, not an actor).
+//
+// Collection: deliveryHubs/{hubId}. Server-managed only (firestore.rules keep it
+// client-unreadable/unwritable; admin/company access is via server APIs that
+// scope by companyId). A hub belongs to exactly ONE company; cross-company
+// access is never permitted. NO money/capacity/routing-graph fields here — this
+// is the minimum needed to receive first-mile custody into an origin hub.
+// ===========================================================================
+export type DeliveryHubStatus = "Active" | "Inactive";
+
+export type DeliveryHub = {
+  companyId: string; // owning company — authorization is always scoped to this
+  name: string;
+  city?: string;
+  region?: string;
+  status: DeliveryHubStatus;
+  createdBy?: string; // admin uid that provisioned it
+  createdAt?: unknown;
+  updatedAt?: unknown;
 };

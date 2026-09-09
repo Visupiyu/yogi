@@ -78,6 +78,10 @@ function friendlyStage(stage: unknown): string {
   switch (stage) {
     case "PickedUp":
       return "Picked up";
+    case "AtOriginHub":
+      // COMPANY_HUB journey: received and held at the origin company hub,
+      // awaiting transit. A real persisted stage — never fabricated.
+      return "At origin hub";
     case "InTransit":
     case "ArrivedAtStage":
     case "HandoverInitiated":
@@ -107,6 +111,10 @@ function buildMilestones(job: DeliveryJob): { key: string; label: string; at: st
   if (created) out.push({ key: "shipment_created", label: "Shipment created", at: created });
   const pickedUp = toIso(job.executionStartedAt);
   if (pickedUp) out.push({ key: "picked_up", label: "Picked up", at: pickedUp });
+  // COMPANY_HUB journey: origin-hub intake. Only present when it actually
+  // happened (persisted timestamp) — no transit/destination/final-mile invented.
+  const atOriginHub = toIso(job.originHubIntakeAt);
+  if (atOriginHub) out.push({ key: "at_origin_hub", label: "At origin hub", at: atOriginHub });
   const delivered = toIso(job.deliveredAt);
   if (delivered) out.push({ key: "delivered", label: "Delivered", at: delivered });
   return out;
