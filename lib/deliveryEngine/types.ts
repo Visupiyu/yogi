@@ -318,6 +318,16 @@ export type DeliveryJob = {
   // milestone. Destination hub is intentionally NOT represented yet.
   originHubId?: string | null;
   transitStartedAt?: unknown | null;
+  // COMPANY_HUB journey — destination hub. Set by the destination-hub-receipt
+  // transition when the line-haul person delivers the parcel into the (explicitly
+  // requested, server-validated) destination hub. There is no persisted
+  // destination-routing source today, so this hub is never auto-selected — it is
+  // provided by the authorized receiving actor and validated. destinationHubId
+  // also becomes currentHubId once received; destinationHubReceivedAt is the
+  // denormalised timestamp customer tracking uses for the "at destination hub"
+  // milestone. Final-mile is a later slice — NOT set here.
+  destinationHubId?: string | null;
+  destinationHubReceivedAt?: unknown | null;
   deliveredAt?: unknown | null;
   failedAt?: unknown | null;
   // 2B-5: set by the commerce-owned reconciliation (NOT by the Delivery Engine
