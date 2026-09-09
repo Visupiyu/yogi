@@ -87,6 +87,11 @@ function friendlyStage(stage: unknown): string {
       // awaiting final-mile. A real persisted stage — never fabricated. NOT
       // "out for delivery"/"delivered" (those are later slices).
       return "At destination hub";
+    case "FinalMileAssigned":
+      // COMPANY_HUB journey: a final-mile person has been assigned and has taken
+      // custody from the destination hub, but has NOT yet departed. A real
+      // persisted stage — never fabricated. NOT "out for delivery"/"delivered".
+      return "Assigned for final delivery";
     case "InTransit":
     case "ArrivedAtStage":
     case "HandoverInitiated":
@@ -128,6 +133,11 @@ function buildMilestones(job: DeliveryJob): { key: string; label: string; at: st
   // actually happened (persisted timestamp). No final-mile/delivery invented.
   const atDestinationHub = toIso(job.destinationHubReceivedAt);
   if (atDestinationHub) out.push({ key: "at_destination_hub", label: "At destination hub", at: atDestinationHub });
+  // COMPANY_HUB journey: assigned to a final-mile person (custody handed from the
+  // destination hub). Present only when it actually happened (persisted timestamp).
+  // NOT departure/out-for-delivery/delivery — those are later slices.
+  const finalMileAssigned = toIso(job.finalMileAssignedAt);
+  if (finalMileAssigned) out.push({ key: "final_mile_assigned", label: "Assigned for final delivery", at: finalMileAssigned });
   const delivered = toIso(job.deliveredAt);
   if (delivered) out.push({ key: "delivered", label: "Delivered", at: delivered });
   return out;

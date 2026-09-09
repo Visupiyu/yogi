@@ -328,6 +328,15 @@ export type DeliveryJob = {
   // milestone. Final-mile is a later slice — NOT set here.
   destinationHubId?: string | null;
   destinationHubReceivedAt?: unknown | null;
+  // COMPANY_HUB journey — final-mile assignment. Set by the final-mile-assignment
+  // transition when the company DISPATCHER (the server-authoritative company
+  // actor) assigns an eligible company delivery person to carry the parcel from
+  // the destination hub to the customer, and custody is handed from the hub to
+  // that person. This is ASSIGNMENT + a hub→person custody handover, NOT
+  // departure: OutForDelivery / customer delivery are later slices and are NOT
+  // set here. finalMileAssignedAt is the denormalised timestamp customer tracking
+  // uses for the "assigned for final delivery" milestone. Absent for DIRECT jobs.
+  finalMileAssignedAt?: unknown | null;
   deliveredAt?: unknown | null;
   failedAt?: unknown | null;
   // 2B-5: set by the commerce-owned reconciliation (NOT by the Delivery Engine
