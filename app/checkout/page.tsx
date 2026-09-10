@@ -80,6 +80,11 @@ export default function CheckoutPage() {
   // only once an order actually exists.
   const codIdempotencyKey = useRef<string | null>(null);
 
+  // Guards against loading saved addresses more than once — onAuthStateChanged
+  // can fire again (e.g. token refresh), and addresses must load exactly once,
+  // only after Firebase Auth restoration confirms a signed-in user.
+  const addressesLoadedRef = useRef(false);
+
   useEffect(() => {
     getShippingSettings().then((settings) => {
       setFreeShippingThreshold(settings.freeShippingThreshold);
@@ -96,7 +101,6 @@ export default function CheckoutPage() {
     setName(userData.name || "");
 setPhone(userData.phone || "");
 setAddress(userData.address || "");
-    loadAddresses();
 
     // Reward balance must come from Firestore, not the cached localStorage
     // value — that's trivially editable client-side and was never actually
@@ -109,6 +113,14 @@ setAddress(userData.address || "");
         alert("Please login to checkout.");
         router.push("/login");
         return;
+      }
+
+      // Firebase Auth is now restored and a user is known — load their saved
+      // addresses exactly once (loadAddresses reads auth.currentUser, which is
+      // this user). Running it here, not on mount, avoids the pre-auth null.
+      if (!addressesLoadedRef.current) {
+        addressesLoadedRef.current = true;
+        void loadAddresses();
       }
 
       try {
@@ -253,11 +265,11 @@ setAddress(userData.address || "");
   // (?newAddress=<id>), else the default, else the first.
   async function loadAddresses() {
     try {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
-      if (!user.email) return;
+     const firebaseUser = auth.currentUser;
+     if (!firebaseUser?.email) return;
 
       const snapshot = await getDocs(
-        query(collection(db, "addresses"), where("userEmail", "==", user.email))
+        query(collection(db, "addresses"), where("userEmail", "==", firebaseUser.email))
       );
       const list: SavedAddress[] = snapshot.docs.map((d) => ({
         id: d.id,
@@ -470,8 +482,9 @@ setAddress(userData.address || "");
           items: items.map((item: any) => ({
             id: item.id,
             qty: item.qty,
-            size: item.size,
-            color: item.color,
+            size: item.size || "",
+            color: item.color || "",
+            variantId: item.variantId,
           })),
           couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
           redeemPoints,
