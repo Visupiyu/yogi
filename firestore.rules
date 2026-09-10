@@ -659,10 +659,22 @@ service cloud.firestore {
           // the route is unaffected.
           //
           // What a seller may still write here is their own shipping detail.
+          // shipmentWeightKg is the ACTUAL packed parcel weight (kg) for this
+          // seller's shipment — seller-owned dispatch detail, same class as
+          // courier/tracking. When present it must be a positive number (the
+          // field may be absent until the seller enters it); no other field's
+          // writability is affected.
           && affectedKeysOnly([
             'courierPartner', 'trackingNumber', 'dispatchDate',
-            'expectedDelivery', 'sellerNotes', 'updatedAt'
+            'expectedDelivery', 'sellerNotes', 'shipmentWeightKg', 'updatedAt'
           ])
+          && (
+            !('shipmentWeightKg' in request.resource.data)
+            || (
+              request.resource.data.shipmentWeightKg is number
+              && request.resource.data.shipmentWeightKg > 0
+            )
+          )
         );
     }
 

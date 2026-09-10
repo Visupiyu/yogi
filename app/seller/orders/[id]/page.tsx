@@ -52,6 +52,9 @@ type SellerFulfilmentRecord = {
   items?: FulfilmentLine[];
   itemFulfilment?: ItemFulfilmentMap;
   deliveryDeadlineAt?: unknown;
+  // Actual final PACKED parcel weight (kg) for THIS seller's shipment — product
+  // + box + packaging. Seller-entered; NOT derived from product catalog weight.
+  shipmentWeightKg?: number;
 };
 
 // The ONLY paymentMethod a vendor may mark Paid by themselves. Kept as an
@@ -89,6 +92,10 @@ export default function SellerOrderDetailsPage(){
   const [expectedDelivery,setExpectedDelivery] =useState("");
   const [sellerNotes,setSellerNotes] = useState("");
   const [vendorUid,setVendorUid] = useState("");
+  // Actual packed parcel weight (kg) for this seller's shipment. Kept as a
+  // string for controlled decimal input; persisted to the sellerOrders record.
+  const [shipmentWeightKg,setShipmentWeightKg] = useState("");
+  const [savingWeight,setSavingWeight] = useState(false);
 
   // The seller's own fulfilment record for this order. This — not
   // order.status — is what drives every stage shown below.
@@ -121,6 +128,13 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
     return () => unsubscribe();
 
   },[router]);
+
+  // Sync the weight input with the loaded seller fulfilment record (the
+  // authoritative store for this seller's packed shipment weight).
+  useEffect(() => {
+    const w = sellerRecord?.shipmentWeightKg;
+    setShipmentWeightKg(typeof w === "number" && w > 0 ? String(w) : "");
+  }, [sellerRecord]);
 
   const loadOrder = async(vendorUid: string)=>{
     try{
@@ -374,7 +388,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
         // same wording, shape and type as the general path below.
         await addDoc(collection(db, "notifications"), {
           title: "Order Status Updated",
-          message: `Your order ${id.slice(0, 8)} is now ${fulfilmentStageLabel(
+          message: `Your order ${order?.orderNumber || id.slice(0, 8)} is now ${fulfilmentStageLabel(
             status
           )}`,
           userId: order.userId,
@@ -473,7 +487,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
     "Order Status Updated",
 
   message:
-    `Your order ${id.slice(0,8)} is now ${fulfilmentStageLabel(status)}`,
+    `Your order ${order?.orderNumber || id.slice(0,8)} is now ${fulfilmentStageLabel(status)}`,
 
   userId:
     order.userId,
@@ -510,6 +524,47 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
 }
 finally{ setSaving(false);} };
+
+  // The seller's record-level stage (least-advanced item). Packed parcel weight
+  // is editable up to dispatch and frozen once the shipment has left (Shipped /
+  // Out For Delivery / Delivered) — using the EXISTING fulfilment stages, not a
+  // new lifecycle.
+  const sellerStage = deriveFulfilmentStage(sellerRecord?.itemFulfilment || null);
+  const weightLocked =
+    sellerStage === "Shipped" ||
+    sellerStage === "Out For Delivery" ||
+    sellerStage === "Delivered";
+
+  // Persist the packed parcel weight to THIS seller's own fulfilment record
+  // (sellerOrders/{orderId}_{vendorId}) — never to the parent order, which can
+  // hold several vendors' parcels. Validates a positive numeric kg value.
+  const saveShipmentWeight = async () => {
+    if (!vendorUid || savingWeight) return;
+    if (weightLocked) {
+      toast.error("Shipment weight is locked once the parcel has been shipped.");
+      return;
+    }
+    const kg = Number(shipmentWeightKg);
+    if (!shipmentWeightKg.trim() || !Number.isFinite(kg) || kg <= 0) {
+      toast.error("Enter the packed parcel weight in kg (a number greater than 0).");
+      return;
+    }
+    try {
+      setSavingWeight(true);
+      const recordId = sellerOrderRecordId(id, vendorUid);
+      await updateDoc(doc(db, "sellerOrders", recordId), {
+        shipmentWeightKg: kg,
+        updatedAt: serverTimestamp(),
+      });
+      setSellerRecord((prev) => (prev ? { ...prev, shipmentWeightKg: kg } : prev));
+      toast.success("Shipment weight saved.");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to save shipment weight.");
+    } finally {
+      setSavingWeight(false);
+    }
+  };
 
   if(loading){
 
@@ -607,7 +662,7 @@ finally{ setSaving(false);} };
 
             Order ID :
             {" "}
-            {order.id}
+            {order.orderNumber || order.id}
 
           </p>
 
@@ -1477,6 +1532,43 @@ finally{ setSaving(false);} };
                     "
 
                   />
+
+                </div>
+
+                {/* Shipment Weight (kg) — ACTUAL packed parcel weight, stored on
+                    this seller's own fulfilment record (sellerOrders). */}
+                <div>
+
+                  <label className="font-semibold">
+                    Shipment Weight (kg)
+                  </label>
+
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={shipmentWeightKg}
+                      disabled={weightLocked || savingWeight}
+                      onChange={(e) => setShipmentWeightKg(e.target.value)}
+                      placeholder="e.g. 3.20"
+                      className="w-full border rounded-xl p-3 disabled:bg-gray-100 disabled:opacity-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={saveShipmentWeight}
+                      disabled={weightLocked || savingWeight}
+                      className="shrink-0 rounded-xl bg-black px-4 text-sm font-semibold text-white disabled:opacity-50"
+                    >
+                      {savingWeight ? "Saving…" : "Save weight"}
+                    </button>
+                  </div>
+
+                  <p className="mt-1 text-xs text-gray-500">
+                    Actual packed parcel weight, including product and packaging.
+                    {weightLocked ? " Locked — the shipment has already been shipped." : ""}
+                  </p>
 
                 </div>
 
