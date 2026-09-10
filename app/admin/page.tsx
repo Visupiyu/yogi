@@ -487,7 +487,7 @@ export default function AdminPage() {
 
     <Link href="/admin/delivery-partners" className="bg-yellow-50 p-6 rounded-xl text-center hover:shadow-lg">
       🛵
-      <p className="font-bold mt-2">Delivery Partners</p>
+      <p className="font-bold mt-2">Delivery Partners (Legacy)</p>
     </Link>
 
     <Link href="/admin/analytics" className="bg-purple-50 p-6 rounded-xl text-center hover:shadow-lg">

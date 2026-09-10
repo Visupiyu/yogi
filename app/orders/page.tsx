@@ -186,7 +186,7 @@ export default function OrdersPage() {
                   <div>
                     <h2 className="text-2xl font-bold">
                       Order #
-                      {order.id.slice(0, 8)}
+                      {order.orderNumber || order.id.slice(0, 8)}
                     </h2>
                     <p className="mt-4">
                       👤 {order.customerName}

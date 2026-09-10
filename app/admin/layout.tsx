@@ -23,7 +23,7 @@ const navItems = [
   { href: "/admin/delivery/persons", label: "Delivery Persons", icon: "🛵" },
   { href: "/admin/delivery/applications", label: "Freelancer Applications", icon: "🧑‍💼" },
   { href: "/admin/delivery/company-applications", label: "Company Applications", icon: "🏢" },
-  { href: "/admin/delivery-partners", label: "Delivery Partners", icon: "🛵" },
+  { href: "/admin/delivery-partners", label: "Delivery Partners (Legacy)", icon: "🛵" },
   { href: "/admin/notifications", label: "Notifications", icon: "🔔" },
   { href: "/admin/support", label: "Support", icon: "🎫" },
   { href: "/admin/reviews", label: "Reviews", icon: "⭐" },

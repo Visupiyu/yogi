@@ -665,6 +665,7 @@ setOrders(items);
 const filtered = orders.filter(
   (order) =>
     order.id.toLowerCase().includes(search.toLowerCase()) ||
+    (order.orderNumber || "").toLowerCase().includes(search.toLowerCase()) ||
     order.customerName.toLowerCase().includes(search.toLowerCase()) ||
     (order.userEmail || "")
       .toLowerCase()
@@ -783,7 +784,7 @@ const filtered = orders.filter(
                     return (
                       <tr key={order.id} className="border-b align-top">
                         <td className="py-3 px-2 font-mono text-xs" title={order.id}>
-                          {row.label}
+                          {order.orderNumber || row.label}
                         </td>
                         <td className="py-3 px-2">{formatIst(row.createdAt)}</td>
                         <td className="py-3 px-2">
@@ -848,7 +849,7 @@ const filtered = orders.filter(
                 return (
                   <div key={order.id} className="border rounded-2xl p-4">
                     <p className="font-mono text-xs text-gray-600 break-all" title={order.id}>
-                      {row.label}
+                      {order.orderNumber || row.label}
                     </p>
 
                     <div className="flex flex-wrap gap-2 mt-2">

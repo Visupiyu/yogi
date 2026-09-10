@@ -7,13 +7,10 @@ import {
   getDocs,
   query,
   orderBy,
-  updateDoc,
-  doc,
-  addDoc,
-  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import AssignDelivery from "@/app/admin/delivery/_components/AssignDelivery";
 
 type Delivery = {
   id: string;
@@ -36,7 +33,6 @@ export default function AdminDeliveryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [partners, setPartners] = useState<any[]>([]);
 
   useEffect(() => {
     loadDeliveries();
@@ -67,15 +63,9 @@ export default function AdminDeliveryPage() {
         });
       });
       setDeliveries(items);
-
-      const partnerSnapshot = await getDocs(
-        collection(db, "deliveryPartners")
-      );
-      const partnerList: any[] = [];
-      partnerSnapshot.forEach((docSnap) =>
-        partnerList.push({ id: docSnap.id, ...docSnap.data() })
-      );
-      setPartners(partnerList);
+      // Legacy note: this page no longer reads the legacy `deliveryPartners`
+      // collection or assigns deliveries. Delivery assignment now happens in the
+      // Delivery Control Tower (the current delivery engine).
     } catch (error) {
       console.error(error);
     } finally {
@@ -109,35 +99,6 @@ export default function AdminDeliveryPage() {
     return searchMatch && statusMatch;
   });
 
-  const assignPartner = async (orderId: string, partner: any) => {
-    try {
-      // Assigning a partner is orthogonal to fulfillment status — writing
-      // "Assigned" into order.status overwrote the real Pending/Packed/
-      // Shipped/etc value, which the customer's tracking bar doesn't
-      // recognize and so visually reset back to step 1 ("Placed").
-      await updateDoc(doc(db, "orders", orderId), {
-        deliveryPartnerId: partner.id,
-        deliveryPartnerName: partner.name,
-        assignedAt: serverTimestamp(),
-      });
-      loadDeliveries();
-
-      await addDoc(collection(db, "notifications"), {
-        role: "admin",
-        title: "Delivery Assigned",
-        message: `${partner.name} has been assigned to Order ${orderId.slice(
-          0,
-          8
-        )}.`,
-        type: "delivery",
-        read: false,
-        createdAt: serverTimestamp(),
-      });
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   const exportCSV = () => {
     const rows = [
       ["Order ID", "Customer", "Partner", "Status", "Tracking", "Expected Delivery"],
@@ -165,6 +126,21 @@ export default function AdminDeliveryPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Assignment uses the CURRENT delivery engine (YOMICO persons + delivery
+            companies), not the legacy `deliveryPartners` list. */}
+        <div className="mb-6 rounded-2xl border border-teal-300 bg-teal-50 p-4">
+          <p className="text-sm font-semibold text-teal-900">Delivery assignment</p>
+          <p className="mt-1 text-sm text-teal-800">
+            Assign each shipment to a YOMICO delivery person/freelancer, or hand it to a delivery company. This uses the
+            current YOMICO delivery engine — the legacy partner list is no longer used. When you hand a shipment to a
+            company, the company assigns its own rider(s) in the Company Console. You can monitor live progress in the{" "}
+            <Link href="/admin/delivery/control-tower" className="font-semibold underline">
+              Control Tower
+            </Link>
+            .
+          </p>
+        </div>
+
         <div className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-3xl p-8 mb-8">
           <h1 className="text-4xl font-bold">🚚 Delivery Management</h1>
           <p className="mt-2 opacity-90">Manage all marketplace deliveries</p>
@@ -286,30 +262,7 @@ export default function AdminDeliveryPage() {
                     <p>📍 {order.trackingNumber}</p>
                   <p>📅{" "} {order.expectedDelivery &&  order.expectedDelivery !== "-"
                    ? new Date(order.expectedDelivery).toLocaleDateString("en-IN") : "-"} </p>
-                    <select
-  className="mt-3 border rounded-lg p-2 w-full"
-  defaultValue=""
-  disabled={order.status === "Delivered"}
-  onChange={(e) => {
-    const partner = partners.find(
-      (p) => p.id === e.target.value
-    );
-
-    if (
-      partner &&
-      confirm(`Assign ${partner.name} to this order?`)
-    ) {
-      assignPartner(order.id, partner);
-    }
-  }}
->
-                      <option value="">Assign Delivery Partner</option>
-                      {partners.map((partner) => (
-                        <option key={partner.id} value={partner.id}>
-                          {partner.name}
-                        </option>
-                      ))}
-                    </select>
+                    <AssignDelivery orderId={order.id} />
                   </div>
                 </div>
               </div>
