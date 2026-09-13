@@ -204,10 +204,21 @@ export default function SellerTaxPage() {
             )}
 
           {gstStatus === "UNREGISTERED" && (
-            <p className="text-xs text-amber-700">
-              Unregistered sellers cannot list products until a GST registration
-              (Regular or Composition) is added and verified.
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-amber-700">
+                Unregistered sellers may list products if they are legally eligible to
+                sell without GST registration under applicable GST rules. YOMICO is not
+                responsible for the seller&apos;s GST payment, registration, filing, or
+                other GST obligations. It is the seller&apos;s responsibility to comply
+                with all applicable GST laws and to provide any information or supporting
+                documents that may be required to be produced to a GST official for legal
+                or compliance purposes.
+              </p>
+              <p className="text-xs text-gray-500">
+                If you are unsure whether GST registration is required for your business,
+                please consult a qualified tax professional or the GST authorities.
+              </p>
+            </div>
           )}
 
           <button

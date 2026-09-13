@@ -152,13 +152,18 @@ export function validateSellerTaxProfile(
 }
 
 /**
- * STRICT listing policy (the approved choice): a seller may list/sell only when
- * REGISTERED or COMPOSITION with a valid, admin-VERIFIED GSTIN. UNREGISTERED
- * sellers are blocked.
+ * Listing eligibility policy. YOMICO allows Registered (Regular), Composition
+ * and Unregistered sellers to list, provided:
+ *   - UNREGISTERED: ALLOWED. Legal eligibility to sell without GST registration
+ *     is the SELLER's own responsibility — YOMICO is not responsible for the
+ *     seller's GST registration, payment, filing or other GST obligations, and
+ *     never requires turnover details to grant listing eligibility.
+ *   - REGISTERED / COMPOSITION: unchanged — a valid, admin-VERIFIED GSTIN is
+ *     still required (existing GSTIN + verification checks preserved).
+ * A profile with no GST status chosen yet is not eligible (complete the profile).
  *
- * This is the ELIGIBILITY logic only. Wiring it to actually block product
- * creation is a separate, later step — enabling it here would not change
- * behaviour until a call site enforces it.
+ * This is the ELIGIBILITY logic; the server-side gate in
+ * app/api/seller/create-product enforces it so the client cannot bypass it.
  */
 /** Loose shape — vendor docs supply plain strings, not the narrowed unions. */
 export type ListingProfileLike = {
@@ -170,6 +175,12 @@ export type ListingProfileLike = {
 export function canSellerList(profile: ListingProfileLike): boolean {
   if (!profile) return false;
   const status = profile.gstStatus;
+  // Unregistered sellers may list — no GSTIN is required and none is expected;
+  // legal eligibility to operate without GST registration is the seller's own
+  // responsibility.
+  if (status === "UNREGISTERED") return true;
+  // Registered / Composition: preserved exactly — require a valid, admin-VERIFIED
+  // GSTIN. Any other/absent status is not eligible until a status is chosen.
   if (status !== "REGISTERED" && status !== "COMPOSITION") return false;
   if (!isValidGstin(profile.gstin)) return false;
   return profile.taxVerificationStatus === "VERIFIED";
@@ -182,8 +193,9 @@ export function sellerListingBlockReason(
   if (!profile || !profile.gstStatus) {
     return "Complete your GST / tax profile to start selling.";
   }
+  // Unregistered sellers may list (their own legal responsibility) — not blocked.
   if (profile.gstStatus === "UNREGISTERED") {
-    return "A GST registration (Regular or Composition) is required to list products.";
+    return null;
   }
   if (!isValidGstin(profile.gstin)) {
     return "Add a valid GSTIN to your tax profile to start selling.";
