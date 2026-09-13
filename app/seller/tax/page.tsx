@@ -98,12 +98,17 @@ export default function SellerTaxPage() {
         },
         body: JSON.stringify({
           gstStatus,
-          gstin,
+          // An UNREGISTERED seller must not submit a GSTIN (server rule in
+          // lib/sellerTax.ts). The GSTIN/registration-state inputs are hidden for
+          // a non-registered seller but their state can still be pre-filled from
+          // the vendor's registration gstNumber, so gate them on status here —
+          // otherwise a stale, unclearable GSTIN is sent and the save is rejected.
+          gstin: registered ? gstin : "",
           legalName,
           tradeName,
           pan,
           businessState,
-          gstRegistrationState,
+          gstRegistrationState: registered ? gstRegistrationState : "",
         }),
       });
       const data = await res.json();
