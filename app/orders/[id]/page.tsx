@@ -26,6 +26,7 @@ import {
   statusTone,
   type ItemRequestType,
 } from "@/lib/itemRequests";
+import DeliveryOtpNotice from "@/components/DeliveryOtpNotice";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -355,6 +356,10 @@ export default function OrderDetailsPage() {
           </div>
         </div>
 
+        {/* Delivery OTP notice — visible only while a shipment is out for
+            delivery. Shows a "code sent" message + Resend; never the code. */}
+        <DeliveryOtpNotice orderId={orderId} />
+
         {/* CANCEL — same Pending-only condition the orders list uses, so a
             customer can cancel from the page they opened to look at the order
             instead of having to navigate back to the list. */}
@@ -457,6 +462,7 @@ export default function OrderDetailsPage() {
         <div className="mt-8 bg-white rounded-3xl shadow border p-8">
           <h2 className="text-2xl font-bold mb-6">📦 Delivery Details</h2>
           {order.expectedDelivery ||
+          order.courierPartner ||
           order.courierName ||
           order.trackingNumber ? (
             <div className="space-y-4">
@@ -468,10 +474,10 @@ export default function OrderDetailsPage() {
                   </span>
                 </div>
               )}
-              {order.courierName && (
+              {(order.courierPartner || order.courierName) && (
                 <div className="flex justify-between">
                   <span>Courier Partner</span>
-                  <span className="font-semibold">{order.courierName}</span>
+                  <span className="font-semibold">{order.courierPartner || order.courierName}</span>
                 </div>
               )}
               {order.trackingNumber && (

@@ -71,3 +71,23 @@ export function deliveryProofPath(
     file?.name
   )}`;
 }
+
+/**
+ * Sensitive delivery-partner KYC documents (freelancer Aadhaar + bank cancelled
+ * cheque). Owner-scoped under the applicant's uid so storage.rules can match
+ * `request.auth.uid == uid` (owner + admin read only — the same locked model as
+ * vendor-kyc). Returns the Storage OBJECT PATH only; the caller stores this path
+ * in the application document and never persists a public getDownloadURL token.
+ * The label is whitelisted so a caller can never steer the object outside the
+ * intended folder, and the filename is sanitized (no path traversal).
+ */
+const DELIVERY_KYC_LABELS = new Set(["aadhaar", "cheque"]);
+export function deliveryKycPath(
+  uid: string | null | undefined,
+  label: string,
+  file: File
+): string {
+  const safeUid = assertUid(uid, "delivery KYC document");
+  const safeLabel = DELIVERY_KYC_LABELS.has(label) ? label : "doc";
+  return `delivery-kyc/${safeUid}/${safeLabel}-${uniqueFileName(file?.name)}`;
+}

@@ -26,7 +26,7 @@ export function getAdminApp(): App {
 
   if (!serviceAccountKey) {
     throw new Error(
-      "FIREBASE_SERVICE_ACCOUNT_KEY is not set. Add the Firebase service account JSON (as a single-line string) to .env.local to enable AI Engine data access."
+      "FIREBASE_SERVICE_ACCOUNT_KEY is not set. Add the Firebase service account JSON (as a single-line string) to the environment to enable Admin SDK access."
     );
   }
 

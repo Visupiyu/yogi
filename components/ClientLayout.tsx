@@ -16,6 +16,21 @@ const HIDE_CHROME_PREFIXES = [
   // Has its own full saffron header + hero built into the page — the
   // shared MinimalHeader would stack a second, redundant bar above it.
   "/vendor-register",
+  // Delivery-partner registration pages carry their own branded header/hero
+  // (same reasoning as vendor-register). Whole-segment matches, so
+  // "/delivery-company-register" is distinct from "/delivery-company".
+  "/delivery-register",
+  "/delivery-company-register",
+  // The Delivery Company operator console has its OWN header/nav and auth gate;
+  // the customer TopStrip/Navbar/MobileBottomNav and the customer email-
+  // verification banner must never appear inside it. Whole-segment match, so it
+  // covers /delivery-company and /delivery-company/* but NOT
+  // /delivery-company-register (already listed above).
+  "/delivery-company",
+  // The Delivery Person web app (login + person console) has its OWN shell;
+  // the customer chrome/verification banner must not appear inside it. Note
+  // "/delivery" above does NOT cover "/delivery-app" (whole-segment match).
+  "/delivery-app",
 ];
 
 // Vendor/delivery-partner auth pages hide the customer navbar (its Login

@@ -116,6 +116,15 @@ export async function POST(request: Request) {
         itemFulfilment?: ItemFulfilmentMap;
       };
 
+      // 2B-5: if a Delivery Engine job covers this record (jobId === recordId),
+      // physical Delivered is owned by the Delivery Engine and its commerce
+      // reconciliation — the seller may not manually mark it Delivered. Earlier
+      // stages remain seller-controlled. Read here (reads-first) and enforced
+      // below once the target stage is known. Orders with no delivery job keep
+      // the existing manual Delivered path.
+      const deliveryJobSnap = await tx.get(db.collection("deliveryJobs").doc(recordId));
+      const hasDeliveryJob = deliveryJobSnap.exists;
+
       // Ownership. A seller may only ever advance their own product — this is
       // the same boundary firestore.rules draws on reads, restated here
       // because the Admin SDK bypasses rules.
@@ -171,6 +180,18 @@ export async function POST(request: Request) {
       // Belt and braces: the same rule the UI and the client-side model use.
       if (!isLegalItemTransition(current, next)) {
         return { kind: "error", status: 409, error: "Illegal transition." };
+      }
+
+      // 2B-5 server guard: the seller cannot manually mark a Delivery-Engine-
+      // covered record Delivered — that transition is owned by the DELIVER scan
+      // + commerce reconciliation. Earlier stages are unaffected.
+      if (next === "Delivered" && hasDeliveryJob) {
+        return {
+          kind: "error",
+          status: 409,
+          error:
+            "Final delivery for this order is handled by the Delivery Engine and cannot be marked manually.",
+        };
       }
 
       // Every seller's records for this order — needed to roll the parent up.

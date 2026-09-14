@@ -189,7 +189,7 @@ export default function OrdersPage() {
                   <div>
                     <h2 className="text-2xl font-bold">
                       Order #
-                      {order.id.slice(0, 8)}
+                      {order.orderNumber || order.id.slice(0, 8)}
                     </h2>
                     <p className="mt-4">
                       👤 {order.customerName}
@@ -550,7 +550,7 @@ export default function OrdersPage() {
 
   )}
 
-  {order.courierName && (
+  {(order.courierPartner || order.courierName) && (
 
     <p className="mb-2">
 
@@ -560,7 +560,7 @@ export default function OrdersPage() {
 
       <span className="font-semibold">
 
-        {order.courierName}
+        {order.courierPartner || order.courierName}
 
       </span>
 

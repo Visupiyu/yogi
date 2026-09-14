@@ -272,6 +272,28 @@ export async function finalizeOnlineOrder(params: {
       });
     }
 
+    // Inventory + Order Consistency V1 — ONLY when a shortfall happened
+    // (never rejected above, since the payment is already captured): the
+    // order's own items[].qty stays the customer's ORIGINALLY REQUESTED
+    // quantity (unchanged, so pricing/receipts stay honest about what was
+    // paid for), which can now exceed what was ACTUALLY decremented from
+    // inventory. Without recording the real figure, cancelling this order
+    // later (app/api/cancel-order) would restore the requested quantity —
+    // creating stock units that were never actually taken. This is the
+    // minimal additive marker: the actual total decremented per product,
+    // straight off the decrements/variantWrites already computed above —
+    // no new computation, just persisting it. Absent on the (overwhelmingly
+    // common) clean order with no shortfall.
+    const stockDeductedQty: Record<string, number> = {};
+    if (shortfalls.length > 0) {
+      for (const { ref, qty } of decrements) {
+        stockDeductedQty[ref.id] = (stockDeductedQty[ref.id] || 0) + qty;
+      }
+      for (const { ref, taken } of variantWrites) {
+        stockDeductedQty[ref.id] = (stockDeductedQty[ref.id] || 0) + taken;
+      }
+    }
+
     tx.set(orderRef, {
       orderNumber,
       paymentNumber,
@@ -330,6 +352,7 @@ export async function finalizeOnlineOrder(params: {
       // Anything that needed tolerating rather than rejecting. Absent on a
       // clean order; present means an admin should look.
       ...(shortfalls.length > 0 ? { stockShortfall: shortfalls } : {}),
+      ...(Object.keys(stockDeductedQty).length > 0 ? { stockDeductedQty } : {}),
       ...(couponConflict ? { couponConflict: true } : {}),
       ...(rewardShort > 0 ? { rewardShortfall: rewardShort } : {}),
       ...(shortfalls.length > 0 || couponConflict || rewardShort > 0
