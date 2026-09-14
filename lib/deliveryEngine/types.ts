@@ -48,6 +48,18 @@ export type DeliveryAvailability = "Available" | "Offline" | "Busy";
 // phase (locked decision 5). New code reads accountStatus; this shadows it.
 export type DeliveryPersonStatus = "Active" | "Inactive";
 
+// Physical role within a COMPANY workforce (four-actor COMPANY_HUB model,
+// Phase 1). Server-owned — NEVER trusted from a client body; every route that
+// creates/reads a person derives or defaults this itself.
+//   RIDER      -> moves a parcel between two points (seller<->hub, hub<->
+//                 customer). Every existing/legacy person (incl. ALL YOMICO
+//                 persons, which are never hub staff) is a RIDER; a doc with no
+//                 `role` at all defaults to RIDER for backward compatibility.
+//   HUB_PERSON -> stationed AT one specific DeliveryHub (hubId REQUIRED, never
+//                 optional) to receive parcels handed to that hub. Only ever
+//                 valid for a COMPANY person.
+export type DeliveryPersonRole = "RIDER" | "HUB_PERSON";
+
 // Collection: deliveryPersons/{personId}
 // personId REUSES the existing deliveryPartners doc id on migration, so
 // orders.deliveryPartnerId references stay valid.
@@ -57,6 +69,13 @@ export type DeliveryPerson = {
   // The mutual-exclusion invariant (providerType/companyId) is enforced
   // server-side on create — never trusted from a client body.
   companyId: string | null;
+  // Absent on every legacy/YOMICO doc => treated as RIDER (see
+  // DeliveryPersonRole). Only a COMPANY person may ever be "HUB_PERSON".
+  role?: DeliveryPersonRole;
+  // REQUIRED (and only meaningful) when role is "HUB_PERSON": the one
+  // DeliveryHub this person is stationed at. MUST be null/absent for a RIDER
+  // and for every YOMICO person — never optional-but-empty for a hub person.
+  hubId?: string | null;
   uid: string; // Firebase Auth uid (preserved on migration)
   name: string;
   phone: string;
@@ -105,6 +124,10 @@ export type DeliveryPersonInput = {
   vehicleNumber?: string;
   serviceArea?: string;
   city?: string;
+  // Optional; server defaults to "RIDER" when omitted. "HUB_PERSON" REQUIRES
+  // hubId — the server rejects one without the other (see company/persons).
+  role?: DeliveryPersonRole;
+  hubId?: string | null;
 };
 
 // ===========================================================================
@@ -212,7 +235,15 @@ export type DeliveryExceptionCode =
   | "FAILED_PICKUP"
   | "FAILED_DELIVERY"
   | "HANDOVER_TIMEOUT"
-  | "PERSON_UNAVAILABLE";
+  | "PERSON_UNAVAILABLE"
+  // Delivery Failure/Exception Handling V1 — rider-reported customer-delivery
+  // attempt reasons (see lib/deliveryEngine/deliveryException.ts). CUSTOMER_
+  // UNAVAILABLE above is reused as-is; these four are additive.
+  | "CUSTOMER_REFUSED"
+  | "ADDRESS_PROBLEM"
+  | "COD_PAYMENT_FAILED"
+  | "OTP_VERIFICATION_FAILED"
+  | "OTHER";
 
 // Proof captured at a custody-changing scan. scan+timestamp+actor+geo are the
 // core; photo/signature are optional/future; otpVerified gates final delivery.
@@ -227,6 +258,27 @@ export type ProofRecord = {
   otpVerified?: boolean;
 };
 
+// Proof-of-Delivery (POD) foundation — Part 1. A durable, server-derived
+// summary written on the SAME job-level write as the DELIVER transition
+// (execution.ts), never a second custody mutation or a second event. Every
+// value is derived from the authenticated actor, the current leg, or the
+// order doc — NEVER from the client request. Deliberately amount-free
+// (codPaymentStatus/codPaymentReference only — never an amount), matching the
+// no-financial-fields boundary the rest of this file already documents for
+// every other DeliveryJob field (see jobFactory.ts's assertNoFinancialFields).
+export type DeliveryPod = {
+  deliveredAt: unknown; // server Timestamp — never the client's capturedAt
+  deliveredByPersonId: string;
+  eventId: string; // the DELIVER DeliveryEvent's id — the durable audit reference
+  legId: string;
+  otpVerified: true; // DELIVER only ever writes this once OTP verification succeeded
+  // Present only for a PAY_ON_DELIVERY_UPI order — the order's own
+  // paymentStatus/paymentTransactionId AT THE MOMENT of delivery (see
+  // codPayment.ts for what these values mean). Null for a non-COD order.
+  codPaymentStatus?: string | null;
+  codPaymentReference?: string | null;
+};
+
 // Two-sided custody handover between two delivery people (relay, or a future
 // inter-leg handover). Custody transfers only on Confirmed by the incoming party.
 export type LegHandover = {
@@ -237,6 +289,53 @@ export type LegHandover = {
   toPersonId: string;
   initiatedAt: unknown;
   initiatedEventId: string;
+  confirmedAt?: unknown | null;
+  confirmedEventId?: string | null;
+};
+
+// Two-actor ORIGIN HUB handover (four-actor COMPANY_HUB model, Phase 1):
+//   Rider 1 (fromPersonId)  "I am handing this shipment to the Origin Hub."
+//   Origin Hub Person       "I received this shipment." (confirmedByPersonId)
+// Deliberately NOT the generic LegHandover above: LegHandover requires a
+// specific NAMED toPersonId chosen by the outgoing party, but Rider 1 does not
+// choose which Hub Person receives it — ANY eligible person stationed at the
+// target hub may confirm. state "Initiated" => the parcel is still physically
+// in Rider 1's custody (custody is UNCHANGED); only "Confirmed" moves custody
+// to COMPANY at the hub. fromPersonName is denormalized (mirrors
+// assignedPersonName elsewhere) purely so the receiving Hub Person's task list
+// needs no extra read.
+export type OriginHubHandover = {
+  state: "Initiated" | "Confirmed";
+  hubId: string;
+  fromPersonId: string;
+  fromPersonName: string;
+  initiatedAt: unknown;
+  initiatedEventId: string;
+  confirmedByPersonId?: string | null;
+  confirmedAt?: unknown | null;
+  confirmedEventId?: string | null;
+};
+
+// Two-actor DESTINATION HUB -> RIDER 2 handover (four-actor COMPANY_HUB model,
+// Phase 2):
+//   Destination Hub Person (fromPersonId)  "I am handing this shipment to Rider 2."
+//   Rider 2                                "I received this shipment."
+// Unlike OriginHubHandover, the receiving party here IS already named — Rider 2
+// was selected by the dispatcher (applyFinalMileAssignment) BEFORE this handover
+// starts, and that selection is recorded as the leg's own assignedPersonId, so
+// this type deliberately carries no separate toPersonId (one source of truth:
+// leg.assignedPersonId). state "Initiated" => custody is UNCHANGED (still
+// parked at the hub, holderKind COMPANY / personId null); only "Confirmed"
+// moves custody to Rider 2. fromPersonName is denormalized purely for a
+// self-contained audit record on the leg.
+export type DestinationHandover = {
+  state: "Initiated" | "Confirmed";
+  hubId: string;
+  fromPersonId: string;
+  fromPersonName: string;
+  initiatedAt: unknown;
+  initiatedEventId: string;
+  confirmedByPersonId?: string | null;
   confirmedAt?: unknown | null;
   confirmedEventId?: string | null;
 };
@@ -281,7 +380,10 @@ export type DeliveryJob = {
   responsibleParty: ResponsibleParty | null;
   lastEventId: string | null;
   lastEventAt: unknown | null;
-  pickup: { sellerName: string; area: string };
+  // Seller pickup location, SNAPSHOTTED from the vendor's own profile at job
+  // creation (materialize) — never re-read from the vendor doc afterward, so a
+  // later change to the vendor's address does not alter an existing job.
+  pickup: { sellerName: string; street: string; unit: string; city: string; state: string; zipCode: string };
   drop: { customerName: string; phone: string; address: string; slot: string | null };
   parcel: { items: DeliveryParcelItem[] };
   attemptCount: number;
@@ -310,22 +412,41 @@ export type DeliveryJob = {
   // for the "at origin hub" milestone. Absent for YOMICO DIRECT jobs.
   currentHubId?: string | null;
   originHubIntakeAt?: unknown | null;
+  // Four-actor origin-hub handover (Phase 1) — a TRANSIENT task-queue marker,
+  // set by the handover-initiate transition and cleared (null) by the
+  // handover-confirm transition. Mirrors the current leg's originHubHandover
+  // ONLY while state is "Initiated"; this is what a HUB_PERSON's task query
+  // (my-hub-tasks) filters on — deliberately separate from assignedPersonId so
+  // a hub person never appears in a rider's /my-jobs query. Absent/null once
+  // there is no outstanding origin-hub handover awaiting receipt.
+  pendingOriginHubHandover?: OriginHubHandover | null;
   // COMPANY_HUB journey — transit / line-haul. Set by the transit-departure
   // transition when the parcel leaves the origin hub into line-haul. originHubId
   // preserves the origin hub after the parcel has left it (currentHubId becomes
   // null while in transit — it is not AT any hub). transitStartedAt is the
   // denormalised timestamp the customer tracking uses for the "in transit"
-  // milestone. Destination hub is intentionally NOT represented yet.
+  // milestone.
   originHubId?: string | null;
   transitStartedAt?: unknown | null;
-  // COMPANY_HUB journey — destination hub. Set by the destination-hub-receipt
-  // transition when the line-haul person delivers the parcel into the (explicitly
-  // requested, server-validated) destination hub. There is no persisted
-  // destination-routing source today, so this hub is never auto-selected — it is
-  // provided by the authorized receiving actor and validated. destinationHubId
-  // also becomes currentHubId once received; destinationHubReceivedAt is the
-  // denormalised timestamp customer tracking uses for the "at destination hub"
-  // milestone. Final-mile is a later slice — NOT set here.
+  // COMPANY_HUB journey — destination hub.
+  //
+  // PHASE 5: destinationHubId is now set by the TRANSIT-DEPARTURE transition
+  // (transit.ts), as an explicit, server-validated DISPATCHER decision — the
+  // only authoritative, non-guessed source (never derived from hub count,
+  // city/address text, or geocoding). It is METADATA: the INTENDED
+  // destination, established before the parcel ever moves. This is DISTINCT
+  // from custody.hubId (the physical CURRENT hub location, null throughout
+  // transit) and from currentHubId (mirrors custody.hubId) — destinationHubId
+  // does not change either of those and is not itself custody.
+  //
+  // The destination-hub-receipt transition (destinationHub.ts) later
+  // re-validates that the receiving Hub Person's own hub matches this exact
+  // field (rejecting a mismatched hub) rather than establishing it for the
+  // first time — except for a job that entered transit before this field
+  // existed, where receipt still establishes it once, for backward
+  // compatibility. destinationHubReceivedAt is the denormalised timestamp
+  // customer tracking uses for the "at destination hub" milestone. Final-mile
+  // is a later slice — NOT set here.
   destinationHubId?: string | null;
   destinationHubReceivedAt?: unknown | null;
   // COMPANY_HUB journey — final-mile assignment. Set by the final-mile-assignment
@@ -338,7 +459,23 @@ export type DeliveryJob = {
   // uses for the "assigned for final delivery" milestone. Absent for DIRECT jobs.
   finalMileAssignedAt?: unknown | null;
   deliveredAt?: unknown | null;
+  // Set by a rider-reported customer-delivery exception (Delivery Failure/
+  // Exception Handling V1 — see deliveryException.ts). Reused for its
+  // obvious intended purpose; never written anywhere else today.
   failedAt?: unknown | null;
+  // Most recent customer-delivery exception a final-mile rider reported.
+  // Mirrors the current leg's own `exception` (LegException) for convenience
+  // — NOT a second source of truth; both are written in the SAME
+  // transaction. Persists across a later reattempt (a subsequent
+  // OUT_FOR_DELIVERY does not clear it) as a simple "last reported issue"
+  // audit trail; never read to gate any transition itself.
+  lastDeliveryException?: {
+    code: DeliveryExceptionCode;
+    reportedAt: unknown;
+    reportedByPersonId: string;
+    note?: string | null;
+    eventId: string;
+  } | null;
   // 2B-5: set by the commerce-owned reconciliation (NOT by the Delivery Engine
   // scan path) once a Delivered job has been reflected into its sellerOrder /
   // order. Its presence is the idempotency/retry marker: unset on a Delivered
@@ -352,10 +489,15 @@ export type DeliveryJob = {
   deliveryOtpHash?: string | null;
   deliveryOtpIssuedAt?: unknown | null;
   deliveryOtpAttempts?: number | null;
+  // POD foundation — Part 1. Set ONCE, only by the DELIVER transition in
+  // execution.ts, alongside status/deliveredAt on that SAME write. See
+  // DeliveryPod above. Absent on every job that has not yet been Delivered.
+  pod?: DeliveryPod | null;
   createdAt?: unknown;
   updatedAt?: unknown;
-  // NO cod/payment fields (payment sub-phase), NO agreedCost/wallet/earnings/
-  // settlement/pricing/commission — ever.
+  // NO cod/payment AMOUNT fields ever (see DeliveryPod above for the one
+  // exception: a non-amount payment STATE/REFERENCE snapshot at delivery
+  // time), NO agreedCost/wallet/earnings/settlement/pricing/commission — ever.
 };
 
 // Collection: deliveryJobs/{jobId}/legs/{legId}
@@ -379,6 +521,16 @@ export type DeliveryLeg = {
   // populated by execution scans. attemptCount counts delivery attempts.
   custody?: CustodyState | null;
   handover?: LegHandover | null;
+  // Four-actor origin-hub handover (Phase 1) — the PERMANENT audit record on
+  // the Pickup leg. Distinct from `handover` above (the generic person->named
+  // -person relay), never the other's shape. Absent on any leg that never goes
+  // through an origin-hub handover (YOMICO Direct, and every leg after Pickup).
+  originHubHandover?: OriginHubHandover | null;
+  // Four-actor destination-hub -> Rider 2 handover (Phase 2) — the PERMANENT
+  // audit record on the FinalMile leg. Distinct from both `handover` and
+  // `originHubHandover`. Absent on any leg that never goes through this
+  // handover (YOMICO Direct, and every leg before the FinalMile leg).
+  destinationHandover?: DestinationHandover | null;
   proof?: { pickup?: ProofRecord | null; delivery?: ProofRecord | null } | null;
   exception?: LegException | null;
   attemptCount?: number;
@@ -415,6 +567,11 @@ export type DeliveryEvent = {
   // COMPANY_HUB journey: the hub a custody-to-hub transition (e.g. origin-hub
   // intake) parked the parcel at. Audit only; null for non-hub events.
   hubId?: string | null;
+  // Denormalized from the job for a customer-delivery exception report (see
+  // deliveryException.ts) — lets a future order-level projection query "all
+  // exceptions for this order" without joining through jobId. Audit only;
+  // absent on every event that isn't a delivery-exception report.
+  orderId?: string | null;
   at?: unknown;
   geo?: { lat: number; lng: number } | null;
   notes?: string | null;
@@ -438,6 +595,12 @@ export type DeliveryHub = {
   name: string;
   city?: string;
   region?: string;
+  // Optional real street address, for the V1 navigation feature only (see
+  // lib/deliveryEngine/taskLocation.ts's deriveNavigationDestination). Absent
+  // on every hub created before this field existed and NEVER backfilled/
+  // geocoded automatically — a hub with no address here honestly reports
+  // navigation as unavailable rather than guessing one.
+  address?: string;
   status: DeliveryHubStatus;
   createdBy?: string; // admin uid that provisioned it
   createdAt?: unknown;

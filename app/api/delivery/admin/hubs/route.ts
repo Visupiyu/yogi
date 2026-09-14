@@ -7,7 +7,14 @@ import type { DeliveryCompany, DeliveryHub } from "@/lib/deliveryEngine/types";
 // Admin-managed company hubs (server-only collection deliveryHubs).
 //
 //   GET  /api/delivery/admin/hubs?companyId=...   list a company's hubs (admin)
-//   POST /api/delivery/admin/hubs  { companyId, name, city?, region? }  create
+//   POST /api/delivery/admin/hubs  { companyId, name, city?, region?, address? }  create
+//
+// `address` is optional (V1 navigation feature — see
+// lib/deliveryEngine/taskLocation.ts's deriveNavigationDestination): a real
+// street address a rider's map app can navigate to. Omitted/blank means this
+// hub has none on file yet — NEVER invented or geocoded here or anywhere else;
+// navigation to a hub with no address is reported to the mobile app as
+// honestly unavailable instead.
 //
 // Admin only. A hub always belongs to exactly one company (companyId is stored
 // server-side and is the authorization scope for every hub operation elsewhere).
@@ -32,7 +39,15 @@ export async function GET(request: Request) {
 
   const hubs = snap.docs.map((d) => {
     const h = d.data() as DeliveryHub;
-    return { id: d.id, companyId: h.companyId, name: h.name, city: h.city ?? "", region: h.region ?? "", status: h.status };
+    return {
+      id: d.id,
+      companyId: h.companyId,
+      name: h.name,
+      city: h.city ?? "",
+      region: h.region ?? "",
+      address: h.address ?? "",
+      status: h.status,
+    };
   });
   return Response.json({ hubs });
 }
@@ -58,11 +73,16 @@ export async function POST(request: Request) {
   void (companySnap.data() as DeliveryCompany);
 
   const now = Timestamp.now();
+  const address = str(body.address, 200);
   const ref = await db.collection("deliveryHubs").add({
     companyId, // server-owned ownership scope
     name,
     city: str(body.city, 80),
     region: str(body.region, 80),
+    // Optional; omitted entirely (not stored as "") when blank, so a hub with
+    // no address on file stays indistinguishable from one created before this
+    // field existed — both honestly report navigation as unavailable.
+    ...(address ? { address } : {}),
     status: "Active",
     createdBy: requester.uid,
     createdAt: now,

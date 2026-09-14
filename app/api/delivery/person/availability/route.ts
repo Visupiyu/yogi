@@ -55,12 +55,26 @@ export async function POST(request: Request) {
   const availability = str(body.availability, 12);
   if (availability !== "Available" && availability !== "Offline")
     return Response.json({ error: "availability must be Available or Offline." }, { status: 400 });
+  // Busy is engine-managed and cannot be changed by a person.
+  // Read + write must be atomic so assignment cannot race with this update.
+  const db = getAdminDb();
+  const personRef = db.collection("deliveryPersons").doc(actor.personId);
 
-  // Write ONLY availability to the caller's own person doc (id from the actor).
-  await getAdminDb()
-    .collection("deliveryPersons")
-    .doc(actor.personId)
-    .update({ availability, updatedAt: Timestamp.now() });
+  const finalAvailability = await db.runTransaction(async (tx) => {
+    const snapshot = await tx.get(personRef);
+    const currentAvailability = snapshot.data()?.availability;
 
-  return Response.json({ ok: true, availability });
+    if (currentAvailability === "Busy") {
+      return "Busy";
+    }
+
+    tx.update(personRef, {
+      availability,
+      updatedAt: Timestamp.now(),
+    });
+
+    return availability;
+  });
+
+  return Response.json({ ok: true, availability: finalAvailability });
 }

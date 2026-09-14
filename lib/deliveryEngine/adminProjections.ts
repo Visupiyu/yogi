@@ -47,6 +47,15 @@ export type AdminJobRow = {
   updatedAt: string | null;
   executionStartedAt: string | null;
   deliveredAt: string | null;
+  // Admin Operations V1 — the most recent rider-reported customer-delivery
+  // exception (see lib/deliveryEngine/deliveryException.ts), if any. Never
+  // cleared on a later reattempt — this is a "last reported issue" audit
+  // trail, exactly as the field itself already documents on DeliveryJob.
+  lastDeliveryException: {
+    code: string;
+    reportedAt: string | null;
+    note: string | null;
+  } | null;
 };
 
 export function buildAdminJobRow(jobId: string, job: DeliveryJob): AdminJobRow {
@@ -81,6 +90,13 @@ export function buildAdminJobRow(jobId: string, job: DeliveryJob): AdminJobRow {
     updatedAt: toIso(job.updatedAt),
     executionStartedAt: toIso(job.executionStartedAt),
     deliveredAt: toIso(job.deliveredAt),
+    lastDeliveryException: job.lastDeliveryException
+      ? {
+          code: typeof job.lastDeliveryException.code === "string" ? job.lastDeliveryException.code : "",
+          reportedAt: toIso(job.lastDeliveryException.reportedAt),
+          note: s(job.lastDeliveryException.note ?? null, 500),
+        }
+      : null,
   };
 }
 
@@ -145,5 +161,85 @@ export function buildAdminCompanyRow(companyId: string, c: DeliveryCompany): Adm
       ? c.serviceAreas.filter((x): x is string => typeof x === "string").slice(0, 50)
       : [],
     hasOwner: typeof c.ownerUid === "string" && c.ownerUid.length > 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Admin Operations V1 — return-collection jobs (reverse logistics; see
+// lib/deliveryEngine/returnCollection.ts). DELIBERATELY a separate row shape
+// from AdminJobRow above: a return-collection job is not a forward
+// deliveryJobs document (different collection, different status vocabulary —
+// see ReturnJobStatus — and no leg/custody-handover concept), so this is
+// never merged into, or mistaken for, a forward-delivery row. Explicit
+// allow-list, same discipline as every other admin projection here — no
+// scanToken/OTP exist on this record anyway, but raw customer/seller uid
+// (job.userId/vendorId) are still excluded in favour of the names already
+// denormalized onto the job.
+export type AdminReturnJobRow = {
+  returnJobId: string;
+  returnRequestId: string;
+  orderId: string;
+  orderNumber: string | null;
+  requestNumber: string | null;
+  vendorName: string | null;
+  customerName: string | null;
+  itemName: string | null;
+  itemQty: number;
+  status: string;
+  providerType: "YOMICO" | "COMPANY" | null;
+  companyId: string | null;
+  assignedPersonId: string | null;
+  assignedPersonName: string | null;
+  attemptCount: number;
+  appointmentAt: string | null;
+  lastException: { code: string; note: string | null; at: string | null } | null;
+  collectedAt: string | null;
+  receivedAt: string | null;
+  failedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export function buildAdminReturnJobRow(
+  returnJobId: string,
+  job: Record<string, unknown>
+): AdminReturnJobRow {
+  const item = (job.item as { name?: unknown; qty?: unknown }) || {};
+  const pickup = (job.pickup as { customerName?: unknown }) || {};
+  const lastException = job.lastException as
+    | { code?: unknown; note?: unknown; at?: unknown }
+    | null
+    | undefined;
+  const providerType =
+    job.providerType === "YOMICO" || job.providerType === "COMPANY" ? job.providerType : null;
+  return {
+    returnJobId,
+    returnRequestId: s(job.returnRequestId, 200) || "",
+    orderId: s(job.orderId, 200) || "",
+    orderNumber: s(job.orderNumber, 40),
+    requestNumber: s(job.requestNumber, 40),
+    vendorName: s((job.destination as { name?: unknown } | undefined)?.name, 200) || s(job.vendorName, 200),
+    customerName: s(pickup.customerName, 200) || s(job.customerName, 200),
+    itemName: s(item.name, 200),
+    itemQty: Number(item.qty) > 0 ? Number(item.qty) : 1,
+    status: typeof job.status === "string" ? job.status : "",
+    providerType,
+    companyId: s(job.companyId, 128),
+    assignedPersonId: s(job.assignedPersonId, 128),
+    assignedPersonName: s(job.assignedPersonName, 200),
+    attemptCount: Number(job.attemptCount) || 0,
+    appointmentAt: toIso(job.appointmentAt),
+    lastException: lastException
+      ? {
+          code: typeof lastException.code === "string" ? lastException.code : "",
+          note: s(lastException.note ?? null, 500),
+          at: toIso(lastException.at),
+        }
+      : null,
+    collectedAt: toIso(job.collectedAt),
+    receivedAt: toIso(job.receivedAt),
+    failedAt: toIso(job.failedAt),
+    createdAt: toIso(job.createdAt),
+    updatedAt: toIso(job.updatedAt),
   };
 }

@@ -19,6 +19,7 @@ import {
   stageLabel,
   itemsSummary,
   companyLifecycle,
+  pickupAddressLine,
   COMPANY_ACTIONABLE_STATUSES,
   type CompanyJobDetail,
   type CompanyPerson,
@@ -27,6 +28,12 @@ import {
 // The persisted stage at which the company dispatcher assigns the final-mile
 // rider (server re-validates this precondition; the UI only gates visibility).
 const FINAL_MILE_STAGE = "AtDestinationHub";
+// The persisted stage once a final-mile rider IS already selected. Whether a
+// dispatcher may still CORRECT that selection is NOT decided here — it is
+// read from the backend's own job.task.finalMileHandoverState ("ready" means
+// the destination-hub handover has not started yet); the server re-validates
+// this precondition independently and remains authoritative.
+const FINAL_MILE_ASSIGNED_STAGE = "FinalMileAssigned";
 
 export default function DeliveryCompanyJobDetailPage() {
   const params = useParams<{ jobId: string }>();
@@ -74,15 +81,22 @@ export default function DeliveryCompanyJobDetailPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Lazily load people once the job is actionable (assign/reject) OR the shipment
-  // is at the destination hub awaiting a company-selected final-mile rider.
+  // Lazily load people once the job is actionable (assign/reject), the shipment
+  // is at the destination hub awaiting a company-selected final-mile rider, OR
+  // a final-mile rider IS selected but the handover hasn't started yet (so a
+  // reassignment correction is still possible).
+  const canReassignFinalMile =
+    !!job &&
+    job.currentStage === FINAL_MILE_ASSIGNED_STAGE &&
+    job.task?.finalMileHandoverState === "ready";
   useEffect(() => {
     const needsPeople =
-      !!job && (COMPANY_ACTIONABLE_STATUSES.has(job.status) || job.currentStage === FINAL_MILE_STAGE);
+      !!job &&
+      (COMPANY_ACTIONABLE_STATUSES.has(job.status) || job.currentStage === FINAL_MILE_STAGE || canReassignFinalMile);
     if (needsPeople && persons === null && !personsLoading) {
       void loadPersons();
     }
-  }, [job, persons, personsLoading, loadPersons]);
+  }, [job, persons, personsLoading, loadPersons, canReassignFinalMile]);
 
   const afterAction = useCallback(async () => {
     await Promise.all([load(), loadPersons()]);
@@ -150,6 +164,12 @@ export default function DeliveryCompanyJobDetailPage() {
             )}
           </Card>
 
+          {/* Pickup / Seller */}
+          <Card title="Pickup / Seller">
+            <Row k="Seller" v={job.pickup?.sellerName} />
+            <Row k="Address" v={pickupAddressLine(job.pickup)} />
+          </Card>
+
           {/* Destination */}
           <Card title="Destination">
             <Row k="Customer" v={job.drop?.customerName} />
@@ -198,6 +218,24 @@ export default function DeliveryCompanyJobDetailPage() {
               </p>
               <FinalMileAssign
                 jobId={job.id}
+                persons={persons}
+                personsLoading={personsLoading}
+                personsError={personsError}
+                onReloadPersons={() => void loadPersons()}
+                onDone={() => void afterAction()}
+              />
+            </Card>
+          ) : canReassignFinalMile ? (
+            <Card title="Reassign final-mile rider">
+              <p className="mb-3 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {job.assignedPersonName || "The current rider"} is assigned but has not yet received this shipment
+                from the destination hub — you can still choose a different rider. This does not move custody or
+                change who is currently responsible for the parcel; it only corrects the selection before hand-off.
+              </p>
+              <FinalMileAssign
+                jobId={job.id}
+                mode="reassign"
+                currentPersonId={job.assignedPersonId}
                 persons={persons}
                 personsLoading={personsLoading}
                 personsError={personsError}

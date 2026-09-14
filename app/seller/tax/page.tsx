@@ -29,6 +29,7 @@ export default function SellerTaxPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [verification, setVerification] = useState<string>("");
+  const [rejectionReason, setRejectionReason] = useState<string>("");
 
   const [gstStatus, setGstStatus] = useState<GstStatus | "">("");
   const [gstin, setGstin] = useState("");
@@ -52,6 +53,7 @@ export default function SellerTaxPage() {
           | {
               taxProfile?: Record<string, string>;
               taxVerificationStatus?: string;
+              taxRejectionReason?: string;
               panNumber?: string;
               businessName?: string;
               fullName?: string;
@@ -70,6 +72,7 @@ export default function SellerTaxPage() {
         setBusinessState(tp.businessState || v?.state || "");
         setGstRegistrationState(tp.gstRegistrationState || v?.state || "");
         setVerification(v?.taxVerificationStatus || "");
+        setRejectionReason(typeof v?.taxRejectionReason === "string" ? v.taxRejectionReason : "");
       } catch (e) {
         console.error(e);
       } finally {
@@ -117,6 +120,7 @@ export default function SellerTaxPage() {
         return;
       }
       setVerification("PENDING");
+      setRejectionReason(""); // resubmitting clears the previous rejection from view
       toast.success("Tax profile saved. It's now pending verification.");
     } catch (e) {
       console.error(e);
@@ -165,12 +169,33 @@ export default function SellerTaxPage() {
 
         {verification && (
           <div
-            className={`mb-6 inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
+            className={`mb-3 inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
               VERIFY_BADGE[verification] || "bg-gray-100 text-gray-600"
             }`}
           >
             Verification: {verification}
           </div>
+        )}
+
+        {verification === "REJECTED" && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-semibold text-red-800">
+              Your GST details were not verified.
+            </p>
+            {rejectionReason ? (
+              <p className="mt-1 text-sm text-red-700">Reason: {rejectionReason}</p>
+            ) : null}
+            <p className="mt-1 text-xs text-red-700">
+              Please correct your tax information below and save again to resubmit for
+              verification.
+            </p>
+          </div>
+        )}
+
+        {verification === "PENDING" && (
+          <p className="mb-6 text-xs text-amber-700">
+            Your GST details are pending verification by our team.
+          </p>
         )}
 
         <div className="bg-white rounded-3xl shadow p-6 sm:p-8 space-y-5">

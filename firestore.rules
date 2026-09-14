@@ -711,6 +711,12 @@ service cloud.firestore {
           // is likewise server-minted.
           && unchanged('taxProfile')
           && unchanged('taxVerificationStatus')
+          // Verification RESULT fields are written ONLY by the admin server route
+          // (app/api/admin/seller-tax-verification) — a seller may never set their
+          // own decision timestamp, deciding admin, or rejection reason.
+          && unchanged('taxVerifiedAt')
+          && unchanged('taxVerifiedBy')
+          && unchanged('taxRejectionReason')
           && unchanged('sellerNumber')
         );
 

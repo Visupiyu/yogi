@@ -1,8 +1,8 @@
 "use client";
 
 // Company-managed lifecycle controls for the ONE Company Job:
-//   • AtOriginHub → dispatch into COMPANY transit  (POST .../transit-depart)
-//   • InTransit   → receive at a destination hub    (POST .../destination-receipt { hubId })
+//   • AtOriginHub → dispatch into COMPANY transit  (POST .../transit-depart { destinationHubId })
+//   • InTransit   → receive at a destination hub    (POST .../destination-receipt)
 //
 // These are DISPATCH / company-management actions (role "company"), NOT physical
 // rider scans. Company transit is the company's own bulk/inter-city transport, so
@@ -10,6 +10,15 @@
 // assigned to it. The server re-validates ownership, stage/custody preconditions
 // and the destination hub, and remains authoritative; after a successful action
 // we re-fetch authoritative state (never assume it).
+//
+// PHASE 5: the destination hub is now chosen by the dispatcher AT DISPATCH time
+// (transit-depart), not at receipt — it is the only authoritative, non-guessed
+// source (an explicit human business decision), and the backend persists it
+// onto the job so a destination Hub Person's task queue can discover it. The
+// InTransit branch below now performs an authenticated PHYSICAL RECEIPT and is
+// therefore a Delivery-App (Hub Person) action, not a dispatcher one — the
+// "Receive at destination hub" control that used to live here has been removed
+// to avoid presenting a Console button that can never succeed for a dispatcher.
 import { useCallback, useEffect, useState } from "react";
 import { authedFetch } from "@/app/delivery-company/_lib/console";
 
@@ -28,7 +37,8 @@ export default function CompanyHubActions({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Destination-hub picker state (only used at InTransit).
+  // Destination-hub picker state (used at AtOriginHub, to choose the
+  // destination hub the dispatcher is sending this shipment to).
   const [hubs, setHubs] = useState<CompanyHub[] | null>(null);
   const [hubsLoading, setHubsLoading] = useState(false);
   const [hubsError, setHubsError] = useState<string | null>(null);
@@ -53,8 +63,8 @@ export default function CompanyHubActions({
   }, []);
 
   useEffect(() => {
-    if (isInTransit && hubs === null && !hubsLoading) void loadHubs();
-  }, [isInTransit, hubs, hubsLoading, loadHubs]);
+    if (isOriginHub && hubs === null && !hubsLoading) void loadHubs();
+  }, [isOriginHub, hubs, hubsLoading, loadHubs]);
 
   const post = async (path: string, body?: Record<string, unknown>) => {
     setBusy(true);
@@ -73,50 +83,14 @@ export default function CompanyHubActions({
   };
 
   if (isOriginHub) {
-    return (
-      <div className="space-y-3">
-        <p className="rounded bg-teal-50 px-3 py-2 text-sm text-teal-800">
-          This shipment is at your origin / local hub. Dispatch it into your company&apos;s own transport to move it
-          toward the destination hub. This is company-managed transport — no rider is assigned to it.
-        </p>
-        {confirming ? (
-          <div className="rounded border border-teal-200 bg-teal-50 p-3">
-            <p className="text-sm text-teal-900">Dispatch this shipment into company transit?</p>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={() => void post(`/api/delivery/company/jobs/${encodeURIComponent(jobId)}/transit-depart`)}
-                disabled={busy}
-                className="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {busy ? "Dispatching…" : "Confirm dispatch"}
-              </button>
-              <button onClick={() => setConfirming(false)} disabled={busy} className="rounded border px-3 py-1.5 text-sm disabled:opacity-50">
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => { setConfirming(true); setError(null); }}
-            disabled={busy}
-            className="rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Dispatch to company transit
-          </button>
-        )}
-        {error ? <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
-      </div>
-    );
-  }
-
-  if (isInTransit) {
     const activeHubs = (hubs ?? []).filter((h) => (h.status ?? "Active") === "Active");
     const selected = (hubs ?? []).find((h) => h.id === selectedHub) || null;
     return (
       <div className="space-y-3">
         <p className="rounded bg-teal-50 px-3 py-2 text-sm text-teal-800">
-          This shipment is in your company&apos;s transport. When it arrives, receive it at the destination hub. Only
-          after that can you assign a final-mile rider.
+          This shipment is at your origin / local hub. Choose the destination hub and dispatch it into your
+          company&apos;s own transport to move it there. This is company-managed transport — no rider is assigned to
+          it.
         </p>
         <label htmlFor={`desthub-${jobId}`} className="block text-xs font-medium text-gray-600">
           Destination hub
@@ -151,22 +125,26 @@ export default function CompanyHubActions({
               })}
             </select>
             <p className="mt-1 text-[11px] text-gray-400">
-              The destination hub must be one of your active hubs and different from the origin hub. Receiving does not
-              deliver the parcel — you then assign a final-mile rider who delivers it in the Delivery App.
+              The destination hub must be one of your active hubs and different from this origin hub. A Destination
+              Hub Person authenticated in the Delivery App will later confirm physical receipt there.
             </p>
 
             {confirming && selected ? (
               <div className="mt-2 rounded border border-teal-200 bg-teal-50 p-3">
                 <p className="text-sm text-teal-900">
-                  Receive this shipment at <span className="font-semibold">{selected.name || selected.id}</span>?
+                  Dispatch this shipment to <span className="font-semibold">{selected.name || selected.id}</span>?
                 </p>
                 <div className="mt-2 flex gap-2">
                   <button
-                    onClick={() => void post(`/api/delivery/company/jobs/${encodeURIComponent(jobId)}/destination-receipt`, { hubId: selectedHub })}
+                    onClick={() =>
+                      void post(`/api/delivery/company/jobs/${encodeURIComponent(jobId)}/transit-depart`, {
+                        destinationHubId: selectedHub,
+                      })
+                    }
                     disabled={busy}
                     className="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                   >
-                    {busy ? "Receiving…" : "Confirm receipt"}
+                    {busy ? "Dispatching…" : "Confirm dispatch"}
                   </button>
                   <button onClick={() => setConfirming(false)} disabled={busy} className="rounded border px-3 py-1.5 text-sm disabled:opacity-50">
                     Cancel
@@ -179,13 +157,26 @@ export default function CompanyHubActions({
                 disabled={!selectedHub || busy}
                 className="mt-2 rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                Receive at destination hub
+                Dispatch to company transit
               </button>
             )}
           </>
         )}
         {error ? <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
       </div>
+    );
+  }
+
+  if (isInTransit) {
+    // Receipt is now an authenticated PHYSICAL action performed by the
+    // Destination Hub Person in the Delivery App (see destinationHub.ts) — the
+    // Console is informational only here, never a control the dispatcher could
+    // click to fake a physical receipt.
+    return (
+      <p className="rounded bg-teal-50 px-3 py-2 text-sm text-teal-800">
+        This shipment is in your company&apos;s transport, routed to its destination hub. The Destination Hub Person
+        will confirm physical receipt there in the Delivery App.
+      </p>
     );
   }
 

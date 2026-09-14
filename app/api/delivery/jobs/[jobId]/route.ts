@@ -2,6 +2,9 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
+import { deriveRiderTask, deriveNavigationDestination } from "@/lib/deliveryEngine/taskLocation";
+import { readCodPaymentInfo } from "@/lib/deliveryEngine/codPayment";
+import { readDeliveryExceptionInfo } from "@/lib/deliveryEngine/deliveryException";
 import type { DeliveryJob } from "@/lib/deliveryEngine/types";
 
 // GET /api/delivery/jobs/[jobId]
@@ -31,6 +34,7 @@ export async function GET(
 
   // Authorize by role.
   let authorized = false;
+  let actorPersonId = ""; // "" for admin/company — never matches a custody.personId
   if (requester.isAdmin) {
     authorized = true;
   } else {
@@ -39,9 +43,31 @@ export async function GET(
       authorized = job.providerType === "COMPANY" && job.companyId === actor.companyId;
     } else if (actor.role === "person") {
       authorized = job.assignedPersonId === actor.personId;
+      actorPersonId = actor.personId;
     }
   }
   if (!authorized) return Response.json({ error: "Not authorized." }, { status: 403 });
+
+  // The rider's actual physical task (pickup -> drop) for whichever leg is
+  // current — see taskLocation.ts. Read-only; job.pickup/job.drop below are
+  // unchanged (always the seller/customer snapshot).
+  const task = await deriveRiderTask(db, snap.id, job);
+  // V1 navigation (open the phone's map app) — see taskLocation.ts. Read-only,
+  // derived from this same authoritative task; never a client-chosen
+  // destination. A HUB_PERSON never reaches this route (their assignedPersonId
+  // is always null while a job is at a hub — see the authorization check
+  // above), so a rider navigation destination is never exposed to one.
+  const navigationDestination = deriveNavigationDestination(job, task);
+  // COD Payment Scan V1 — read-only projection of the authoritative orders/
+  // {orderId} payment record (see codPayment.ts). canVerify is always false
+  // for admin/company (actorPersonId "") and for anyone not currently holding
+  // physical custody of this exact shipment.
+  const codPayment = await readCodPaymentInfo(db, snap.id, job, actorPersonId);
+  // Delivery Failure/Exception Handling V1 — read-only projection (see
+  // deliveryException.ts). canReport is always false for admin/company
+  // (actorPersonId "") and for anyone not currently holding final-mile
+  // custody while OutForDelivery.
+  const deliveryException = await readDeliveryExceptionInfo(db, snap.id, job, actorPersonId);
 
   return Response.json({
     job: {
@@ -65,6 +91,10 @@ export async function GET(
       pickup: job.pickup,
       drop: job.drop,
       parcel: job.parcel,
+      task,
+      navigationDestination,
+      codPayment,
+      deliveryException,
     },
   });
 }

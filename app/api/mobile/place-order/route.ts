@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { mintNumbers } from "@/lib/humanIds";
 import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
+import { hasStockBearingVariants } from "@/lib/products/inventory";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -314,6 +315,25 @@ export async function POST(request: Request) {
 
         if (product.active === false) {
           return { kind: "error", status: 409, error: `${label} is no longer available.` };
+        }
+
+        // Inventory + Order Consistency V1 — this product's REAL stock lives
+        // per-variant (Strategy 1: see lib/products/inventory.ts's
+        // hasStockBearingVariants), not on product.stock. This route has no
+        // variantId to decrement against (the mobile catalog's own
+        // `selectedVariants` is a display-only {label: value} map, never a
+        // Strategy-1 variant id — see that same file's own comment on this
+        // exact distinction) — decrementing product.stock directly here would
+        // silently desync it from the variant array app/api/place-order (web)
+        // correctly maintains, and a later web variant purchase would
+        // overwrite product.stock back up, resurrecting units already sold
+        // here. Fail safe and loud instead of corrupting shared inventory.
+        if (hasStockBearingVariants((snap.data() as { variants?: unknown })?.variants)) {
+          return {
+            kind: "error",
+            status: 409,
+            error: `${label} has options that must be selected on the YOMICO website — please order it from yomico.in.`,
+          };
         }
 
         const availableStock = Number(product.stock ?? 0);

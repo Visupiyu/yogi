@@ -41,6 +41,16 @@ export type JobSourceOrder = {
   items?: unknown;
 };
 
+// The vendor's own pickup-address fields, read as-is from their vendor profile
+// (see app/vendor-register) — never derived, geocoded or invented.
+export type JobSourceSellerAddress = {
+  street?: unknown;
+  unit?: unknown;
+  city?: unknown;
+  state?: unknown;
+  zipCode?: unknown;
+};
+
 function s(v: unknown, max = 500): string {
   return typeof v === "string" ? v.slice(0, max) : "";
 }
@@ -122,6 +132,8 @@ export function buildDeliveryJob(args: {
   vendorName: string;
   order: JobSourceOrder;
   sellerName: string;
+  // The vendor's pickup address, snapshotted onto the job at creation time.
+  sellerAddress: JobSourceSellerAddress;
   // This parcel's own tracking number, minted per (orderId,vendorId) by the
   // transactional helper — NOT the order-level number.
   shipmentNumber: string;
@@ -132,7 +144,7 @@ export function buildDeliveryJob(args: {
   scanToken: string;
   now: Timestamp;
 }): DeliveryJob & { id: string } {
-  const { orderId, vendorId, vendorName, order, sellerName, shipmentNumber, orderShipmentNumber, scanToken, now } = args;
+  const { orderId, vendorId, vendorName, order, sellerName, sellerAddress, shipmentNumber, orderShipmentNumber, scanToken, now } = args;
   const id = deliveryJobId(orderId, vendorId);
   const items: DeliveryParcelItem[] = Array.isArray(order.items)
     ? (order.items as JobSourceItem[])
@@ -157,7 +169,14 @@ export function buildDeliveryJob(args: {
     responsibleParty: null,
     lastEventId: null,
     lastEventAt: null,
-    pickup: { sellerName: s(sellerName, 200), area: "" },
+    pickup: {
+      sellerName: s(sellerName, 200),
+      street: s(sellerAddress.street, 200),
+      unit: s(sellerAddress.unit, 100),
+      city: s(sellerAddress.city, 100),
+      state: s(sellerAddress.state, 100),
+      zipCode: s(sellerAddress.zipCode, 12),
+    },
     drop: {
       customerName: s(order.customerName, 200),
       phone: s(order.phone, 40),
@@ -250,6 +269,7 @@ export type CreateJobArgs = {
   vendorId: string;
   vendorName: string;
   sellerName: string;
+  sellerAddress: JobSourceSellerAddress;
   order: JobSourceOrder;
   // The order-level shipment number, kept on the job as an audit reference.
   // The job's OWN parcel tracking number is minted inside the transaction.
@@ -303,6 +323,7 @@ export async function createJobAndInitialLeg(
     vendorName: args.vendorName,
     order: args.order,
     sellerName: args.sellerName,
+    sellerAddress: args.sellerAddress,
     shipmentNumber,
     orderShipmentNumber: args.orderShipmentNumber,
     scanToken,

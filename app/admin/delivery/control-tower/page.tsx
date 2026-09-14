@@ -15,6 +15,7 @@ import type {
   AdminJobRow,
   AdminPersonRow,
   AdminCompanyRow,
+  AdminReturnJobRow,
 } from "@/lib/deliveryEngine/adminProjections";
 // Local, offline SVG QR renderer (no network, no third-party service). The
 // payload it encodes embeds the scanToken but is never rendered as text.
@@ -65,10 +66,30 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${tone}`}>{status}</span>;
 }
 
+// Admin Operations V1 — the return-collection job's OWN status vocabulary
+// (ReturnJobStatus in lib/deliveryEngine/returnCollection.ts), deliberately
+// distinct from forward DeliveryJobStatus above — never conflated.
+function ReturnStatusBadge({ status }: { status: string }) {
+  const tone =
+    status === "Received" ? "bg-green-100 text-green-800"
+      : status === "CollectionFailed" ? "bg-red-100 text-red-800"
+      : status === "Collected" || status === "OutForCollection" ? "bg-blue-100 text-blue-800"
+      : status === "Cancelled" ? "bg-gray-200 text-gray-700"
+      : "bg-amber-100 text-amber-800";
+  return <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${tone}`}>{status}</span>;
+}
+
 export default function ControlTowerPage() {
   const [jobs, setJobs] = useState<AdminJobRow[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+
+  // Admin Operations V1 — return-collection jobs (reverse logistics). A
+  // SEPARATE list, state and section from the forward jobs above — never
+  // merged into the same table (see the return-jobs route's own comment).
+  const [returnJobs, setReturnJobs] = useState<AdminReturnJobRow[]>([]);
+  const [returnJobsLoading, setReturnJobsLoading] = useState(true);
+  const [returnJobsError, setReturnJobsError] = useState<string | null>(null);
 
   const [selected, setSelected] = useState<AdminJobRow | null>(null);
   const [detail, setDetail] = useState<JobDetail | null>(null);
@@ -97,13 +118,28 @@ export default function ControlTowerPage() {
     }
   }, []);
 
+  const loadReturnJobs = useCallback(async () => {
+    setReturnJobsError(null);
+    try {
+      const res = await authedFetch("/api/delivery/admin/return-jobs?limit=100");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to load return-collection jobs.");
+      setReturnJobs(Array.isArray(data.jobs) ? data.jobs : []);
+    } catch (e) {
+      setReturnJobsError(e instanceof Error ? e.message : "Failed to load return-collection jobs.");
+    } finally {
+      setReturnJobsLoading(false);
+    }
+  }, []);
+
   useEffect(() => { void loadJobs(); }, [loadJobs]);
+  useEffect(() => { void loadReturnJobs(); }, [loadReturnJobs]);
 
   const refresh = useCallback(async () => {
     setBusy("refresh");
-    await loadJobs();
+    await Promise.all([loadJobs(), loadReturnJobs()]);
     setBusy(null);
-  }, [loadJobs]);
+  }, [loadJobs, loadReturnJobs]);
 
   const openDetail = useCallback(async (job: AdminJobRow) => {
     setSelected(job);
@@ -278,7 +314,14 @@ export default function ControlTowerPage() {
                     <td className="px-3 py-2">{j.vendorName || "—"}</td>
                     <td className="px-3 py-2">{j.providerType || "—"}{j.companyName ? ` · ${j.companyName}` : ""}</td>
                     <td className="px-3 py-2">{j.assignedPersonName || "—"}</td>
-                    <td className="px-3 py-2"><StatusBadge status={j.status} /></td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1">
+                        <StatusBadge status={j.status} />
+                        {j.lastDeliveryException && (
+                          <span title={`${j.lastDeliveryException.code}${j.lastDeliveryException.note ? `: ${j.lastDeliveryException.note}` : ""}`} className="text-amber-600">⚠️</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-3 py-2">{j.currentStage || "—"}</td>
                     <td className="px-3 py-2">{j.custody?.holderKind || "—"}</td>
                     <td className="px-3 py-2">{j.commerceReconciledAt ? "✓" : (j.status === "Delivered" ? "pending" : "—")}</td>
@@ -298,7 +341,10 @@ export default function ControlTowerPage() {
               <div key={j.jobId} className="rounded border bg-white p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-xs">{j.shipmentNumber || "—"}</span>
-                  <StatusBadge status={j.status} />
+                  <div className="flex items-center gap-1">
+                    <StatusBadge status={j.status} />
+                    {j.lastDeliveryException && <span className="text-amber-600">⚠️</span>}
+                  </div>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-600">
                   <div><span className="text-gray-400">Order</span> {j.orderNumber || "—"}</div>
@@ -314,6 +360,67 @@ export default function ControlTowerPage() {
           </div>
         </>
       )}
+
+      {/* Return-collection jobs — a SEPARATE reverse-logistics list, never
+          merged into the forward-delivery table above. */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold">Return Collection Jobs</h2>
+        <p className="text-sm text-gray-500">
+          Reverse pickup jobs the Delivery App executes for customer returns. Refund/inspection stay with the
+          Returns FSM — this only tracks physical collection.
+        </p>
+
+        {returnJobsLoading ? (
+          <div className="mt-3 rounded border bg-white p-8 text-center text-gray-500">Loading return-collection jobs…</div>
+        ) : returnJobsError ? (
+          <div className="mt-3 rounded border bg-red-50 p-6 text-center text-red-700">
+            <p className="mb-3">{returnJobsError}</p>
+            <button onClick={() => void loadReturnJobs()} className="rounded bg-black px-3 py-2 text-sm text-white">Retry</button>
+          </div>
+        ) : returnJobs.length === 0 ? (
+          <div className="mt-3 rounded border bg-white p-8 text-center text-gray-500">No return-collection jobs yet.</div>
+        ) : (
+          <div className="mt-3 overflow-x-auto rounded border bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                <tr>
+                  <th className="px-3 py-2">Request</th>
+                  <th className="px-3 py-2">Order</th>
+                  <th className="px-3 py-2">Seller</th>
+                  <th className="px-3 py-2">Customer</th>
+                  <th className="px-3 py-2">Item</th>
+                  <th className="px-3 py-2">Assigned</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Attempts</th>
+                  <th className="px-3 py-2">Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returnJobs.map((r) => (
+                  <tr key={r.returnJobId} className="border-t hover:bg-gray-50">
+                    <td className="px-3 py-2 font-mono text-xs">{r.requestNumber || "—"}</td>
+                    <td className="px-3 py-2">{r.orderNumber || "—"}</td>
+                    <td className="px-3 py-2">{r.vendorName || "—"}</td>
+                    <td className="px-3 py-2">{r.customerName || "—"}</td>
+                    <td className="px-3 py-2">{r.itemName ? `${r.itemName} ×${r.itemQty}` : "—"}</td>
+                    <td className="px-3 py-2">{r.assignedPersonName || "—"}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1">
+                        <ReturnStatusBadge status={r.status} />
+                        {r.lastException && (
+                          <span title={`${r.lastException.code}${r.lastException.note ? `: ${r.lastException.note}` : ""}`} className="text-amber-600">⚠️</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">{r.attemptCount}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{fmt(r.updatedAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {/* DETAIL slide-over */}
       {selected && (
@@ -345,6 +452,17 @@ export default function ControlTowerPage() {
               <Row k="Reconciled" v={selected.commerceReconciledAt ? fmt(selected.commerceReconciledAt) : (selected.status === "Delivered" ? "pending" : "—")} />
               <Row k="Created" v={fmt(selected.createdAt)} />
               <Row k="Delivered" v={fmt(selected.deliveredAt)} />
+              {selected.lastDeliveryException && (
+                <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2">
+                  <p className="text-xs font-semibold text-amber-800">
+                    Last reported delivery issue: {selected.lastDeliveryException.code}
+                  </p>
+                  <p className="text-[11px] text-amber-700">
+                    {fmt(selected.lastDeliveryException.reportedAt)}
+                    {selected.lastDeliveryException.note ? ` — ${selected.lastDeliveryException.note}` : ""}
+                  </p>
+                </div>
+              )}
             </dl>
 
             {/* Actions */}
