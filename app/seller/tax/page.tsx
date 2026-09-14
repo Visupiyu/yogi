@@ -6,7 +6,18 @@ import { toast } from "sonner";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { GST_STATUSES, type GstStatus } from "@/lib/sellerTax";
+import { GST_STATUSES, sellerListingBlockReason, type GstStatus } from "@/lib/sellerTax";
+
+// Add Product → Tax flow: return the seller to Add Product automatically once
+// they are actually eligible to list, per the EXISTING eligibility policy
+// (canSellerList / sellerListingBlockReason — unchanged here). Read from the
+// URL on the client (no useSearchParams, so no Suspense/prerender constraint),
+// validated to an internal /seller/ path to avoid an open redirect.
+function readNextDest(): string | null {
+  if (typeof window === "undefined") return null;
+  const n = new URLSearchParams(window.location.search).get("next");
+  return n && n.startsWith("/seller/") ? n : null;
+}
 
 // Seller Tax / GST profile. The seller edits it here; the actual save is
 // server-authoritative (/api/seller/tax-profile validates and resets
@@ -70,6 +81,20 @@ export default function SellerTaxPage() {
         setBusinessState(tp.businessState || v?.state || "");
         setGstRegistrationState(tp.gstRegistrationState || v?.state || "");
         setVerification(v?.taxVerificationStatus || "");
+        // Already eligible + arrived from Add Product → go straight back, so
+        // the seller never dead-ends on the tax page. Canonical policy check.
+        const nextDest = readNextDest();
+        if (
+          nextDest &&
+          sellerListingBlockReason({
+            gstStatus: tp.gstStatus,
+            gstin: tp.gstin || v?.gstNumber,
+            taxVerificationStatus: v?.taxVerificationStatus,
+          }) === null
+        ) {
+          router.replace(nextDest);
+          return;
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -113,6 +138,20 @@ export default function SellerTaxPage() {
       }
       setVerification("PENDING");
       toast.success("Tax profile saved. It's now pending verification.");
+      // If the saved profile is already eligible to list (existing policy) and
+      // the seller came from Add Product, continue there. A status that still
+      // needs admin verification correctly keeps them on this page.
+      const nextDest = readNextDest();
+      if (
+        nextDest &&
+        sellerListingBlockReason({
+          gstStatus,
+          gstin,
+          taxVerificationStatus: "PENDING",
+        }) === null
+      ) {
+        router.push(nextDest);
+      }
     } catch (e) {
       console.error(e);
       toast.error("Something went wrong.");

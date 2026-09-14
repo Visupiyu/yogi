@@ -4,17 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import {
-  doc,
-  setDoc,
-  getDocs,
-  collection,
-  query,
-  where,
-  updateDoc,
-  addDoc,
-  increment,
-} from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
 
@@ -101,50 +91,27 @@ export default function SignupPage() {
         console.error("Failed to send verification email:", err)
       );
 
+      // Referral + welcome bonus are credited SERVER-SIDE.
+      //
+      // rewardPoints is money (the checkout discount currency AND the refund
+      // currency), so firestore.rules now lets no client write it. This
+      // browser used to add +100 to the referrer and set its own +50
+      // directly, which meant any signed-in user could inflate a balance at
+      // will. /api/signup-rewards does both with the Admin SDK, reading the
+      // referral code off the profile written above, and is idempotent — the
+      // amounts (+100 / +50) and the ledger rows are unchanged.
+      //
+      // Best-effort, exactly like the block it replaces: a failure here must
+      // not fail an otherwise-complete signup.
       if (referralCode) {
         try {
-          const snapshot = await getDocs(
-            query(
-              collection(db, "users"),
-              where("referralCode", "==", referralCode)
-            )
-          );
-
-          if (!snapshot.empty) {
-            const referrer = snapshot.docs[0];
-
-            // Read-then-write on rewardPoints/totalReferrals let two
-            // near-simultaneous signups referring the same code race and
-            // drop one bonus — increment() is atomic on Firestore's side.
-            await updateDoc(doc(db, "users", referrer.id), {
-              rewardPoints: increment(100),
-              totalReferrals: increment(1),
-            });
-
-            await updateDoc(doc(db, "users", result.user.uid), {
-              rewardPoints: 50,
-            });
-
-            // The new user's own welcome bonus never got a ledger entry —
-            // it credited their balance but never showed up in their own
-            // points history on /profile/wallet.
-            await addDoc(collection(db, "rewardTransactions"), {
-              userId: result.user.uid,
-              userEmail: cleanEmail,
-              points: 50,
-              type: "Referral Bonus",
-              createdAt: new Date(),
-            });
-
-            await addDoc(collection(db, "rewardTransactions"), {
-              userId: referrer.id,
-              points: 100,
-              type: "Referral Bonus",
-              createdAt: new Date(),
-            });
-          }
+          const idToken = await result.user.getIdToken();
+          await fetch("/api/signup-rewards", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
         } catch (error) {
-          console.error(error);
+          console.error("Failed to credit signup rewards:", error);
         }
       }
 

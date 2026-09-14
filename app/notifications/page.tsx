@@ -15,6 +15,8 @@ import {
 
 import { onAuthStateChanged } from "firebase/auth";
 
+import Link from "next/link";
+
 import { auth, db } from "@/lib/firebase";
 
 interface Notification {
@@ -25,6 +27,28 @@ interface Notification {
   createdAt?: any;
   type?: string;
   link?: string;
+  // Customer-safe order context on delivery notifications. orderId is the
+  // orders/{id} doc id used only as the navigation target; orderNumber is the
+  // human order number already shown to the customer. Internal delivery fields
+  // are intentionally not read here so they can never be surfaced.
+  orderId?: string | null;
+  orderNumber?: string | null;
+}
+
+// Customer-safe timestamp. Firestore Timestamps carry toDate(); a plain
+// {seconds} shape is handled as a fallback. Never throws into render.
+function formatTime(createdAt: any): string {
+  try {
+    const d =
+      typeof createdAt?.toDate === "function"
+        ? createdAt.toDate()
+        : typeof createdAt?.seconds === "number"
+        ? new Date(createdAt.seconds * 1000)
+        : null;
+    return d ? d.toLocaleString() : "";
+  } catch {
+    return "";
+  }
 }
 
 export default function NotificationsPage() {
@@ -274,6 +298,34 @@ useEffect(() => {
                   {item.message}
 
                 </p>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+
+                  <span className="text-xs text-gray-400">
+
+                    {formatTime(item.createdAt)}
+
+                  </span>
+
+                  {item.orderId && (
+
+                    <Link
+
+                      href={`/orders/${item.orderId}`}
+
+                      className="text-sm font-semibold text-green-700 hover:underline"
+
+                    >
+
+                      View order
+
+                      {item.orderNumber ? ` #${item.orderNumber}` : ""} →
+
+                    </Link>
+
+                  )}
+
+                </div>
 
               </div>
 

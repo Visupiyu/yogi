@@ -192,6 +192,8 @@ window.dispatchEvent(
         mx-auto
       ">
 
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
+
        <div
   className="
     bg-gradient-to-r

@@ -185,6 +185,7 @@ export default function RefundsPage() {
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
       <div className="max-w-4xl mx-auto">
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
         <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white p-6 sm:p-8 rounded-3xl mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold">My Returns & Refunds</h1>
           <p className="opacity-90">Track your return and replacement requests</p>

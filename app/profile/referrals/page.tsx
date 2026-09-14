@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   useEffect,
   useState
@@ -96,6 +98,8 @@ export default function ReferralsPage(){
         max-w-4xl
         mx-auto
       ">
+
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
 
         <div className="
           bg-gradient-to-r

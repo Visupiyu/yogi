@@ -46,6 +46,11 @@ type ItemRequest = {
   customerName?: string;
   reason?: string;
   item?: { name?: string; image?: string; qty?: number };
+  // YOMICO delivery assignment for a replacement (read-only for the seller;
+  // written by the admin-only assign-delivery route). Matches the order flow.
+  deliveryCompanyName?: string;
+  deliveryPartnerName?: string;
+  shipmentNumber?: string;
   createdAt?: { seconds?: number };
 };
 
@@ -159,6 +164,25 @@ export default function SellerReturnsPage() {
           >
             {statusLabel(type, status)}
           </span>
+
+          {/* YOMICO delivery assignment (replacement) — read-only, matching
+              the normal order presentation. Shown only once assigned. */}
+          {type === "replace" &&
+            (r.deliveryCompanyName ||
+              r.deliveryPartnerName ||
+              r.shipmentNumber) && (
+              <div className="self-start sm:self-end sm:text-right text-xs text-gray-600">
+                {(r.deliveryCompanyName || r.deliveryPartnerName) && (
+                  <p>
+                    🚚{" "}
+                    {[r.deliveryCompanyName, r.deliveryPartnerName]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+                {r.shipmentNumber && <p>Tracking {r.shipmentNumber}</p>}
+              </div>
+            )}
 
           {actionable && sellerNext && (
             <button

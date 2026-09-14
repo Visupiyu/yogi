@@ -752,43 +752,15 @@ service cloud.firestore {
 
     function isValidNewUser() {
       let d = request.resource.data;
-      return d.uid == request.auth.uid && d.role == 'customer';
-    }
-
-    function isReferralBonusUpdate() {
-      // Referral crediting is inherently cross-user: a NEW signup (a
-      // different uid) updates the REFERRER's doc — see
-      // app/signup/page.tsx's updateDoc(doc(db,'users', referrer.id),
-      // {rewardPoints: increment(100), totalReferrals: increment(1)}).
-      // Ownership can't be required here, so instead the exact
-      // business-rule delta is capped (+100 points, +1 referral per
-      // write) — previously any signed-in user could jump ANY other
-      // user's rewardPoints straight to an arbitrary higher number in
-      // one call, since only ">= previous value" was checked.
-      return isSignedIn()
-        && affectedKeysOnly(['rewardPoints', 'totalReferrals'])
-        && request.resource.data.rewardPoints is number
-        && request.resource.data.rewardPoints >= resource.data.rewardPoints
-        && request.resource.data.rewardPoints <= resource.data.rewardPoints + 100
-        && request.resource.data.totalReferrals is number
-        && request.resource.data.totalReferrals >= resource.data.totalReferrals
-        && request.resource.data.totalReferrals <= resource.data.totalReferrals + 1;
-    }
-
-    function isRewardPointsCheckoutUpdate(userId) {
-      // Checkout earns points on a purchase or spends them on a discount —
-      // the exact delta can't be validated here without knowing the order,
-      // but isolating it to only this field, always a non-negative number,
-      // stops it being silently bundled into an unrelated profile write.
-      // Unlike the referral bonus above, this is always the signed-in
-      // customer's own balance (app/checkout/page.tsx only ever targets
-      // doc(db,'users', firebaseUser.uid)), so ownership is required —
-      // previously this had no ownership check at all, letting any
-      // signed-in user rewrite (or zero out) any OTHER user's balance.
-      return isOwnerUid(userId)
-        && affectedKeysOnly(['rewardPoints'])
-        && request.resource.data.rewardPoints is number
-        && request.resource.data.rewardPoints >= 0;
+      // rewardPoints is MONEY (it is both the checkout discount currency and
+      // the refund currency), so a self-created profile may not open with a
+      // balance. Absent or exactly 0 only; every later change is server-side.
+      // totalReferrals is locked to 0 for the same reason — it is the counter
+      // the referral bonus is paid against.
+      return d.uid == request.auth.uid
+        && d.role == 'customer'
+        && (!('rewardPoints' in d) || d.rewardPoints == 0)
+        && (!('totalReferrals' in d) || d.totalReferrals == 0);
     }
 
     match /users/{userId} {
@@ -796,6 +768,22 @@ service cloud.firestore {
 
       allow create: if isOwnerUid(userId) && isValidNewUser();
 
+      // rewardPoints is SERVER-AUTHORITATIVE. No client branch may write it.
+      //
+      // Every legitimate mutation runs through the Admin SDK, which bypasses
+      // these rules entirely:
+      //   spend at checkout  -> app/api/place-order, lib/onlineOrder
+      //   earn after delivery-> lib/rewardCreditServer (credit-reward-points)
+      //   refund to points   -> app/api/item-request/transition
+      //   cancellation       -> app/api/cancel-order
+      //   signup/referral    -> app/api/signup-rewards
+      //
+      // The two client branches that used to live here (a referral bonus and
+      // a "checkout" balance write) let a signed-in customer set their own
+      // balance to any non-negative number, and repeatedly add +100 to ANY
+      // account — and lib/orderPricing.ts trusts the stored balance to grant
+      // a checkout discount, so either one minted spendable money. Both are
+      // removed; the owner branch below still requires unchanged('rewardPoints').
       allow update: if isAdmin()
         || (
           isOwnerUid(userId)
@@ -803,9 +791,8 @@ service cloud.firestore {
           && unchanged('status')
           && unchanged('uid')
           && unchanged('rewardPoints')
-        )
-        || isReferralBonusUpdate()
-        || isRewardPointsCheckoutUpdate(userId);
+          && unchanged('totalReferrals')
+        );
 
       allow delete: if isAdmin();
     }
@@ -1261,21 +1248,16 @@ service cloud.firestore {
       allow read: if isAdmin()
         || ('userEmail' in resource.data && isOwnerEmail(resource.data.userEmail));
 
+      // The signup referral-bonus carve-out that used to sit here let any
+      // signed-in user write a 'Referral Bonus' ledger row against ANOTHER
+      // user's uid. Signup rewards are now credited by app/api/signup-rewards
+      // with the Admin SDK, which writes both ledger rows itself and bypasses
+      // these rules, so no client needs to write another user's history.
       allow create: if isAdmin()
         || (
           isSignedIn()
           && 'userEmail' in request.resource.data
           && request.resource.data.userEmail == request.auth.token.email
-        )
-        || (
-          // Signup referral-bonus carve-out: credits another user's uid,
-          // bounded and type-locked, no userEmail written.
-          isSignedIn()
-          && !('userEmail' in request.resource.data)
-          && request.resource.data.type == 'Referral Bonus'
-          && request.resource.data.points is number
-          && request.resource.data.points > 0
-          && request.resource.data.points <= 1000
         );
 
       allow update, delete: if isAdmin();

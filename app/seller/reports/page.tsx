@@ -12,6 +12,7 @@ import {
 
 import { auth, db } from "@/lib/firebase";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 import { onAuthStateChanged } from "firebase/auth";
 
 import * as XLSX from "xlsx";
@@ -99,19 +100,11 @@ export default function SellerReportsPage(){
               order.customerName,
 
             amount:
-              items.reduce(
-
-                (sum:number,item:any)=>
-
-                  sum +
-
-                  item.price *
-
-                  item.qty,
-
-                0
-
-              ),
+              // Canonical seller gross revenue for this order — the SAME source
+              // the dashboard uses — and NaN-safe: computeVendorShare treats a
+              // missing/non-numeric price or qty as 0 instead of poisoning the
+              // sum. Falls back to 0 when this vendor has no line on the order.
+              computeVendorShare(order, vendorUid)?.vendorRawSubtotal ?? 0,
 
             status:
               order.status,
@@ -269,7 +262,8 @@ data.sort(
 // still see what was cancelled), but shouldn't count toward revenue —
 // matches the exclusion Wallet and Admin Analytics both already apply.
 const totalRevenue = orders.reduce(
-  (sum, order) => sum + (order.status === "Cancelled" ? 0 : order.amount),
+  (sum, order) =>
+    sum + (order.status === "Cancelled" ? 0 : Number(order.amount) || 0),
   0
 );
   if(loading){

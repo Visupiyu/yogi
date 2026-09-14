@@ -83,6 +83,8 @@ export default function SettingsPage() {
 
       <div className="max-w-5xl mx-auto">
 
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
+
         {/* ================= HEADER ================= */}
 
         <div className="mb-8">

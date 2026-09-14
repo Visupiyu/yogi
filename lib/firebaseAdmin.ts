@@ -30,7 +30,22 @@ export function getAdminApp(): App {
     );
   }
 
-  const serviceAccount = JSON.parse(serviceAccountKey);
+  // Parse defensively. Leading/trailing whitespace is tolerated (trim), but any
+  // OTHER malformation — e.g. extra non-whitespace AFTER the JSON object, the
+  // classic cause of "Unexpected non-whitespace character after JSON at position
+  // N" — is a corrupt env value that must be fixed at its source. We surface a
+  // clear, non-secret error (the raw JSON body is never included) instead of an
+  // opaque SyntaxError, and never try to "repair" the value ourselves, since a
+  // silently-truncated credential would fail worse later.
+  let serviceAccount: object;
+  try {
+    serviceAccount = JSON.parse(serviceAccountKey.trim());
+  } catch (parseError) {
+    const reason = parseError instanceof Error ? parseError.message : "invalid JSON";
+    throw new Error(
+      `FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON (${reason}). It must be EXACTLY the Firebase service-account JSON object, with no extra characters before or after it.`
+    );
+  }
 
   return initializeApp(
     { credential: cert(serviceAccount) },

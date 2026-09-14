@@ -46,8 +46,28 @@ export default function AdminLayout({
   }, [pathname]);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    let cancelled = false;
+    const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user || user.email !== ADMIN_EMAIL) {
+        localStorage.removeItem("admin");
+        router.replace("/admin-login");
+        return;
+      }
+      // Force-refresh the ID token (and reload the user record) before
+      // authorizing, so a stale email_verified claim cannot let the panel
+      // render while every isAdmin() Firestore read is denied. The security
+      // rules require email_verified == true; the UI gate must match — an
+      // unverified admin is sent to /admin-login, which re-issues the
+      // verification email, rather than into a panel that silently fails.
+      try {
+        await user.getIdToken(true);
+        await user.reload();
+      } catch {
+        // Refresh failed (e.g. offline) — treat as not-yet-authorized rather
+        // than admitting on a possibly stale token.
+      }
+      if (cancelled) return;
+      if (!user.emailVerified) {
         localStorage.removeItem("admin");
         router.replace("/admin-login");
         return;
@@ -58,7 +78,10 @@ export default function AdminLayout({
       setChecking(false);
     });
 
-    return () => unsub();
+    return () => {
+      cancelled = true;
+      unsub();
+    };
   }, [router]);
 
   const logout = async () => {

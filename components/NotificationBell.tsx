@@ -22,6 +22,14 @@ interface Notification {
   createdAt?: any;
   type?: string;
   link?: string;
+  // Customer-safe order context, present on delivery notifications written by
+  // the delivery backend. orderId is the orders/{id} doc id, used only as the
+  // navigation target (never rendered as text); orderNumber is the human order
+  // number the customer already sees on the order page. Internal delivery
+  // fields (jobId/legId/notificationType/sellerOrderId/eventId) are
+  // deliberately not read here, so they can never be surfaced.
+  orderId?: string | null;
+  orderNumber?: string | null;
 }
 
 export default function NotificationBell() {
@@ -98,6 +106,14 @@ export default function NotificationBell() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  const markRead = async (id: string) => {
+    try {
+      await updateDoc(doc(db, "notifications", id), { read: true });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const markAllRead = async () => {
     for (const item of notifications) {
       if (!item.read) {
@@ -139,17 +155,46 @@ export default function NotificationBell() {
                 🔔 No Notifications
               </div>
             ) : (
-              notifications.map((item) => (
-                <div
-                  key={item.id}
-                  className={`p-4 border-b ${
-                    item.read ? "bg-white" : "bg-green-50"
-                  }`}
-                >
-                  <h4 className="font-semibold">{item.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1">{item.message}</p>
-                </div>
-              ))
+              notifications.map((item) => {
+                const body = (
+                  <>
+                    <h4 className="font-semibold">{item.title}</h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {item.message}
+                    </p>
+                    {item.orderId && (
+                      <span className="mt-1 inline-block text-xs font-semibold text-green-600">
+                        View order
+                        {item.orderNumber ? ` #${item.orderNumber}` : ""} →
+                      </span>
+                    )}
+                  </>
+                );
+                const base = `block p-4 border-b ${
+                  item.read ? "bg-white" : "bg-green-50"
+                }`;
+                // Delivery notifications carry an order reference, so the whole
+                // row becomes a link to that order (marking it read + closing
+                // the dropdown on the way). Other notifications keep their
+                // existing non-clickable presentation.
+                return item.orderId ? (
+                  <Link
+                    key={item.id}
+                    href={`/orders/${item.orderId}`}
+                    onClick={() => {
+                      void markRead(item.id);
+                      setOpen(false);
+                    }}
+                    className={`${base} hover:bg-gray-100 transition`}
+                  >
+                    {body}
+                  </Link>
+                ) : (
+                  <div key={item.id} className={base}>
+                    {body}
+                  </div>
+                );
+              })
             )}
           </div>
 
