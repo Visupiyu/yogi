@@ -177,7 +177,14 @@ export async function deriveRiderTask(
   }
 
   if (leg.type === "Pickup") {
-    const originHub = job.companyId
+    // Prefer the operator's per-job origin-hub selection (job.originHubId) so a
+    // company running multiple active hubs navigates to the RIGHT one; fall back
+    // to the company's single active hub when none was chosen. resolveHubById
+    // reads by id regardless of status, so an in-flight job keeps working even
+    // if that hub is later deactivated.
+    const originHub = job.originHubId
+      ? await resolveHubById(db, job.originHubId, caches)
+      : job.companyId
       ? await resolveOriginHub(db, job.companyId, caches)
       : unassignedLocation("Origin hub not assigned yet.");
     return { pickup: sellerLocation(job), drop: originHub };

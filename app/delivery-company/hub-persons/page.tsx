@@ -1,36 +1,38 @@
 "use client";
 
-// Delivery Company — Delivery People. Manage ONLY this company's own people via
-// the existing company-scoped endpoints:
-//   GET/POST /api/delivery/company/persons
-//   PATCH    /api/delivery/company/persons/[personId]   (activate / suspend)
+// Delivery Company — Hub Persons. A first-class management section for HUB
+// PERSONS (stationed receivers), separate from Delivery People (riders). It
+// REUSES the existing deliveryPersons model + company-scoped endpoints:
+//   GET/POST /api/delivery/company/persons          (list all; create)
+//   PATCH    /api/delivery/company/persons/[personId] (activate / suspend)
+//   GET      /api/delivery/company/hubs               (the company's hubs)
 //
-// providerType / companyId / uid / createdBy are ALL server-owned — the company
-// can never create a YOMICO person, change providerType/companyId, or touch
-// another company's people (the server enforces this from the verified caller;
-// this UI never sends those fields). Availability is NOT settable here — the
-// person toggles it themselves in the Delivery App — so it is shown read-only.
+// A Hub Person is stored as role="HUB_PERSON" + hubId=<a company-owned hub>.
+// providerType / companyId / uid / createdBy / role / hubId are all validated
+// server-side from the verified caller (companyId is never trusted from the
+// browser; the hub must be one of this company's own Active hubs). This page
+// lists ONLY hub persons and shows each person's stored hub. The same hub
+// person can be designated on many jobs — nothing here limits that.
 //
 // SECURITY: the new person's password is created only in the browser on a
-// SEPARATE "secondary" Firebase app (so the operator's own session is untouched),
-// is NEVER sent to any API, NEVER written to Firestore, NEVER logged, and never
-// placed in a URL/localStorage. The reset-mode throwaway password is never shown.
+// SEPARATE "secondary" Firebase app (so the operator's own session is
+// untouched), is NEVER sent to any API, written to Firestore, logged, or put in
+// a URL/localStorage — identical to the Delivery People page.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signOut } from "firebase/auth";
-import { auth, getSecondaryAuth } from "@/lib/firebase";
+import { getSecondaryAuth } from "@/lib/firebase";
 import { authedFetch, Spinner, type CompanyPerson } from "@/app/delivery-company/_lib/console";
 
 const APP_LOGIN_HINT = "/delivery-app/login";
 
 type CredMode = "reset" | "temp";
-type PersonRole = "RIDER" | "HUB_PERSON";
+type Hub = { id: string; name?: string; status?: string };
 type Outcome =
   | { kind: "success-reset"; name: string; email: string; resetEmailSent: boolean }
   | { kind: "success-temp"; name: string; email: string; tempPassword: string }
   | { kind: "partial"; email: string }
   | null;
 
-// Strong throwaway password for reset-email mode. Never displayed, never stored.
 function generateStrongPassword(): string {
   const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const lower = "abcdefghijkmnopqrstuvwxyz";
@@ -45,23 +47,13 @@ function generateStrongPassword(): string {
   return (pick(upper) + pick(lower) + pick(digit) + pick(sym) + body).slice(0, 24);
 }
 
-export default function DeliveryCompanyPersonsPage() {
+export default function DeliveryCompanyHubPersonsPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [vehicleType, setVehicleType] = useState("");
-  const [vehicleNumber, setVehicleNumber] = useState("");
-  const [serviceArea, setServiceArea] = useState("");
-  const [city, setCity] = useState("");
+  const [hubId, setHubId] = useState("");
   const [credMode, setCredMode] = useState<CredMode>("reset");
   const [tempPassword, setTempPassword] = useState("");
-
-  // Role + hub: a RIDER (default) or a HUB_PERSON stationed at one of the
-  // company's hubs. The backend POST /api/delivery/company/persons already
-  // validates role + hubId (HUB_PERSON requires a company-owned Active hub).
-  const [role, setRole] = useState<PersonRole>("RIDER");
-  const [hubId, setHubId] = useState("");
-  const [hubs, setHubs] = useState<{ id: string; name?: string; status?: string }[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const inFlightRef = useRef(false);
@@ -71,12 +63,13 @@ export default function DeliveryCompanyPersonsPage() {
   const [copied, setCopied] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  const [persons, setPersons] = useState<CompanyPerson[]>([]);
+  const [hubPersons, setHubPersons] = useState<CompanyPerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [hubs, setHubs] = useState<Hub[]>([]);
 
-  const loadPersons = useCallback(async () => {
+  const loadHubPersons = useCallback(async () => {
     setListError(null);
     try {
       const res = await authedFetch("/api/delivery/company/persons");
@@ -85,19 +78,18 @@ export default function DeliveryCompanyPersonsPage() {
         setListError("You are not authorized. Please sign in as a delivery company operator again.");
         return;
       }
-      if (!res.ok) throw new Error(data?.error || "Could not load your delivery people.");
-      setPersons(Array.isArray(data.persons) ? data.persons : []);
+      if (!res.ok) throw new Error(data?.error || "Could not load your hub persons.");
+      const all: CompanyPerson[] = Array.isArray(data.persons) ? data.persons : [];
+      setHubPersons(all.filter((p) => p.role === "HUB_PERSON"));
     } catch (e) {
-      setListError(e instanceof Error ? e.message : "Could not load your delivery people.");
+      setListError(e instanceof Error ? e.message : "Could not load your hub persons.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { void loadPersons(); }, [loadPersons]);
+  useEffect(() => { void loadHubPersons(); }, [loadHubPersons]);
 
-  // Load the company's hubs once — used for the Hub Person hub selector and to
-  // label each hub person's hub in the list (by authoritative hubId, not name).
   useEffect(() => {
     (async () => {
       try {
@@ -109,13 +101,10 @@ export default function DeliveryCompanyPersonsPage() {
   }, []);
 
   const hubNameById = (id?: string | null): string =>
-    (id && hubs.find((h) => h.id === id)?.name) || (id ? "Unknown hub" : "");
+    (id && hubs.find((h) => h.id === id)?.name) || (id ? "Unknown hub" : "—");
 
   const resetFormFields = () => {
-    setName(""); setPhone(""); setEmail("");
-    setVehicleType(""); setVehicleNumber(""); setServiceArea(""); setCity("");
-    setTempPassword("");
-    setRole("RIDER"); setHubId("");
+    setName(""); setPhone(""); setEmail(""); setHubId(""); setTempPassword("");
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -128,7 +117,7 @@ export default function DeliveryCompanyPersonsPage() {
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanName || !cleanPhone || !cleanEmail) { setFormError("Name, phone and email are required."); return; }
     if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) { setFormError("Enter a valid email address."); return; }
-    if (role === "HUB_PERSON" && !hubId) { setFormError("Select a hub for this hub person."); return; }
+    if (!hubId) { setFormError("Select the hub where this person is stationed."); return; }
     if (credMode === "temp" && tempPassword.length < 8) { setFormError("Temporary password must be at least 8 characters."); return; }
 
     inFlightRef.current = true;
@@ -137,7 +126,6 @@ export default function DeliveryCompanyPersonsPage() {
     const password = credMode === "temp" ? tempPassword : generateStrongPassword(); // local only
 
     try {
-      // 1. Create the Auth account on the SECONDARY app (operator session untouched).
       let uid = "";
       try {
         const cred = await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, password);
@@ -156,12 +144,11 @@ export default function DeliveryCompanyPersonsPage() {
         return;
       }
 
-      // 2. Sign the secondary app out immediately.
       try { await signOut(secondaryAuth); } catch { /* non-fatal */ }
 
-      // 3. Register through the company API. Body carries NO password and NO
-      //    providerType/companyId — the server forces providerType:"COMPANY" and
-      //    companyId from the verified caller.
+      // Register as a HUB_PERSON. The body carries NO password; providerType/
+      // companyId are forced server-side. role="HUB_PERSON" REQUIRES hubId, which
+      // the server validates is one of THIS company's own Active hubs.
       try {
         const res = await authedFetch("/api/delivery/company/persons", {
           method: "POST",
@@ -170,12 +157,8 @@ export default function DeliveryCompanyPersonsPage() {
             name: cleanName,
             phone: cleanPhone,
             email: cleanEmail,
-            vehicleType: vehicleType.trim(),
-            vehicleNumber: vehicleNumber.trim(),
-            serviceArea: serviceArea.trim(),
-            city: city.trim(),
-            role,
-            ...(role === "HUB_PERSON" ? { hubId } : {}),
+            role: "HUB_PERSON",
+            hubId,
           }),
         });
         if (!res.ok) { setOutcome({ kind: "partial", email: cleanEmail }); return; }
@@ -184,7 +167,6 @@ export default function DeliveryCompanyPersonsPage() {
         return;
       }
 
-      // 4. Success — establish the credential per the chosen mode.
       if (credMode === "temp") {
         setOutcome({ kind: "success-temp", name: cleanName, email: cleanEmail, tempPassword: password });
       } else {
@@ -193,7 +175,7 @@ export default function DeliveryCompanyPersonsPage() {
         setOutcome({ kind: "success-reset", name: cleanName, email: cleanEmail, resetEmailSent: sent });
       }
       resetFormFields();
-      void loadPersons();
+      void loadHubPersons();
     } finally {
       inFlightRef.current = false;
       setSubmitting(false);
@@ -220,41 +202,41 @@ export default function DeliveryCompanyPersonsPage() {
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setListError(d?.error || "Could not update this delivery person.");
+        setListError(d?.error || "Could not update this hub person.");
       } else {
-        await loadPersons();
+        await loadHubPersons();
       }
     } catch {
-      setListError("Could not update this delivery person.");
+      setListError("Could not update this hub person.");
     } finally {
       setRowBusy(null);
     }
   };
 
+  const activeHubs = hubs.filter((h) => (h.status ?? "Active") === "Active");
   const inputCls = "mt-1 w-full rounded border px-3 py-2 text-sm";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Delivery People</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Hub Persons</h1>
           <p className="text-sm text-gray-500">
-            Your company&apos;s delivery people. They sign in to the YOMICO Delivery Person app
-            (<code className="rounded bg-gray-100 px-1">{APP_LOGIN_HINT}</code>).
+            Receivers stationed at your hubs (not riders). They sign in to the YOMICO Delivery Person app
+            (<code className="rounded bg-gray-100 px-1">{APP_LOGIN_HINT}</code>) and confirm shipment receipt at their hub.
           </p>
         </div>
         <button
           onClick={() => { setShowForm((s) => !s); setOutcome(null); setFormError(null); }}
           className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white"
         >
-          {showForm ? "Close" : "Add delivery person"}
+          {showForm ? "Close" : "Add hub person"}
         </button>
       </div>
 
-      {/* Add form */}
       {showForm ? (
         <section className="rounded-xl border bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold">Add delivery person</h2>
+          <h2 className="mb-4 text-lg font-semibold">Add hub person</h2>
           {outcome ? (
             <OutcomeView outcome={outcome} resending={resending} copied={copied} onResend={resendReset} onCopy={async (pw) => {
               try { await navigator.clipboard.writeText(pw); setCopied(true); window.setTimeout(() => setCopied(false), 2000); } catch { setCopied(false); }
@@ -274,56 +256,21 @@ export default function DeliveryCompanyPersonsPage() {
                   <span className="text-sm text-gray-600">Email<span className="text-red-500">*</span></span>
                   <input className={inputCls} type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} required />
                 </label>
-                <label className="block">
-                  <span className="text-sm text-gray-600">Vehicle type</span>
-                  <input className={inputCls} value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} placeholder="e.g. Bike" />
-                </label>
-                <label className="block">
-                  <span className="text-sm text-gray-600">Vehicle number</span>
-                  <input className={inputCls} value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="text-sm text-gray-600">Service area</span>
-                  <input className={inputCls} value={serviceArea} onChange={(e) => setServiceArea(e.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="text-sm text-gray-600">City</span>
-                  <input className={inputCls} value={city} onChange={(e) => setCity(e.target.value)} />
-                </label>
-                <label className="block">
-                  <span className="text-sm text-gray-600">Role<span className="text-red-500">*</span></span>
-                  <select
-                    className={inputCls}
-                    value={role}
-                    onChange={(e) => { const r = e.target.value as PersonRole; setRole(r); if (r !== "HUB_PERSON") setHubId(""); }}
-                  >
-                    <option value="RIDER">Rider</option>
-                    <option value="HUB_PERSON">Hub person</option>
+                <label className="block md:col-span-2">
+                  <span className="text-sm text-gray-600">Hub<span className="text-red-500">*</span></span>
+                  <select className={inputCls} value={hubId} onChange={(e) => setHubId(e.target.value)} required>
+                    <option value="">{activeHubs.length ? "Select the hub this person is stationed at…" : "No active hubs configured"}</option>
+                    {hubs.map((h) => {
+                      const activeHub = (h.status ?? "Active") === "Active";
+                      return (
+                        <option key={h.id} value={h.id} disabled={!activeHub}>
+                          {h.name || h.id}{activeHub ? "" : " (inactive)"}
+                        </option>
+                      );
+                    })}
                   </select>
+                  <span className="mt-1 block text-[11px] text-gray-400">Only your company&apos;s active hubs can be selected for a new hub person.</span>
                 </label>
-                {role === "HUB_PERSON" ? (
-                  <label className="block">
-                    <span className="text-sm text-gray-600">Hub<span className="text-red-500">*</span></span>
-                    <select
-                      className={inputCls}
-                      value={hubId}
-                      onChange={(e) => setHubId(e.target.value)}
-                      required
-                    >
-                      <option value="">
-                        {hubs.some((h) => (h.status ?? "Active") === "Active") ? "Select a hub…" : "No active hubs configured"}
-                      </option>
-                      {hubs.map((h) => {
-                        const activeHub = (h.status ?? "Active") === "Active";
-                        return (
-                          <option key={h.id} value={h.id} disabled={!activeHub}>
-                            {h.name || h.id}{activeHub ? "" : " (inactive)"}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </label>
-                ) : null}
               </div>
 
               <fieldset className="rounded-lg border p-3">
@@ -351,18 +298,17 @@ export default function DeliveryCompanyPersonsPage() {
               {formError ? <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p> : null}
 
               <button type="submit" disabled={submitting} className="rounded bg-slate-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">
-                {submitting ? "Adding…" : "Add delivery person"}
+                {submitting ? "Adding…" : "Add hub person"}
               </button>
             </form>
           )}
         </section>
       ) : null}
 
-      {/* List */}
       <section className="rounded-xl border bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Your delivery people</h2>
-          <button onClick={() => { setLoading(true); void loadPersons(); }} disabled={loading} className="rounded border px-3 py-1.5 text-sm disabled:opacity-50">
+          <h2 className="text-lg font-semibold">Your hub persons</h2>
+          <button onClick={() => { setLoading(true); void loadHubPersons(); }} disabled={loading} className="rounded border px-3 py-1.5 text-sm disabled:opacity-50">
             {loading ? "Refreshing…" : "Refresh"}
           </button>
         </div>
@@ -371,19 +317,19 @@ export default function DeliveryCompanyPersonsPage() {
 
         {loading ? (
           <Spinner />
-        ) : persons.length === 0 ? (
+        ) : hubPersons.length === 0 ? (
           <div className="rounded border border-dashed bg-gray-50 p-8 text-center text-sm text-gray-500">
-            No delivery people yet. Add one above.
+            No hub persons yet. Add one above and station them at a hub.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {persons.map((p) => (
-              <PersonCard
+            {hubPersons.map((p) => (
+              <HubPersonCard
                 key={p.id}
                 person={p}
+                hubName={hubNameById(p.hubId)}
                 busy={rowBusy === p.id}
                 disabled={rowBusy !== null && rowBusy !== p.id}
-                hubName={hubNameById(p.hubId)}
                 onSetStatus={setStatus}
               />
             ))}
@@ -409,7 +355,7 @@ function OutcomeView({ outcome, resending, copied, onResend, onCopy, onDismiss, 
         <h3 className="font-semibold text-amber-900">Provisioning incomplete</h3>
         <p className="mt-2 text-sm text-amber-800">
           The login account for <span className="font-medium">{outcome.email}</span> was created, but the
-          delivery-person record could not be saved. Do not re-submit the same email — no account was overwritten.
+          hub-person record could not be saved. Do not re-submit the same email — no account was overwritten.
         </p>
         <button onClick={onDismiss} className="mt-3 rounded border border-amber-400 px-3 py-1.5 text-sm text-amber-900">Back to form</button>
       </div>
@@ -424,7 +370,7 @@ function OutcomeView({ outcome, resending, copied, onResend, onCopy, onDismiss, 
 
   return (
     <div className="rounded-lg border border-green-300 bg-green-50 p-4">
-      <h3 className="font-semibold text-green-900">Delivery person added</h3>
+      <h3 className="font-semibold text-green-900">Hub person added</h3>
       <dl className="mt-2 space-y-1 text-sm text-green-900">
         <div><span className="text-green-700">Name:</span> <span className="font-medium">{outcome.name}</span></div>
         <div><span className="text-green-700">Email:</span> <span className="font-medium">{outcome.email}</span></div>
@@ -449,23 +395,22 @@ function OutcomeView({ outcome, resending, copied, onResend, onCopy, onDismiss, 
       ) : null}
 
       <p className="mt-3 text-sm text-green-800">
-        Next: the delivery person signs in to the YOMICO Delivery Person app (<code className="rounded bg-white px-1">{loginHint}</code>).
+        Next: the hub person signs in to the YOMICO Delivery Person app (<code className="rounded bg-white px-1">{loginHint}</code>) and confirms receipt at their hub.
       </p>
       <button onClick={onDismiss} className="mt-3 rounded border border-green-400 px-3 py-1.5 text-sm text-green-900">Add another</button>
     </div>
   );
 }
 
-function PersonCard({ person, busy, disabled, hubName, onSetStatus }: {
+function HubPersonCard({ person, hubName, busy, disabled, onSetStatus }: {
   person: CompanyPerson;
+  hubName: string;
   busy: boolean;
   disabled: boolean;
-  hubName: string;
   onSetStatus: (personId: string, status: "Active" | "Suspended") => void;
 }) {
   const active = (person.accountStatus || "Active") === "Active";
   const availability = person.availability || "Offline";
-  const vehicle = [person.vehicleType, person.vehicleNumber].filter(Boolean).join(" · ") || "—";
   const blocked = busy || disabled;
 
   return (
@@ -476,15 +421,9 @@ function PersonCard({ person, busy, disabled, hubName, onSetStatus }: {
           <p className="truncate text-sm text-gray-500">{person.email || "—"}</p>
           <p className="text-sm text-gray-500">{person.phone || "—"}</p>
           <p className="mt-1">
-            {person.role === "HUB_PERSON" ? (
-              <span className="rounded bg-teal-100 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
-                HUB PERSON{hubName ? ` — ${hubName}` : ""}
-              </span>
-            ) : (
-              <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                RIDER
-              </span>
-            )}
+            <span className="rounded bg-teal-100 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
+              HUB PERSON{hubName && hubName !== "—" ? ` — ${hubName}` : ""}
+            </span>
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
@@ -501,11 +440,6 @@ function PersonCard({ person, busy, disabled, hubName, onSetStatus }: {
         </div>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1 text-xs text-gray-600">
-        <div><span className="text-gray-400">Vehicle</span> {vehicle}</div>
-        <div><span className="text-gray-400">Area</span> {person.serviceArea || "—"}</div>
-      </div>
-
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {active ? (
           <button onClick={() => onSetStatus(person.id, "Suspended")} disabled={blocked} className="rounded border border-red-300 px-2.5 py-1 text-xs text-red-700 disabled:opacity-50">
@@ -518,7 +452,10 @@ function PersonCard({ person, busy, disabled, hubName, onSetStatus }: {
         )}
         {busy ? <span className="text-xs text-gray-400">Updating…</span> : null}
       </div>
-      <p className="mt-2 text-[11px] text-gray-400">Availability is set by the person in the Delivery App.</p>
+      <p className="mt-2 text-[11px] text-gray-400">
+        Availability is set by the person in the Delivery App. A hub person is stationed at their hub and can receive
+        many shipments.
+      </p>
     </div>
   );
 }

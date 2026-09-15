@@ -45,6 +45,15 @@ export type CompanyJob = {
   updatedAt?: unknown;
 };
 
+// The four operational actors on a COMPANY hub-routed job (read-only view).
+export type DeliveryActorView = {
+  personId?: string | null;
+  name?: string;
+  phone?: string;
+  status: string;
+  hubName?: string;
+};
+
 // GET /api/delivery/jobs/[jobId] → { job: CompanyJobDetail } (no secrets)
 export type CompanyJobDetail = {
   id: string;
@@ -59,6 +68,18 @@ export type CompanyJobDetail = {
   status: string;
   currentLegId?: string | null;
   currentStage?: string;
+  originHubId?: string | null;
+  destinationHubId?: string | null;
+  originHubPersonId?: string | null;
+  destinationHubPersonId?: string | null;
+  originHub?: { id: string; name?: string; address?: string; city?: string; region?: string; pincode?: string } | null;
+  destinationHub?: { id: string; name?: string; address?: string; city?: string; region?: string; pincode?: string } | null;
+  deliveryActors?: {
+    rider1: DeliveryActorView;
+    originHubPerson: DeliveryActorView;
+    destinationHubPerson: DeliveryActorView;
+    rider2: DeliveryActorView;
+  } | null;
   responsibleParty?: { kind: string | null; companyId: string | null; personId: string | null } | null;
   assignedPersonId?: string | null;
   assignedPersonName?: string | null;
@@ -78,6 +99,8 @@ export type CompanyJobDetail = {
 export type CompanyPerson = {
   id: string;
   providerType?: string;
+  role?: string; // "RIDER" | "HUB_PERSON"
+  hubId?: string | null; // set only for a HUB_PERSON — their stationed hub
   name?: string;
   phone?: string;
   email?: string;

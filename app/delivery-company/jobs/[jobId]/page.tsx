@@ -11,6 +11,10 @@ import JobActions from "@/app/delivery-company/_components/JobActions";
 import JobLifecycle from "@/app/delivery-company/_components/JobLifecycle";
 import FinalMileAssign from "@/app/delivery-company/_components/FinalMileAssign";
 import CompanyHubActions from "@/app/delivery-company/_components/CompanyHubActions";
+import HubSelect from "@/app/delivery-company/_components/HubSelect";
+import DeliveryRoute from "@/app/delivery-company/_components/DeliveryRoute";
+import DeliveryPeople from "@/app/delivery-company/_components/DeliveryPeople";
+import HubPersonSelect from "@/app/delivery-company/_components/HubPersonSelect";
 import {
   authedFetch,
   StatusBadge,
@@ -34,6 +38,21 @@ const FINAL_MILE_STAGE = "AtDestinationHub";
 // the destination-hub handover has not started yet); the server re-validates
 // this precondition independently and remains authoritative.
 const FINAL_MILE_ASSIGNED_STAGE = "FinalMileAssigned";
+
+// Stages at/after which a hub is fixed — the Job Card then shows it read-only.
+// Origin locks once received at a hub; destination locks once transit departs.
+const ORIGIN_HUB_LOCKED_STAGES = new Set([
+  "AtOriginHub", "InTransit", "AtDestinationHub", "FinalMileAssigned", "OutForDelivery", "Delivered",
+]);
+const DESTINATION_HUB_LOCKED_STAGES = new Set([
+  "InTransit", "AtDestinationHub", "FinalMileAssigned", "OutForDelivery", "Delivered",
+]);
+// A destination hub PERSON may be assigned right up until the shipment is
+// physically received at the destination hub (unlike the destination HUB, which
+// locks at dispatch). ORIGIN_HUB_LOCKED_STAGES already covers the origin person.
+const DESTINATION_HUB_PERSON_LOCKED_STAGES = new Set([
+  "AtDestinationHub", "FinalMileAssigned", "OutForDelivery", "Delivered",
+]);
 
 export default function DeliveryCompanyJobDetailPage() {
   const params = useParams<{ jobId: string }>();
@@ -170,6 +189,91 @@ export default function DeliveryCompanyJobDetailPage() {
             <Row k="Address" v={pickupAddressLine(job.pickup)} />
           </Card>
 
+          {/* DELIVERY ROUTE (COMPANY jobs): the full physical route for this
+              shipment, always visible regardless of the current FSM stage and
+              loaded from the server projection (survives refresh). */}
+          {job.providerType === "COMPANY" ? (
+            <Card title="Delivery route">
+              <p className="mb-3 text-xs text-gray-500">
+                The full physical route for this shipment — seller pickup to customer delivery.
+              </p>
+              <DeliveryRoute
+                pickup={job.pickup ?? null}
+                originHub={job.originHub ?? null}
+                destinationHub={job.destinationHub ?? null}
+                drop={job.drop ?? null}
+              />
+            </Card>
+          ) : null}
+
+          {/* DELIVERY PEOPLE (COMPANY jobs): the four distinct operational actors
+              for this shipment, from the server projection (survives refresh). */}
+          {job.providerType === "COMPANY" ? (
+            <Card title="Delivery people">
+              <p className="mb-3 text-xs text-gray-500">
+                Four separate operational assignments — first-mile rider, origin hub person,
+                destination hub person, and final-mile rider.
+              </p>
+              <DeliveryPeople
+                rider1={job.deliveryActors?.rider1 ?? null}
+                originHubPerson={job.deliveryActors?.originHubPerson ?? null}
+                destinationHubPerson={job.deliveryActors?.destinationHubPerson ?? null}
+                rider2={job.deliveryActors?.rider2 ?? null}
+              />
+            </Card>
+          ) : null}
+
+          {/* Hub selection (COMPANY jobs): choose BOTH origin and destination
+              hubs up front. Only active hubs are selectable; each shows its
+              stored address read-only beneath. Locked once past its stage. */}
+          {job.providerType === "COMPANY" ? (
+            <Card title="Hub selection">
+              <p className="mb-3 text-xs text-gray-500">
+                Choose which of your hubs this shipment routes through. Only active hubs can be selected.
+              </p>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-3 rounded-lg border p-3">
+                  <HubSelect
+                    jobId={job.id}
+                    kind="origin"
+                    currentHubId={job.originHubId}
+                    excludeHubId={job.destinationHubId}
+                    editable={!ORIGIN_HUB_LOCKED_STAGES.has(job.currentStage || "")}
+                    onDone={() => void afterAction()}
+                  />
+                  <HubPersonSelect
+                    jobId={job.id}
+                    which="origin"
+                    hubId={job.originHubId}
+                    currentPersonId={job.originHubPersonId}
+                    currentPersonName={job.deliveryActors?.originHubPerson?.name}
+                    editable={!ORIGIN_HUB_LOCKED_STAGES.has(job.currentStage || "")}
+                    onDone={() => void afterAction()}
+                  />
+                </div>
+                <div className="space-y-3 rounded-lg border p-3">
+                  <HubSelect
+                    jobId={job.id}
+                    kind="destination"
+                    currentHubId={job.destinationHubId}
+                    excludeHubId={job.originHubId}
+                    editable={!DESTINATION_HUB_LOCKED_STAGES.has(job.currentStage || "")}
+                    onDone={() => void afterAction()}
+                  />
+                  <HubPersonSelect
+                    jobId={job.id}
+                    which="destination"
+                    hubId={job.destinationHubId}
+                    currentPersonId={job.destinationHubPersonId}
+                    currentPersonName={job.deliveryActors?.destinationHubPerson?.name}
+                    editable={!DESTINATION_HUB_PERSON_LOCKED_STAGES.has(job.currentStage || "")}
+                    onDone={() => void afterAction()}
+                  />
+                </div>
+              </div>
+            </Card>
+          ) : null}
+
           {/* Destination */}
           <Card title="Destination">
             <Row k="Customer" v={job.drop?.customerName} />
@@ -203,7 +307,7 @@ export default function DeliveryCompanyJobDetailPage() {
             </Card>
           ) : job.currentStage === "AtOriginHub" ? (
             <Card title="Company transit">
-              <CompanyHubActions jobId={job.id} currentStage={job.currentStage} onDone={() => void afterAction()} />
+              <CompanyHubActions jobId={job.id} currentStage={job.currentStage} currentDestinationHubId={job.destinationHubId} onDone={() => void afterAction()} />
             </Card>
           ) : job.currentStage === "InTransit" ? (
             <Card title="Destination hub">

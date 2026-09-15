@@ -22,15 +22,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { authedFetch } from "@/app/delivery-company/_lib/console";
 
-type CompanyHub = { id: string; name?: string; city?: string; region?: string; status?: string };
+type CompanyHub = { id: string; name?: string; city?: string; region?: string; address?: string; status?: string };
 
 export default function CompanyHubActions({
   jobId,
   currentStage,
+  currentDestinationHubId,
   onDone,
 }: {
   jobId: string;
   currentStage?: string | null;
+  currentDestinationHubId?: string | null;
   onDone: () => void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -42,7 +44,7 @@ export default function CompanyHubActions({
   const [hubs, setHubs] = useState<CompanyHub[] | null>(null);
   const [hubsLoading, setHubsLoading] = useState(false);
   const [hubsError, setHubsError] = useState<string | null>(null);
-  const [selectedHub, setSelectedHub] = useState("");
+  const [selectedHub, setSelectedHub] = useState(currentDestinationHubId || "");
 
   const isOriginHub = currentStage === "AtOriginHub";
   const isInTransit = currentStage === "InTransit";
@@ -128,6 +130,18 @@ export default function CompanyHubActions({
               The destination hub must be one of your active hubs and different from this origin hub. A Destination
               Hub Person authenticated in the Delivery App will later confirm physical receipt there.
             </p>
+
+            {/* Selected destination hub's stored address — read-only (never typed). */}
+            {selected ? (
+              <div className="mt-1 rounded border bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                <span className="font-medium text-gray-700">{selected.name || selected.id}</span>
+                {selected.address ? (
+                  <div className="mt-0.5">{selected.address}</div>
+                ) : (
+                  <div className="mt-0.5 text-gray-400">No address on file for this hub.</div>
+                )}
+              </div>
+            ) : null}
 
             {confirming && selected ? (
               <div className="mt-2 rounded border border-teal-200 bg-teal-50 p-3">

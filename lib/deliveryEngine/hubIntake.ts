@@ -157,13 +157,26 @@ export async function applyOriginHubHandoverInitiate(
     const hub = hubSnap.data() as DeliveryHub;
     if (hub.companyId !== actor.companyId) throw new ExecutionError("That hub belongs to another company.", 403);
     if (hub.status !== "Active") throw new ExecutionError("That hub is not active.", 409);
+  } else if (typeof job.originHubId === "string" && job.originHubId.trim()) {
+    // The operator's per-job origin-hub selection made on the Job Card
+    // (job.originHubId). This is what lets a company run MULTIPLE active hubs:
+    // the hub for THIS shipment is chosen per job, not inferred from a
+    // single-active assumption.
+    hubId = job.originHubId.trim();
+    const hubRef = db.collection("deliveryHubs").doc(hubId);
+    const hubSnap = await tx.get(hubRef);
+    if (!hubSnap.exists) throw new ExecutionError("The selected origin hub was not found.", 404);
+    const hub = hubSnap.data() as DeliveryHub;
+    if (hub.companyId !== actor.companyId) throw new ExecutionError("That hub belongs to another company.", 403);
+    if (hub.status !== "Active") throw new ExecutionError("The selected origin hub is not active.", 409);
   } else {
-    // Derive: this company's active hubs. Single-field query (no composite
-    // index); active filtered in memory.
+    // Fallback when no per-job selection and no explicit hubId: the company's
+    // single active hub. With multiple active hubs the operator must choose one
+    // on the Job Card (stored as job.originHubId) — we never guess between them.
     const hubsSnap = await tx.get(db.collection("deliveryHubs").where("companyId", "==", actor.companyId));
     const active = hubsSnap.docs.filter((d) => (d.data() as DeliveryHub).status === "Active");
     if (active.length === 0) throw new ExecutionError("Your company has no active hub configured.", 409);
-    if (active.length > 1) throw new ExecutionError("Multiple hubs exist — specify hubId.", 400);
+    if (active.length > 1) throw new ExecutionError("Select an origin hub for this shipment on the Job Card.", 400);
     hubId = active[0].id;
   }
 

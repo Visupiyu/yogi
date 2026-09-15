@@ -22,6 +22,8 @@ const NAV: { href: string; label: string; exact?: boolean }[] = [
   { href: "/delivery-company", label: "Dashboard", exact: true },
   { href: "/delivery-company/jobs", label: "Jobs" },
   { href: "/delivery-company/persons", label: "Delivery People" },
+  { href: "/delivery-company/hubs", label: "Hubs" },
+  { href: "/delivery-company/hub-persons", label: "Hub Persons" },
 ];
 
 export default function DeliveryCompanyLayout({ children }: { children: React.ReactNode }) {

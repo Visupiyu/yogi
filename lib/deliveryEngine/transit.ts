@@ -79,10 +79,9 @@ export async function applyTransitDeparture(
   args: { jobId: string; destinationHubId: string; actor: TransitDepartureActor }
 ): Promise<TransitDepartureResult> {
   const { actor } = args;
+  // The dispatcher's explicit destination-hub choice. May be empty when the
+  // operator pre-selected it on the Job Card — resolved from the job below.
   const requestedDestHubId = typeof args.destinationHubId === "string" ? args.destinationHubId.trim() : "";
-  if (!requestedDestHubId) {
-    throw new ExecutionError("A destination hub is required to dispatch this shipment into transit.", 400);
-  }
 
   // ---- READS (all before any write) ----
   const jobRef = db.collection("deliveryJobs").doc(args.jobId);
@@ -106,6 +105,18 @@ export async function applyTransitDeparture(
     throw new ExecutionError("Transit is not valid for this delivery model.", 409);
   }
 
+  // Effective destination hub: the dispatcher's explicit choice, else the one
+  // the operator pre-selected on the Job Card (job.destinationHubId). Either
+  // way it is fully validated below (exists, same company, Active, != origin).
+  const requestedDestHubIdEffective =
+    requestedDestHubId || (typeof job.destinationHubId === "string" ? job.destinationHubId.trim() : "");
+  if (!requestedDestHubIdEffective) {
+    throw new ExecutionError(
+      "A destination hub is required to dispatch this shipment into transit. Select one on the Job Card.",
+      400
+    );
+  }
+
   const currentLegId = job.currentLegId;
   if (!currentLegId) throw new ExecutionError("Job has no current leg.", 409);
   const legRef = jobRef.collection("legs").doc(currentLegId);
@@ -122,7 +133,7 @@ export async function applyTransitDeparture(
   const eventRef = db.collection("deliveryEvents").doc(transitDepartureEventId(args.jobId));
   const eventSnap = await tx.get(eventRef);
   if (eventSnap.exists) {
-    if (job.destinationHubId && job.destinationHubId !== requestedDestHubId) {
+    if (job.destinationHubId && job.destinationHubId !== requestedDestHubIdEffective) {
       throw new ExecutionError("This shipment has already been dispatched to a different destination hub.", 409);
     }
     return {
@@ -149,16 +160,16 @@ export async function applyTransitDeparture(
   // Validate the REQUESTED destination hub (an explicit dispatcher decision,
   // never auto-derived from hub count, city/address text, or geocoding). It
   // must exist, belong to this company, be Active, and not be the origin hub.
-  const destHubRef = db.collection("deliveryHubs").doc(requestedDestHubId);
+  const destHubRef = db.collection("deliveryHubs").doc(requestedDestHubIdEffective);
   const destHubSnap = await tx.get(destHubRef);
   if (!destHubSnap.exists) throw new ExecutionError("Destination hub not found.", 404);
   const destHub = destHubSnap.data() as DeliveryHub;
   if (destHub.companyId !== actor.companyId) throw new ExecutionError("That hub belongs to another company.", 403);
   if (destHub.status !== "Active") throw new ExecutionError("That hub is not active.", 409);
-  if (requestedDestHubId === originHubId) {
+  if (requestedDestHubIdEffective === originHubId) {
     throw new ExecutionError("The destination hub cannot be the origin hub.", 409);
   }
-  const destinationHubId = requestedDestHubId;
+  const destinationHubId = requestedDestHubIdEffective;
   const destHubName = typeof destHub.name === "string" && destHub.name ? destHub.name : "Destination hub";
 
   // Delivery Notification System V1 — customer recipient (IN_COMPANY_TRANSPORT)

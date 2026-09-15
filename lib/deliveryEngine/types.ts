@@ -449,6 +449,12 @@ export type DeliveryJob = {
   // is a later slice — NOT set here.
   destinationHubId?: string | null;
   destinationHubReceivedAt?: unknown | null;
+  // Company-operator designation (four-actor model): WHICH hub person is assigned
+  // to receive this shipment at the origin / destination hub. Set by the per-job
+  // hub-person assignment route; the person still authenticates + confirms
+  // physical receipt in the Delivery App (hubIntake.ts / destinationHub.ts).
+  originHubPersonId?: string | null;
+  destinationHubPersonId?: string | null;
   // COMPANY_HUB journey — final-mile assignment. Set by the final-mile-assignment
   // transition when the company DISPATCHER (the server-authoritative company
   // actor) assigns an eligible company delivery person to carry the parcel from
@@ -601,6 +607,10 @@ export type DeliveryHub = {
   // geocoded automatically — a hub with no address here honestly reports
   // navigation as unavailable rather than guessing one.
   address?: string;
+  // Optional postal PIN code for company-configured hubs. Additive; absent on
+  // admin-created / pre-existing hubs. Record/display only — the FSM navigation
+  // uses `address`, never this.
+  pincode?: string;
   status: DeliveryHubStatus;
   createdBy?: string; // admin uid that provisioned it
   createdAt?: unknown;
