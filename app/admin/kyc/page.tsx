@@ -2,8 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { collection, getDocs, updateDoc, doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { logAdminAction } from "@/lib/auditLog";
+
+function tsToText(v: unknown): string {
+  if (!v) return "";
+  const anyV = v as { toDate?: () => Date; seconds?: number };
+  try {
+    if (typeof anyV.toDate === "function") return anyV.toDate().toLocaleString();
+    if (typeof anyV.seconds === "number") return new Date(anyV.seconds * 1000).toLocaleString();
+    if (typeof v === "string") return new Date(v).toLocaleString();
+  } catch { /* ignore */ }
+  return "";
+}
 
 export default function AdminKYCPage() {
   const [vendors, setVendors] = useState<any[]>([]);
@@ -40,21 +51,66 @@ setVendors(items);
     }
   };
 
-  // Admin-only GST verification. Sets taxVerificationStatus on the vendor
-  // (the vendor rule allows an admin to write it; sellers cannot). This is the
-  // only path to VERIFIED.
-  const updateTaxVerification = async (id: string, status: string) => {
+  const [taxBusy, setTaxBusy] = useState<string | null>(null);
+
+  // Admin-only GST verification — routed through the SERVER (Admin SDK), which
+  // re-checks admin authorization from the verified token, enforces the policy
+  // (Registered/Composition only, valid GSTIN to verify, no duplicate
+  // transitions), records the deciding admin + timestamp + rejection reason, and
+  // writes an append-only audit entry. The client never writes taxVerification*.
+  const decideTaxVerification = async (
+    id: string,
+    action: "VERIFY" | "REJECT",
+    reason?: string
+  ) => {
     try {
-      await updateDoc(doc(db, "vendors", id), { taxVerificationStatus: status });
-      await logAdminAction("tax_verification_change", id, { newStatus: status });
+      setTaxBusy(id);
+      const user = auth.currentUser;
+      if (!user) { alert("Please sign in again."); return; }
+      const token = await user.getIdToken();
+      const res = await fetch("/api/admin/seller-tax-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ vendorId: id, action, reason }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Surface the HTTP status so a server-side failure is never a silent
+        // no-op: e.g. 404 (route not deployed), 403 (not admin), 500 (server /
+        // Firebase Admin credential error) — the admin then knows why nothing
+        // changed instead of thinking the button "did nothing".
+        alert(
+          (data?.error ? `${data.error} ` : "Could not update the tax verification. ") +
+            `(HTTP ${res.status})`
+        );
+        return;
+      }
       setVendors(
         vendors.map((vendor) =>
-          vendor.id === id ? { ...vendor, taxVerificationStatus: status } : vendor
+          vendor.id === id
+            ? {
+                ...vendor,
+                taxVerificationStatus: data.taxVerificationStatus,
+                taxVerifiedAt: data.taxVerifiedAt,
+                taxVerifiedBy: data.taxVerifiedBy,
+                taxRejectionReason: data.taxRejectionReason,
+              }
+            : vendor
         )
       );
     } catch (error) {
       console.error(error);
+      alert("Could not update the tax verification.");
+    } finally {
+      setTaxBusy(null);
     }
+  };
+
+  const rejectTaxVerification = (id: string) => {
+    const reason = window.prompt("Reason for rejecting this seller's GST/tax profile:");
+    if (reason === null) return; // cancelled
+    if (!reason.trim()) { alert("A rejection reason is required."); return; }
+    void decideTaxVerification(id, "REJECT", reason.trim());
   };
 
   const updateKYC = async (id: string, status: string) => {
@@ -126,32 +182,69 @@ setVendors(items);
                     <td className="py-4 px-3">{vendor.businessName || "-"}</td>
                     <td>{vendor.gstNumber || "-"}</td>
                     <td>
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs text-gray-600">
-                          {vendor.taxProfile?.gstStatus || "—"}
-                          {vendor.taxVerificationStatus
-                            ? ` · ${vendor.taxVerificationStatus}`
-                            : ""}
-                        </span>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() =>
-                              updateTaxVerification(vendor.id, "VERIFIED")
-                            }
-                            className="text-xs px-2 py-1 rounded bg-green-600 text-white"
-                          >
-                            Verify
-                          </button>
-                          <button
-                            onClick={() =>
-                              updateTaxVerification(vendor.id, "REJECTED")
-                            }
-                            className="text-xs px-2 py-1 rounded border border-red-300 text-red-700"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      </div>
+                      {(() => {
+                        const gstStatus = vendor.taxProfile?.gstStatus;
+                        const needsVerify =
+                          gstStatus === "REGISTERED" || gstStatus === "COMPOSITION";
+                        const vStatus = vendor.taxVerificationStatus || "PENDING";
+                        const busy = taxBusy === vendor.id;
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-medium text-gray-700">
+                              {gstStatus || "—"}
+                            </span>
+                            {needsVerify ? (
+                              <>
+                                <span className="text-[11px] text-gray-500">
+                                  GSTIN: {vendor.taxProfile?.gstin || "—"}
+                                </span>
+                                <span
+                                  className={`inline-block w-fit rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                                    vStatus === "VERIFIED"
+                                      ? "bg-green-100 text-green-700"
+                                      : vStatus === "REJECTED"
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-amber-100 text-amber-700"
+                                  }`}
+                                >
+                                  {vStatus}
+                                </span>
+                                {(vendor.taxVerifiedAt || vendor.taxVerifiedBy) && (
+                                  <span className="text-[10px] text-gray-400">
+                                    {tsToText(vendor.taxVerifiedAt)}
+                                    {vendor.taxVerifiedBy ? ` · ${vendor.taxVerifiedBy}` : ""}
+                                  </span>
+                                )}
+                                {vStatus === "REJECTED" && vendor.taxRejectionReason && (
+                                  <span className="text-[10px] text-red-600">
+                                    Reason: {vendor.taxRejectionReason}
+                                  </span>
+                                )}
+                                <div className="mt-1 flex gap-1">
+                                  <button
+                                    onClick={() => void decideTaxVerification(vendor.id, "VERIFY")}
+                                    disabled={busy || vStatus === "VERIFIED"}
+                                    className="text-xs px-2 py-1 rounded bg-green-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                  >
+                                    {busy ? "…" : "Verify"}
+                                  </button>
+                                  <button
+                                    onClick={() => rejectTaxVerification(vendor.id)}
+                                    disabled={busy || vStatus === "REJECTED"}
+                                    className="text-xs px-2 py-1 rounded border border-red-300 text-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-gray-400">
+                                No verification required
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td>{vendor.panNumber || "-"}</td>
                     <td>{vendor.aadhaarNumber || "-"}</td>

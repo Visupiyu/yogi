@@ -1,9 +1,14 @@
 "use client";
 
 // Company dispatcher → final-mile rider assignment, using ONLY the existing
-//   POST /api/delivery/company/jobs/[jobId]/final-mile-assign  { personId }
-// backend transition (role "company"; the server re-validates company ownership,
-// destination-hub precondition and person eligibility and remains authoritative).
+//   POST /api/delivery/company/jobs/[jobId]/final-mile-assign     { personId }
+//   POST /api/delivery/company/jobs/[jobId]/final-mile-reassign   { personId }
+// backend transitions (role "company"; the server re-validates company
+// ownership, state preconditions and person eligibility and remains
+// authoritative — reassignment is additionally rejected once the destination-
+// hub handover has started in any way, which the Console never re-derives
+// itself: the parent page only renders `mode="reassign"` while the backend's
+// own job.task.finalMileHandoverState reads "ready").
 //
 // This is a DISPATCH action: it selects which of the company's own people carries
 // the final mile. The Console never performs the physical delivery — the assigned
@@ -18,6 +23,8 @@ import {
 
 export default function FinalMileAssign({
   jobId,
+  mode = "assign",
+  currentPersonId,
   persons,
   personsLoading,
   personsError,
@@ -25,6 +32,13 @@ export default function FinalMileAssign({
   onDone,
 }: {
   jobId: string;
+  // "assign": no final-mile rider selected yet (AtDestinationHub). "reassign":
+  // a rider is already selected but has not yet received the handover — this
+  // corrects the selection without touching custody/handover state.
+  mode?: "assign" | "reassign";
+  // reassign only: excluded from the picker (reassigning to the same person
+  // is a meaningless correction) and used for the confirmation copy.
+  currentPersonId?: string | null;
   persons: CompanyPerson[] | null;
   personsLoading: boolean;
   personsError: string | null;
@@ -36,25 +50,29 @@ export default function FinalMileAssign({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const assignable = (persons ?? []).filter(isAssignablePerson);
+  const assignable = (persons ?? []).filter(
+    (p) => isAssignablePerson(p) && (mode !== "reassign" || p.id !== currentPersonId)
+  );
   const selectedPerson = (persons ?? []).find((p) => p.id === selected) || null;
+  const endpoint = mode === "reassign" ? "final-mile-reassign" : "final-mile-assign";
+  const failMsg = mode === "reassign" ? "Could not reassign the final-mile rider." : "Could not assign a final-mile rider.";
 
   const doAssign = async () => {
     if (!selected || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await authedFetch(`/api/delivery/company/jobs/${encodeURIComponent(jobId)}/final-mile-assign`, {
+      const res = await authedFetch(`/api/delivery/company/jobs/${encodeURIComponent(jobId)}/${endpoint}`, {
         method: "POST",
         body: JSON.stringify({ personId: selected }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Could not assign a final-mile rider.");
+      if (!res.ok) throw new Error(data?.error || failMsg);
       setConfirming(false);
       setSelected("");
       onDone(); // re-fetch authoritative state; do not assume success locally
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not assign a final-mile rider.");
+      setError(e instanceof Error ? e.message : failMsg);
     } finally {
       setBusy(false);
     }
@@ -63,7 +81,7 @@ export default function FinalMileAssign({
   return (
     <div className="space-y-3">
       <label htmlFor={`finalmile-${jobId}`} className="block text-xs font-medium text-gray-600">
-        Final-mile delivery person
+        {mode === "reassign" ? "Replacement final-mile delivery person" : "Final-mile delivery person"}
       </label>
       {personsLoading ? (
         <p className="mt-1 text-sm text-gray-500">Loading your delivery people…</p>
@@ -97,14 +115,16 @@ export default function FinalMileAssign({
             })}
           </select>
           <p className="mt-1 text-[11px] text-gray-400">
-            Only your company&apos;s active, available people can be assigned. The assigned rider carries the parcel
-            from the destination hub to the customer and performs the delivery in the Delivery App.
+            {mode === "reassign"
+              ? "Only your company's active, available people can be selected. This only changes WHO is assigned — it does not move custody, which is still safely at your destination hub."
+              : "Only your company's active, available people can be assigned. The assigned rider carries the parcel from the destination hub to the customer and performs the delivery in the Delivery App."}
           </p>
 
           {confirming && selectedPerson ? (
             <div className="mt-2 rounded border border-teal-200 bg-teal-50 p-3">
               <p className="text-sm text-teal-900">
-                Assign the final mile to <span className="font-semibold">{selectedPerson.name || selectedPerson.id}</span>?
+                {mode === "reassign" ? "Reassign the final mile to " : "Assign the final mile to "}
+                <span className="font-semibold">{selectedPerson.name || selectedPerson.id}</span>?
               </p>
               <div className="mt-2 flex gap-2">
                 <button
@@ -112,7 +132,7 @@ export default function FinalMileAssign({
                   disabled={busy}
                   className="rounded bg-teal-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
                 >
-                  {busy ? "Assigning…" : "Confirm assignment"}
+                  {busy ? (mode === "reassign" ? "Reassigning…" : "Assigning…") : "Confirm"}
                 </button>
                 <button
                   onClick={() => setConfirming(false)}
@@ -129,7 +149,7 @@ export default function FinalMileAssign({
               disabled={!selected || busy}
               className="mt-2 rounded bg-teal-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
-              Assign final-mile rider
+              {mode === "reassign" ? "Reassign final-mile rider" : "Assign final-mile rider"}
             </button>
           )}
         </>

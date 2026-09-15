@@ -31,6 +31,17 @@ export async function GET(request: Request) {
         id: actor.person.id,
         name: actor.person.name,
         providerType: actor.providerType,
+        // Physical workforce role, derived SERVER-SIDE from the authoritative
+        // deliveryPersons doc (never trusted from the client). Absent/legacy =>
+        // RIDER; only a COMPANY person can be HUB_PERSON. This lets the Delivery
+        // App RECOGNISE a hub person and route them to the hub workflow instead
+        // of the rider job queue. It does NOT change who is admitted — that is
+        // still gated on actor.role === "person" above (both roles pass).
+        role: actor.person.role === "HUB_PERSON" ? "HUB_PERSON" : "RIDER",
+        // The hub a HUB_PERSON is stationed at (null for a rider). Client uses it
+        // only for display/routing; every hub-receipt/handover route RE-derives
+        // it server-side from the caller's own doc, so it is never trusted for authz.
+        hubId: actor.person.role === "HUB_PERSON" ? actor.person.hubId ?? null : null,
         accountStatus: actor.person.accountStatus ?? (actor.person.status === "Inactive" ? "Suspended" : "Active"),
         availability: actor.person.availability ?? "Offline",
         companyId: actor.companyId,

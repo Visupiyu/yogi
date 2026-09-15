@@ -1,4 +1,6 @@
 "use client";
+
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -163,6 +165,8 @@ async()=>{
         mx-auto
       ">
 
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
+
         <div className="
           bg-gradient-to-r
           from-blue-600
@@ -190,10 +194,12 @@ async()=>{
     }
     className="
       w-full
-      border
+      border border-gray-300
       p-4
       rounded-xl
       mb-4
+      bg-white text-gray-900 placeholder-gray-500
+      focus:outline-none focus:ring-2 focus:ring-blue-500
     "
   />
 
@@ -206,10 +212,12 @@ async()=>{
     }
     className="
       w-full
-      border
+      border border-gray-300
       p-4
       rounded-xl
       mb-4
+      bg-white text-gray-900 placeholder-gray-500
+      focus:outline-none focus:ring-2 focus:ring-blue-500
     "
   >
 
@@ -246,10 +254,12 @@ async()=>{
     }
     className="
       w-full
-      border
+      border border-gray-300
       p-4
       rounded-xl
       mb-4
+      bg-white text-gray-900 placeholder-gray-500
+      focus:outline-none focus:ring-2 focus:ring-blue-500
     "
   />
 

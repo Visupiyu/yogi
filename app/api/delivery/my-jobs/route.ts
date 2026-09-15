@@ -2,6 +2,7 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
+import { deriveRiderTask, newTaskHubCaches } from "@/lib/deliveryEngine/taskLocation";
 import type { DeliveryJob } from "@/lib/deliveryEngine/types";
 
 // GET /api/delivery/my-jobs
@@ -28,14 +29,21 @@ export async function GET(request: Request) {
   if (actor.role !== "person")
     return Response.json({ error: "Only a delivery person has a job queue." }, { status: 403 });
 
-  const snap = await getAdminDb()
+  const db = getAdminDb();
+  const snap = await db
     .collection("deliveryJobs")
     .where("assignedPersonId", "==", actor.personId)
     .get();
 
-  const jobs = snap.docs
-    .map((d) => {
+  // Task derivation reads the current leg (+ maybe a hub doc); only worth
+  // doing for jobs that survive the active-status filter. caches avoid
+  // re-reading the same company's hub for multiple jobs in this one response.
+  const caches = newTaskHubCaches();
+  const activeDocs = snap.docs.filter((d) => ACTIVE_STATUSES.has((d.data() as DeliveryJob).status));
+  const jobs = await Promise.all(
+    activeDocs.map(async (d) => {
       const job = d.data() as DeliveryJob;
+      const task = await deriveRiderTask(db, d.id, job, caches);
       return {
         id: d.id,
         orderNumber: job.orderNumber,
@@ -49,14 +57,15 @@ export async function GET(request: Request) {
         drop: job.drop, // needed to perform the delivery
         parcel: job.parcel,
         updatedAt: job.updatedAt ?? null,
+        task, // the rider's actual physical pickup -> drop for the current leg
       };
     })
-    .filter((j) => ACTIVE_STATUSES.has(j.status))
-    .sort((a, b) => {
-      const at = (a.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
-      const bt = (b.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
-      return bt - at;
-    });
+  );
+  jobs.sort((a, b) => {
+    const at = (a.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
+    const bt = (b.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
+    return bt - at;
+  });
 
   return Response.json({ personId: actor.personId, jobs });
 }

@@ -41,6 +41,14 @@ type ItemRequest = {
   needsReview?: boolean;
   item?: { name?: string; image?: string; qty?: number };
   refund?: { amount?: number };
+  // Replacement delivery assignment (written by the admin-only
+  // /api/item-request/assign-delivery route; itemRequests stays client-write
+  // disabled). Present only on replace requests once assigned.
+  deliveryCompanyId?: string;
+  deliveryCompanyName?: string;
+  deliveryPartnerId?: string;
+  deliveryPartnerName?: string;
+  shipmentNumber?: string;
   pickup?: {
     requestedAt?: { seconds?: number; toDate?: () => Date };
     proposedAt?: { seconds?: number; toDate?: () => Date };
@@ -88,6 +96,17 @@ export default function AdminReturnsPage() {
   const [pickupInputs, setPickupInputs] = useState<Record<string, string>>({});
   // Admin's confirmed pickup partner per request, sent when scheduling.
   const [partnerInputs, setPartnerInputs] = useState<Record<string, string>>({});
+  // Delivery companies + partners, for assigning a replacement's delivery
+  // (same active-company/active-partner model as Admin Delivery). Loaded once.
+  const [companies, setCompanies] = useState<
+    { id: string; name?: string; status?: string }[]
+  >([]);
+  const [partners, setPartners] = useState<
+    { id: string; name?: string; status?: string; companyId?: string }[]
+  >([]);
+  // Admin's Step-1 company choice per replacement request, so Step-2 lists only
+  // that company's active people. Keyed by request id.
+  const [companyByReq, setCompanyByReq] = useState<Record<string, string>>({});
   // Bumped to force a reload after a transition, so the fetch (and its
   // setState calls) stay inside the effect rather than a called-out function.
   const [reloadKey, setReloadKey] = useState(0);
@@ -136,6 +155,31 @@ export default function AdminReturnsPage() {
         console.error("Failed to load returns:", error);
       }
 
+      // ---- delivery companies + partners (for replacement assignment) ----
+      try {
+        const [companySnap, partnerSnap] = await Promise.all([
+          getDocs(collection(db, "deliveryCompanies")),
+          getDocs(collection(db, "deliveryPartners")),
+        ]);
+        if (active) {
+          const cs: { id: string; name?: string; status?: string }[] = [];
+          companySnap.forEach((d) => cs.push({ id: d.id, ...(d.data() as object) }));
+          cs.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+          setCompanies(cs);
+
+          const ps: {
+            id: string;
+            name?: string;
+            status?: string;
+            companyId?: string;
+          }[] = [];
+          partnerSnap.forEach((d) => ps.push({ id: d.id, ...(d.data() as object) }));
+          setPartners(ps);
+        }
+      } catch (error) {
+        console.error("Failed to load delivery companies/partners:", error);
+      }
+
       if (active) setLoading(false);
     })();
     return () => {
@@ -175,6 +219,48 @@ export default function AdminReturnsPage() {
       const data = await res.json();
       if (!res.ok) {
         alert(data?.error || "Could not update the request.");
+        return;
+      }
+      setReloadKey((k) => k + 1);
+    } catch (error) {
+      console.error(error);
+      alert("Something went wrong.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Assign a YOMICO Delivery Company + Person to a replacement via the
+  // admin-only server route (itemRequests is client-write disabled). Names +
+  // the fresh shipment number are resolved server-side; we only send ids.
+  const assignDelivery = async (
+    requestId: string,
+    deliveryCompanyId: string,
+    deliveryPartnerId: string
+  ) => {
+    const user = auth.currentUser;
+    if (!user) {
+      alert("Please sign in again.");
+      return;
+    }
+    if (!deliveryCompanyId || !deliveryPartnerId) {
+      alert("Select a delivery company and a delivery person.");
+      return;
+    }
+    try {
+      setBusyId(requestId);
+      const token = await user.getIdToken();
+      const res = await fetch("/api/item-request/assign-delivery", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ requestId, deliveryCompanyId, deliveryPartnerId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data?.error || "Could not assign delivery.");
         return;
       }
       setReloadKey((k) => k + 1);
@@ -357,6 +443,103 @@ export default function AdminReturnsPage() {
                     )}
                   </div>
                   </div>
+
+                  {/* REPLACEMENT DELIVERY — YOMICO Delivery Company -> Delivery
+                      Person, the same procedure as a normal order. Assignment
+                      is written by the admin-only server route; the replacement
+                      state machine is unchanged. Handover is gated on this. */}
+                  {type === "replace" &&
+                    !isTerminal(status) &&
+                    status !== "DELIVERED" && (
+                      <div className="border-t pt-4">
+                        <p className="text-sm font-semibold text-gray-700 mb-2">
+                          YOMICO Delivery
+                        </p>
+
+                        {r.deliveryPartnerId ? (
+                          <p className="text-xs text-green-700 font-semibold">
+                            ✓ Assigned:{" "}
+                            {[r.deliveryCompanyName, r.deliveryPartnerName]
+                              .filter(Boolean)
+                              .join(" · ")}
+                            {r.shipmentNumber
+                              ? ` · Tracking ${r.shipmentNumber}`
+                              : ""}
+                          </p>
+                        ) : status === "APPROVED" ||
+                          status === "READY_FOR_DELIVERY" ? (
+                          <>
+                            <div className="flex flex-wrap gap-2 items-center">
+                              <select
+                                value={companyByReq[r.id] || ""}
+                                onChange={(e) =>
+                                  setCompanyByReq((p) => ({
+                                    ...p,
+                                    [r.id]: e.target.value,
+                                  }))
+                                }
+                                className="text-sm border rounded-lg px-2 py-1"
+                              >
+                                <option value="">1) Select company</option>
+                                {companies
+                                  .filter((c) => c.status === "Active")
+                                  .map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name}
+                                    </option>
+                                  ))}
+                              </select>
+
+                              <select
+                                value=""
+                                disabled={busy || !companyByReq[r.id]}
+                                onChange={(e) => {
+                                  const personId = e.target.value;
+                                  if (!personId) return;
+                                  const p = partners.find(
+                                    (x) => x.id === personId
+                                  );
+                                  if (
+                                    p &&
+                                    confirm(
+                                      `Assign ${p.name} to deliver this replacement?`
+                                    )
+                                  ) {
+                                    assignDelivery(
+                                      r.id,
+                                      companyByReq[r.id],
+                                      personId
+                                    );
+                                  }
+                                }}
+                                className="text-sm border rounded-lg px-2 py-1 disabled:bg-gray-100 disabled:text-gray-400"
+                              >
+                                <option value="">2) Select delivery person</option>
+                                {partners
+                                  .filter(
+                                    (p) =>
+                                      p.status === "Active" &&
+                                      p.companyId === companyByReq[r.id]
+                                  )
+                                  .map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.name}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                            <p className="mt-1 text-xs text-amber-700">
+                              Delivery assignment is required before the seller
+                              can hand this replacement to the courier.
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-gray-400">
+                            Assign delivery once the replacement is approved.
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                   {/* PICKUP NEGOTIATION — a full-width, clearly-labelled section
                       so the admin always sees how to move an approved return

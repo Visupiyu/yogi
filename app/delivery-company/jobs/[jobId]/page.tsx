@@ -11,6 +11,10 @@ import JobActions from "@/app/delivery-company/_components/JobActions";
 import JobLifecycle from "@/app/delivery-company/_components/JobLifecycle";
 import FinalMileAssign from "@/app/delivery-company/_components/FinalMileAssign";
 import CompanyHubActions from "@/app/delivery-company/_components/CompanyHubActions";
+import HubSelect from "@/app/delivery-company/_components/HubSelect";
+import DeliveryRoute from "@/app/delivery-company/_components/DeliveryRoute";
+import DeliveryPeople from "@/app/delivery-company/_components/DeliveryPeople";
+import HubPersonSelect from "@/app/delivery-company/_components/HubPersonSelect";
 import {
   authedFetch,
   StatusBadge,
@@ -19,6 +23,7 @@ import {
   stageLabel,
   itemsSummary,
   companyLifecycle,
+  pickupAddressLine,
   COMPANY_ACTIONABLE_STATUSES,
   type CompanyJobDetail,
   type CompanyPerson,
@@ -27,6 +32,27 @@ import {
 // The persisted stage at which the company dispatcher assigns the final-mile
 // rider (server re-validates this precondition; the UI only gates visibility).
 const FINAL_MILE_STAGE = "AtDestinationHub";
+// The persisted stage once a final-mile rider IS already selected. Whether a
+// dispatcher may still CORRECT that selection is NOT decided here — it is
+// read from the backend's own job.task.finalMileHandoverState ("ready" means
+// the destination-hub handover has not started yet); the server re-validates
+// this precondition independently and remains authoritative.
+const FINAL_MILE_ASSIGNED_STAGE = "FinalMileAssigned";
+
+// Stages at/after which a hub is fixed — the Job Card then shows it read-only.
+// Origin locks once received at a hub; destination locks once transit departs.
+const ORIGIN_HUB_LOCKED_STAGES = new Set([
+  "AtOriginHub", "InTransit", "AtDestinationHub", "FinalMileAssigned", "OutForDelivery", "Delivered",
+]);
+const DESTINATION_HUB_LOCKED_STAGES = new Set([
+  "InTransit", "AtDestinationHub", "FinalMileAssigned", "OutForDelivery", "Delivered",
+]);
+// A destination hub PERSON may be assigned right up until the shipment is
+// physically received at the destination hub (unlike the destination HUB, which
+// locks at dispatch). ORIGIN_HUB_LOCKED_STAGES already covers the origin person.
+const DESTINATION_HUB_PERSON_LOCKED_STAGES = new Set([
+  "AtDestinationHub", "FinalMileAssigned", "OutForDelivery", "Delivered",
+]);
 
 export default function DeliveryCompanyJobDetailPage() {
   const params = useParams<{ jobId: string }>();
@@ -74,15 +100,22 @@ export default function DeliveryCompanyJobDetailPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  // Lazily load people once the job is actionable (assign/reject) OR the shipment
-  // is at the destination hub awaiting a company-selected final-mile rider.
+  // Lazily load people once the job is actionable (assign/reject), the shipment
+  // is at the destination hub awaiting a company-selected final-mile rider, OR
+  // a final-mile rider IS selected but the handover hasn't started yet (so a
+  // reassignment correction is still possible).
+  const canReassignFinalMile =
+    !!job &&
+    job.currentStage === FINAL_MILE_ASSIGNED_STAGE &&
+    job.task?.finalMileHandoverState === "ready";
   useEffect(() => {
     const needsPeople =
-      !!job && (COMPANY_ACTIONABLE_STATUSES.has(job.status) || job.currentStage === FINAL_MILE_STAGE);
+      !!job &&
+      (COMPANY_ACTIONABLE_STATUSES.has(job.status) || job.currentStage === FINAL_MILE_STAGE || canReassignFinalMile);
     if (needsPeople && persons === null && !personsLoading) {
       void loadPersons();
     }
-  }, [job, persons, personsLoading, loadPersons]);
+  }, [job, persons, personsLoading, loadPersons, canReassignFinalMile]);
 
   const afterAction = useCallback(async () => {
     await Promise.all([load(), loadPersons()]);
@@ -150,6 +183,97 @@ export default function DeliveryCompanyJobDetailPage() {
             )}
           </Card>
 
+          {/* Pickup / Seller */}
+          <Card title="Pickup / Seller">
+            <Row k="Seller" v={job.pickup?.sellerName} />
+            <Row k="Address" v={pickupAddressLine(job.pickup)} />
+          </Card>
+
+          {/* DELIVERY ROUTE (COMPANY jobs): the full physical route for this
+              shipment, always visible regardless of the current FSM stage and
+              loaded from the server projection (survives refresh). */}
+          {job.providerType === "COMPANY" ? (
+            <Card title="Delivery route">
+              <p className="mb-3 text-xs text-gray-500">
+                The full physical route for this shipment — seller pickup to customer delivery.
+              </p>
+              <DeliveryRoute
+                pickup={job.pickup ?? null}
+                originHub={job.originHub ?? null}
+                destinationHub={job.destinationHub ?? null}
+                drop={job.drop ?? null}
+              />
+            </Card>
+          ) : null}
+
+          {/* DELIVERY PEOPLE (COMPANY jobs): the four distinct operational actors
+              for this shipment, from the server projection (survives refresh). */}
+          {job.providerType === "COMPANY" ? (
+            <Card title="Delivery people">
+              <p className="mb-3 text-xs text-gray-500">
+                Four separate operational assignments — first-mile rider, origin hub person,
+                destination hub person, and final-mile rider.
+              </p>
+              <DeliveryPeople
+                rider1={job.deliveryActors?.rider1 ?? null}
+                originHubPerson={job.deliveryActors?.originHubPerson ?? null}
+                destinationHubPerson={job.deliveryActors?.destinationHubPerson ?? null}
+                rider2={job.deliveryActors?.rider2 ?? null}
+              />
+            </Card>
+          ) : null}
+
+          {/* Hub selection (COMPANY jobs): choose BOTH origin and destination
+              hubs up front. Only active hubs are selectable; each shows its
+              stored address read-only beneath. Locked once past its stage. */}
+          {job.providerType === "COMPANY" ? (
+            <Card title="Hub selection">
+              <p className="mb-3 text-xs text-gray-500">
+                Choose which of your hubs this shipment routes through. Only active hubs can be selected.
+              </p>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-3 rounded-lg border p-3">
+                  <HubSelect
+                    jobId={job.id}
+                    kind="origin"
+                    currentHubId={job.originHubId}
+                    excludeHubId={job.destinationHubId}
+                    editable={!ORIGIN_HUB_LOCKED_STAGES.has(job.currentStage || "")}
+                    onDone={() => void afterAction()}
+                  />
+                  <HubPersonSelect
+                    jobId={job.id}
+                    which="origin"
+                    hubId={job.originHubId}
+                    currentPersonId={job.originHubPersonId}
+                    currentPersonName={job.deliveryActors?.originHubPerson?.name}
+                    editable={!ORIGIN_HUB_LOCKED_STAGES.has(job.currentStage || "")}
+                    onDone={() => void afterAction()}
+                  />
+                </div>
+                <div className="space-y-3 rounded-lg border p-3">
+                  <HubSelect
+                    jobId={job.id}
+                    kind="destination"
+                    currentHubId={job.destinationHubId}
+                    excludeHubId={job.originHubId}
+                    editable={!DESTINATION_HUB_LOCKED_STAGES.has(job.currentStage || "")}
+                    onDone={() => void afterAction()}
+                  />
+                  <HubPersonSelect
+                    jobId={job.id}
+                    which="destination"
+                    hubId={job.destinationHubId}
+                    currentPersonId={job.destinationHubPersonId}
+                    currentPersonName={job.deliveryActors?.destinationHubPerson?.name}
+                    editable={!DESTINATION_HUB_PERSON_LOCKED_STAGES.has(job.currentStage || "")}
+                    onDone={() => void afterAction()}
+                  />
+                </div>
+              </div>
+            </Card>
+          ) : null}
+
           {/* Destination */}
           <Card title="Destination">
             <Row k="Customer" v={job.drop?.customerName} />
@@ -183,7 +307,7 @@ export default function DeliveryCompanyJobDetailPage() {
             </Card>
           ) : job.currentStage === "AtOriginHub" ? (
             <Card title="Company transit">
-              <CompanyHubActions jobId={job.id} currentStage={job.currentStage} onDone={() => void afterAction()} />
+              <CompanyHubActions jobId={job.id} currentStage={job.currentStage} currentDestinationHubId={job.destinationHubId} onDone={() => void afterAction()} />
             </Card>
           ) : job.currentStage === "InTransit" ? (
             <Card title="Destination hub">
@@ -198,6 +322,24 @@ export default function DeliveryCompanyJobDetailPage() {
               </p>
               <FinalMileAssign
                 jobId={job.id}
+                persons={persons}
+                personsLoading={personsLoading}
+                personsError={personsError}
+                onReloadPersons={() => void loadPersons()}
+                onDone={() => void afterAction()}
+              />
+            </Card>
+          ) : canReassignFinalMile ? (
+            <Card title="Reassign final-mile rider">
+              <p className="mb-3 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {job.assignedPersonName || "The current rider"} is assigned but has not yet received this shipment
+                from the destination hub — you can still choose a different rider. This does not move custody or
+                change who is currently responsible for the parcel; it only corrects the selection before hand-off.
+              </p>
+              <FinalMileAssign
+                jobId={job.id}
+                mode="reassign"
+                currentPersonId={job.assignedPersonId}
                 persons={persons}
                 personsLoading={personsLoading}
                 personsError={personsError}

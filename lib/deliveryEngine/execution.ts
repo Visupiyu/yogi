@@ -32,8 +32,11 @@ import type {
   ExecutionAction,
   CustodyState,
   CustodyHolderKind,
+  DeliveryPod,
 } from "@/lib/deliveryEngine/types";
 import { classifyDeliveryOtp } from "@/lib/deliveryEngine/deliveryOtp";
+import { PAY_ON_DELIVERY_UPI } from "@/lib/deliveryEngine/codPayment";
+import { emitDeliveryNotification, readCustomerUid } from "@/lib/deliveryEngine/notifications";
 
 export class ExecutionError extends Error {
   status: number;
@@ -96,6 +99,14 @@ const EXCEPTION_CODES: ReadonlySet<string> = new Set([
   "FAILED_DELIVERY",
   "HANDOVER_TIMEOUT",
   "PERSON_UNAVAILABLE",
+  // Delivery Failure/Exception Handling V1 (see deliveryException.ts) — kept
+  // in sync with types.ts's DeliveryExceptionCode union so this scan-path
+  // validation and the new rider-facing endpoint never diverge.
+  "CUSTOMER_REFUSED",
+  "ADDRESS_PROBLEM",
+  "COD_PAYMENT_FAILED",
+  "OTP_VERIFICATION_FAILED",
+  "OTHER",
 ]);
 
 // Legal leg-status preconditions per action. EXCEPTION is allowed from any
@@ -250,9 +261,28 @@ export async function applyScan(
     }
   }
 
+  // Delivery Notification System V1 — the customer recipient for PICKUP /
+  // OUT_FOR_DELIVERY (see below for DELIVER, which reuses its OWN existing
+  // order read instead of a second one). A missing/unreadable order degrades
+  // to null (no customer notification), never a thrown error.
+  let pickupOrTransitCustomerUid: string | null = null;
+  if ((action === "PICKUP" || action === "OUT_FOR_DELIVERY") && job.orderId) {
+    pickupOrTransitCustomerUid = await readCustomerUid(tx, db, job.orderId);
+  }
+
   // ---- VALIDATE (still no writes) ----
   if (TERMINAL_LEG.has(leg.status)) {
     throw new ExecutionError(`Leg is already ${leg.status}.`, 409);
+  }
+  // Payment Lifecycle V1 — a Cancelled/Returned order's job must never keep
+  // physically executing (a rider must never still scan PICKUP/OUT_FOR_
+  // DELIVERY/DELIVER on a sale that no longer exists). Mirrors the SAME
+  // TERMINAL_JOB_STATUSES check codPayment.ts and deliveryException.ts
+  // already enforce; app/api/cancel-order is the only writer of job.status
+  // "Cancelled" (see its own comment on this — a first-class part of
+  // cancellation, not a new mechanism).
+  if (job.status === "Cancelled" || job.status === "Returned") {
+    throw new ExecutionError("This order is no longer active.", 409);
   }
 
   // Actor <-> provider/company consistency (defense in depth; actor is already
@@ -311,6 +341,39 @@ export async function applyScan(
       throw new ExecutionError(`Action ${action} is not allowed from ${leg.status}.`, 409);
     }
     newLegStatus = t.to;
+  }
+
+  // COD delivery-completion guard (COD Payment Scan V1): for a Pay-on-Delivery
+  // order, DELIVER is rejected outright while payment is still Pending — never
+  // bypassed, and checked BEFORE the OTP check below so an unpaid COD attempt
+  // never burns an OTP attempt. This is read-only against orders/{orderId}
+  // (the authoritative payment record — see codPayment.ts) and writes nothing
+  // here; it does not touch custody, OTP or any other delivery state. A
+  // non-COD order (paymentMethod !== PAY_ON_DELIVERY_UPI, including no order
+  // found / no orderId) is completely unaffected — existing behavior.
+  //
+  // The same read also feeds the POD projection written below on success (POD
+  // Part 1): orderPaymentSnapshot is a small, amount-FREE snapshot
+  // (paymentMethod/paymentStatus/paymentTransactionId only — never
+  // paymentAmount, never any money field, matching jobFactory.ts's
+  // assertNoFinancialFields boundary for every other DeliveryJob field) of
+  // exactly what this guard already saw, so POD records "was this COD, and
+  // what payment state/reference applied at delivery time" without a second
+  // read or a second source of truth.
+  let orderPaymentSnapshot: { paymentMethod?: string; paymentStatus?: string; paymentTransactionId?: string | null } | null = null;
+  // Delivery Notification System V1 — the DELIVERED notification's customer
+  // recipient, read off this SAME order doc (no second read).
+  let deliverCustomerUid: string | null = null;
+  if (action === "DELIVER" && job.orderId) {
+    const orderSnap = await tx.get(db.collection("orders").doc(job.orderId));
+    if (orderSnap.exists) {
+      const order = orderSnap.data() as { paymentMethod?: string; paymentStatus?: string; paymentTransactionId?: string | null; userId?: string };
+      orderPaymentSnapshot = order;
+      deliverCustomerUid = typeof order.userId === "string" && order.userId ? order.userId : null;
+      if (order.paymentMethod === PAY_ON_DELIVERY_UPI && order.paymentStatus !== "AwaitingVerification" && order.paymentStatus !== "Paid") {
+        throw new ExecutionError("COD payment has not been verified yet.", 409);
+      }
+    }
   }
 
   // DELIVER requires customer OTP verification (fail-closed boundary). A genuine
@@ -487,8 +550,124 @@ export async function applyScan(
   if (action === "DELIVER") {
     jobUpdate.status = "Delivered";
     jobUpdate.deliveredAt = now;
+    // POD Part 1 — a durable, server-derived proof-of-delivery projection on
+    // the SAME write as the custody/status transition above (no second
+    // custody mutation, no second event, no second transaction). Every value
+    // here comes from the authenticated actor, this leg, or the order doc
+    // already read above — NEVER from the client's request body. Amount-free
+    // by design (see orderPaymentSnapshot's comment above and
+    // jobFactory.ts's assertNoFinancialFields): codPaymentStatus/Reference are
+    // state/reference only, never paymentAmount.
+    const pod: DeliveryPod = {
+      deliveredAt: now,
+      deliveredByPersonId: actor.personId,
+      eventId: eventRef.id,
+      legId,
+      otpVerified: true, // DELIVER only ever reaches this line once classifyDeliveryOtp returned "ok"
+      codPaymentStatus: orderPaymentSnapshot?.paymentMethod === PAY_ON_DELIVERY_UPI ? orderPaymentSnapshot.paymentStatus ?? null : null,
+      codPaymentReference: orderPaymentSnapshot?.paymentMethod === PAY_ON_DELIVERY_UPI ? orderPaymentSnapshot.paymentTransactionId ?? null : null,
+    };
+    jobUpdate.pod = pod;
   }
   tx.set(jobRef, jobUpdate, { merge: true });
+
+  // Delivery Notification System V1 — derived from THIS authoritative scan
+  // event (eventRef.id is the deterministic idempotency key already used
+  // above), never from client UI state. Seller recipient is job.vendorId
+  // directly (one DeliveryJob == one order+vendor — see jobFactory.ts), no
+  // extra read needed. See notifications.ts for the failure-isolation
+  // contract (never throws, never blocks this transition).
+  if (action === "PICKUP") {
+    const shipmentRef = job.orderNumber ? `order #${job.orderNumber}` : `shipment ${job.shipmentNumber}`;
+    if (pickupOrTransitCustomerUid) {
+      emitDeliveryNotification(tx, db, {
+        type: "SHIPMENT_PICKED_UP",
+        recipient: { role: "customer", userId: pickupOrTransitCustomerUid },
+        eventId: eventRef.id,
+        title: "Order picked up",
+        message: `Your ${shipmentRef} has been picked up and is on its way.`,
+        orderId: job.orderId,
+        orderNumber: job.orderNumber,
+        sellerOrderId: job.sellerOrderId,
+        deliveryJobId: args.jobId,
+        now,
+      });
+    }
+    if (job.vendorId) {
+      emitDeliveryNotification(tx, db, {
+        type: "SHIPMENT_PICKED_UP",
+        recipient: { role: "seller", userId: job.vendorId },
+        eventId: eventRef.id,
+        title: "Shipment picked up",
+        message: `Shipment for ${shipmentRef} has been picked up by the delivery partner.`,
+        orderId: job.orderId,
+        orderNumber: job.orderNumber,
+        sellerOrderId: job.sellerOrderId,
+        deliveryJobId: args.jobId,
+        now,
+      });
+    }
+  } else if (action === "OUT_FOR_DELIVERY") {
+    const shipmentRef = job.orderNumber ? `order #${job.orderNumber}` : `shipment ${job.shipmentNumber}`;
+    if (pickupOrTransitCustomerUid) {
+      emitDeliveryNotification(tx, db, {
+        type: "OUT_FOR_DELIVERY",
+        recipient: { role: "customer", userId: pickupOrTransitCustomerUid },
+        eventId: eventRef.id,
+        title: "Out for delivery",
+        message: `Your ${shipmentRef} is out for delivery.`,
+        orderId: job.orderId,
+        orderNumber: job.orderNumber,
+        sellerOrderId: job.sellerOrderId,
+        deliveryJobId: args.jobId,
+        now,
+      });
+    }
+    if (job.vendorId) {
+      emitDeliveryNotification(tx, db, {
+        type: "OUT_FOR_DELIVERY",
+        recipient: { role: "seller", userId: job.vendorId },
+        eventId: eventRef.id,
+        title: "Out for delivery",
+        message: `${shipmentRef} is out for delivery.`,
+        orderId: job.orderId,
+        orderNumber: job.orderNumber,
+        sellerOrderId: job.sellerOrderId,
+        deliveryJobId: args.jobId,
+        now,
+      });
+    }
+  } else if (action === "DELIVER") {
+    const shipmentRef = job.orderNumber ? `order #${job.orderNumber}` : `shipment ${job.shipmentNumber}`;
+    if (deliverCustomerUid) {
+      emitDeliveryNotification(tx, db, {
+        type: "DELIVERED",
+        recipient: { role: "customer", userId: deliverCustomerUid },
+        eventId: eventRef.id,
+        title: "Order delivered",
+        message: `Your ${shipmentRef} has been delivered.`,
+        orderId: job.orderId,
+        orderNumber: job.orderNumber,
+        sellerOrderId: job.sellerOrderId,
+        deliveryJobId: args.jobId,
+        now,
+      });
+    }
+    if (job.vendorId) {
+      emitDeliveryNotification(tx, db, {
+        type: "DELIVERED",
+        recipient: { role: "seller", userId: job.vendorId },
+        eventId: eventRef.id,
+        title: "Order delivered",
+        message: `${shipmentRef} has been delivered.`,
+        orderId: job.orderId,
+        orderNumber: job.orderNumber,
+        sellerOrderId: job.sellerOrderId,
+        deliveryJobId: args.jobId,
+        now,
+      });
+    }
+  }
 
   return {
     applied: true,

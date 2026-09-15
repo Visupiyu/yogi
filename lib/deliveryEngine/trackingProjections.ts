@@ -99,6 +99,19 @@ function friendlyStage(stage: unknown): string {
       return "In transit";
     case "OutForDelivery":
       return "Out for delivery";
+    // A delivery exception was reported (rider-reported reason via
+    // deliveryException.ts, or the legacy ATTEMPT_FAILED scan action in
+    // execution.ts) — the leg/job stays in this recoverable "Failed" stage
+    // until a fresh OUT_FOR_DELIVERY reattempt clears it (see execution.ts's
+    // own Failed -> OutForDelivery TRANSITIONS entry: this is not a new
+    // recovery mechanism, just the existing one). Customer-safe: never the
+    // raw "Failed" enum, and never a regression to "Preparing for delivery"
+    // — mirrors the Customer App's OWN existing legacy-tracker precedent for
+    // the identical problem (it already treats order-level "Delivery
+    // Failed" as "Out For Delivery" so progress already made is never
+    // erased). exceptionMessage() below carries the "needs attention" detail.
+    case "Failed":
+      return "Delivery attempted";
     case "Delivered":
       return "Delivered";
     default:
@@ -143,10 +156,20 @@ function buildMilestones(job: DeliveryJob): { key: string; label: string; at: st
   return out;
 }
 
-// A customer-safe exception message, derived from the coarse job status only —
-// never from leg exception codes or internal event data.
+// A customer-safe exception message, derived from the coarse job status/stage
+// only — never from leg exception codes, rider notes, or internal event data.
 function exceptionMessage(job: DeliveryJob): string | null {
   if (job.status === "DeliveryFailed") {
+    return "A delivery attempt was unsuccessful. It will be reattempted.";
+  }
+  // job.status is deliberately left unchanged (InProgress) by both delivery-
+  // exception paths (deliveryException.ts's rider-reported reasons and
+  // execution.ts's legacy ATTEMPT_FAILED action) — job.currentStage
+  // "Failed" is the actual, reachable signal for an open delivery exception
+  // today. Self-clearing: a fresh OUT_FOR_DELIVERY reattempt moves
+  // currentStage away from "Failed", so this message disappears on its own
+  // once the shipment is back out for delivery.
+  if (job.currentStage === "Failed") {
     return "A delivery attempt was unsuccessful. It will be reattempted.";
   }
   return null;

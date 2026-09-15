@@ -10,7 +10,7 @@ const slides = [
     title: "Shop Smarter. Live Better.",
 subtitle:  "Groceries • Electronics • Fashion • Home Essentials from trusted local sellers.",
     offer: "🔥 LIMITED TIME OFFER",
-    image: "/banners/grocery.jpg",
+    image: "/Grocery.jpg",
     button: "Shop Now",
     category: "Grocery",
   },
@@ -19,7 +19,7 @@ subtitle:  "Groceries • Electronics • Fashion • Home Essentials from trust
 subtitle:
   "Save more on every purchase with trusted sellers across India.",
     offer: "⚡ BEST PRICE GUARANTEE",
-    image: "/banners/electronics.jpg",
+    image: "/Furniture.jpg",
     button: "Explore",
     category: "Electronics",
   },
@@ -28,7 +28,7 @@ subtitle:
 subtitle:
   "One marketplace for groceries, electronics, fashion, home and much more.",
     offer: "👗 NEW ARRIVALS",
-    image: "/banners/fashion.jpg",
+    image: "/woman-fashion.jpg",
     button: "Shop Fashion",
     category: "Women",
   },
@@ -37,7 +37,7 @@ subtitle:
 subtitle:
   "Buy directly from verified sellers and help local businesses grow.",
     offer: "🎉 FREE SHIPPING ABOVE ₹499",
-    image: "/banners/mega-sale.jpg",
+    image: "/man-fashion.jpg",
     button: "View Deals",
     category: "Mobiles",
   },
@@ -100,9 +100,9 @@ const nextSlide = () => {
     absolute
     inset-0
     bg-gradient-to-r
-    from-blue-900/85
-    via-blue-700/65
-    to-orange-500/40
+    from-rose-900/85
+    via-orange-700/65
+    to-amber-500/40
   "
 />
 
@@ -176,9 +176,9 @@ inline-flex
 items-center
 justify-center
 bg-gradient-to-r
-from-blue-700
+from-rose-600
 to-orange-500
-hover:from-blue-600
+hover:from-rose-500
 hover:to-orange-400
 px-4
 py-2

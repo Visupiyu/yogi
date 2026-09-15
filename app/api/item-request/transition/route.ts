@@ -177,6 +177,12 @@ export async function POST(request: Request) {
   refund?: { amount?: number; credited?: boolean };
   replacement?: Record<string, unknown>;
   history?: unknown[];
+
+  // Replacement delivery assignment (written by the admin-only
+  // assign-delivery route). Read here only to gate the handover step.
+  deliveryCompanyId?: string;
+  deliveryPartnerId?: string;
+  shipmentNumber?: string;
 };
 
       const type: ItemRequestType = req.type === "replace" ? "replace" : "return";
@@ -223,6 +229,28 @@ export async function POST(request: Request) {
                 : "Sellers can only confirm the return inspection.",
           };
         }
+      }
+
+      // ---- REPLACEMENT DELIVERY GATE (mandatory) ----
+      // A replacement may not be handed to the courier until YOMICO has
+      // assigned a Delivery Company + Delivery Person and a shipment number
+      // exists — exactly like a normal order, where admin assigns delivery
+      // before it ships. Enforced server-side so neither the seller UI nor a
+      // direct API call can skip it. Only this one replace transition is
+      // gated; all other transitions (returns, earlier replace steps) are
+      // unchanged.
+      if (
+        type === "replace" &&
+        from === "READY_FOR_DELIVERY" &&
+        toStatus === "HANDED_OVER_TO_COURIER" &&
+        !(req.deliveryCompanyId && req.deliveryPartnerId && req.shipmentNumber)
+      ) {
+        return {
+          kind: "error",
+          status: 409,
+          error:
+            "YOMICO delivery assignment is required before handover. Ask an admin to assign a Delivery Company and Delivery Person to this replacement.",
+        };
       }
 
       // ---- PICKUP negotiation guards ----

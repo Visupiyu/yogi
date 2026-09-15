@@ -6,7 +6,18 @@ import { toast } from "sonner";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { GST_STATUSES, type GstStatus } from "@/lib/sellerTax";
+import { GST_STATUSES, sellerListingBlockReason, type GstStatus } from "@/lib/sellerTax";
+
+// Add Product → Tax flow: return the seller to Add Product automatically once
+// they are actually eligible to list, per the EXISTING eligibility policy
+// (canSellerList / sellerListingBlockReason — unchanged here). Read from the
+// URL on the client (no useSearchParams, so no Suspense/prerender constraint),
+// validated to an internal /seller/ path to avoid an open redirect.
+function readNextDest(): string | null {
+  if (typeof window === "undefined") return null;
+  const n = new URLSearchParams(window.location.search).get("next");
+  return n && n.startsWith("/seller/") ? n : null;
+}
 
 // Seller Tax / GST profile. The seller edits it here; the actual save is
 // server-authoritative (/api/seller/tax-profile validates and resets
@@ -29,6 +40,7 @@ export default function SellerTaxPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [verification, setVerification] = useState<string>("");
+  const [rejectionReason, setRejectionReason] = useState<string>("");
 
   const [gstStatus, setGstStatus] = useState<GstStatus | "">("");
   const [gstin, setGstin] = useState("");
@@ -52,6 +64,7 @@ export default function SellerTaxPage() {
           | {
               taxProfile?: Record<string, string>;
               taxVerificationStatus?: string;
+              taxRejectionReason?: string;
               panNumber?: string;
               businessName?: string;
               fullName?: string;
@@ -70,6 +83,21 @@ export default function SellerTaxPage() {
         setBusinessState(tp.businessState || v?.state || "");
         setGstRegistrationState(tp.gstRegistrationState || v?.state || "");
         setVerification(v?.taxVerificationStatus || "");
+        setRejectionReason(typeof v?.taxRejectionReason === "string" ? v.taxRejectionReason : "");
+        // Already eligible + arrived from Add Product → go straight back, so
+        // the seller never dead-ends on the tax page. Canonical policy check.
+        const nextDest = readNextDest();
+        if (
+          nextDest &&
+          sellerListingBlockReason({
+            gstStatus: tp.gstStatus,
+            gstin: tp.gstin || v?.gstNumber,
+            taxVerificationStatus: v?.taxVerificationStatus,
+          }) === null
+        ) {
+          router.replace(nextDest);
+          return;
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -117,7 +145,22 @@ export default function SellerTaxPage() {
         return;
       }
       setVerification("PENDING");
+      setRejectionReason(""); // resubmitting clears the previous rejection from view
       toast.success("Tax profile saved. It's now pending verification.");
+      // If the saved profile is already eligible to list (existing policy) and
+      // the seller came from Add Product, continue there. A status that still
+      // needs admin verification correctly keeps them on this page.
+      const nextDest = readNextDest();
+      if (
+        nextDest &&
+        sellerListingBlockReason({
+          gstStatus,
+          gstin,
+          taxVerificationStatus: "PENDING",
+        }) === null
+      ) {
+        router.push(nextDest);
+      }
     } catch (e) {
       console.error(e);
       toast.error("Something went wrong.");
@@ -165,12 +208,33 @@ export default function SellerTaxPage() {
 
         {verification && (
           <div
-            className={`mb-6 inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
+            className={`mb-3 inline-flex px-3 py-1 rounded-full text-xs font-semibold border ${
               VERIFY_BADGE[verification] || "bg-gray-100 text-gray-600"
             }`}
           >
             Verification: {verification}
           </div>
+        )}
+
+        {verification === "REJECTED" && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-semibold text-red-800">
+              Your GST details were not verified.
+            </p>
+            {rejectionReason ? (
+              <p className="mt-1 text-sm text-red-700">Reason: {rejectionReason}</p>
+            ) : null}
+            <p className="mt-1 text-xs text-red-700">
+              Please correct your tax information below and save again to resubmit for
+              verification.
+            </p>
+          </div>
+        )}
+
+        {verification === "PENDING" && (
+          <p className="mb-6 text-xs text-amber-700">
+            Your GST details are pending verification by our team.
+          </p>
         )}
 
         <div className="bg-white rounded-3xl shadow p-6 sm:p-8 space-y-5">

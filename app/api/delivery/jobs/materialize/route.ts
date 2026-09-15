@@ -4,6 +4,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import {
   createJobAndInitialLeg,
   canMaterializeStatus,
+  type JobSourceSellerAddress,
 } from "@/lib/deliveryEngine/jobFactory";
 import {
   vendorsOnOrder,
@@ -156,10 +157,15 @@ export async function POST(request: Request) {
       const nm = typeof it?.vendorName === "string" ? it.vendorName : "";
       if (vId && nm && !nameFromSnapshot.has(vId)) nameFromSnapshot.set(vId, nm);
     }
-    // Fallback: resolve any missing store name via a vendors lookup by uid.
-    async function resolveVendorName(vendorId: string): Promise<string> {
-      const snap = nameFromSnapshot.get(vendorId);
-      if (snap) return snap;
+    // Store name (fallback to a vendors lookup when the order snapshot lacks
+    // it) and the vendor's OWN pickup-address fields (street/unit/city/state/
+    // zipCode, captured at seller registration — see app/vendor-register).
+    // The address only lives on the vendor doc, so this lookup always runs;
+    // nothing is derived, geocoded or invented — it is copied as-is.
+    async function resolveVendorInfo(
+      vendorId: string
+    ): Promise<{ name: string; address: JobSourceSellerAddress }> {
+      const snapshotName = nameFromSnapshot.get(vendorId) || "";
       try {
         const vq = await db
           .collection("vendors")
@@ -167,16 +173,35 @@ export async function POST(request: Request) {
           .limit(1)
           .get();
         const v = vq.docs[0]?.data() as
-          | { businessName?: unknown; storeName?: unknown; name?: unknown }
+          | {
+              businessName?: unknown;
+              storeName?: unknown;
+              name?: unknown;
+              street?: unknown;
+              unit?: unknown;
+              city?: unknown;
+              state?: unknown;
+              zipCode?: unknown;
+            }
           | undefined;
-        return (
+        const name =
+          snapshotName ||
           (typeof v?.businessName === "string" && v.businessName) ||
           (typeof v?.storeName === "string" && v.storeName) ||
           (typeof v?.name === "string" && v.name) ||
-          ""
-        );
+          "";
+        return {
+          name,
+          address: {
+            street: v?.street,
+            unit: v?.unit,
+            city: v?.city,
+            state: v?.state,
+            zipCode: v?.zipCode,
+          },
+        };
       } catch {
-        return "";
+        return { name: snapshotName, address: {} };
       }
     }
 
@@ -195,7 +220,7 @@ export async function POST(request: Request) {
     const results: JobResult[] = [];
     const vendorIds = [...vendorItems.keys()].sort((a, b) => a.localeCompare(b));
     for (const vendorId of vendorIds) {
-      const vendorName = await resolveVendorName(vendorId);
+      const { name: vendorName, address: sellerAddress } = await resolveVendorInfo(vendorId);
       const items = (vendorItems.get(vendorId) || []).map((it) => ({
         name: it?.name,
         qty: it?.qty,
@@ -208,6 +233,7 @@ export async function POST(request: Request) {
           vendorId,
           vendorName,
           sellerName: vendorName,
+          sellerAddress,
           orderShipmentNumber,
           actorUid: requester.uid,
           order: {

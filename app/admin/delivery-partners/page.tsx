@@ -31,6 +31,14 @@ type DeliveryPartner = {
   serviceArea: string;
   status: string;
   uid?: string;
+  companyId?: string;
+  companyName?: string;
+};
+
+type DeliveryCompany = {
+  id: string;
+  name: string;
+  status: string;
 };
 
 export default function DeliveryPartnersPage() {
@@ -44,12 +52,34 @@ export default function DeliveryPartnersPage() {
   const [vehicleType, setVehicleType] = useState("Bike");
   const [dailyCapacity, setDailyCapacity] = useState(20);
   const [serviceArea, setServiceArea] = useState("");
+  const [companyId, setCompanyId] = useState("");
+  const [companies, setCompanies] = useState<DeliveryCompany[]>([]);
   const [editingId, setEditingId] = useState("");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     loadPartners();
+    loadCompanies();
   }, []);
+
+  const loadCompanies = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "deliveryCompanies"));
+      const items: DeliveryCompany[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        items.push({
+          id: docSnap.id,
+          name: typeof data.name === "string" ? data.name : "",
+          status: typeof data.status === "string" ? data.status : "Active",
+        });
+      });
+      items.sort((a, b) => a.name.localeCompare(b.name));
+      setCompanies(items);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const loadPartners = async () => {
     try {
@@ -81,6 +111,7 @@ export default function DeliveryPartnersPage() {
     setVehicleType("Bike");
     setDailyCapacity(20);
     setServiceArea("");
+    setCompanyId("");
   };
 
   const addPartner = async () => {
@@ -100,6 +131,12 @@ export default function DeliveryPartnersPage() {
       );
       return;
     }
+
+    // Resolve the chosen company (blank = Unassigned). Storing the name
+    // alongside the id keeps the assignment screen and lists readable
+    // without a second lookup; partners left Unassigned stay valid.
+    const selectedCompany = companies.find((c) => c.id === companyId);
+    const companyName = selectedCompany ? selectedCompany.name : "";
 
     try {
       let uid = editingPartner?.uid;
@@ -126,6 +163,8 @@ export default function DeliveryPartnersPage() {
           vehicleType,
           dailyCapacity,
           serviceArea,
+          companyId,
+          companyName,
           ...(uid ? { uid } : {}),
         });
         clearForm();
@@ -141,6 +180,8 @@ export default function DeliveryPartnersPage() {
         vehicleType,
         dailyCapacity,
         serviceArea,
+        companyId,
+        companyName,
         uid,
         status: "Active",
         createdAt: serverTimestamp(),
@@ -222,6 +263,7 @@ export default function DeliveryPartnersPage() {
     setVehicleType(partner.vehicleType || "Bike");
     setDailyCapacity(partner.dailyCapacity || 20);
     setServiceArea(partner.serviceArea);
+    setCompanyId(partner.companyId || "");
   };
 
   const filteredPartners = partners.filter(
@@ -265,6 +307,21 @@ export default function DeliveryPartnersPage() {
           </select>
           <input type="number" min="1" placeholder="Daily Capacity" value={dailyCapacity} onChange={(e) => setDailyCapacity(Number(e.target.value))} className="border rounded-xl p-3" />
           <input placeholder="Service Area" value={serviceArea} onChange={(e) => setServiceArea(e.target.value)} className="border rounded-xl p-3" />
+          <select
+            value={companyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+            className="border rounded-xl p-3"
+          >
+            <option value="">Unassigned (no company)</option>
+            {companies
+              .filter((c) => c.status === "Active" || c.id === companyId)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.status !== "Active" ? " (Inactive)" : ""}
+                </option>
+              ))}
+          </select>
           <button onClick={addPartner} className="bg-green-600 hover:bg-green-700 transition text-white rounded-xl p-3">
             {editingId ? "💾 Update Partner" : "➕ Add Delivery Partner"}
           </button>
@@ -296,6 +353,7 @@ export default function DeliveryPartnersPage() {
                   <p>📦 Capacity: {partner.dailyCapacity} orders/day</p>
                   <p>📋 Assigned Orders: {partner.assignedOrders || 0}</p>
                   <p>📍 {partner.serviceArea}</p>
+                  <p>🏢 {partner.companyName || "Unassigned"}</p>
 
                   {/* FIXED: proper span element (was loose text before) */}
                   <span

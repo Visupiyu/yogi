@@ -3,7 +3,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { Timestamp } from "firebase-admin/firestore";
 import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
-import type { DeliveryPerson } from "@/lib/deliveryEngine/types";
+import type { DeliveryHub, DeliveryPerson, DeliveryPersonRole } from "@/lib/deliveryEngine/types";
 
 // Company-scoped delivery-person management. Admin does NOT manage delivery
 // people — a delivery COMPANY manages its own. Every operation is gated on the
@@ -41,6 +41,8 @@ export async function GET(request: Request) {
     return {
       id: d.id,
       providerType: p.providerType ?? "COMPANY",
+      role: p.role === "HUB_PERSON" ? "HUB_PERSON" : "RIDER",
+      hubId: p.role === "HUB_PERSON" ? p.hubId ?? null : null,
       name: p.name,
       phone: p.phone,
       email: p.email,
@@ -55,7 +57,14 @@ export async function GET(request: Request) {
 }
 
 // POST — register a person the company has ALREADY created an Auth account for.
-// Body: { uid, name, phone, email, vehicleType?, vehicleNumber?, serviceArea?, city? }
+// Body: { uid, name, phone, email, vehicleType?, vehicleNumber?, serviceArea?,
+//         city?, role?, hubId? }
+//
+// role defaults to "RIDER" when omitted (locked backward-compat default — see
+// DeliveryPersonRole). "HUB_PERSON" REQUIRES hubId: a hub-person doc is never
+// created without one. The named hub must exist, be Active, and belong to
+// THIS company — a company can never station a person at another company's
+// hub. A RIDER is never given a hubId, even if the client sends one.
 export async function POST(request: Request) {
   const requester = await verifyRequestUser(request);
   if (!requester) return Response.json({ error: "Please sign in." }, { status: 401 });
@@ -76,6 +85,11 @@ export async function POST(request: Request) {
   if (!uid || !name || !phone || !email)
     return Response.json({ error: "uid, name, phone and email are all required." }, { status: 400 });
 
+  const rawRole = str(body.role, 20);
+  if (rawRole && rawRole !== "RIDER" && rawRole !== "HUB_PERSON")
+    return Response.json({ error: "role must be RIDER or HUB_PERSON." }, { status: 400 });
+  const role: DeliveryPersonRole = rawRole === "HUB_PERSON" ? "HUB_PERSON" : "RIDER";
+
   const db = getAdminDb();
 
   // A uid can belong to exactly one delivery person, in exactly one provider.
@@ -83,10 +97,27 @@ export async function POST(request: Request) {
   if (!existing.empty)
     return Response.json({ error: "This account is already registered as a delivery person." }, { status: 409 });
 
+  // HUB_PERSON: hubId is REQUIRED (never optional) and must be one of THIS
+  // company's own Active hubs. RIDER: hubId is always forced null, regardless
+  // of anything the client sends.
+  let hubId: string | null = null;
+  if (role === "HUB_PERSON") {
+    hubId = str(body.hubId, 128);
+    if (!hubId) return Response.json({ error: "hubId is required for role HUB_PERSON." }, { status: 400 });
+    const hubSnap = await db.collection("deliveryHubs").doc(hubId).get();
+    if (!hubSnap.exists) return Response.json({ error: "Hub not found." }, { status: 404 });
+    const hub = hubSnap.data() as DeliveryHub;
+    if (hub.companyId !== actor.companyId)
+      return Response.json({ error: "That hub belongs to another company." }, { status: 403 });
+    if (hub.status !== "Active") return Response.json({ error: "That hub is not active." }, { status: 409 });
+  }
+
   const now = Timestamp.now();
   const ref = await db.collection("deliveryPersons").add({
     providerType: "COMPANY",             // server-owned: never from the body
     companyId: actor.companyId,          // from the caller, never the body
+    role,                                // server-validated above
+    hubId,                               // null unless role is HUB_PERSON
     uid,
     name,
     phone,
@@ -103,5 +134,5 @@ export async function POST(request: Request) {
     updatedAt: now,
   });
 
-  return Response.json({ success: true, personId: ref.id });
+  return Response.json({ success: true, personId: ref.id, role, hubId });
 }

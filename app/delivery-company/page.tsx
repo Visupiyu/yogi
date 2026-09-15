@@ -31,6 +31,9 @@ export default function DeliveryCompanyDashboard() {
   const [jobs, setJobs] = useState<CompanyJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Active-hub notice: a company must have an active hub before hub handoff
+  // operations can proceed. Read-only; company-scoped server-side.
+  const [activeHubCount, setActiveHubCount] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -48,6 +51,22 @@ export default function DeliveryCompanyDashboard() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authedFetch("/api/delivery/company/hubs");
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok && Array.isArray(data.hubs)) {
+          setActiveHubCount(
+            data.hubs.filter((h: { status?: string }) => h.status === "Active").length
+          );
+        }
+      } catch { /* non-fatal — the Hubs page surfaces hub problems in full */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const { awaiting, active, completed } = useMemo(() => {
     const awaiting = jobs.filter((j) => AWAITING_STATUSES.has(j.status)).sort(byUpdatedDesc);
     const active = jobs.filter((j) => ACTIVE_STATUSES.has(j.status)).sort(byUpdatedDesc);
@@ -57,6 +76,21 @@ export default function DeliveryCompanyDashboard() {
 
   return (
     <div className="space-y-6">
+      {activeHubCount === 0 ? (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm font-semibold text-amber-900">No active hub configured</p>
+          <p className="mt-1 text-sm text-amber-800">
+            Hub handoff operations (Seller &rarr; Rider 1 &rarr; Origin Hub) can&apos;t proceed
+            until your company has an active hub. Configure one to continue.
+          </p>
+          <Link
+            href="/delivery-company/hubs"
+            className="mt-3 inline-block rounded bg-amber-600 px-3 py-1.5 text-sm font-medium text-white"
+          >
+            Go to Hubs &rarr; Add Hub
+          </Link>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">{company.companyName}</h1>

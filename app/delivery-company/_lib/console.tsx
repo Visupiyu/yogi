@@ -45,6 +45,15 @@ export type CompanyJob = {
   updatedAt?: unknown;
 };
 
+// The four operational actors on a COMPANY hub-routed job (read-only view).
+export type DeliveryActorView = {
+  personId?: string | null;
+  name?: string;
+  phone?: string;
+  status: string;
+  hubName?: string;
+};
+
 // GET /api/delivery/jobs/[jobId] → { job: CompanyJobDetail } (no secrets)
 export type CompanyJobDetail = {
   id: string;
@@ -59,20 +68,39 @@ export type CompanyJobDetail = {
   status: string;
   currentLegId?: string | null;
   currentStage?: string;
+  originHubId?: string | null;
+  destinationHubId?: string | null;
+  originHubPersonId?: string | null;
+  destinationHubPersonId?: string | null;
+  originHub?: { id: string; name?: string; address?: string; city?: string; region?: string; pincode?: string } | null;
+  destinationHub?: { id: string; name?: string; address?: string; city?: string; region?: string; pincode?: string } | null;
+  deliveryActors?: {
+    rider1: DeliveryActorView;
+    originHubPerson: DeliveryActorView;
+    destinationHubPerson: DeliveryActorView;
+    rider2: DeliveryActorView;
+  } | null;
   responsibleParty?: { kind: string | null; companyId: string | null; personId: string | null } | null;
   assignedPersonId?: string | null;
   assignedPersonName?: string | null;
   assignedPersonPhone?: string | null;
   assignedCompanyName?: string | null;
-  pickup?: { sellerName?: string; area?: string } | null;
+  pickup?: { sellerName?: string; street?: string; unit?: string; city?: string; state?: string; zipCode?: string } | null;
   drop?: { customerName?: string; phone?: string; address?: string; slot?: string | null } | null;
   parcel?: { items?: { name?: string; qty?: number }[] } | null;
+  // FinalMile leg only (see the backend's taskLocation.ts): "ready" means the
+  // destination-hub -> Rider 2 handover has NOT started yet — reassignment is
+  // still safe. "awaiting_rider_confirmation"/"confirmed" mean it has, and
+  // reassignment must not be offered. Absent for every other leg type.
+  task?: { finalMileHandoverState?: "ready" | "awaiting_rider_confirmation" | "confirmed" } | null;
 };
 
 // GET /api/delivery/company/persons → { companyId, persons: CompanyPerson[] }
 export type CompanyPerson = {
   id: string;
   providerType?: string;
+  role?: string; // "RIDER" | "HUB_PERSON"
+  hubId?: string | null; // set only for a HUB_PERSON — their stationed hub
   name?: string;
   phone?: string;
   email?: string;
@@ -204,6 +232,16 @@ export function fmtTs(v: unknown): string {
 export function itemsSummary(items?: { name?: string; qty?: number }[] | null): string {
   if (!Array.isArray(items) || items.length === 0) return "—";
   return items.map((i) => `${i.name ?? "item"} ×${i.qty ?? 1}`).join(", ");
+}
+
+// Joins the seller's pickup-address fields (snapshotted onto the job at
+// creation) into one display line. "—" when none of it was ever captured.
+export function pickupAddressLine(pickup?: CompanyJobDetail["pickup"]): string {
+  if (!pickup) return "—";
+  const parts = [pickup.street, pickup.unit, pickup.city, pickup.state, pickup.zipCode].filter(
+    (p): p is string => typeof p === "string" && p.trim().length > 0
+  );
+  return parts.length ? parts.join(", ") : "—";
 }
 
 // ---- Company identity context (provided by the layout after whoami) ----

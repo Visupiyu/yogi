@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -164,6 +166,7 @@ export default function OrdersPage() {
   return (
   <section className="bg-gray-50 min-h-screen py-10">
       <div className="max-w-6xl mx-auto px-5">
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
         <h1 className="text-4xl font-bold mb-10">
           My Orders
         </h1>

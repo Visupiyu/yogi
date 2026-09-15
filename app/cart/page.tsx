@@ -237,6 +237,7 @@ const moveToCart = (index: number) => {
   return (
     <section className="py-8 px-4 pb-24 md:pb-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
         {/* CHECKOUT PROGRESS BAR */}
         <div className="flex items-center justify-center gap-2 sm:gap-4 mb-8">
           {["Cart", "Address", "Payment"].map((label, i) => (

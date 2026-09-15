@@ -158,67 +158,40 @@ export default function OrderDetailsPage() {
 
     return () => unsub();
   }, [orderId, router]);
+  // Contact Seller is server-authorized: the API verifies (from the ID token)
+  // that the caller OWNS this order, then finds/creates the chat with the Admin
+  // SDK. The client no longer queries the chats collection directly (a customer
+  // query by orderId+sellerId can't satisfy the participant-based read rule, so
+  // Firestore denied it with "Missing or insufficient permissions").
   const openSellerChat = async () => {
-     console.log("Firebase User:", auth.currentUser);
-  console.log("Order:", order);
-  console.log("First Item:", order?.items?.[0]);
+    if (!order?.items?.length) return;
 
-  if (!order?.items?.length) return;
-
-  try {
-
-    const item = order.items[0];
-
-    const q = query(
-      collection(db, "chats"),
-      where("orderId", "==", order.id),
-      where("sellerId", "==", item.vendorId)
-    );
-
-    const snapshot = await getDocs(q);
-
-    if (!snapshot.empty) {
-      router.push(`/chat/${snapshot.docs[0].id}`);
-      return;
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      const token = await user.getIdToken();
+      const res = await fetch("/api/contact-seller", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.chatId) {
+        alert(data?.error || "Could not open the chat. Please try again.");
+        return;
+      }
+      router.push(`/chat/${data.chatId}`);
+    } catch (error) {
+      console.error("Chat Error:", error);
+      alert("Could not open the chat. Please try again.");
     }
-
-    const chatRef = await addDoc(
-  collection(db, "chats"),
-  {
-    orderId: order.id,
-
-    sellerId: item.vendorId,
-    sellerName: item.vendorName || "",
-
-    customerId: order.userId,
-    customerName: order.customerName,
-    customerEmail: order.userEmail,
-
-    productId: item.id,
-    productName: item.name,
-    productImage: item.image || "",
-
-    lastMessage: "Conversation started",
-    lastSender: "system",
-
-    sellerUnread: 0,
-    customerUnread: 0,
-
-    createdAt: serverTimestamp(),
-    lastMessageAt: serverTimestamp(),
-  }
-);
-
-    router.push(`/chat/${chatRef.id}`);
-
-  } catch (error: any) {
-
-  console.error("Chat Error:", error);
-
-  alert(error.message);
-
-}
-};
+  };
 
   // getStep() and the labels now live in lib/orderTracking.ts, shared with
   // app/orders and app/track-order. They were duplicated per page and had

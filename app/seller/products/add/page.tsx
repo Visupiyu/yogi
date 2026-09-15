@@ -94,7 +94,7 @@ useEffect(() => {
           </h2>
           <p className="mt-2 text-gray-700">{blockReason}</p>
           <Link
-            href="/seller/tax"
+            href="/seller/tax?next=/seller/products/add"
             className="inline-flex mt-6 px-6 py-3 rounded-xl bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold"
           >
             Go to Tax &amp; GST Profile

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -40,6 +40,11 @@ import { shortOrderLabel } from "@/lib/orderSla";
 export default function SellerOrdersPage() {
   const router = useRouter();
   const [records, setRecords] = useState([]);
+  // Delivery assignment per record, keyed by sellerOrder record id. The
+  // assignment (Delivery Company/Person + shipmentNumber) lives ONLY on the
+  // parent order, never on sellerOrders, so it is fetched from there — see the
+  // load effect. Only the delivery fields are kept; customer PII is discarded.
+  const [deliveryByRecord, setDeliveryByRecord] = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [busyKey, setBusyKey] = useState(null);
@@ -71,6 +76,41 @@ export default function SellerOrdersPage() {
         );
 
         setRecords(list);
+
+        // The real delivery assignment (Delivery Company, Delivery Person,
+        // YOMICO tracking number) is written by Admin -> Delivery onto the
+        // PARENT order, never onto sellerOrders. Read it from there for each
+        // record — the seller is already authorized to read every confirmed
+        // parent order (uid in vendorIds && status != 'Pending'), which every
+        // listed record satisfies. Only the delivery fields are copied into
+        // state; the order's customer details are never stored or shown here.
+        // Per-order try/catch so one failed read can't blank the whole list,
+        // and only fields that exist are kept, so legacy orders are unaffected.
+        const deliveryMap = {};
+        await Promise.all(
+          list.map(async (record) => {
+            if (!record.orderId) return;
+            try {
+              const orderSnap = await getDoc(doc(db, "orders", record.orderId));
+              if (!orderSnap.exists()) return;
+              const o = orderSnap.data();
+              if (
+                o.deliveryCompanyName ||
+                o.deliveryPartnerName ||
+                o.shipmentNumber
+              ) {
+                deliveryMap[record.id] = {
+                  deliveryCompanyName: o.deliveryCompanyName || "",
+                  deliveryPartnerName: o.deliveryPartnerName || "",
+                  shipmentNumber: o.shipmentNumber || "",
+                };
+              }
+            } catch {
+              // Non-fatal — the row still renders without delivery info.
+            }
+          })
+        );
+        setDeliveryByRecord(deliveryMap);
       } catch (error) {
         console.error("Failed to load seller orders:", error);
       } finally {
@@ -213,6 +253,34 @@ export default function SellerOrdersPage() {
                   Your earnings: ₹
                   {Number(record.vendorEarning || 0).toLocaleString("en-IN")}
                 </p>
+
+                {/* Real YOMICO delivery assignment, read from the parent order
+                    (order-level info only — no other seller's data, no customer
+                    PII). Shown only when assigned/available, so legacy orders
+                    are unaffected. Full detail remains on the order page. */}
+                {(() => {
+                  const d = deliveryByRecord[record.id];
+                  if (
+                    !d ||
+                    (!d.deliveryCompanyName &&
+                      !d.deliveryPartnerName &&
+                      !d.shipmentNumber)
+                  ) {
+                    return null;
+                  }
+                  const who = [d.deliveryCompanyName, d.deliveryPartnerName]
+                    .filter(Boolean)
+                    .join(" · ");
+                  return (
+                    <p className="mt-1 text-sm">
+                      <span className="text-gray-500">Delivery: </span>
+                      {who || "Assigned"}
+                      {d.shipmentNumber ? (
+                        <span> · Tracking {d.shipmentNumber}</span>
+                      ) : null}
+                    </p>
+                  );
+                })()}
 
                 <p className="mt-2 text-sm">
                   <span className="text-gray-500">Overall (summary): </span>

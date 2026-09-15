@@ -11,6 +11,7 @@ import {
   sumVariantStock,
   type VariantStockEntry,
 } from "@/lib/products/inventory";
+import { emitDeliveryNotification } from "@/lib/deliveryEngine/notifications";
 
 // ---------------------------------------------------------------------------
 // Single server-authoritative cancellation path.
@@ -64,7 +65,23 @@ async function isWithinCancelRateLimit(uid: string): Promise<boolean> {
   });
 }
 
-type OrderItem = { id?: unknown; qty?: unknown; variantId?: unknown };
+// Two order-creation paths write two DIFFERENT item shapes into the SAME
+// `orders/{id}.items[]` array:
+//   web (lib/orderPricing.ts's PricedLineItem, via app/api/place-order and
+//        lib/onlineOrder.ts)   — id IS the product id; quantity is `qty`.
+//   mobile (app/api/mobile/place-order)
+//        — `id` is the CART DOCUMENT id (never a product), the product id is
+//          `productId`, and quantity is `quantity`, not `qty`.
+// Reading only `item.qty`/`item.id` here silently restored ZERO stock for
+// every mobile-app order (id resolved to a nonexistent "product", qty was
+// always undefined) — this type/the resolution below accepts both shapes.
+type OrderItem = {
+  id?: unknown;
+  productId?: unknown;
+  qty?: unknown;
+  quantity?: unknown;
+  variantId?: unknown;
+};
 
 type OrderRecord = {
   userId?: unknown;
@@ -77,6 +94,12 @@ type OrderRecord = {
   couponCode?: unknown;
   paymentMethod?: unknown;
   paymentStatus?: unknown;
+  // Inventory + Order Consistency V1 — see lib/onlineOrder.ts's own comment.
+  // Present only when a stock shortfall happened at order-creation time (the
+  // Razorpay finalize path never rejects, since the payment is already
+  // captured): the ACTUAL total decremented per product, which can be less
+  // than the sum of items[].qty for that product.
+  stockDeductedQty?: unknown;
 };
 
 // Mirrors isLegalOrderStatusTransition() in firestore.rules: Cancelled is
@@ -232,8 +255,15 @@ export async function POST(request: Request) {
         const restockByProduct = new Map<string, RestockPlan>();
 
         for (const item of items) {
-          const id = item?.id;
-          const qty = Number(item?.qty);
+          // Prefer `productId` (mobile's real product reference) over `id`
+          // (mobile's `id` is the cart document, not a product; web has no
+          // separate productId and uses `id` as the product id directly —
+          // see the OrderItem type comment above).
+          const id =
+            typeof item?.productId === "string" && item.productId
+              ? item.productId
+              : item?.id;
+          const qty = Number(item?.qty ?? item?.quantity);
           if (typeof id !== "string" || !id || !Number.isFinite(qty) || qty <= 0) {
             continue;
           }
@@ -266,6 +296,31 @@ export async function POST(request: Request) {
             // No variantId, product has no variants, or the variant was
             // deleted since purchase: restore at product level, never guess.
             plan.productLevelQty += qty;
+          }
+        }
+
+        // Inventory + Order Consistency V1 — if this order had a stock
+        // shortfall at creation (lib/onlineOrder.ts's stockDeductedQty),
+        // items[].qty summed above is the customer's ORIGINAL request, which
+        // can exceed what was actually taken from inventory. Restoring the
+        // requested amount would create phantom stock that was never
+        // removed. Trust the recorded actual figure instead — but ONLY for
+        // the plain product-level bucket (variantRestore empty): a per-
+        // variant shortfall is not attributable back to one variant from
+        // this aggregate total alone, so that rarer combination is left as
+        // the existing (pre-this-fix) behavior rather than risking a wrong
+        // per-variant split.
+        const stockDeductedQty =
+          order.stockDeductedQty && typeof order.stockDeductedQty === "object"
+            ? (order.stockDeductedQty as Record<string, unknown>)
+            : null;
+        if (stockDeductedQty) {
+          for (const [productId, plan] of restockByProduct) {
+            if (plan.variantRestore.size > 0) continue;
+            const actual = Number(stockDeductedQty[productId]);
+            if (Number.isFinite(actual) && actual >= 0 && actual !== plan.productLevelQty) {
+              plan.productLevelQty = actual;
+            }
           }
         }
 
@@ -310,6 +365,71 @@ export async function POST(request: Request) {
             : null;
         const couponSnap = couponRef ? await tx.get(couponRef) : null;
 
+        // Delivery Engine integration (Payment Lifecycle V1): "Confirmed" and
+        // "Packed" are BOTH cancellable (CANCELLABLE_STATUSES above) AND
+        // materializable (jobFactory.ts's MATERIALIZABLE_STATUSES) — so a
+        // DeliveryJob can already exist for an order being cancelled here.
+        // Without this, a rider/company dispatcher could keep physically
+        // executing a shipment (pickup, hub handoff, out-for-delivery,
+        // delivery) for a sale that no longer exists. This does NOT touch
+        // payment/refund state (owesRefund below is the only payment-side
+        // effect of cancellation) — it only halts further physical execution.
+        // Every delivery-engine transition already rejects job.status
+        // "Cancelled"/"Returned" (see lib/deliveryEngine/execution.ts,
+        // hubIntake.ts, transit.ts, destinationHub.ts, finalMileAssign.ts,
+        // destinationHandover.ts, codPayment.ts, deliveryException.ts) — this
+        // is simply the first and only writer of that value.
+        const deliveryJobsSnap = await tx.get(
+          db.collection("deliveryJobs").where("orderId", "==", orderId)
+        );
+        const DELIVERY_TERMINAL = new Set(["Delivered", "Cancelled", "Returned"]);
+        type HaltPlan = {
+          jobRef: FirebaseFirestore.DocumentReference;
+          orderNumber: string;
+          shipmentNumber: string;
+          personRef: FirebaseFirestore.DocumentReference | null;
+          personUid: string | null;
+          personWasBusy: boolean;
+        };
+        const deliveryJobsToHalt: HaltPlan[] = [];
+        for (const jobDoc of deliveryJobsSnap.docs) {
+          const jobData = jobDoc.data() as {
+            status?: string;
+            assignedPersonId?: string | null;
+            orderNumber?: string;
+            shipmentNumber?: string;
+          };
+          if (jobData.status && DELIVERY_TERMINAL.has(jobData.status)) continue;
+
+          // Free the assigned delivery person (Busy -> Available only — never
+          // clobber a manual Offline) and get their uid for a courtesy
+          // notification. Read before any write, same discipline the
+          // delivery engine itself uses (see lib/deliveryEngine/
+          // assignment.ts's own freeIfBusy).
+          let personRef: FirebaseFirestore.DocumentReference | null = null;
+          let personUid: string | null = null;
+          let personWasBusy = false;
+          if (typeof jobData.assignedPersonId === "string" && jobData.assignedPersonId) {
+            const pRef = db.collection("deliveryPersons").doc(jobData.assignedPersonId);
+            const pSnap = await tx.get(pRef);
+            if (pSnap.exists) {
+              const pData = pSnap.data() as { availability?: string; uid?: string };
+              personRef = pRef;
+              personUid = typeof pData.uid === "string" ? pData.uid : null;
+              personWasBusy = pData.availability === "Busy";
+            }
+          }
+
+          deliveryJobsToHalt.push({
+            jobRef: jobDoc.ref,
+            orderNumber: typeof jobData.orderNumber === "string" ? jobData.orderNumber : "",
+            shipmentNumber: typeof jobData.shipmentNumber === "string" ? jobData.shipmentNumber : "",
+            personRef,
+            personUid,
+            personWasBusy,
+          });
+        }
+
         // Cancelling a captured ONLINE payment creates an obligation to return
         // real money. Cancellation records that obligation; it deliberately
         // does NOT execute the refund — no Razorpay call happens here, and
@@ -345,6 +465,31 @@ export async function POST(request: Request) {
               }
             : {}),
         });
+
+        // Halt any non-terminal DeliveryJob(s) for this order (see the read
+        // phase above for why this can exist at all). Never touches
+        // payment/refund fields — those are owned entirely by owesRefund
+        // above; this only stops further physical execution.
+        const cancelledAt = Timestamp.now();
+        for (const plan of deliveryJobsToHalt) {
+          tx.set(plan.jobRef, { status: "Cancelled", updatedAt: cancelledAt }, { merge: true });
+          if (plan.personRef && plan.personWasBusy) {
+            tx.set(plan.personRef, { availability: "Available", updatedAt: cancelledAt }, { merge: true });
+          }
+          if (plan.personUid) {
+            emitDeliveryNotification(tx, db, {
+              type: "DELIVERY_STATE_CHANGED",
+              recipient: { role: "delivery_person", userId: plan.personUid },
+              eventId: `${plan.jobRef.id}__order_cancelled`,
+              title: "Delivery cancelled",
+              message: `The order for shipment ${plan.shipmentNumber || plan.jobRef.id} was cancelled — no further action is needed.`,
+              orderId,
+              orderNumber: plan.orderNumber || null,
+              deliveryJobId: plan.jobRef.id,
+              now: cancelledAt,
+            });
+          }
+        }
 
         for (const plan of restockByProduct.values()) {
           if (plan.variants && plan.variantRestore.size > 0) {
@@ -448,6 +593,28 @@ export async function POST(request: Request) {
         } catch (error) {
           console.error("cancel-order: reward ledger write failed:", error);
         }
+      }
+    }
+
+    // Customer notification — centralised here so every caller (the website's
+    // own pages AND the Customer App, once migrated to this same route) gets
+    // the identical, consistent behavior this route's own header comment
+    // describes; previously only the Customer App's own client-side
+    // cancellation wrote this, and the website pages wrote none at all.
+    // Reuses the EXISTING shared `notifications` collection — no new system.
+    if (outcome.orderUserId) {
+      try {
+        await db.collection("notifications").add({
+          userId: outcome.orderUserId,
+          role: "customer",
+          title: "Order Cancelled",
+          message: "Your order has been cancelled.",
+          type: "order",
+          read: false,
+          createdAt: Timestamp.now(),
+        });
+      } catch (error) {
+        console.error("cancel-order: customer notification failed:", error);
       }
     }
 

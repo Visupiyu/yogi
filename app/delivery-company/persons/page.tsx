@@ -23,6 +23,7 @@ import { authedFetch, Spinner, type CompanyPerson } from "@/app/delivery-company
 const APP_LOGIN_HINT = "/delivery-app/login";
 
 type CredMode = "reset" | "temp";
+type PersonRole = "RIDER" | "HUB_PERSON";
 type Outcome =
   | { kind: "success-reset"; name: string; email: string; resetEmailSent: boolean }
   | { kind: "success-temp"; name: string; email: string; tempPassword: string }
@@ -54,6 +55,13 @@ export default function DeliveryCompanyPersonsPage() {
   const [city, setCity] = useState("");
   const [credMode, setCredMode] = useState<CredMode>("reset");
   const [tempPassword, setTempPassword] = useState("");
+
+  // Role + hub: a RIDER (default) or a HUB_PERSON stationed at one of the
+  // company's hubs. The backend POST /api/delivery/company/persons already
+  // validates role + hubId (HUB_PERSON requires a company-owned Active hub).
+  const [role, setRole] = useState<PersonRole>("RIDER");
+  const [hubId, setHubId] = useState("");
+  const [hubs, setHubs] = useState<{ id: string; name?: string; status?: string }[]>([]);
 
   const [submitting, setSubmitting] = useState(false);
   const inFlightRef = useRef(false);
@@ -88,10 +96,26 @@ export default function DeliveryCompanyPersonsPage() {
 
   useEffect(() => { void loadPersons(); }, [loadPersons]);
 
+  // Load the company's hubs once — used for the Hub Person hub selector and to
+  // label each hub person's hub in the list (by authoritative hubId, not name).
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await authedFetch("/api/delivery/company/hubs");
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && Array.isArray(data.hubs)) setHubs(data.hubs);
+      } catch { /* non-fatal — the list still renders without hub names */ }
+    })();
+  }, []);
+
+  const hubNameById = (id?: string | null): string =>
+    (id && hubs.find((h) => h.id === id)?.name) || (id ? "Unknown hub" : "");
+
   const resetFormFields = () => {
     setName(""); setPhone(""); setEmail("");
     setVehicleType(""); setVehicleNumber(""); setServiceArea(""); setCity("");
     setTempPassword("");
+    setRole("RIDER"); setHubId("");
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -104,6 +128,7 @@ export default function DeliveryCompanyPersonsPage() {
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanName || !cleanPhone || !cleanEmail) { setFormError("Name, phone and email are required."); return; }
     if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) { setFormError("Enter a valid email address."); return; }
+    if (role === "HUB_PERSON" && !hubId) { setFormError("Select a hub for this hub person."); return; }
     if (credMode === "temp" && tempPassword.length < 8) { setFormError("Temporary password must be at least 8 characters."); return; }
 
     inFlightRef.current = true;
@@ -149,6 +174,8 @@ export default function DeliveryCompanyPersonsPage() {
             vehicleNumber: vehicleNumber.trim(),
             serviceArea: serviceArea.trim(),
             city: city.trim(),
+            role,
+            ...(role === "HUB_PERSON" ? { hubId } : {}),
           }),
         });
         if (!res.ok) { setOutcome({ kind: "partial", email: cleanEmail }); return; }
@@ -263,6 +290,40 @@ export default function DeliveryCompanyPersonsPage() {
                   <span className="text-sm text-gray-600">City</span>
                   <input className={inputCls} value={city} onChange={(e) => setCity(e.target.value)} />
                 </label>
+                <label className="block">
+                  <span className="text-sm text-gray-600">Role<span className="text-red-500">*</span></span>
+                  <select
+                    className={inputCls}
+                    value={role}
+                    onChange={(e) => { const r = e.target.value as PersonRole; setRole(r); if (r !== "HUB_PERSON") setHubId(""); }}
+                  >
+                    <option value="RIDER">Rider</option>
+                    <option value="HUB_PERSON">Hub person</option>
+                  </select>
+                </label>
+                {role === "HUB_PERSON" ? (
+                  <label className="block">
+                    <span className="text-sm text-gray-600">Hub<span className="text-red-500">*</span></span>
+                    <select
+                      className={inputCls}
+                      value={hubId}
+                      onChange={(e) => setHubId(e.target.value)}
+                      required
+                    >
+                      <option value="">
+                        {hubs.some((h) => (h.status ?? "Active") === "Active") ? "Select a hub…" : "No active hubs configured"}
+                      </option>
+                      {hubs.map((h) => {
+                        const activeHub = (h.status ?? "Active") === "Active";
+                        return (
+                          <option key={h.id} value={h.id} disabled={!activeHub}>
+                            {h.name || h.id}{activeHub ? "" : " (inactive)"}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                ) : null}
               </div>
 
               <fieldset className="rounded-lg border p-3">
@@ -322,6 +383,7 @@ export default function DeliveryCompanyPersonsPage() {
                 person={p}
                 busy={rowBusy === p.id}
                 disabled={rowBusy !== null && rowBusy !== p.id}
+                hubName={hubNameById(p.hubId)}
                 onSetStatus={setStatus}
               />
             ))}
@@ -394,10 +456,11 @@ function OutcomeView({ outcome, resending, copied, onResend, onCopy, onDismiss, 
   );
 }
 
-function PersonCard({ person, busy, disabled, onSetStatus }: {
+function PersonCard({ person, busy, disabled, hubName, onSetStatus }: {
   person: CompanyPerson;
   busy: boolean;
   disabled: boolean;
+  hubName: string;
   onSetStatus: (personId: string, status: "Active" | "Suspended") => void;
 }) {
   const active = (person.accountStatus || "Active") === "Active";
@@ -412,6 +475,17 @@ function PersonCard({ person, busy, disabled, onSetStatus }: {
           <p className="truncate font-medium text-gray-900">{person.name || "—"}</p>
           <p className="truncate text-sm text-gray-500">{person.email || "—"}</p>
           <p className="text-sm text-gray-500">{person.phone || "—"}</p>
+          <p className="mt-1">
+            {person.role === "HUB_PERSON" ? (
+              <span className="rounded bg-teal-100 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
+                HUB PERSON{hubName ? ` — ${hubName}` : ""}
+              </span>
+            ) : (
+              <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                RIDER
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span className={`rounded px-2 py-0.5 text-xs font-medium ${active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>

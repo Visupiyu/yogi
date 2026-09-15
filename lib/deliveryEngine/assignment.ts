@@ -39,6 +39,7 @@ import type {
   DeliveryEvent,
   DeliveryEventRole,
 } from "@/lib/deliveryEngine/types";
+import { emitDeliveryNotification } from "@/lib/deliveryEngine/notifications";
 
 // ---- Errors (routes map .status to an HTTP code) ----
 export class AssignmentError extends Error {
@@ -98,6 +99,39 @@ export function assertYomicoPerson(person: DeliveryPerson): void {
 export function assertCompanyPerson(person: DeliveryPerson, companyId: string): void {
   if (person.providerType !== "COMPANY" || person.companyId !== companyId) {
     throw new AssignmentError("That delivery person belongs to another company.", 403);
+  }
+}
+
+/**
+ * Origin Hub Person eligible to RECEIVE a shipment at a specific hub
+ * (four-actor COMPANY_HUB model, Phase 1): same company, role HUB_PERSON,
+ * stationed at exactly this hub, and Active. Unlike assertPersonAssignable,
+ * availability is NOT gated here — a hub person works a fixed station, not a
+ * one-shipment-at-a-time assignment, so Busy/Available is irrelevant to
+ * whether they may receive a parcel.
+ */
+export function assertHubPerson(person: DeliveryPerson, companyId: string, hubId: string): void {
+  if (person.providerType !== "COMPANY" || person.companyId !== companyId) {
+    throw new AssignmentError("That delivery person belongs to another company.", 403);
+  }
+  if (person.role !== "HUB_PERSON" || !person.hubId || person.hubId !== hubId) {
+    throw new AssignmentError("That person is not the origin hub person for this shipment.", 403);
+  }
+  const accountStatus = person.accountStatus ?? (person.status === "Inactive" ? "Suspended" : "Active");
+  if (accountStatus !== "Active") {
+    throw new AssignmentError("That delivery person is not active.", 409);
+  }
+}
+
+/**
+ * Four-actor invariant (Phase 2): a HUB_PERSON can never also act as a rider
+ * on a shipment — enforces "Origin/Destination Hub Person != Rider 2" at every
+ * point a company person is selected/confirmed as a delivery rider (absent
+ * role defaults to RIDER, so every legacy/YOMICO person passes unaffected).
+ */
+export function assertRiderPerson(person: DeliveryPerson): void {
+  if (person.role === "HUB_PERSON") {
+    throw new AssignmentError("A hub person cannot be assigned as a delivery rider.", 409);
   }
 }
 
@@ -265,6 +299,24 @@ export async function assignYomicoPerson(
     { merge: true }
   );
 
+  // Delivery Notification System V1 — internal, delivery-person-only signal
+  // (never a customer/seller notification: Rider 1/first-mile assignment is
+  // an internal handoff mechanic, per the Company Job rule in the spec).
+  if (person.uid) {
+    emitDeliveryNotification(tx, db, {
+      type: "DELIVERY_JOB_ASSIGNED",
+      recipient: { role: "delivery_person", userId: person.uid },
+      eventId,
+      title: "New delivery assigned",
+      message: `A new delivery (shipment ${job.shipmentNumber}) has been assigned to you.`,
+      orderId: job.orderId,
+      orderNumber: job.orderNumber,
+      sellerOrderId: job.sellerOrderId,
+      deliveryJobId: args.jobId,
+      now,
+    });
+  }
+
   return { changed: true, jobId: args.jobId, personId: args.personId };
 }
 
@@ -416,6 +468,7 @@ export async function assignCompanyPerson(
 
   // ---- VALIDATE ----
   assertCompanyPerson(person, args.companyId);
+  assertRiderPerson(person); // never a HUB_PERSON (else 409) — four-actor invariant (Phase 5)
   assertPersonAssignable(person);
 
   // ---- WRITES ----
@@ -469,6 +522,23 @@ export async function assignCompanyPerson(
     },
     { merge: true }
   );
+
+  // Delivery Notification System V1 — internal, delivery-person-only signal
+  // (never a customer/seller notification — see the note on assignYomicoPerson).
+  if (person.uid) {
+    emitDeliveryNotification(tx, db, {
+      type: "DELIVERY_JOB_ASSIGNED",
+      recipient: { role: "delivery_person", userId: person.uid },
+      eventId,
+      title: "New delivery assigned",
+      message: `A new delivery (shipment ${job.shipmentNumber}) has been assigned to you.`,
+      orderId: job.orderId,
+      orderNumber: job.orderNumber,
+      sellerOrderId: job.sellerOrderId,
+      deliveryJobId: args.jobId,
+      now,
+    });
+  }
 
   return { changed: true, jobId: args.jobId, personId: args.personId };
 }

@@ -265,7 +265,14 @@ export default function SellerAnalyticsPage() {
               </div>
               <div>
                 <p className="text-gray-500 text-lg">{kpi.label}</p>
-                <h2 className="text-4xl font-bold mt-2 break-words">
+                <h2
+                  title={String(kpi.value)}
+                  className={`font-bold mt-2 break-words ${
+                    typeof kpi.value === "string" && kpi.value.length > 14
+                      ? "text-xl leading-snug line-clamp-2"
+                      : "text-4xl"
+                  }`}
+                >
                   {kpi.value}
                 </h2>
               </div>
