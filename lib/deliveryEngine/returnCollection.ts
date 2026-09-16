@@ -60,7 +60,11 @@ const REQUIRED_ITEM_REQUEST_STATUS = "PICKUP_ASSIGNED";
 const ITEM_STATUS_ON_COLLECTED = "PICKED_UP";
 const ITEM_STATUS_ON_RECEIVED = "RECEIVED_BY_YOMICO";
 
-export type ReturnExecutionAction = "start" | "collect" | "receive" | "exception";
+// Runtime-checkable list backing ReturnExecutionAction — the HTTP execution
+// route validates an incoming action against this SAME array (never a second,
+// hand-typed copy of the engine's own action vocabulary).
+export const RETURN_EXECUTION_ACTIONS = ["start", "collect", "receive", "exception"] as const;
+export type ReturnExecutionAction = (typeof RETURN_EXECUTION_ACTIONS)[number];
 
 // Customer-safe return-collection exception reasons (a subset that maps to the
 // engine's own DeliveryExceptionCode vocabulary; validated in the route).
@@ -163,6 +167,78 @@ function writeReturnEvent(
   };
   tx.set(eventRef, event, { merge: true });
   return eventRef.id;
+}
+
+// ===========================================================================
+// Resolve the ReturnJobSnapshot an admin/company route needs BEFORE calling
+// createOrAssignReturnJob (which, per its own contract, reads it OUTSIDE the
+// transaction — see the ReturnJobSnapshot doc comment above). Read-only;
+// invents nothing and re-derives no FSM decision — it only copies the same
+// order/vendor fields the FORWARD job builder already copies verbatim
+// (see jobFactory.ts's buildDeliveryJob: order.customerName/phone/address for
+// the customer side, the vendor doc's street/unit/city/state/zipCode for the
+// seller side), just with pickup/destination reversed for the reverse leg.
+// No slot/appointment label exists on itemRequests beyond the Timestamp
+// createOrAssignReturnJob already reads itself (req.pickup.scheduledAt), so
+// customerPickup.slot is honestly left null rather than reusing the
+// forward-delivery order.deliverySlot (a different appointment entirely).
+export async function resolveReturnJobSnapshot(
+  db: Firestore,
+  returnRequestId: string
+): Promise<ReturnJobSnapshot> {
+  const itemSnap = await db.collection("itemRequests").doc(returnRequestId).get();
+  if (!itemSnap.exists) throw new ReturnCollectionError("Return request not found.", 404);
+  const req = itemSnap.data() as ItemRequestData;
+
+  const orderId = typeof req.orderId === "string" ? req.orderId : "";
+  if (!orderId) throw new ReturnCollectionError("This return request has no associated order.", 409);
+  const orderSnap = await db.collection("orders").doc(orderId).get();
+  if (!orderSnap.exists) throw new ReturnCollectionError("Order not found.", 404);
+  const order = orderSnap.data() as {
+    orderNumber?: unknown;
+    customerName?: unknown;
+    phone?: unknown;
+    address?: unknown;
+  };
+
+  const vendorId = typeof req.vendorId === "string" ? req.vendorId : "";
+  let vendorName = "";
+  let vendorAddress: { street?: unknown; unit?: unknown; city?: unknown; state?: unknown; zipCode?: unknown } = {};
+  if (vendorId) {
+    try {
+      const vq = await db.collection("vendors").where("uid", "==", vendorId).limit(1).get();
+      const v = vq.docs[0]?.data() as
+        | { businessName?: unknown; storeName?: unknown; name?: unknown; street?: unknown; unit?: unknown; city?: unknown; state?: unknown; zipCode?: unknown }
+        | undefined;
+      vendorName =
+        (typeof v?.businessName === "string" && v.businessName) ||
+        (typeof v?.storeName === "string" && v.storeName) ||
+        (typeof v?.name === "string" && v.name) ||
+        "";
+      vendorAddress = { street: v?.street, unit: v?.unit, city: v?.city, state: v?.state, zipCode: v?.zipCode };
+    } catch {
+      // Same tolerance as materialize's resolveVendorInfo: an address lookup
+      // failure degrades to an empty address, never blocks the caller.
+    }
+  }
+
+  return {
+    orderNumber: str(order.orderNumber, 40),
+    customerPickup: {
+      customerName: str(req.customerName, 200) || str(order.customerName, 200),
+      phone: str(order.phone, 40),
+      address: str(order.address, 1000),
+      slot: null,
+    },
+    destination: {
+      name: str(vendorName, 200),
+      street: str(vendorAddress.street, 200),
+      unit: str(vendorAddress.unit, 100),
+      city: str(vendorAddress.city, 100),
+      state: str(vendorAddress.state, 100),
+      zipCode: str(vendorAddress.zipCode, 12),
+    },
+  };
 }
 
 // ===========================================================================

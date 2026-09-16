@@ -164,7 +164,10 @@ function legRef(db: Firestore, jobId: string, legId: string): DocumentReference 
 const FWD_ACTIVE_JOB_STATUSES: ReadonlySet<string> = new Set([
   "AssignedToYomico", "AssignedToCompany", "InProgress",
 ]);
-const RETURN_ACTIVE_JOB_STATUSES: ReadonlySet<string> = new Set([
+// Exported so the HTTP layer (my-return-jobs) can filter a rider's return
+// queue to the SAME "still active" definition this module already enforces —
+// never a second, hand-typed copy of this status list.
+export const RETURN_ACTIVE_JOB_STATUSES: ReadonlySet<string> = new Set([
   "Assigned", "OutForCollection", "Collected", "CollectionFailed",
 ]);
 
