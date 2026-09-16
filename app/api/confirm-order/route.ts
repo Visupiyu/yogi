@@ -244,14 +244,36 @@ export async function POST(request: Request) {
         ? confirmedAt.toMillis() > adminConfirmDeadlineAt.toMillis()
         : false;
 
-      // Human-readable invoice + shipment numbers, minted once at confirmation
-      // (this route only runs on a Pending→Confirmed transition). Batched so
-      // all counter reads precede all writes; the invoice date is the
-      // confirmation date; the order's doc id is unchanged.
-      const [invoiceNumber, shipmentNumber] = await mintNumbers(tx, db, [
+      // Human-readable invoice number + ONE shipment tracking number PER new
+      // per-vendor shipment (each sellerOrders doc). YOMICO is multi-vendor:
+      // every vendor's parcel is its OWN physical shipment and gets its OWN
+      // globally unique TRCK number, minted EXACTLY ONCE here at confirmation
+      // and then REUSED verbatim by delivery-job creation (never re-minted).
+      // Existing sellerOrders keep their stored number and burn none. All
+      // counter reads precede all writes (guaranteed inside mintNumbers).
+      const newSeedIdx = seeds
+        .map((_, i) => i)
+        .filter((i) => !existingSellerDocs[i].exists);
+      const minted = await mintNumbers(tx, db, [
         { kind: "daily", daily: "invoice", at: confirmedAt.toDate() },
-        { kind: "seq", counter: "shipment" },
+        { kind: "seq", counter: "shipment", count: newSeedIdx.length },
       ]);
+      const invoiceNumber = minted[0];
+      const freshShipmentNumbers = minted.slice(1); // one per NEW sellerOrder
+      // Each sellerOrder's authoritative shipment number: an existing doc keeps
+      // its own; a new one takes the next freshly minted number, in seed order.
+      let freshCursor = 0;
+      const seedShipmentNumbers = seeds.map((_, i) => {
+        if (existingSellerDocs[i].exists) {
+          const d = existingSellerDocs[i].data() as { shipmentNumber?: unknown };
+          return typeof d.shipmentNumber === "string" ? d.shipmentNumber : "";
+        }
+        return freshShipmentNumbers[freshCursor++] ?? "";
+      });
+      // Order-level reference: the first vendor shipment's number, so a
+      // single-vendor order's order/sellerOrder/job numbers are all identical
+      // and legacy readers of orders.shipmentNumber keep working.
+      const shipmentNumber = seedShipmentNumbers[0] ?? "";
 
       // Immutable per-line tax snapshot. GST is extracted from the (inclusive)
       // line price, so the order total is UNCHANGED — this only records the tax
@@ -292,6 +314,8 @@ export async function POST(request: Request) {
 
         tx.set(sellerRefs[index], {
           ...seed,
+          // Authoritative per-vendor shipment tracking number, minted once here.
+          shipmentNumber: seedShipmentNumbers[index],
           confirmedAt,
           deliveryDeadlineAt: hoursAfter(confirmedAt, MAX_DELIVERY_HOURS),
           createdAt: confirmedAt,

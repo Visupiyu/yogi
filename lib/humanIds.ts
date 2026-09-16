@@ -116,7 +116,7 @@ export async function mintDaily(
 }
 
 export type MintSpec =
-  | { kind: "seq"; counter: SeqCounter }
+  | { kind: "seq"; counter: SeqCounter; count?: number }
   | { kind: "daily"; daily: DailyKind; at: Date };
 
 /**
@@ -141,15 +141,28 @@ export async function mintNumbers(
   );
   const refs = keys.map((k) => db.collection("counters").doc(k));
   const snaps = await Promise.all(refs.map((r) => tx.get(r))); // ALL READS
-  return snaps.map((snap, i) => {
-    const seq = nextSeqFromSnap(snap.exists, snap.data());
-    tx.set(refs[i], { seq }, { merge: true }); // ALL WRITES, after every read
+  const out: string[] = [];
+  snaps.forEach((snap, i) => {
     const spec = specs[i];
-    return spec.kind === "seq"
-      ? formatSequential(spec.counter, seq)
-      : formatDaily(
+    const start = nextSeqFromSnap(snap.exists, snap.data());
+    if (spec.kind === "seq") {
+      // A seq spec may reserve a CONTIGUOUS range of `count` numbers from its
+      // counter in this one read+write (count defaults to 1). Each is emitted in
+      // order and is globally unique — used to mint one shipment (TRCK) number
+      // per vendor shipment of a multi-vendor order together.
+      const count = spec.count === undefined ? 1 : spec.count;
+      if (count <= 0) return; // reserve nothing, emit nothing
+      tx.set(refs[i], { seq: start + count - 1 }, { merge: true }); // WRITE after all reads
+      for (let k = 0; k < count; k++) out.push(formatSequential(spec.counter, start + k));
+    } else {
+      tx.set(refs[i], { seq: start }, { merge: true }); // WRITE after all reads
+      out.push(
+        formatDaily(
           spec.daily === "order" ? orderDateKey(spec.at) : invoiceDateKey(spec.at),
-          seq
-        );
+          start
+        )
+      );
+    }
   });
+  return out;
 }

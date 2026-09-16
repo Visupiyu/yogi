@@ -6,6 +6,7 @@ import {
   canMaterializeStatus,
   type JobSourceSellerAddress,
 } from "@/lib/deliveryEngine/jobFactory";
+import { deliveryJobId } from "@/lib/deliveryEngine/jobIds";
 import {
   vendorsOnOrder,
   type SellerOrderItem,
@@ -20,26 +21,27 @@ import {
 //
 // For a confirmed order it creates exactly one DeliveryJob per (orderId,
 // vendorId) -- with only that vendor's items -- each with its initial Pickup
-// leg and a JobCreated event, minting that parcel's own shipment number and
-// keeping the order-level shipment number as an audit reference. Every field is
+// leg and a JobCreated event, REUSING that vendor shipment's tracking number
+// minted once at confirmation (sellerOrders.shipmentNumber) and keeping the
+// order-level shipment number as an audit reference. Every field is
 // derived SERVER-SIDE from the stored order/sellerOrders; the client supplies
 // only the orderId. Nothing about money, inventory, payment, rewards,
 // commission, earnings, wallet, settlement or order status is read for a
 // decision or ever written -- job creation is financially/operationally
 // neutral.
 //
-// Idempotent: re-running skips jobs that already exist (deterministic ids) and
-// burns no shipment number for them, so it is safe to call repeatedly.
+// Idempotent: re-running skips jobs that already exist (deterministic ids), so
+// it is safe to call repeatedly.
 //
 // One Firestore transaction PER vendor: the creation helper does an existence
-// read then mints (a counter read+write) then writes the job. Running two jobs
-// in a single transaction would read-after-write on the second existence check
-// and double-mint the shipment counter.
+// read then writes the job (no minting — the tracking number is reused from the
+// sellerOrder). Running two jobs in one transaction would read-after-write on
+// the second existence check.
 // ---------------------------------------------------------------------------
 
 type JobResult =
   | { vendorId: string; created: true; jobId: string; shipmentNumber: string }
-  | { vendorId: string; created: false; jobId: string };
+  | { vendorId: string; created: false; jobId: string; reason?: string };
 
 export async function POST(request: Request) {
   try {
@@ -109,12 +111,17 @@ export async function POST(request: Request) {
 
     const vendorItems = new Map<string, SellerOrderItem[]>();
     const vendorCustomerName = new Map<string, string>();
+    // The AUTHORITATIVE per-vendor shipment tracking number minted at
+    // confirmation (sellerOrders/{orderId_vendorId}.shipmentNumber). The job
+    // REUSES this; materialization never mints a tracking number.
+    const vendorShipmentNumber = new Map<string, string>();
     if (!sellerOrdersSnap.empty) {
       sellerOrdersSnap.forEach((d) => {
         const so = d.data() as {
           vendorId?: unknown;
           items?: unknown;
           customerName?: unknown;
+          shipmentNumber?: unknown;
         };
         const vId = typeof so.vendorId === "string" ? so.vendorId : "";
         if (!vId) return;
@@ -126,6 +133,9 @@ export async function POST(request: Request) {
           vId,
           typeof so.customerName === "string" ? so.customerName : ""
         );
+        if (typeof so.shipmentNumber === "string" && so.shipmentNumber) {
+          vendorShipmentNumber.set(vId, so.shipmentNumber);
+        }
       });
     } else {
       const orderItems = Array.isArray(order.items)
@@ -219,6 +229,7 @@ export async function POST(request: Request) {
     // One transaction per (orderId, vendorId).
     const results: JobResult[] = [];
     const vendorIds = [...vendorItems.keys()].sort((a, b) => a.localeCompare(b));
+    const singleVendor = vendorIds.length === 1;
     for (const vendorId of vendorIds) {
       const { name: vendorName, address: sellerAddress } = await resolveVendorInfo(vendorId);
       const items = (vendorItems.get(vendorId) || []).map((it) => ({
@@ -227,6 +238,24 @@ export async function POST(request: Request) {
       }));
       const customerName = vendorCustomerName.get(vendorId) || customerNameOrder;
 
+      // REUSE the per-vendor tracking number minted at confirmation. Never mint
+      // here. Legacy fallback to the order-level number ONLY when unambiguous
+      // (single-vendor order): a multi-vendor legacy order missing per-vendor
+      // numbers is skipped rather than risk one number colliding across parcels.
+      const sellerShipmentNumber = vendorShipmentNumber.get(vendorId) || "";
+      const jobShipmentNumber =
+        sellerShipmentNumber || (singleVendor ? orderShipmentNumber : "");
+      if (!jobShipmentNumber) {
+        results.push({
+          vendorId,
+          created: false,
+          jobId: deliveryJobId(orderId, vendorId),
+          reason:
+            "No shipment tracking number on this vendor's sellerOrder (legacy multi-vendor order). Skipped — needs a one-time backfill; not minting during materialization.",
+        });
+        continue;
+      }
+
       const outcome = await db.runTransaction((tx) =>
         createJobAndInitialLeg(tx, db, {
           orderId,
@@ -234,6 +263,7 @@ export async function POST(request: Request) {
           vendorName,
           sellerName: vendorName,
           sellerAddress,
+          shipmentNumber: jobShipmentNumber,
           orderShipmentNumber,
           actorUid: requester.uid,
           order: {
