@@ -203,10 +203,14 @@ export function companyLifecycle(currentStage?: string | null, status?: string):
   });
 }
 
-/** A person eligible to RECEIVE an assignment: Active account AND Available. */
+/**
+ * A person eligible to RECEIVE an assignment. Multi-parcel model: a rider may
+ * hold many jobs at once, so Busy is NOT a lock — only an off-shift (Offline)
+ * rider is ineligible (Available = free, Busy = already has active work).
+ */
 export function isAssignablePerson(p: CompanyPerson): boolean {
   const acct = p.accountStatus || "Active";
-  return acct === "Active" && p.availability === "Available";
+  return acct === "Active" && p.availability !== "Offline";
 }
 
 // Firestore Timestamps serialize to { _seconds, _nanoseconds } over JSON; also

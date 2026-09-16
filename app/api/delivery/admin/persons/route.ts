@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   let persons = snap.docs.map((d) => buildAdminPersonRow(d.id, d.data() as DeliveryPerson));
   if (assignableOnly) {
     // Filter in memory to avoid a composite index (decision: no speculative indexes).
-    persons = persons.filter((p) => p.accountStatus === "Active" && p.availability === "Available");
+    persons = persons.filter((p) => p.accountStatus === "Active" && p.availability !== "Offline");
   }
   persons.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 

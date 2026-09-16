@@ -37,7 +37,7 @@
 import type { Transaction, Firestore, DocumentReference } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import { ExecutionError } from "@/lib/deliveryEngine/execution";
-import { assertCompanyPerson, assertPersonAssignable, assertRiderPerson } from "@/lib/deliveryEngine/assignment";
+import { assertCompanyPerson, assertPersonAssignable, assertRiderPerson, hasOtherActiveJobs, releaseAfterLosingJob } from "@/lib/deliveryEngine/assignment";
 import { deliveryLegId } from "@/lib/deliveryEngine/jobIds";
 import type {
   DeliveryJob,
@@ -442,6 +442,11 @@ export async function applyFinalMileReassignment(
   const prevRef = db.collection("deliveryPersons").doc(previousPersonId);
   const prevSnap = await tx.get(prevRef);
   const prevPerson = prevSnap.exists ? (prevSnap.data() as DeliveryPerson) : null;
+  // Multi-parcel (READ phase): does the previous Rider 2 still hold another
+  // active job? If so they stay Busy when we free them from THIS job below.
+  const prevHasOtherActive = prevPerson
+    ? await hasOtherActiveJobs(tx, db, previousPersonId, args.jobId)
+    : false;
 
   const newRef = db.collection("deliveryPersons").doc(newPersonId);
   const newSnap = await tx.get(newRef);
@@ -456,11 +461,9 @@ export async function applyFinalMileReassignment(
   // ---- WRITES (after all reads) ----
   const now = Timestamp.now();
 
-  // 1) Free the previous Rider 2 (Busy -> Available only; never clobber a
-  //    manual Offline — mirrors freeIfBusy used elsewhere in the engine).
-  if (prevPerson && prevPerson.availability === "Busy") {
-    tx.set(prevRef, { availability: "Available", updatedAt: now }, { merge: true });
-  }
+  // 1) Free the previous Rider 2 ONLY if they hold no other active job
+  //    (multi-parcel); otherwise they stay Busy. Never clobbers a manual Offline.
+  if (prevPerson) releaseAfterLosingJob(tx, prevRef, prevPerson, prevHasOtherActive, now);
   // 2) New Rider 2 -> Busy (assertPersonAssignable already required Available,
   //    so this cannot double-book).
   tx.set(newRef, { availability: "Busy", updatedAt: now }, { merge: true });

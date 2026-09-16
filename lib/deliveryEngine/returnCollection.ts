@@ -33,6 +33,8 @@ import {
   assertYomicoPerson,
   assertCompanyPerson,
   assertRiderPerson,
+  hasOtherActiveJobs,
+  releaseAfterLosingJob,
 } from "@/lib/deliveryEngine/assignment";
 import { assertNoFinancialFields } from "@/lib/deliveryEngine/jobFactory";
 import { emitDeliveryNotification } from "@/lib/deliveryEngine/notifications";
@@ -241,16 +243,19 @@ export async function createOrAssignReturnJob(
     if (job.assignedPersonId === args.personId) {
       return { created: false, changed: false, returnJobId: rjId, personId: args.personId };
     }
-    // Free the previously-assigned person (Busy -> Available), read first.
+    // Free the previously-assigned person (read first). Multi-parcel: only
+    // return them to Available if they hold no OTHER active job; else stay Busy.
     let oldPerson: DeliveryPerson | null = null;
     let oldRef: DocumentReference | null = null;
+    let oldHasOtherActive = false;
     if (job.assignedPersonId) {
       oldRef = db.collection("deliveryPersons").doc(job.assignedPersonId);
       const oldSnap = await tx.get(oldRef);
       oldPerson = oldSnap.exists ? (oldSnap.data() as DeliveryPerson) : null;
+      oldHasOtherActive = await hasOtherActiveJobs(tx, db, job.assignedPersonId, rjId);
     }
-    if (oldRef && oldPerson && oldPerson.availability === "Busy") {
-      tx.set(oldRef, { availability: "Available", updatedAt: now }, { merge: true });
+    if (oldRef && oldPerson) {
+      releaseAfterLosingJob(tx, oldRef, oldPerson, oldHasOtherActive, now);
     }
     tx.set(personRef, { availability: "Busy", updatedAt: now }, { merge: true });
 
@@ -490,12 +495,15 @@ export async function executeReturnTransition(
   // For "receive" we free the assigned person — read the person doc first.
   let personSnapAvailability: string | null = null;
   let personRef: DocumentReference | null = null;
+  let receiveHasOtherActive = false;
   if (args.action === "receive") {
     personRef = db.collection("deliveryPersons").doc(args.personId);
     const pSnap = await tx.get(personRef);
     personSnapAvailability = pSnap.exists
       ? ((pSnap.data() as DeliveryPerson).availability ?? null)
       : null;
+    // Multi-parcel (READ phase): keep Busy on receive if another active job remains.
+    receiveHasOtherActive = await hasOtherActiveJobs(tx, db, args.personId, args.returnJobId);
   }
 
   const customerUid = req?.userId || job.userId || "";
@@ -635,8 +643,9 @@ export async function executeReturnTransition(
       { status: "Received", custody, receivedAt: now, lastEventId: eventId, lastEventAt: now, updatedAt: now },
       { merge: true }
     );
-    // Free the delivery person (Busy -> Available) — the job is done for them.
-    if (personRef && personSnapAvailability === "Busy") {
+    // Free the delivery person ONLY if they hold no OTHER active job (multi-
+    // parcel); otherwise they stay Busy. Never overrides a manual Offline.
+    if (personRef && personSnapAvailability === "Busy" && !receiveHasOtherActive) {
       tx.set(personRef, { availability: "Available", updatedAt: now }, { merge: true });
     }
     // Advance the website return FSM to RECEIVED_BY_YOMICO (only from PICKED_UP).
