@@ -6,25 +6,28 @@
 // entirely — see lib/ai/serverAuth.ts for the identity verification this
 // depends on.
 //
-// firebase-admin/auth (needed for generateEmailVerificationLink, used by
-// app/api/auth/send-verification-email/route.ts) pulls in jwks-rsa -> jose
-// v6, which ships ESM-only. That's not a blocker on this project's pinned
-// Node >=22.12.0: Node's require(ESM) interop (unflagged since 20.19/22.12)
-// loads jose's synchronous ESM build under a plain require(), verified
-// directly against the installed firebase-admin@14.2.0. lib/serverAuth.ts's
-// verifyRequestUser() still checks ID tokens via Google's REST API rather
-// than verifyIdToken() — that choice is unrelated to this import and is
-// unaffected by this change.
+// Deliberately never imports firebase-admin/auth: it pulls in jwks-rsa,
+// which depends on jose v6 (ESM-only, no CJS build at all). Confirmed in
+// Vercel's actual production Lambda runtime (not just locally, where it
+// misleadingly works): importing it anywhere crashes every route that
+// touches this file at module-load time with ERR_REQUIRE_ESM, before any
+// handler code runs. app/api/auth/send-verification-email/route.ts calls
+// the Identity Toolkit REST API directly instead (using getAdminProjectId()
+// below for the project-scoped endpoint), and lib/serverAuth.ts verifies ID
+// tokens via Google's REST API rather than verifyIdToken() — same reason.
 //
 // Never import this file from a "use client" component or any file
 // reachable from the browser bundle.
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { getAuth, type Auth } from "firebase-admin/auth";
 
-export function getAdminApp(): App {
-  const existing = getApps().find((a) => a.name === "yomico-admin");
-  if (existing) return existing;
+// Parsed once per warm instance and reused by getAdminApp() and
+// getAdminProjectId() — the env var doesn't change at runtime, and this
+// keeps the credential JSON from being re-parsed on every call.
+let cachedServiceAccount: object | undefined;
+
+function readServiceAccount(): object {
+  if (cachedServiceAccount) return cachedServiceAccount;
 
   const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
@@ -51,8 +54,16 @@ export function getAdminApp(): App {
     );
   }
 
+  cachedServiceAccount = serviceAccount;
+  return serviceAccount;
+}
+
+export function getAdminApp(): App {
+  const existing = getApps().find((a) => a.name === "yomico-admin");
+  if (existing) return existing;
+
   return initializeApp(
-    { credential: cert(serviceAccount) },
+    { credential: cert(readServiceAccount()) },
     "yomico-admin"
   );
 }
@@ -61,6 +72,21 @@ export function getAdminDb() {
   return getFirestore(getAdminApp());
 }
 
-export function getAdminAuth(): Auth {
-  return getAuth(getAdminApp());
+// The service account's OWN project_id — never the client-config
+// firebaseConfig.projectId (lib/firebase.ts), which a rotated or reissued
+// key could silently disagree with. Used by the project-scoped Identity
+// Toolkit REST call in app/api/auth/send-verification-email/route.ts so the
+// request always targets the project the Bearer token was actually minted
+// for. Throws rather than guessing if the key has no project_id.
+export function getAdminProjectId(): string {
+  const projectId = (readServiceAccount() as { project_id?: unknown })
+    .project_id;
+
+  if (typeof projectId !== "string" || !projectId) {
+    throw new Error(
+      "FIREBASE_SERVICE_ACCOUNT_KEY has no valid project_id field."
+    );
+  }
+
+  return projectId;
 }
