@@ -1,7 +1,6 @@
 import { Resend } from "resend";
 import { verifyRequestUser } from "@/lib/serverAuth";
-import { getAdminApp, getAdminDb } from "@/lib/firebaseAdmin";
-import { firebaseConfig } from "@/lib/firebase";
+import { getAdminAuth, getAdminDb } from "@/lib/firebaseAdmin";
 
 // ---------------------------------------------------------------------------
 // Branded email-verification sender.
@@ -10,8 +9,8 @@ import { firebaseConfig } from "@/lib/firebase";
 // signup/login flows: this project's Firebase console reports "Email template
 // updates are currently unavailable", so its default mail can't be branded or
 // pointed at the verified yomico.in domain. Instead the verification LINK is
-// generated server-side with the service-account credential and delivered via
-// Resend from YOMICO <noreply@yomico.in>.
+// generated server-side via the Admin SDK and delivered via Resend from
+// YOMICO <noreply@yomico.in>.
 //
 // The client sends NOTHING. No email, no name, no redirect URL, no template
 // data. The recipient is taken from the verified ID token, the display name is
@@ -20,14 +19,11 @@ import { firebaseConfig } from "@/lib/firebase";
 // content, and it is not an open relay.
 //
 // NOTE ON THE ADMIN SDK:
-// firebase-admin/auth (which exposes generateEmailVerificationLink) is
-// deliberately NOT imported — see the comment block in lib/firebaseAdmin.ts:
-// it pulls in jose v6 (ESM-only) and crashes Vercel with ERR_REQUIRE_ESM,
-// which would take down every route that touches the admin app. This calls the
-// same Identity Toolkit endpoint that generateEmailVerificationLink() calls
-// internally (accounts:sendOobCode with returnOobLink), authenticated with the
-// same service-account credential, which is the same workaround
-// lib/serverAuth.ts already uses in place of verifyIdToken().
+// The link comes from firebase-admin/auth's generateEmailVerificationLink()
+// (see getAdminAuth() in lib/firebaseAdmin.ts), not a hand-rolled call to
+// Identity Toolkit's accounts:sendOobCode — see the comment in
+// lib/firebaseAdmin.ts for why importing firebase-admin/auth is safe on this
+// project's Node >=22.12.0.
 // ---------------------------------------------------------------------------
 
 const apiKey = process.env.RESEND_API_KEY;
@@ -113,133 +109,6 @@ async function lookupDisplayName(uid: string): Promise<string | null> {
   }
 
   return null;
-}
-
-// Structured outcome so the caller can log/surface exactly why Identity
-// Toolkit refused, instead of collapsing every failure into "null".
-type LinkFailure = {
-  stage: "credential" | "token" | "request" | "response";
-  httpStatus: number | null;
-  code: string | null;
-  message: string | null;
-  endpoint: string;
-};
-
-type LinkResult =
-  | { ok: true; link: string }
-  | ({ ok: false } & LinkFailure);
-
-// Mints the verification link without sending Firebase's own email.
-// returnOobLink:true is what makes Identity Toolkit hand the link back to us
-// instead of mailing it, so the customer only ever receives the Resend copy.
-async function generateVerificationLink(email: string): Promise<LinkResult> {
-  const app = getAdminApp();
-  // Same project either way; firebaseConfig is the existing single source of
-  // truth for the id (lib/serverAuth.ts already reads it server-side).
-  const projectId = app.options.projectId || firebaseConfig.projectId;
-  // No API key in this URL — the call is authorised by the Bearer token, so
-  // the endpoint is safe to log verbatim.
-  const endpoint = `https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:sendOobCode`;
-
-  const credential = app.options.credential;
-
-  if (!credential) {
-    return {
-      ok: false,
-      stage: "credential",
-      httpStatus: null,
-      code: null,
-      message:
-        "Admin app has no credential — FIREBASE_SERVICE_ACCOUNT_KEY may be missing or unparseable.",
-      endpoint,
-    };
-  }
-
-  let accessToken: string | undefined;
-  try {
-    // Never logged, never returned — only its presence is ever reported.
-    const token = await credential.getAccessToken();
-    accessToken = token?.access_token;
-  } catch (error) {
-    return {
-      ok: false,
-      stage: "token",
-      httpStatus: null,
-      code: null,
-      message: `Could not mint an access token from the service account: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-      endpoint,
-    };
-  }
-
-  if (!accessToken) {
-    return {
-      ok: false,
-      stage: "token",
-      httpStatus: null,
-      code: null,
-      message: "Service account returned an empty access token.",
-      endpoint,
-    };
-  }
-
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      requestType: "VERIFY_EMAIL",
-      email,
-      returnOobLink: true,
-      continueUrl: SITE_URL,
-    }),
-  });
-
-  if (!response.ok) {
-    const rawBody = await response.text();
-    let code: string | null = null;
-    let message: string | null = null;
-
-    // Identity Toolkit returns { error: { code, message, status, errors[] } }.
-    try {
-      const parsed = JSON.parse(rawBody) as {
-        error?: { message?: unknown; status?: unknown };
-      };
-      const m = parsed.error?.message;
-      const s = parsed.error?.status;
-      message = typeof m === "string" ? m : null;
-      code = typeof s === "string" ? s : null;
-    } catch {
-      message = rawBody.slice(0, 500);
-    }
-
-    return {
-      ok: false,
-      stage: "request",
-      httpStatus: response.status,
-      code,
-      message,
-      endpoint,
-    };
-  }
-
-  const data = (await response.json()) as { oobLink?: unknown };
-
-  if (typeof data.oobLink !== "string" || !data.oobLink) {
-    return {
-      ok: false,
-      stage: "response",
-      httpStatus: response.status,
-      code: null,
-      message: "Identity Toolkit returned 200 but no oobLink field.",
-      endpoint,
-    };
-  }
-
-  return { ok: true, link: data.oobLink };
 }
 
 function buildHtml(name: string | null, link: string): string {
@@ -339,63 +208,72 @@ export async function POST(request: Request) {
       );
     }
 
-    const linkResult = await generateVerificationLink(requester.email);
+    // In development only, surface the real failure reason so the cause is
+    // visible without digging through the server console. Production keeps
+    // the opaque message either way.
+    const isDev = process.env.NODE_ENV !== "production";
 
-    if (!linkResult.ok) {
-      // Always log the full diagnostic server-side. Contains no secrets: the
-      // access token and service-account key are never included, and the
-      // endpoint carries no API key (it is Bearer-authorised).
+    let link: string;
+    try {
+      link = await getAdminAuth().generateEmailVerificationLink(
+        requester.email,
+        { url: SITE_URL }
+      );
+    } catch (error) {
+      // FirebaseAuthError only ever carries a code/message describing the
+      // failure — never the credential or an access token — so it's safe to
+      // log in full server-side.
+      const code =
+        typeof error === "object" && error && "code" in error
+          ? String((error as { code: unknown }).code)
+          : null;
+      const message = error instanceof Error ? error.message : String(error);
+
       console.error("send-verification-email: link generation failed", {
-        stage: linkResult.stage,
-        httpStatus: linkResult.httpStatus,
-        firebaseCode: linkResult.code,
-        firebaseMessage: linkResult.message,
-        endpoint: linkResult.endpoint,
-        continueUrl: SITE_URL,
+        code,
+        message,
       });
-
-      // In development only, hand the same detail back to the browser so the
-      // real cause is visible without digging through the server console.
-      // Production keeps the opaque message.
-      const isDev = process.env.NODE_ENV !== "production";
 
       return Response.json(
         {
           success: false,
-          // In development the real Identity Toolkit reason replaces the
-          // generic string, so the browser shows the actual cause. Production
-          // still returns the opaque message.
           error: isDev
-            ? `[${linkResult.stage}${
-                linkResult.httpStatus ? " " + linkResult.httpStatus : ""
-              }] ${linkResult.message ?? "Couldn't create the verification link."}`
+            ? `[${code ?? "unknown"}] ${message}`
             : "Couldn't create the verification link.",
-          ...(isDev
-            ? {
-                debug: {
-                  stage: linkResult.stage,
-                  httpStatus: linkResult.httpStatus,
-                  firebaseCode: linkResult.code,
-                  firebaseMessage: linkResult.message,
-                  endpoint: linkResult.endpoint,
-                  continueUrl: SITE_URL,
-                },
-              }
-            : {}),
         },
         { status: 502 }
       );
     }
 
-    const link = linkResult.link;
     const name = await lookupDisplayName(requester.uid);
 
-    await resend.emails.send({
+    const { error: resendError } = await resend.emails.send({
       from: FROM,
       to: requester.email,
       subject: SUBJECT,
       html: buildHtml(name, link),
     });
+
+    if (resendError) {
+      // Resend resolves with an { error } object rather than throwing, so
+      // this must be checked explicitly — no secrets in this error shape.
+      console.error("send-verification-email: Resend send failed", {
+        name: resendError.name,
+        statusCode: resendError.statusCode,
+      });
+
+      return Response.json(
+        {
+          success: false,
+          error: isDev
+            ? `[${resendError.name}${
+                resendError.statusCode ? " " + resendError.statusCode : ""
+              }] ${resendError.message}`
+            : "Couldn't send the verification email.",
+        },
+        { status: 502 }
+      );
+    }
 
     return Response.json({ success: true });
   } catch (error) {
