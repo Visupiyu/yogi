@@ -100,7 +100,7 @@ export default function FinalMileAssign({
             onChange={(e) => { setSelected(e.target.value); setConfirming(false); setError(null); }}
           >
             <option value="">
-              {assignable.length ? "Select an active, available person…" : "No active + available people"}
+              {assignable.length ? "Select an on-shift person…" : "No on-shift people"}
             </option>
             {(persons ?? []).map((p) => {
               const ok = isAssignablePerson(p);
@@ -109,7 +109,7 @@ export default function FinalMileAssign({
               return (
                 <option key={p.id} value={p.id} disabled={!ok}>
                   {p.name || p.id}
-                  {ok ? "" : ` — ${acct !== "Active" ? acct : avail}`}
+                  {!ok ? ` — ${acct !== "Active" ? acct : avail}` : avail === "Busy" ? " — busy (has active jobs)" : ""}
                 </option>
               );
             })}

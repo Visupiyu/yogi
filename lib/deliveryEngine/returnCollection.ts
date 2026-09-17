@@ -33,6 +33,8 @@ import {
   assertYomicoPerson,
   assertCompanyPerson,
   assertRiderPerson,
+  hasOtherActiveJobs,
+  releaseAfterLosingJob,
 } from "@/lib/deliveryEngine/assignment";
 import { assertNoFinancialFields } from "@/lib/deliveryEngine/jobFactory";
 import { emitDeliveryNotification } from "@/lib/deliveryEngine/notifications";
@@ -58,7 +60,11 @@ const REQUIRED_ITEM_REQUEST_STATUS = "PICKUP_ASSIGNED";
 const ITEM_STATUS_ON_COLLECTED = "PICKED_UP";
 const ITEM_STATUS_ON_RECEIVED = "RECEIVED_BY_YOMICO";
 
-export type ReturnExecutionAction = "start" | "collect" | "receive" | "exception";
+// Runtime-checkable list backing ReturnExecutionAction — the HTTP execution
+// route validates an incoming action against this SAME array (never a second,
+// hand-typed copy of the engine's own action vocabulary).
+export const RETURN_EXECUTION_ACTIONS = ["start", "collect", "receive", "exception"] as const;
+export type ReturnExecutionAction = (typeof RETURN_EXECUTION_ACTIONS)[number];
 
 // Customer-safe return-collection exception reasons (a subset that maps to the
 // engine's own DeliveryExceptionCode vocabulary; validated in the route).
@@ -164,6 +170,78 @@ function writeReturnEvent(
 }
 
 // ===========================================================================
+// Resolve the ReturnJobSnapshot an admin/company route needs BEFORE calling
+// createOrAssignReturnJob (which, per its own contract, reads it OUTSIDE the
+// transaction — see the ReturnJobSnapshot doc comment above). Read-only;
+// invents nothing and re-derives no FSM decision — it only copies the same
+// order/vendor fields the FORWARD job builder already copies verbatim
+// (see jobFactory.ts's buildDeliveryJob: order.customerName/phone/address for
+// the customer side, the vendor doc's street/unit/city/state/zipCode for the
+// seller side), just with pickup/destination reversed for the reverse leg.
+// No slot/appointment label exists on itemRequests beyond the Timestamp
+// createOrAssignReturnJob already reads itself (req.pickup.scheduledAt), so
+// customerPickup.slot is honestly left null rather than reusing the
+// forward-delivery order.deliverySlot (a different appointment entirely).
+export async function resolveReturnJobSnapshot(
+  db: Firestore,
+  returnRequestId: string
+): Promise<ReturnJobSnapshot> {
+  const itemSnap = await db.collection("itemRequests").doc(returnRequestId).get();
+  if (!itemSnap.exists) throw new ReturnCollectionError("Return request not found.", 404);
+  const req = itemSnap.data() as ItemRequestData;
+
+  const orderId = typeof req.orderId === "string" ? req.orderId : "";
+  if (!orderId) throw new ReturnCollectionError("This return request has no associated order.", 409);
+  const orderSnap = await db.collection("orders").doc(orderId).get();
+  if (!orderSnap.exists) throw new ReturnCollectionError("Order not found.", 404);
+  const order = orderSnap.data() as {
+    orderNumber?: unknown;
+    customerName?: unknown;
+    phone?: unknown;
+    address?: unknown;
+  };
+
+  const vendorId = typeof req.vendorId === "string" ? req.vendorId : "";
+  let vendorName = "";
+  let vendorAddress: { street?: unknown; unit?: unknown; city?: unknown; state?: unknown; zipCode?: unknown } = {};
+  if (vendorId) {
+    try {
+      const vq = await db.collection("vendors").where("uid", "==", vendorId).limit(1).get();
+      const v = vq.docs[0]?.data() as
+        | { businessName?: unknown; storeName?: unknown; name?: unknown; street?: unknown; unit?: unknown; city?: unknown; state?: unknown; zipCode?: unknown }
+        | undefined;
+      vendorName =
+        (typeof v?.businessName === "string" && v.businessName) ||
+        (typeof v?.storeName === "string" && v.storeName) ||
+        (typeof v?.name === "string" && v.name) ||
+        "";
+      vendorAddress = { street: v?.street, unit: v?.unit, city: v?.city, state: v?.state, zipCode: v?.zipCode };
+    } catch {
+      // Same tolerance as materialize's resolveVendorInfo: an address lookup
+      // failure degrades to an empty address, never blocks the caller.
+    }
+  }
+
+  return {
+    orderNumber: str(order.orderNumber, 40),
+    customerPickup: {
+      customerName: str(req.customerName, 200) || str(order.customerName, 200),
+      phone: str(order.phone, 40),
+      address: str(order.address, 1000),
+      slot: null,
+    },
+    destination: {
+      name: str(vendorName, 200),
+      street: str(vendorAddress.street, 200),
+      unit: str(vendorAddress.unit, 100),
+      city: str(vendorAddress.city, 100),
+      state: str(vendorAddress.state, 100),
+      zipCode: str(vendorAddress.zipCode, 12),
+    },
+  };
+}
+
+// ===========================================================================
 // Create + assign / reassign a return-collection job.
 //
 // Trigger: an itemRequests return in PICKUP_ASSIGNED (i.e. the customer has
@@ -241,16 +319,19 @@ export async function createOrAssignReturnJob(
     if (job.assignedPersonId === args.personId) {
       return { created: false, changed: false, returnJobId: rjId, personId: args.personId };
     }
-    // Free the previously-assigned person (Busy -> Available), read first.
+    // Free the previously-assigned person (read first). Multi-parcel: only
+    // return them to Available if they hold no OTHER active job; else stay Busy.
     let oldPerson: DeliveryPerson | null = null;
     let oldRef: DocumentReference | null = null;
+    let oldHasOtherActive = false;
     if (job.assignedPersonId) {
       oldRef = db.collection("deliveryPersons").doc(job.assignedPersonId);
       const oldSnap = await tx.get(oldRef);
       oldPerson = oldSnap.exists ? (oldSnap.data() as DeliveryPerson) : null;
+      oldHasOtherActive = await hasOtherActiveJobs(tx, db, job.assignedPersonId, rjId);
     }
-    if (oldRef && oldPerson && oldPerson.availability === "Busy") {
-      tx.set(oldRef, { availability: "Available", updatedAt: now }, { merge: true });
+    if (oldRef && oldPerson) {
+      releaseAfterLosingJob(tx, oldRef, oldPerson, oldHasOtherActive, now);
     }
     tx.set(personRef, { availability: "Busy", updatedAt: now }, { merge: true });
 
@@ -490,12 +571,15 @@ export async function executeReturnTransition(
   // For "receive" we free the assigned person — read the person doc first.
   let personSnapAvailability: string | null = null;
   let personRef: DocumentReference | null = null;
+  let receiveHasOtherActive = false;
   if (args.action === "receive") {
     personRef = db.collection("deliveryPersons").doc(args.personId);
     const pSnap = await tx.get(personRef);
     personSnapAvailability = pSnap.exists
       ? ((pSnap.data() as DeliveryPerson).availability ?? null)
       : null;
+    // Multi-parcel (READ phase): keep Busy on receive if another active job remains.
+    receiveHasOtherActive = await hasOtherActiveJobs(tx, db, args.personId, args.returnJobId);
   }
 
   const customerUid = req?.userId || job.userId || "";
@@ -635,8 +719,9 @@ export async function executeReturnTransition(
       { status: "Received", custody, receivedAt: now, lastEventId: eventId, lastEventAt: now, updatedAt: now },
       { merge: true }
     );
-    // Free the delivery person (Busy -> Available) — the job is done for them.
-    if (personRef && personSnapAvailability === "Busy") {
+    // Free the delivery person ONLY if they hold no OTHER active job (multi-
+    // parcel); otherwise they stay Busy. Never overrides a manual Offline.
+    if (personRef && personSnapAvailability === "Busy" && !receiveHasOtherActive) {
       tx.set(personRef, { availability: "Available", updatedAt: now }, { merge: true });
     }
     // Advance the website return FSM to RECEIVED_BY_YOMICO (only from PICKED_UP).

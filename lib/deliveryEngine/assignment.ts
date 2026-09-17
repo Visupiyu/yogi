@@ -76,14 +76,16 @@ function str(v: unknown, max = 200): string {
 
 // ---- Pure eligibility validators ----
 
-/** A person eligible to RECEIVE a new assignment: Active account AND Available. */
+/** Eligible to RECEIVE a new assignment: Active AND not Offline (Available OR Busy — multi-parcel). */
 export function assertPersonAssignable(person: DeliveryPerson): void {
   const accountStatus = person.accountStatus ?? (person.status === "Inactive" ? "Suspended" : "Active");
   if (accountStatus !== "Active") {
     throw new AssignmentError("That delivery person is not active.", 409);
   }
-  if (person.availability !== "Available") {
-    throw new AssignmentError("That delivery person is not available.", 409);
+  // Multi-parcel model: a rider may hold many active jobs at once, so Busy is
+  // NOT a lock. Only an off-shift (Offline) rider is refused new work.
+  if (person.availability === "Offline") {
+    throw new AssignmentError("That delivery person is offline (off shift).", 409);
   }
 }
 
@@ -150,12 +152,78 @@ function legRef(db: Firestore, jobId: string, legId: string): DocumentReference 
   return db.collection("deliveryJobs").doc(jobId).collection("legs").doc(legId);
 }
 
-// Free a previously-assigned person: only flip Busy -> Available, so a person
-// who has manually gone Offline keeps that choice. Reads must already be done.
-function freeIfBusy(tx: Transaction, ref: DocumentReference, person: DeliveryPerson, now: Timestamp): void {
-  if (person.availability === "Busy") {
+// ---------------------------------------------------------------------------
+// Multi-parcel availability model. A rider may hold MANY active jobs at once,
+// so availability is NOT a per-job lock:
+//   Offline   = off shift (cannot receive new work)
+//   Available = on shift, ZERO active jobs
+//   Busy      = on shift, ONE OR MORE active jobs
+// A person's active jobs span BOTH families a rider can hold: forward
+// deliveryJobs and returnCollectionJobs (separate collections, disjoint ids).
+// ---------------------------------------------------------------------------
+const FWD_ACTIVE_JOB_STATUSES: ReadonlySet<string> = new Set([
+  "AssignedToYomico", "AssignedToCompany", "InProgress",
+]);
+// Exported so the HTTP layer (my-return-jobs) can filter a rider's return
+// queue to the SAME "still active" definition this module already enforces —
+// never a second, hand-typed copy of this status list.
+export const RETURN_ACTIVE_JOB_STATUSES: ReadonlySet<string> = new Set([
+  "Assigned", "OutForCollection", "Collected", "CollectionFailed",
+]);
+
+// TRANSACTION-SAFE: does this person still hold an ACTIVE job OTHER than
+// excludeJobId? MUST be awaited during the caller's READ phase (before any
+// write) so the query joins the transaction and a concurrent assignment/
+// completion serialises against it instead of racing a client-side count.
+export async function hasOtherActiveJobs(
+  tx: Transaction,
+  db: Firestore,
+  personId: string,
+  excludeJobId: string
+): Promise<boolean> {
+  const [fwd, ret] = await Promise.all([
+    tx.get(db.collection("deliveryJobs").where("assignedPersonId", "==", personId)),
+    tx.get(db.collection("returnCollectionJobs").where("assignedPersonId", "==", personId)),
+  ]);
+  const anyFwd = fwd.docs.some(
+    (d) => d.id !== excludeJobId && FWD_ACTIVE_JOB_STATUSES.has((d.data() as { status?: string }).status || "")
+  );
+  const anyRet = ret.docs.some(
+    (d) => d.id !== excludeJobId && RETURN_ACTIVE_JOB_STATUSES.has((d.data() as { status?: string }).status || "")
+  );
+  return anyFwd || anyRet;
+}
+
+// Release a person who has just LOST one job: back to Available ONLY when no
+// other active job remains (else stay Busy). Never overrides a manual Offline.
+// hasOthers MUST come from hasOtherActiveJobs read during the READ phase.
+export function releaseAfterLosingJob(
+  tx: Transaction,
+  ref: DocumentReference,
+  person: DeliveryPerson,
+  hasOthers: boolean,
+  now: Timestamp
+): void {
+  if (person.availability === "Busy" && !hasOthers) {
     tx.set(ref, { availability: "Available", updatedAt: now }, { merge: true });
   }
+}
+
+// Free the previously-assigned person on a reassignment/removal. The active-job
+// probe is READ here — every call site invokes this at the very start of its
+// write phase (all prior reads done, no tx.set yet), so the internal read is
+// still legal before the subsequent assignment writes.
+async function releaseOldPerson(
+  tx: Transaction,
+  db: Firestore,
+  ref: DocumentReference,
+  person: DeliveryPerson,
+  personId: string,
+  excludeJobId: string,
+  now: Timestamp
+): Promise<void> {
+  const hasOthers = await hasOtherActiveJobs(tx, db, personId, excludeJobId);
+  releaseAfterLosingJob(tx, ref, person, hasOthers, now);
 }
 
 function writeAssignmentEvent(
@@ -246,7 +314,7 @@ export async function assignYomicoPerson(
 
   // ---- WRITES ----
   const now = Timestamp.now();
-  if (oldRef && oldPerson) freeIfBusy(tx, oldRef, oldPerson, now);
+  if (oldRef && oldPerson) await releaseOldPerson(tx, db, oldRef, oldPerson, job.assignedPersonId as string, args.jobId, now);
   tx.set(personRef, { availability: "Busy", updatedAt: now }, { merge: true });
 
   tx.set(
@@ -369,7 +437,7 @@ export async function handoffToCompany(
 
   // ---- WRITES ----
   const now = Timestamp.now();
-  if (oldRef && oldPerson) freeIfBusy(tx, oldRef, oldPerson, now);
+  if (oldRef && oldPerson) await releaseOldPerson(tx, db, oldRef, oldPerson, job.assignedPersonId as string, args.jobId, now);
 
   tx.set(
     lRef,
@@ -473,7 +541,7 @@ export async function assignCompanyPerson(
 
   // ---- WRITES ----
   const now = Timestamp.now();
-  if (oldRef && oldPerson) freeIfBusy(tx, oldRef, oldPerson, now);
+  if (oldRef && oldPerson) await releaseOldPerson(tx, db, oldRef, oldPerson, job.assignedPersonId as string, args.jobId, now);
   tx.set(personRef, { availability: "Busy", updatedAt: now }, { merge: true });
 
   tx.set(
@@ -576,7 +644,7 @@ export async function rejectCompanyHandoff(
 
   // ---- WRITES ----
   const now = Timestamp.now();
-  if (oldRef && oldPerson) freeIfBusy(tx, oldRef, oldPerson, now);
+  if (oldRef && oldPerson) await releaseOldPerson(tx, db, oldRef, oldPerson, job.assignedPersonId as string, args.jobId, now);
 
   // Provider is removed; the job returns to an unassigned state awaiting a new
   // Admin decision, with the rejection recorded on its status + the event.

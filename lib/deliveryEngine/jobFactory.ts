@@ -19,7 +19,6 @@ import {
   deliveryLegId,
   deliveryJobCreatedEventId,
 } from "@/lib/deliveryEngine/jobIds";
-import { mintSequential } from "@/lib/humanIds";
 import { mintScanToken } from "@/lib/deliveryEngine/qr";
 import type {
   DeliveryJob,
@@ -271,29 +270,31 @@ export type CreateJobArgs = {
   sellerName: string;
   sellerAddress: JobSourceSellerAddress;
   order: JobSourceOrder;
-  // The order-level shipment number, kept on the job as an audit reference.
-  // The job's OWN parcel tracking number is minted inside the transaction.
+  // The AUTHORITATIVE per-vendor shipment tracking number, minted EXACTLY ONCE
+  // at order confirmation on the sellerOrders doc (see app/api/confirm-order).
+  // Delivery-job creation REUSES it verbatim and NEVER mints a new one.
+  shipmentNumber: string;
+  // The order-level shipment number, kept on the job only as an audit reference.
   orderShipmentNumber: string;
   actorUid: string;
 };
 
 /**
  * Create a DeliveryJob + its initial Pickup leg + a JobCreated event, atomically
- * and idempotently, and mint this parcel's own shipment number.
+ * and idempotently, REUSING the shipment number minted at confirmation.
  *
  * Read/write order (Firestore forbids a read after a write):
  *   READS  1. tx.get(deliveryJobs/{jobId})   — existence; if it exists, return
- *             {created:false} with NO mint and NO write (so a re-run never
- *             burns a shipment number).
- *          2. tx.get(counters/shipment)       — inside mintSequential.
- *   WRITES 3. tx.set(counters/shipment)       — inside mintSequential.
- *          4. tx.set(deliveryJobs/{jobId})
- *          5. tx.set(deliveryJobs/{jobId}/legs/{legId})
- *          6. tx.set(deliveryEvents/{eventId})
+ *             {created:false} with NO write.
+ *   WRITES 2. tx.set(deliveryJobs/{jobId})
+ *          3. tx.set(deliveryJobs/{jobId}/legs/{legId})
+ *          4. tx.set(deliveryEvents/{eventId})
  *
- * MUST be called one job per transaction: two jobs in a single transaction
- * would either read-after-write on the second existence check or double-mint
- * the same shipment counter. The materialization route runs one tx per vendor.
+ * The tracking number is NOT minted here: it is minted once at confirmation on
+ * the sellerOrders doc and passed in as args.shipmentNumber, which this job
+ * reuses verbatim. Still one job per transaction (the existence check must not
+ * read-after-write against these sets). The materialization route runs one tx
+ * per vendor.
  */
 export async function createJobAndInitialLeg(
   tx: Transaction,
@@ -309,11 +310,17 @@ export async function createJobAndInitialLeg(
     return { created: false, jobId }; // idempotent no-op — no mint, no write
   }
 
-  // Still a READ-then-WRITE, but every read above has completed: mint this
-  // parcel's own tracking number (counters/shipment -> TRCK######).
-  const shipmentNumber = await mintSequential(tx, db, "shipment");
-  // Permanent opaque QR secret for this shipment (decision M4). No counter
-  // read/write, so it does not affect the reads-before-writes ordering.
+  // The tracking number is NOT minted here. It was minted EXACTLY ONCE at order
+  // confirmation (per vendor, on the sellerOrders doc) and is passed in as
+  // args.shipmentNumber; this job REUSES it verbatim so the number is stable for
+  // the whole delivery lifecycle. Guard so a job is never created without one.
+  const shipmentNumber = args.shipmentNumber;
+  if (!shipmentNumber) {
+    throw new Error(
+      "createJobAndInitialLeg: an authoritative sellerOrder shipmentNumber is required (none supplied)."
+    );
+  }
+  // Permanent opaque QR secret for this shipment (decision M4).
   const scanToken = mintScanToken();
 
   const now = Timestamp.now();

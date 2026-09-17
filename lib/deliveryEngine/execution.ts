@@ -37,6 +37,7 @@ import type {
 import { classifyDeliveryOtp } from "@/lib/deliveryEngine/deliveryOtp";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/deliveryEngine/codPayment";
 import { emitDeliveryNotification, readCustomerUid } from "@/lib/deliveryEngine/notifications";
+import { hasOtherActiveJobs, releaseAfterLosingJob } from "@/lib/deliveryEngine/assignment";
 
 export class ExecutionError extends Error {
   status: number;
@@ -186,13 +187,9 @@ function s(v: unknown, max = 200): string {
   return typeof v === "string" ? v.slice(0, max) : "";
 }
 
-// Availability nudges mirror assignment.ts: only flip Busy<->Available so a
-// manually Offline person is never overridden.
-function freeIfBusy(tx: Transaction, ref: DocumentReference, person: DeliveryPerson, now: Timestamp): void {
-  if (person.availability === "Busy") {
-    tx.set(ref, { availability: "Available", updatedAt: now }, { merge: true });
-  }
-}
+// Availability transitions use the shared multi-parcel helpers from
+// assignment.ts (hasOtherActiveJobs / releaseAfterLosingJob): a person returns
+// to Available only when they hold no OTHER active job.
 
 export async function applyScan(
   tx: Transaction,
@@ -261,6 +258,26 @@ export async function applyScan(
     }
   }
 
+  // Multi-parcel availability (READ phase): whether a person about to LOSE this
+  // job still holds another active job, so the write phase keeps them Busy
+  // instead of wrongly flipping to Available.
+  let outgoingHasOtherActive = false;
+  if (action === "HANDOVER_CONFIRM" && outgoing && leg.handover?.fromPersonId) {
+    outgoingHasOtherActive = await hasOtherActiveJobs(tx, db, leg.handover.fromPersonId, args.jobId);
+  }
+  let deliverHolderRef: DocumentReference | null = null;
+  let deliverHolder: DeliveryPerson | null = null;
+  let deliverHolderHasOtherActive = false;
+  if (action === "DELIVER") {
+    const holderId = leg.custody?.personId || "";
+    if (holderId) {
+      deliverHolderRef = db.collection("deliveryPersons").doc(holderId);
+      const hSnap = await tx.get(deliverHolderRef);
+      deliverHolder = hSnap.exists ? (hSnap.data() as DeliveryPerson) : null;
+      deliverHolderHasOtherActive = await hasOtherActiveJobs(tx, db, holderId, args.jobId);
+    }
+  }
+
   // Delivery Notification System V1 — the customer recipient for PICKUP /
   // OUT_FOR_DELIVERY (see below for DELIVER, which reuses its OWN existing
   // order read instead of a second one). A missing/unreadable order degrades
@@ -316,7 +333,7 @@ export async function applyScan(
   if (action === "HANDOVER_INITIATE" && incoming) {
     const acct = incoming.accountStatus ?? (incoming.status === "Inactive" ? "Suspended" : "Active");
     if (acct !== "Active") throw new ExecutionError("Handover target is not active.", 409);
-    if (incoming.availability !== "Available") throw new ExecutionError("Handover target is not available.", 409);
+    if (incoming.availability === "Offline") throw new ExecutionError("Handover target is offline (off shift).", 409);
     const targetProvider: DeliveryProviderType = incoming.providerType === "YOMICO" ? "YOMICO" : "COMPANY";
     if (targetProvider !== actor.providerType) throw new ExecutionError("Handover target is a different provider.", 409);
     if (actor.providerType === "COMPANY" && incoming.companyId !== actor.companyId) {
@@ -453,20 +470,19 @@ export async function applyScan(
   // ---- WRITES (after all reads) ----
   // 1) availability nudges
   if (action === "HANDOVER_CONFIRM") {
-    if (outgoingRef && outgoing) freeIfBusy(tx, outgoingRef, outgoing, now); // previous holder released
-    // incoming (the actor) is now the holder
+    // Previous holder handed THIS job away — free them ONLY if they hold no
+    // other active job (multi-parcel); otherwise they stay Busy.
+    if (outgoingRef && outgoing) releaseAfterLosingJob(tx, outgoingRef, outgoing, outgoingHasOtherActive, now);
+    // incoming (the actor) is now a holder -> Busy. A person confirming receipt
+    // is actively working; merge never clobbers an explicit Offline choice made
+    // afterwards, and cannot happen mid-receipt.
     const meRef = db.collection("deliveryPersons").doc(actor.personId);
-    // actor doc not read above; set Busy unconditionally is unsafe (could
-    // override Offline). Read-free path: only mark Busy via merge if we know it
-    // is the holder — but we must not clobber Offline. We conservatively set
-    // Busy since a person confirming receipt is actively working.
     tx.set(meRef, { availability: "Busy", updatedAt: now }, { merge: true });
   } else if (action === "DELIVER") {
-    const holderId = leg.custody?.personId;
-    if (holderId) {
-      const holderRef = db.collection("deliveryPersons").doc(holderId);
-      // free-on-complete: set Available (job done for this person)
-      tx.set(holderRef, { availability: "Available", updatedAt: now }, { merge: true });
+    // Completed THIS job — return the holder to Available ONLY if no other
+    // active job remains (multi-parcel); otherwise they stay Busy.
+    if (deliverHolderRef && deliverHolder) {
+      releaseAfterLosingJob(tx, deliverHolderRef, deliverHolder, deliverHolderHasOtherActive, now);
     }
   }
 

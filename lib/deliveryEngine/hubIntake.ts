@@ -23,7 +23,7 @@
 import type { Transaction, Firestore, DocumentReference } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import { ExecutionError } from "@/lib/deliveryEngine/execution";
-import { assertHubPerson } from "@/lib/deliveryEngine/assignment";
+import { assertHubPerson, hasOtherActiveJobs, releaseAfterLosingJob } from "@/lib/deliveryEngine/assignment";
 import { deliveryLegId } from "@/lib/deliveryEngine/jobIds";
 import type {
   DeliveryJob,
@@ -381,6 +381,12 @@ export async function applyOriginHubReceiptConfirm(
   const riderRef: DocumentReference = db.collection("deliveryPersons").doc(handoverIn.fromPersonId);
   const riderSnap = await tx.get(riderRef);
   const rider = riderSnap.exists ? (riderSnap.data() as DeliveryPerson) : null;
+  // Multi-parcel (READ phase): does Rider 1 still hold another active job? If so
+  // they stay Busy when freed from THIS job below; only a rider with zero other
+  // active jobs returns to Available.
+  const riderHasOtherActive = rider
+    ? await hasOtherActiveJobs(tx, db, handoverIn.fromPersonId, args.jobId)
+    : false;
 
   // Delivery Notification System V1 — customer recipient for ORIGIN_HUB_RECEIVED.
   const customerUid = await readCustomerUid(tx, db, job.orderId);
@@ -465,11 +471,10 @@ export async function applyOriginHubReceiptConfirm(
   };
   tx.set(eventRef, event);
 
-  // 4) Free Rider 1 (only Busy -> Available; never clobber a manual Offline).
-  //    Their task is complete; they never touch this job again in this phase.
-  if (rider && rider.availability === "Busy") {
-    tx.set(riderRef, { availability: "Available", updatedAt: now }, { merge: true });
-  }
+  // 4) Free Rider 1 ONLY if they hold no OTHER active job (multi-parcel);
+  //    otherwise they stay Busy. Never clobbers a manual Offline. Uses the same
+  //    shared helper as execution.ts / finalMileAssign.ts / returnCollection.ts.
+  if (rider) releaseAfterLosingJob(tx, riderRef, rider, riderHasOtherActive, now);
 
   // 5) Advance the job: currentLegId -> new leg, custody at hub, denormalised
   //    tracking fields. status stays InProgress (NOT terminal) — the Company
