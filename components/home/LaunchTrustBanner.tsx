@@ -15,11 +15,11 @@ export default function LaunchTrustBanner() {
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-white to-green-600 shadow-2xl">
         <div className="bg-black/0 px-6 py-8 sm:px-10 sm:py-10">
           <span className="inline-block rounded-full bg-black/80 px-4 py-2 text-sm font-bold text-white shadow-lg">
-            🇮🇳 Independence Day Launch
+            🚀 YOMICO Launch Offer
           </span>
 
           <h2 className="mt-5 max-w-2xl text-3xl font-extrabold leading-tight text-gray-900 md:text-4xl">
-            Shop With Confidence This Independence Day
+            Shop With Confidence on YOMICO
           </h2>
 
           <p className="mt-4 max-w-xl text-base text-gray-800 md:text-lg">

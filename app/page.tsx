@@ -1,7 +1,5 @@
 "use client";
 
-import Image from "next/image";
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -107,22 +105,18 @@ export default function Home() {
   <HeroSlider />
 </section>
 
-      {/* YOMICO Independence Day launch banner — separate promotional
-          banner, not part of HeroSlider. Links to /sell (the existing
-          vendor page); no new route created. */}
-      <section className="max-w-7xl mx-auto px-2 pb-2">
-        <Link href="/sell" className="block overflow-hidden rounded-2xl shadow-md">
-          <Image
-            src="/yomico-independence-day-launch.jpg"
-            alt="YOMICO Independence Day launch banner - 15 August"
-            width={1168}
-            height={784}
-            sizes="(max-width: 768px) 100vw, 1152px"
-            className="h-auto w-full"
-            priority
-          />
-        </Link>
-      </section>
+      {/* Navratri festive banner — reuses the existing reusable PromoBanner
+          component (same one used for the Electronics sale further down)
+          instead of a new bespoke banner. Replaces the former 15 August /
+          Independence Day launch banner in this slot. */}
+      <PromoBanner
+        badge="NAVRATRI SPECIAL"
+        title="Navratri Festive Sale"
+        subtitle="Celebrate. Shop. Save."
+        image="/navratri-banner.svg"
+        button1="Explore Offers"
+        link1="/store"
+      />
 
       {/* Coded (no image asset) customer-facing trust/launch banner —
           reinforces the same 0% commission launch, framed for shoppers. */}
