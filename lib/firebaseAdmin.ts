@@ -20,6 +20,8 @@
 // reachable from the browser bundle.
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import { firebaseConfig } from "@/lib/firebase";
 
 // Parsed once per warm instance and reused by getAdminApp() and
 // getAdminProjectId() — the env var doesn't change at runtime, and this
@@ -70,6 +72,16 @@ export function getAdminApp(): App {
 
 export function getAdminDb() {
   return getFirestore(getAdminApp());
+}
+
+// Admin-SDK access to the same Storage bucket the client SDK uses
+// (firebaseConfig.storageBucket), authenticated as the service account
+// rather than via a request/download token. Lets server routes read
+// objects (e.g. KYC documents) directly by path, bypassing storage.rules
+// the same way getAdminDb() bypasses firestore.rules — callers remain
+// responsible for their own authorization checks before using this.
+export function getAdminBucket() {
+  return getStorage(getAdminApp()).bucket(firebaseConfig.storageBucket);
 }
 
 // The service account's OWN project_id — never the client-config

@@ -16,6 +16,97 @@ function tsToText(v: unknown): string {
   return "";
 }
 
+type KycDocType = "gst" | "aadhaar" | "cheque";
+
+// Downloads via the protected server endpoint (never the raw Storage URL) —
+// the server authenticates the admin, resolves the document from the
+// vendor's own record, and returns it with a real Content-Disposition:
+// attachment header. Blob + throwaway <a download> is still needed client
+// side because the request must carry the admin's bearer token, which a
+// plain link navigation can't do; the filename is read back from the
+// response header rather than guessed. Never logs the response URL/headers —
+// only a generic message on failure.
+async function downloadKycDocument(
+  vendorId: string,
+  docType: KycDocType,
+  fileLabel: string
+) {
+  try {
+    const user = auth.currentUser;
+    if (!user) { alert("Please sign in again."); return; }
+    const token = await user.getIdToken();
+    const res = await fetch(
+      `/api/admin/kyc/document?vendorId=${encodeURIComponent(vendorId)}&type=${docType}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data?.error || `Could not download this document. (HTTP ${res.status})`);
+      return;
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get("content-disposition") || "";
+    const filenameMatch = disposition.match(/filename="([^"]+)"/);
+    const filename = filenameMatch ? filenameMatch[1] : fileLabel;
+
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    console.error(`Failed to download KYC document (${fileLabel}).`);
+    alert("Could not download this document.");
+  }
+}
+
+// One row of View/Download controls for a single KYC document. Renders
+// "Not uploaded" instead of a broken link when the URL is missing, and never
+// prints the URL itself as visible text. View still opens the document's own
+// Storage URL directly (unchanged); Download goes through the protected
+// server endpoint instead of fetching that URL from the browser.
+function KycDocumentRow({
+  label,
+  url,
+  vendorId,
+  docType,
+}: {
+  label: string;
+  url?: string;
+  vendorId: string;
+  docType: KycDocType;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-xs py-0.5">
+      <span className="text-gray-600 font-medium">{label}</span>
+      {url ? (
+        <div className="flex gap-1.5 shrink-0">
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition"
+          >
+            View
+          </a>
+          <button
+            type="button"
+            onClick={() => void downloadKycDocument(vendorId, docType, label)}
+            className="px-2 py-1 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50 transition"
+          >
+            Download
+          </button>
+        </div>
+      ) : (
+        <span className="text-gray-400 italic shrink-0">Not uploaded</span>
+      )}
+    </div>
+  );
+}
+
 export default function AdminKYCPage() {
   const [vendors, setVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +259,7 @@ setVendors(items);
                   <th className="text-left">GST Status / Verify</th>
                   <th className="text-left">PAN</th>
                   <th className="text-left">Aadhaar</th>
+                  <th className="text-left">KYC Documents</th>
                   <th className="text-left">Email</th>
                   <th className="text-left">KYC Status</th>
                   <th className="text-left">Action</th>
@@ -248,6 +340,13 @@ setVendors(items);
                     </td>
                     <td>{vendor.panNumber || "-"}</td>
                     <td>{vendor.aadhaarNumber || "-"}</td>
+                    <td>
+                      <div className="flex flex-col gap-1 min-w-[220px]">
+                        <KycDocumentRow label="GST Certificate" url={vendor.gstDocUrl} vendorId={vendor.id} docType="gst" />
+                        <KycDocumentRow label="Aadhaar" url={vendor.aadhaarDocUrl} vendorId={vendor.id} docType="aadhaar" />
+                        <KycDocumentRow label="Cancelled Cheque" url={vendor.chequeDocUrl} vendorId={vendor.id} docType="cheque" />
+                      </div>
+                    </td>
                     <td>{vendor.email || "-"}</td>
                     <td>
                       <span
