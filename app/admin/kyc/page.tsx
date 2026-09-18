@@ -17,42 +17,68 @@ function tsToText(v: unknown): string {
 }
 
 type KycDocType = "gst" | "aadhaar" | "cheque";
+type KycDocMode = "view" | "download";
 
-// Downloads via the protected server endpoint (never the raw Storage URL) —
-// the server authenticates the admin, resolves the document from the
-// vendor's own record, and returns it with a real Content-Disposition:
-// attachment header. Blob + throwaway <a download> is still needed client
-// side because the request must carry the admin's bearer token, which a
-// plain link navigation can't do; the filename is read back from the
-// response header rather than guessed. Never logs the response URL/headers —
-// only a generic message on failure.
-async function downloadKycDocument(
+// Shared fetch against the protected server endpoint for BOTH View and
+// Download — the browser never opens a raw Firebase Storage
+// getDownloadURL() for either action anymore. The server authenticates the
+// admin, resolves the document from the vendor's own record, and returns it
+// with the right Content-Disposition (inline for view, attachment for
+// download). Never logs the response URL/headers/bytes — only a generic
+// message on failure.
+async function fetchKycDocument(
   vendorId: string,
   docType: KycDocType,
+  mode: KycDocMode,
   fileLabel: string
-) {
-  try {
-    const user = auth.currentUser;
-    if (!user) { alert("Please sign in again."); return; }
-    const token = await user.getIdToken();
-    const res = await fetch(
-      `/api/admin/kyc/document?vendorId=${encodeURIComponent(vendorId)}&type=${docType}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      alert(data?.error || `Could not download this document. (HTTP ${res.status})`);
-      return;
-    }
-    const blob = await res.blob();
-    const disposition = res.headers.get("content-disposition") || "";
-    const filenameMatch = disposition.match(/filename="([^"]+)"/);
-    const filename = filenameMatch ? filenameMatch[1] : fileLabel;
+): Promise<{ blob: Blob; filename: string } | null> {
+  const user = auth.currentUser;
+  if (!user) { alert("Please sign in again."); return null; }
+  const token = await user.getIdToken();
+  const res = await fetch(
+    `/api/admin/kyc/document?vendorId=${encodeURIComponent(vendorId)}&type=${docType}&mode=${mode}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    alert(data?.error || `Could not open this document. (HTTP ${res.status})`);
+    return null;
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("content-disposition") || "";
+  const filenameMatch = disposition.match(/filename="([^"]+)"/);
+  const filename = filenameMatch ? filenameMatch[1] : fileLabel;
+  return { blob, filename };
+}
 
-    const blobUrl = URL.createObjectURL(blob);
+// Opens the document in a new tab via a local blob: URL built from the
+// server's response — the new tab never sees, and the app never exposes,
+// the underlying Firebase Storage URL.
+async function viewKycDocument(vendorId: string, docType: KycDocType, fileLabel: string) {
+  try {
+    const result = await fetchKycDocument(vendorId, docType, "view", fileLabel);
+    if (!result) return;
+    const blobUrl = URL.createObjectURL(result.blob);
+    window.open(blobUrl, "_blank", "noopener,noreferrer");
+    // Give the new tab time to load the blob before releasing it.
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch {
+    console.error(`Failed to open KYC document (${fileLabel}).`);
+    alert("Could not open this document.");
+  }
+}
+
+// Saves the document via a throwaway <a download> — still needed client
+// side (rather than a plain link) because the request must carry the
+// admin's bearer token, which a plain link navigation can't do.
+async function downloadKycDocument(vendorId: string, docType: KycDocType, fileLabel: string) {
+  try {
+    const result = await fetchKycDocument(vendorId, docType, "download", fileLabel);
+    if (!result) return;
+    const blobUrl = URL.createObjectURL(result.blob);
     const link = document.createElement("a");
     link.href = blobUrl;
-    link.download = filename;
+    link.download = result.filename;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -64,34 +90,32 @@ async function downloadKycDocument(
 }
 
 // One row of View/Download controls for a single KYC document. Renders
-// "Not uploaded" instead of a broken link when the URL is missing, and never
-// prints the URL itself as visible text. View still opens the document's own
-// Storage URL directly (unchanged); Download goes through the protected
-// server endpoint instead of fetching that URL from the browser.
+// "Not uploaded" when no document exists, and never renders (or receives)
+// the underlying Storage URL — only a boolean of whether one exists, so
+// there's nothing here that could ever be opened directly.
 function KycDocumentRow({
   label,
-  url,
+  hasDocument,
   vendorId,
   docType,
 }: {
   label: string;
-  url?: string;
+  hasDocument: boolean;
   vendorId: string;
   docType: KycDocType;
 }) {
   return (
     <div className="flex items-center justify-between gap-3 text-xs py-0.5">
       <span className="text-gray-600 font-medium">{label}</span>
-      {url ? (
+      {hasDocument ? (
         <div className="flex gap-1.5 shrink-0">
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => void viewKycDocument(vendorId, docType, label)}
             className="px-2 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition"
           >
             View
-          </a>
+          </button>
           <button
             type="button"
             onClick={() => void downloadKycDocument(vendorId, docType, label)}
@@ -342,9 +366,9 @@ setVendors(items);
                     <td>{vendor.aadhaarNumber || "-"}</td>
                     <td>
                       <div className="flex flex-col gap-1 min-w-[220px]">
-                        <KycDocumentRow label="GST Certificate" url={vendor.gstDocUrl} vendorId={vendor.id} docType="gst" />
-                        <KycDocumentRow label="Aadhaar" url={vendor.aadhaarDocUrl} vendorId={vendor.id} docType="aadhaar" />
-                        <KycDocumentRow label="Cancelled Cheque" url={vendor.chequeDocUrl} vendorId={vendor.id} docType="cheque" />
+                        <KycDocumentRow label="GST Certificate" hasDocument={!!vendor.gstDocUrl} vendorId={vendor.id} docType="gst" />
+                        <KycDocumentRow label="Aadhaar" hasDocument={!!vendor.aadhaarDocUrl} vendorId={vendor.id} docType="aadhaar" />
+                        <KycDocumentRow label="Cancelled Cheque" hasDocument={!!vendor.chequeDocUrl} vendorId={vendor.id} docType="cheque" />
                       </div>
                     </td>
                     <td>{vendor.email || "-"}</td>

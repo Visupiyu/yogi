@@ -3,9 +3,15 @@ import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb, getAdminBucket } from "@/lib/firebaseAdmin";
 
 // ---------------------------------------------------------------------------
-// ADMIN-ONLY seller KYC document download.
-//   GET /api/admin/kyc/document?vendorId=<id>&type=gst|aadhaar|cheque
+// ADMIN-ONLY seller KYC document access — backs BOTH View and Download in
+// the Admin KYC UI, so neither one ever opens a raw Firebase Storage
+// getDownloadURL() in the browser.
+//   GET /api/admin/kyc/document?vendorId=<id>&type=gst|aadhaar|cheque&mode=view|download
 //   Authorization: Bearer <idToken>
+//
+// mode=view     -> Content-Disposition: inline  (renders in a new tab)
+// mode=download -> Content-Disposition: attachment (forces a save), the
+//                  existing behavior; also the default if mode is omitted.
 //
 // The client never supplies a Storage URL — only a vendor id and one of the
 // three fixed document types. The server resolves the actual document itself
@@ -91,12 +97,16 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const vendorId = (searchParams.get("vendorId") || "").trim();
     const typeParam = (searchParams.get("type") || "").trim();
+    const modeParam = (searchParams.get("mode") || "download").trim();
 
     if (!vendorId) {
       return Response.json({ error: "Missing vendor id." }, { status: 400 });
     }
     if (!isDocType(typeParam)) {
       return Response.json({ error: "Invalid document type." }, { status: 400 });
+    }
+    if (modeParam !== "view" && modeParam !== "download") {
+      return Response.json({ error: "Invalid mode." }, { status: 400 });
     }
 
     const db = getAdminDb();
@@ -148,12 +158,13 @@ export async function GET(request: Request) {
     const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : "";
     const vendorNamePart = sanitizeFilenamePart(vendor.businessName || vendorId);
     const filename = `${sanitizeFilenamePart(label)}-${vendorNamePart}${ext}`;
+    const disposition = modeParam === "view" ? "inline" : "attachment";
 
     return new Response(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": `${disposition}; filename="${filename}"`,
         "Content-Length": String(buffer.length),
         // Sensitive PII — never cached by shared/browser caches.
         "Cache-Control": "private, no-store",
@@ -161,11 +172,11 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error(
-      "Admin KYC document download failed:",
+      "Admin KYC document access failed:",
       error instanceof Error ? error.name : "unknown error"
     );
     return Response.json(
-      { error: "Could not download this document." },
+      { error: "Could not access this document." },
       { status: 500 }
     );
   }
