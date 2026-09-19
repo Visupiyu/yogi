@@ -11,6 +11,7 @@
 // is a UX hint only, and each action still round-trips to the server.
 import { useCallback, useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
+import { mapsSearchUrl } from "@/lib/maps";
 import type {
   AdminJobRow,
   AdminPersonRow,
@@ -21,12 +22,17 @@ import type {
 // payload it encodes embeds the scanToken but is never rendered as text.
 import QRCode from "react-qr-code";
 
-// Safe subset of GET /api/delivery/jobs/[jobId] we actually render (no phone,
-// no address, no assignedPersonPhone, no secrets).
+// Safe subset of GET /api/delivery/jobs/[jobId] we actually render. Delivery
+// Navigation Phase N1 (admin-only) additionally surfaces the seller/hub/customer
+// ADDRESSES (already returned to admin by that endpoint) so the operator can
+// open them in a maps app. Still no phone, no assignedPersonPhone, no OTP/
+// scanToken/raw GPS, no secrets.
 type JobDetail = {
   responsibleParty: { kind: string | null; companyId: string | null; personId: string | null } | null;
-  pickup?: { sellerName?: string } | null;
-  drop?: { customerName?: string } | null;
+  pickup?: { sellerName?: string; street?: string; unit?: string; city?: string; state?: string; zipCode?: string } | null;
+  drop?: { customerName?: string; address?: string } | null;
+  originHub?: { name?: string; address?: string; city?: string; region?: string; pincode?: string } | null;
+  destinationHub?: { name?: string; address?: string; city?: string; region?: string; pincode?: string } | null;
   parcel?: { items?: { name?: string; qty?: number }[] } | null;
 };
 
@@ -153,7 +159,9 @@ export default function ControlTowerPage() {
         setDetail({
           responsibleParty: data.job.responsibleParty ?? null,
           pickup: data.job.pickup ?? null,
-          drop: data.job.drop ? { customerName: data.job.drop.customerName } : null,
+          drop: data.job.drop ? { customerName: data.job.drop.customerName, address: data.job.drop.address } : null,
+          originHub: data.job.originHub ?? null,
+          destinationHub: data.job.destinationHub ?? null,
           parcel: data.job.parcel ?? null,
         });
       }
@@ -465,6 +473,29 @@ export default function ControlTowerPage() {
               )}
             </dl>
 
+            {/* Delivery Navigation Phase N1 (admin-only) — open each KNOWN
+                address in the operator's maps app (new tab). Navigation only:
+                no coordinates, no GPS, no tracking, no geocoding, no Maps API.
+                A destination with no address renders no link. */}
+            {(() => {
+              const sellerAddr = sellerAddressLine(detail?.pickup);
+              const originAddr = hubAddressLine(detail?.originHub);
+              const destAddr = hubAddressLine(detail?.destinationHub);
+              const custAddr = (detail?.drop?.address ?? "").trim();
+              if (!(sellerAddr || originAddr || destAddr || custAddr)) return null;
+              return (
+                <div className="mt-3 border-t pt-3">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Navigation</p>
+                  <ul className="space-y-1.5 text-sm">
+                    <LocationRow label="Seller / Pickup" address={sellerAddr} />
+                    <LocationRow label="Origin hub" address={originAddr} />
+                    <LocationRow label="Destination hub" address={destAddr} />
+                    <LocationRow label="Customer / Drop" address={custAddr} />
+                  </ul>
+                </div>
+              );
+            })()}
+
             {/* Actions */}
             <div className="mt-4 space-y-3 border-t pt-4">
               {canAssign(selected.status) ? (
@@ -536,6 +567,43 @@ export default function ControlTowerPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Delivery Navigation Phase N1 (admin-only) — compose ONE address string for a
+// maps link from the parts the jobs/[jobId] projection already returns. Pure
+// string formatting; no coordinates/geocoding.
+function sellerAddressLine(p?: { street?: string; unit?: string; city?: string; state?: string; zipCode?: string } | null): string {
+  return [p?.street, p?.unit, p?.city, p?.state, p?.zipCode].filter(Boolean).join(", ");
+}
+function hubAddressLine(h?: { address?: string; city?: string; region?: string; pincode?: string } | null): string {
+  return [h?.address, h?.city, h?.region, h?.pincode].filter(Boolean).join(", ");
+}
+// "Open in Maps" external link (new tab). Renders nothing when the address is
+// empty, so a missing address never gets a link (never guesses a destination).
+function MapsLink({ address }: { address?: string | null }) {
+  const url = mapsSearchUrl(address);
+  if (!url) return null;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs font-medium text-indigo-600 hover:underline">
+      Open in Maps ↗
+    </a>
+  );
+}
+// One labeled navigation row: address text + its Open-in-Maps link. Renders
+// nothing at all when there is no address for this destination.
+function LocationRow({ label, address }: { label: string; address?: string | null }) {
+  const a = (address ?? "").trim();
+  if (!a) return null;
+  return (
+    <li className="flex items-start justify-between gap-3">
+      <span className="min-w-0">
+        <span className="text-gray-600">{label}</span>
+        <br />
+        <span className="text-xs text-gray-400 break-words">{a}</span>
+      </span>
+      <MapsLink address={a} />
+    </li>
   );
 }
 
