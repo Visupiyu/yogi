@@ -27,6 +27,7 @@ import {
   type ItemRequestType,
 } from "@/lib/itemRequests";
 import DeliveryOtpNotice from "@/components/DeliveryOtpNotice";
+import { mapsSearchUrl } from "@/lib/maps";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -251,6 +252,12 @@ export default function OrderDetailsPage() {
   }
 
   if (!order) return null;
+
+  // Same delivery/drop address already shown as plain text under Customer
+  // Details (order.address, set once at checkout — see app/api/place-order).
+  // Never geocoded, no coordinates stored; null when blank so no maps link
+  // is ever rendered for a guessed destination.
+  const deliveryMapsUrl = mapsSearchUrl(order.address);
 
   return (
     <section className="bg-gray-50 min-h-screen py-10">
@@ -499,6 +506,28 @@ export default function OrderDetailsPage() {
             </div>
           )}
         </div>
+
+        {/* DELIVERY ADDRESS — the same drop address already shown under
+            Customer Details, plus a plain Google Maps search link. No map
+            widget, no live rider location, no ETA, no coordinates: just a
+            navigation shortcut to an address already on the order. Hidden
+            entirely when the address is blank rather than linking nowhere. */}
+        {order.address && (
+          <div className="mt-8 bg-white rounded-3xl shadow border p-8">
+            <h2 className="text-2xl font-bold mb-4">📍 Delivery Address</h2>
+            <p className="text-gray-700">{order.address}</p>
+            {deliveryMapsUrl && (
+              <a
+                href={deliveryMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block mt-3 text-blue-600 font-semibold hover:underline"
+              >
+                View on Maps ↗
+              </a>
+            )}
+          </div>
+        )}
 
         {/* ACTION BUTTONS */}
         <Link
