@@ -3,7 +3,7 @@ import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
 import { deriveRiderTask, newTaskHubCaches } from "@/lib/deliveryEngine/taskLocation";
-import type { DeliveryJob } from "@/lib/deliveryEngine/types";
+import type { DeliveryJob, DeliveryLeg } from "@/lib/deliveryEngine/types";
 
 // GET /api/delivery/my-jobs
 //
@@ -44,6 +44,18 @@ export async function GET(request: Request) {
     activeDocs.map(async (d) => {
       const job = d.data() as DeliveryJob;
       const task = await deriveRiderTask(db, d.id, job, caches);
+      // Rider Assignment Response: expose the current pickup leg status so the
+      // app can show Accept/Reject vs execution (one leg read per active job).
+      let pickupLegStatus: string | null = null;
+      let awaitingRiderAcceptance = false;
+      if (job.currentLegId) {
+        const legSnap = await db.collection("deliveryJobs").doc(d.id).collection("legs").doc(job.currentLegId).get();
+        const leg = legSnap.exists ? (legSnap.data() as DeliveryLeg) : null;
+        if (leg && leg.type === "Pickup") {
+          pickupLegStatus = typeof leg.status === "string" ? leg.status : null;
+          awaitingRiderAcceptance = job.providerType === "COMPANY" && job.status === "AssignedToCompany" && leg.status === "Assigned";
+        }
+      }
       return {
         id: d.id,
         orderNumber: job.orderNumber,
@@ -58,6 +70,8 @@ export async function GET(request: Request) {
         parcel: job.parcel,
         updatedAt: job.updatedAt ?? null,
         task, // the rider's actual physical pickup -> drop for the current leg
+        pickupLegStatus,
+        awaitingRiderAcceptance,
       };
     })
   );

@@ -2,7 +2,7 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
-import type { DeliveryJob } from "@/lib/deliveryEngine/types";
+import type { DeliveryJob, DeliveryLeg } from "@/lib/deliveryEngine/types";
 
 // GET /api/delivery/company/jobs
 //
@@ -25,28 +25,41 @@ export async function GET(request: Request) {
     .where("companyId", "==", actor.companyId)
     .get();
 
-  const jobs = snap.docs
-    .map((d) => {
-      const job = d.data() as DeliveryJob;
-      return {
-        id: d.id,
-        orderNumber: job.orderNumber,
-        vendorName: job.vendorName,
-        shipmentNumber: job.shipmentNumber,
-        status: job.status,
-        currentStage: job.currentStage,
-        assignedPersonId: job.assignedPersonId ?? null,
-        assignedPersonName: job.assignedPersonName ?? null,
-        drop: { area: "", slot: job.drop?.slot ?? null }, // minimal until a person is assigned
-        parcel: job.parcel,
-        updatedAt: job.updatedAt ?? null,
-      };
-    })
-    .sort((a, b) => {
-      const at = (a.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
-      const bt = (b.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
-      return bt - at;
-    });
+  const db = getAdminDb();
+  const jobs = (
+    await Promise.all(
+      snap.docs.map(async (d) => {
+        const job = d.data() as DeliveryJob;
+        // Rider Assignment Response: for an AssignedToCompany job, expose the
+        // pickup leg status so the console can distinguish "awaiting rider
+        // response" (Assigned) from "rider accepted" (Started).
+        let pickupLegStatus: string | null = null;
+        if (job.status === "AssignedToCompany" && job.currentLegId) {
+          const legSnap = await db.collection("deliveryJobs").doc(d.id).collection("legs").doc(job.currentLegId).get();
+          const leg = legSnap.exists ? (legSnap.data() as DeliveryLeg) : null;
+          if (leg && leg.type === "Pickup" && typeof leg.status === "string") pickupLegStatus = leg.status;
+        }
+        return {
+          id: d.id,
+          orderNumber: job.orderNumber,
+          vendorName: job.vendorName,
+          shipmentNumber: job.shipmentNumber,
+          status: job.status,
+          currentStage: job.currentStage,
+          assignedPersonId: job.assignedPersonId ?? null,
+          assignedPersonName: job.assignedPersonName ?? null,
+          pickupLegStatus,
+          drop: { area: "", slot: job.drop?.slot ?? null }, // minimal until a person is assigned
+          parcel: job.parcel,
+          updatedAt: job.updatedAt ?? null,
+        };
+      })
+    )
+  ).sort((a, b) => {
+    const at = (a.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
+    const bt = (b.updatedAt as { toMillis?: () => number } | null)?.toMillis?.() ?? 0;
+    return bt - at;
+  });
 
   return Response.json({ companyId: actor.companyId, jobs });
 }

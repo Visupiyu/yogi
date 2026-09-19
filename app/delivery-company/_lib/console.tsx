@@ -40,6 +40,7 @@ export type CompanyJob = {
   currentStage?: string;
   assignedPersonId?: string | null;
   assignedPersonName?: string | null;
+  pickupLegStatus?: string | null;
   drop?: { area?: string; slot?: string | null } | null;
   parcel?: { items?: { name?: string; qty?: number }[] } | null;
   updatedAt?: unknown;
@@ -85,6 +86,8 @@ export type CompanyJobDetail = {
   assignedPersonName?: string | null;
   assignedPersonPhone?: string | null;
   assignedCompanyName?: string | null;
+  pickupLegStatus?: string | null;
+  awaitingRiderAcceptance?: boolean;
   pickup?: { sellerName?: string; street?: string; unit?: string; city?: string; state?: string; zipCode?: string } | null;
   drop?: { customerName?: string; phone?: string; address?: string; slot?: string | null } | null;
   parcel?: { items?: { name?: string; qty?: number }[] } | null;
@@ -143,6 +146,17 @@ export function statusMeta(status: string): { label: string; tone: string } {
     case "RejectedByCompany": return { label: "Rejected", tone: "bg-gray-200 text-gray-700" };
     default: return { label: status, tone: "bg-gray-100 text-gray-700" };
   }
+}
+
+// Rider Assignment Response — the sub-label a company operator sees while a job
+// is AssignedToCompany, derived from the pickup leg status (Assigned = awaiting
+// the rider's response; Started = the rider accepted, awaiting pickup). Null for
+// every other job status / leg state.
+export function riderResponseSublabel(status: string, pickupLegStatus?: string | null): string | null {
+  if (status !== "AssignedToCompany") return null;
+  if (pickupLegStatus === "Started") return "Rider accepted — awaiting pickup";
+  if (pickupLegStatus === "Assigned") return "Assigned — awaiting rider response";
+  return null;
 }
 
 // Friendly labels for the CORE company flow only. Anything else falls through to

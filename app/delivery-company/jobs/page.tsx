@@ -20,6 +20,7 @@ import {
   AWAITING_STATUSES,
   ACTIVE_STATUSES,
   COMPLETED_STATUSES,
+  riderResponseSublabel,
   type CompanyJob,
   type CompanyPerson,
 } from "@/app/delivery-company/_lib/console";
@@ -171,6 +172,11 @@ export default function DeliveryCompanyJobsPage() {
                       <span className="sm:col-span-2">
                         {job.assignedPersonName ? `Assigned: ${job.assignedPersonName}` : "Unassigned"} · Updated {fmtTs(job.updatedAt)}
                       </span>
+                      {riderResponseSublabel(job.status, job.pickupLegStatus) ? (
+                        <span className="sm:col-span-2 text-[11px] font-medium text-sky-700">
+                          {riderResponseSublabel(job.status, job.pickupLegStatus)}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">

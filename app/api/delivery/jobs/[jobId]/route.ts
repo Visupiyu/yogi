@@ -174,6 +174,20 @@ export async function GET(
     };
   }
 
+  // Rider Assignment Response projection — expose the current pickup leg status
+  // so a person/company client can tell "assigned, awaiting rider acceptance"
+  // from "rider accepted". Reads the current leg once (by id).
+  let pickupLegStatus: string | null = null;
+  let awaitingRiderAcceptance = false;
+  if (job.currentLegId) {
+    const clSnap = await db.collection("deliveryJobs").doc(snap.id).collection("legs").doc(job.currentLegId).get();
+    const cl = clSnap.exists ? (clSnap.data() as DeliveryLeg) : null;
+    if (cl && cl.type === "Pickup") {
+      pickupLegStatus = typeof cl.status === "string" ? cl.status : null;
+      awaitingRiderAcceptance = job.providerType === "COMPANY" && job.status === "AssignedToCompany" && cl.status === "Assigned";
+    }
+  }
+
   return Response.json({
     job: {
       id: snap.id,
@@ -204,6 +218,8 @@ export async function GET(
       drop: job.drop,
       parcel: job.parcel,
       task,
+      pickupLegStatus,
+      awaitingRiderAcceptance,
       navigationDestination,
       codPayment,
       deliveryException,

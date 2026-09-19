@@ -781,3 +781,196 @@ export async function rejectCompanyHandoff(
 
   return { changed: true, jobId: args.jobId };
 }
+
+// ===========================================================================
+// 5) Rider -> ACCEPT / REJECT an assignment (Rider Assignment Response)
+// A rider responds to a COMPANY assignment on the SAME Company Job — an action
+// on the assigned PICKUP leg/person, never a new job and never a company-level
+// reject. Accept advances the pickup leg Assigned -> Started (job.status stays
+// AssignedToCompany); PICKUP already accepts a "Started" leg, so nothing else
+// changes. Reject releases the rider (pickup leg -> LegCreated, job ->
+// AcceptedByCompany, company ownership KEPT) so the company can assign another
+// rider via assignCompanyPerson. Scoped to the PICKUP leg only — never a
+// FinalMile leg (whose "Assigned" status gates the destination handover).
+// ===========================================================================
+
+// Pickup-leg statuses that mean physical execution has begun (past acceptance).
+// Accept is a safe no-op from these; reject is refused (custody has moved).
+const EXECUTION_LEG_STATUSES: ReadonlySet<string> = new Set([
+  "PickedUp", "InTransit", "ArrivedAtStage", "HandoverInitiated",
+  "HandoverConfirmed", "OutForDelivery", "Delivered", "Failed", "Rescheduled",
+]);
+
+export async function acceptRiderAssignment(
+  tx: Transaction,
+  db: Firestore,
+  args: { jobId: string; personId: string; actorUid: string }
+): Promise<{ changed: boolean; jobId: string }> {
+  // ---- READS ----
+  const { ref: jobRef, job } = await readJob(tx, db, args.jobId);
+  if (!job.currentLegId) throw new AssignmentError("Job has no current leg.", 409);
+
+  // Authorization: only the currently-assigned rider may respond, and only on a
+  // COMPANY-provider job. Ownership (companyId/providerType) is never changed.
+  if (!job.assignedPersonId) {
+    throw new AssignmentError("No rider is assigned to this job.", 409);
+  }
+  if (job.assignedPersonId !== args.personId) {
+    throw new AssignmentError("This assignment is not yours.", 403);
+  }
+  if (job.providerType !== "COMPANY") {
+    throw new AssignmentError("Rider acceptance applies only to company assignments.", 409);
+  }
+
+  const lRef = legRef(db, args.jobId, job.currentLegId);
+  const legSnap = await tx.get(lRef);
+  if (!legSnap.exists) throw new AssignmentError("Current leg not found.", 409);
+  const leg = legSnap.data() as DeliveryLeg;
+
+  // Scope: the PICKUP leg only. Never touch a FinalMile leg (its "Assigned"
+  // status gates the destination handover) or any other leg.
+  if (leg.type !== "Pickup") {
+    throw new AssignmentError("Rider acceptance applies only to the pickup assignment.", 409);
+  }
+
+  // Idempotent: already accepted.
+  if (leg.status === "Started") {
+    return { changed: false, jobId: args.jobId };
+  }
+  // Already executing (picked up or beyond): acceptance is moot -> safe no-op.
+  if (job.status === "InProgress" || EXECUTION_LEG_STATUSES.has(leg.status)) {
+    return { changed: false, jobId: args.jobId };
+  }
+  // Otherwise the only acceptable state is a fresh company assignment.
+  if (job.status !== "AssignedToCompany" || leg.status !== "Assigned") {
+    throw new AssignmentError(`This assignment cannot be accepted from status "${job.status}" / leg "${leg.status}".`, 409);
+  }
+
+  // ---- WRITES ----
+  // Acceptance is not custody: only the pickup leg advances Assigned -> Started.
+  // job.status, assignedPersonId, responsibleParty, companyId and currentStage
+  // all stay exactly as the company set them.
+  const now = Timestamp.now();
+  tx.set(lRef, { status: "Started", updatedAt: now }, { merge: true });
+
+  const eventId = writeAssignmentEvent(tx, db, {
+    job,
+    jobId: args.jobId,
+    legId: job.currentLegId,
+    actorUid: args.actorUid,
+    role: "person",
+    providerType: "COMPANY",
+    companyId: job.companyId ?? null,
+    personId: args.personId,
+    action: "RiderAcceptedAssignment",
+    fromStatus: "AssignedToCompany",
+    toStatus: "AssignedToCompany",
+    now,
+  });
+
+  // Link the event on the job for audit; status/assignment are untouched.
+  tx.set(jobRef, { lastEventId: eventId, lastEventAt: now, updatedAt: now }, { merge: true });
+
+  return { changed: true, jobId: args.jobId };
+}
+
+export async function rejectRiderAssignment(
+  tx: Transaction,
+  db: Firestore,
+  args: { jobId: string; personId: string; actorUid: string; reason?: string }
+): Promise<{ changed: boolean; jobId: string }> {
+  // ---- READS ----
+  const { ref: jobRef, job } = await readJob(tx, db, args.jobId);
+  if (!job.currentLegId) throw new AssignmentError("Job has no current leg.", 409);
+
+  if (!job.assignedPersonId) {
+    throw new AssignmentError("No rider is assigned to this job.", 409);
+  }
+  if (job.assignedPersonId !== args.personId) {
+    throw new AssignmentError("This assignment is not yours.", 403);
+  }
+  if (job.providerType !== "COMPANY") {
+    throw new AssignmentError("Rider rejection applies only to company assignments.", 409);
+  }
+  if (job.status !== "AssignedToCompany") {
+    throw new AssignmentError(`This assignment cannot be rejected from status "${job.status}".`, 409);
+  }
+
+  const lRef = legRef(db, args.jobId, job.currentLegId);
+  const legSnap = await tx.get(lRef);
+  if (!legSnap.exists) throw new AssignmentError("Current leg not found.", 409);
+  const leg = legSnap.data() as DeliveryLeg;
+
+  if (leg.type !== "Pickup") {
+    throw new AssignmentError("Rider rejection applies only to the pickup assignment.", 409);
+  }
+  // Reject is only allowed BEFORE pickup/custody. Once execution has begun the
+  // rider must use the execution/exception flow, not release the assignment.
+  if (leg.status !== "Assigned" && leg.status !== "Started") {
+    throw new AssignmentError("This assignment can no longer be rejected (pickup has begun).", 409);
+  }
+
+  // The assigned rider (== caller) is freed. Read the person doc so availability
+  // can be released in the write phase (its active-job probe is the last read).
+  const personRef = db.collection("deliveryPersons").doc(args.personId);
+  const personSnap = await tx.get(personRef);
+  const person = personSnap.exists ? (personSnap.data() as DeliveryPerson) : null;
+
+  // ---- WRITES ----
+  const now = Timestamp.now();
+  if (person) await releaseOldPerson(tx, db, personRef, person, args.personId, args.jobId, now);
+
+  // Pickup leg returns to an unassigned-but-company-owned state so the company
+  // can assign another rider. providerType/companyId are KEPT (not a handoff).
+  tx.set(
+    lRef,
+    {
+      providerType: "COMPANY",
+      companyId: job.companyId ?? null,
+      assignedPersonId: null,
+      status: "LegCreated",
+      assignedPersonName: null,
+      assignedAt: null,
+      assignedBy: args.actorUid,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  const eventId = writeAssignmentEvent(tx, db, {
+    job,
+    jobId: args.jobId,
+    legId: job.currentLegId,
+    actorUid: args.actorUid,
+    role: "person",
+    providerType: "COMPANY",
+    companyId: job.companyId ?? null,
+    personId: args.personId,
+    action: "RiderRejectedAssignment",
+    fromStatus: "AssignedToCompany",
+    toStatus: "AcceptedByCompany",
+    notes: args.reason ? str(args.reason, 500) : null,
+    now,
+  });
+
+  // Job returns to AcceptedByCompany (company still owns it) with no person.
+  // NOT RejectedByCompany; companyId + assignedCompanyName are KEPT.
+  tx.set(
+    jobRef,
+    {
+      status: "AcceptedByCompany",
+      responsibleParty: { kind: "COMPANY", companyId: job.companyId ?? null, personId: null },
+      assignedPersonId: null,
+      assignedPersonName: null,
+      assignedPersonPhone: null,
+      assignedAt: now,
+      assignedBy: args.actorUid,
+      lastEventId: eventId,
+      lastEventAt: now,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  return { changed: true, jobId: args.jobId };
+}

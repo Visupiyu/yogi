@@ -25,6 +25,7 @@ import {
   companyLifecycle,
   pickupAddressLine,
   COMPANY_ACTIONABLE_STATUSES,
+  riderResponseSublabel,
   type CompanyJobDetail,
   type CompanyPerson,
 } from "@/app/delivery-company/_lib/console";
@@ -148,6 +149,9 @@ export default function DeliveryCompanyJobDetailPage() {
               <span className="font-mono text-sm text-gray-800">{job.shipmentNumber || "—"}</span>
               <StatusBadge status={job.status} />
             </div>
+            {riderResponseSublabel(job.status, job.pickupLegStatus) ? (
+              <p className="mt-1 text-xs font-medium text-sky-700">{riderResponseSublabel(job.status, job.pickupLegStatus)}</p>
+            ) : null}
             <p className="mt-1 text-lg font-semibold text-gray-900">{job.vendorName || "Seller"}</p>
             <p className="text-sm text-gray-500">Stage: {stageLabel(job.currentStage)}</p>
           </div>
