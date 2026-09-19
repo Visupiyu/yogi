@@ -121,8 +121,11 @@ export const COMPLETED_STATUSES: ReadonlySet<string> = new Set([
   "Delivered", "DeliveryFailed", "Returned", "Cancelled",
 ]);
 
-// Statuses at which the existing assign/reject APIs still accept an operation
-// (mirrors the backend pre-execution gate — the server re-validates and wins).
+// Union of statuses at which the company job panel is shown at all; it controls
+// panel VISIBILITY only. JobActions then branches per status for the actual
+// action: OfferedToCompany -> Accept or Reject; AcceptedByCompany -> Assign (no
+// reject); AssignedToCompany -> Reassign (no reject). The server re-validates
+// each route's own gate and remains authoritative.
 export const COMPANY_ACTIONABLE_STATUSES: ReadonlySet<string> = new Set([
   "OfferedToCompany", "AcceptedByCompany", "AssignedToCompany",
 ]);

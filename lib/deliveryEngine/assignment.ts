@@ -498,8 +498,9 @@ export async function handoffToCompany(
 // Explicit acceptance step: the company acknowledges the offer BEFORE assigning
 // one of its own people. No leg / person / custody / stage change — this only
 // advances the job OfferedToCompany -> AcceptedByCompany so assignment can
-// follow. Rejection stays available from OfferedToCompany OR AcceptedByCompany
-// via rejectCompanyHandoff. Idempotent: re-accepting an accepted job is a no-op.
+// follow. Rejection is available from OfferedToCompany only (see
+// rejectCompanyHandoff); once accepted or assigned the job can no longer be
+// rejected. Idempotent: re-accepting an accepted job is a no-op.
 // ===========================================================================
 export async function acceptCompanyHandoff(
   tx: Transaction,
