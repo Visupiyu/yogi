@@ -29,6 +29,8 @@ import {
 import { requestItemAdvance } from "@/lib/sellerFulfilmentClient";
 import { sellerOrderRecordId } from "@/lib/sellerOrderRecord";
 import { formatIst } from "@/lib/orderTiming";
+import { useVendor } from "@/hooks/useVendor";
+import { mapsSearchUrl } from "@/lib/maps";
 
 import { useRef } from "react";
 
@@ -78,6 +80,11 @@ type SellerVisibleRequest = {
 };
 
 export default function SellerOrderDetailsPage(){
+
+  // Seller's own pickup/business address (vendors/{docId}.street/unit/city/
+  // state/zipCode) — the same profile fields set in app/vendor-register and
+  // editable in app/seller/settings. Read-only here; never geocoded.
+  const { vendor } = useVendor();
 
   const params = useParams();
   const router = useRouter();
@@ -599,6 +606,22 @@ finally{ setSaving(false);} };
     );
 
   }
+
+  // Same plain comma-join the rider-navigation formatter uses
+  // (lib/deliveryEngine/taskLocation.ts formatSellerAddress) — no geocoding,
+  // no stored coordinates, just whatever address string is on file. null
+  // when nothing is on file, so the link below is never rendered for a
+  // guessed/blank destination.
+  const pickupAddress = [
+    vendor?.street,
+    vendor?.unit,
+    vendor?.city,
+    vendor?.state,
+    vendor?.zipCode,
+  ]
+    .filter(Boolean)
+    .join(", ") || null;
+  const pickupMapsUrl = mapsSearchUrl(pickupAddress);
 
   // order.finalTotal/commission/sellerEarning are whole-order figures
   // computed once at checkout — in a multi-vendor order they'd show this
@@ -1600,6 +1623,50 @@ finally{ setSaving(false);} };
               </div>
 
             </div>
+
+            {/* Pickup Location — this seller's own business/pickup address
+                (vendors/{docId}), the same one set at registration and
+                editable in Settings. Read-only navigation link only: no
+                geocoding, no coordinates, no map component. Hidden entirely
+                when the address is blank rather than linking to nowhere. */}
+            <div className="
+              bg-white
+              rounded-3xl
+              shadow
+              p-6
+            ">
+
+              <h2 className="
+                text-2xl
+                font-bold
+                mb-4
+              ">
+
+                Pickup Location
+
+              </h2>
+
+              {pickupAddress ? (
+                <>
+                  <p className="text-gray-700">{pickupAddress}</p>
+
+                  <a
+                    href={pickupMapsUrl ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-3 text-blue-600 font-semibold hover:underline"
+                  >
+                    Open in Maps ↗
+                  </a>
+                </>
+              ) : (
+                <p className="text-gray-500 text-sm">
+                  No pickup address on file. Add one in Settings.
+                </p>
+              )}
+
+            </div>
+
             <div className="
   bg-blue-50
   rounded-3xl
