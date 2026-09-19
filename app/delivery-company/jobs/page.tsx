@@ -145,6 +145,8 @@ export default function DeliveryCompanyJobsPage() {
         <div className="space-y-3">
           {filtered.map((job) => {
             const isOffered = job.status === "OfferedToCompany";
+            const isAccepted = job.status === "AcceptedByCompany";
+            const canAct = isOffered || isAccepted;
             const open = openId === job.id;
             const itemCount = Array.isArray(job.parcel?.items) ? job.parcel!.items!.length : 0;
             return (
@@ -154,7 +156,7 @@ export default function DeliveryCompanyJobsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs text-gray-700">{job.shipmentNumber || "—"}</span>
                       <StatusBadge status={job.status} />
-                      {isOffered ? (
+                      {canAct ? (
                         <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
                           Action needed
                         </span>
@@ -178,19 +180,19 @@ export default function DeliveryCompanyJobsPage() {
                     >
                       Open
                     </Link>
-                    {isOffered ? (
+                    {canAct ? (
                       <button
                         onClick={() => toggleOpen(job)}
                         className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
                         aria-expanded={open}
                       >
-                        {open ? "Close" : "Assign / Reject"}
+                        {open ? "Close" : isOffered ? "Accept / Reject" : "Assign"}
                       </button>
                     ) : null}
                   </div>
                 </div>
 
-                {isOffered && open ? (
+                {canAct && open ? (
                   <div className="border-t bg-gray-50 p-4">
                     <JobActions
                       jobId={job.id}

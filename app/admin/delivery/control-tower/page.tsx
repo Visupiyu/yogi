@@ -52,7 +52,7 @@ function fmt(iso: string | null | undefined): string {
 // Pre-execution statuses an admin may still (re)assign or hand off. Mirrors the
 // backend PRE_EXECUTION_STATUSES purely for UX enable/disable — the server
 // re-validates and is authoritative.
-const ASSIGNABLE = new Set(["Created", "OfferedToCompany", "AssignedToYomico", "AssignedToCompany", "RejectedByCompany"]);
+const ASSIGNABLE = new Set(["Created", "OfferedToCompany", "AcceptedByCompany", "AssignedToYomico", "AssignedToCompany", "RejectedByCompany"]);
 function canAssign(status: string): boolean { return ASSIGNABLE.has(status); }
 function needsReconcile(j: AdminJobRow): boolean { return j.status === "Delivered" && !j.commerceReconciledAt; }
 

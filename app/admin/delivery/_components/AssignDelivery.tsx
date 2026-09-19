@@ -32,6 +32,7 @@ type JobRow = {
 const ASSIGNABLE = new Set([
   "Created",
   "OfferedToCompany",
+  "AcceptedByCompany",
   "AssignedToYomico",
   "AssignedToCompany",
   "RejectedByCompany",

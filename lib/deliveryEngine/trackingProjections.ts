@@ -66,8 +66,8 @@ function friendlyStatus(job: DeliveryJob): string {
     case "InProgress":
       return friendlyStage(job.currentStage);
     default:
-      // Created / OfferedToCompany / AssignedToYomico / AssignedToCompany /
-      // RejectedByCompany — all read as "being prepared" to the customer.
+      // Created / OfferedToCompany / AcceptedByCompany / AssignedToYomico /
+      // AssignedToCompany / RejectedByCompany — all read as "being prepared".
       return "Preparing for delivery";
   }
 }

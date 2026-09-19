@@ -1,14 +1,21 @@
 "use client";
 
-// Reusable company job-action panel: assign / reassign a company person and
-// reject a handoff, using ONLY the existing endpoints
+// Reusable company job-action panel: accept a handoff, assign / reassign a
+// company person, and reject a handoff, using ONLY the existing endpoints
+//   POST /api/delivery/company/jobs/[jobId]/accept  {}
 //   POST /api/delivery/company/jobs/[jobId]/assign  { personId }
 //   POST /api/delivery/company/jobs/[jobId]/reject  { reason? }
 //
+// Phase 2A two-step handoff response:
+//   OfferedToCompany  -> the company ACCEPTS or REJECTS the offer. No person yet.
+//   AcceptedByCompany -> the company ASSIGNS one of its own people. No reject.
+//   AssignedToCompany -> the company may REASSIGN until pickup. No reject.
+// Assignment is offered ONLY once the offer is accepted — an accepted job can no
+// longer be assigned straight from OfferedToCompany. The server re-validates and
+// remains authoritative.
+//
 // It never writes Firestore and never assumes the result: after a successful
-// action it calls onDone() so the parent re-fetches authoritative state. Actions
-// are offered ONLY for statuses the backend still accepts (OfferedToCompany /
-// AssignedToCompany); the server re-validates and remains authoritative.
+// action it calls onDone() so the parent re-fetches authoritative state.
 //
 // Assignment is NOT custody — assigning a person does not pick up the parcel; the
 // stage stays "Awaiting pickup" until the person scans PICKUP in the Delivery App.
@@ -40,16 +47,41 @@ export default function JobActions({
   onDone: () => void;
 }) {
   const [selected, setSelected] = useState("");
-  const [confirming, setConfirming] = useState<null | "assign" | "reject">(null);
+  const [confirming, setConfirming] = useState<null | "accept" | "assign" | "reject">(null);
   const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState<null | "assign" | "reject">(null);
+  const [busy, setBusy] = useState<null | "accept" | "assign" | "reject">(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!COMPANY_ACTIONABLE_STATUSES.has(status)) return null;
 
+  // Phase 2A gating: OfferedToCompany must be accepted before assignment; only
+  // Accepted/Assigned can (re)assign a person. All three may be rejected.
+  const isOffered = status === "OfferedToCompany";
+  const canAssign = status === "AcceptedByCompany" || status === "AssignedToCompany";
+
   const assignable = (persons ?? []).filter(isAssignablePerson);
   const selectedPerson = (persons ?? []).find((p) => p.id === selected) || null;
   const reassign = Boolean(assignedPersonName);
+
+  const doAccept = async () => {
+    if (busy) return;
+    setBusy("accept");
+    setError(null);
+    try {
+      const res = await authedFetch(`/api/delivery/company/jobs/${encodeURIComponent(jobId)}/accept`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Could not accept this handoff.");
+      setConfirming(null);
+      onDone(); // re-fetch authoritative state; do not assume success locally
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not accept this handoff.");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const doAssign = async () => {
     if (!selected || busy) return;
@@ -95,83 +127,126 @@ export default function JobActions({
 
   return (
     <div className="space-y-4">
-      {/* Assign / reassign */}
-      <div>
-        <label htmlFor={`assign-${jobId}`} className="block text-xs font-medium text-gray-600">
-          {reassign ? "Reassign delivery person" : "Assign delivery person"}
-        </label>
-        {personsLoading ? (
-          <p className="mt-1 text-sm text-gray-500">Loading your delivery people…</p>
-        ) : personsError ? (
-          <div className="mt-1 text-sm text-red-700">
-            {personsError}{" "}
-            <button onClick={onReloadPersons} className="underline">Retry</button>
-          </div>
-        ) : (
-          <>
-            <select
-              id={`assign-${jobId}`}
-              className="mt-1 w-full rounded border px-2 py-2 text-sm disabled:opacity-50"
-              value={selected}
-              disabled={busy !== null}
-              onChange={(e) => { setSelected(e.target.value); setConfirming(null); setError(null); }}
-            >
-              <option value="">
-                {assignable.length ? "Select an on-shift person…" : "No on-shift people"}
-              </option>
-              {(persons ?? []).map((p) => {
-                const ok = isAssignablePerson(p);
-                const acct = p.accountStatus || "Active";
-                const avail = p.availability || "Offline";
-                return (
-                  <option key={p.id} value={p.id} disabled={!ok}>
-                    {p.name || p.id}
-                    {!ok ? ` — ${acct !== "Active" ? acct : avail}` : avail === "Busy" ? " — busy (has active jobs)" : ""}
-                  </option>
-                );
-              })}
-            </select>
-            <p className="mt-1 text-[11px] text-gray-400">
-              Only your company&apos;s active, available people can be assigned. Assigning does not pick up the
-              parcel — the stage stays “Awaiting pickup” until the person scans PICKUP in the Delivery App.
-            </p>
-
-            {confirming === "assign" && selectedPerson ? (
-              <div className="mt-2 rounded border border-indigo-200 bg-indigo-50 p-3">
-                <p className="text-sm text-indigo-900">
-                  Assign this shipment to <span className="font-semibold">{selectedPerson.name || selectedPerson.id}</span>?
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={doAssign}
-                    disabled={busy !== null}
-                    className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                  >
-                    {busy === "assign" ? "Assigning…" : "Confirm assign"}
-                  </button>
-                  <button
-                    onClick={() => setConfirming(null)}
-                    disabled={busy !== null}
-                    className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
+      {/* Accept (Phase 2A) — shown only for an outstanding offer, before assignment */}
+      {isOffered ? (
+        <div>
+          <p className="text-xs text-gray-600">
+            Accept this handoff to take on the shipment. Accepting is not custody and does not assign a person —
+            you choose one of your delivery people after accepting.
+          </p>
+          {confirming === "accept" ? (
+            <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-sm text-emerald-900">Accept this handoff for your company?</p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={doAccept}
+                  disabled={busy !== null}
+                  className="rounded bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {busy === "accept" ? "Accepting…" : "Confirm accept"}
+                </button>
+                <button
+                  onClick={() => setConfirming(null)}
+                  disabled={busy !== null}
+                  className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+                >
+                  Cancel
+                </button>
               </div>
-            ) : (
-              <button
-                onClick={() => { if (selected) setConfirming("assign"); }}
-                disabled={!selected || busy !== null}
-                className="mt-2 rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-              >
-                {reassign ? "Reassign" : "Assign"}
-              </button>
-            )}
-          </>
-        )}
-      </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setConfirming("accept"); setError(null); }}
+              disabled={busy !== null}
+              className="mt-2 rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Accept handoff
+            </button>
+          )}
+        </div>
+      ) : null}
 
-      {/* Reject handoff */}
+      {/* Assign / reassign — only after the offer is accepted */}
+      {canAssign ? (
+        <div>
+          <label htmlFor={`assign-${jobId}`} className="block text-xs font-medium text-gray-600">
+            {reassign ? "Reassign delivery person" : "Assign delivery person"}
+          </label>
+          {personsLoading ? (
+            <p className="mt-1 text-sm text-gray-500">Loading your delivery people…</p>
+          ) : personsError ? (
+            <div className="mt-1 text-sm text-red-700">
+              {personsError}{" "}
+              <button onClick={onReloadPersons} className="underline">Retry</button>
+            </div>
+          ) : (
+            <>
+              <select
+                id={`assign-${jobId}`}
+                className="mt-1 w-full rounded border px-2 py-2 text-sm disabled:opacity-50"
+                value={selected}
+                disabled={busy !== null}
+                onChange={(e) => { setSelected(e.target.value); setConfirming(null); setError(null); }}
+              >
+                <option value="">
+                  {assignable.length ? "Select an on-shift person…" : "No on-shift people"}
+                </option>
+                {(persons ?? []).map((p) => {
+                  const ok = isAssignablePerson(p);
+                  const acct = p.accountStatus || "Active";
+                  const avail = p.availability || "Offline";
+                  return (
+                    <option key={p.id} value={p.id} disabled={!ok}>
+                      {p.name || p.id}
+                      {!ok ? ` — ${acct !== "Active" ? acct : avail}` : avail === "Busy" ? " — busy (has active jobs)" : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              <p className="mt-1 text-[11px] text-gray-400">
+                Only your company&apos;s active, available people can be assigned. Assigning does not pick up the
+                parcel — the stage stays “Awaiting pickup” until the person scans PICKUP in the Delivery App.
+              </p>
+
+              {confirming === "assign" && selectedPerson ? (
+                <div className="mt-2 rounded border border-indigo-200 bg-indigo-50 p-3">
+                  <p className="text-sm text-indigo-900">
+                    Assign this shipment to <span className="font-semibold">{selectedPerson.name || selectedPerson.id}</span>?
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={doAssign}
+                      disabled={busy !== null}
+                      className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      {busy === "assign" ? "Assigning…" : "Confirm assign"}
+                    </button>
+                    <button
+                      onClick={() => setConfirming(null)}
+                      disabled={busy !== null}
+                      className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { if (selected) setConfirming("assign"); }}
+                  disabled={!selected || busy !== null}
+                  className="mt-2 rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {reassign ? "Reassign" : "Assign"}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {/* Reject offer — ONLY while the handoff is an outstanding offer; there is
+          no reject/cancel after acceptance or assignment. */}
+      {isOffered ? (
       <div className="border-t pt-3">
         {confirming === "reject" ? (
           <div className="rounded border border-red-200 bg-red-50 p-3">
@@ -213,6 +288,7 @@ export default function JobActions({
           </button>
         )}
       </div>
+      ) : null}
 
       {error ? <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
     </div>

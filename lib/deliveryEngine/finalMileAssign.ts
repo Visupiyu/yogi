@@ -25,8 +25,8 @@
 // throughout; OutForDelivery/DELIVER are later, unaffected slices.
 //
 // WHY A NEW OPERATION (not assignCompanyPerson): the existing company-assign
-// primitive is gated to PRE-EXECUTION statuses (OfferedToCompany / AssignedTo
-// Company) and operates on the job's initial/current leg; it refuses an
+// primitive is gated to a company's post-acceptance statuses (AcceptedByCompany
+// / AssignedToCompany) and operates on the job's initial/current leg; it refuses an
 // InProgress job and would overwrite the original assignment semantics. So this
 // creates the smallest dedicated operation, REUSING the existing eligibility
 // validators (assertCompanyPerson + assertPersonAssignable + assertRiderPerson)

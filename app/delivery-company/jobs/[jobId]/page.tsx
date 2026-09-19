@@ -287,11 +287,15 @@ export default function DeliveryCompanyJobDetailPage() {
             <Card title={job.status === "OfferedToCompany" ? "Respond to this handoff" : "Manage assignment"}>
               {job.status === "OfferedToCompany" ? (
                 <p className="mb-3 rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  This shipment is awaiting your action. Assign one of your delivery people, or reject the handoff.
+                  This shipment is awaiting your response. Accept the handoff to take it on, or reject it.
+                </p>
+              ) : job.status === "AcceptedByCompany" ? (
+                <p className="mb-3 rounded bg-sky-50 px-3 py-2 text-sm text-sky-800">
+                  You&apos;ve accepted this handoff. Assign one of your delivery people to carry it out.
                 </p>
               ) : (
                 <p className="mb-3 text-xs text-gray-500">
-                  You can reassign or reject until the parcel is picked up. After pickup, changes are handled in the field.
+                  You can reassign until the parcel is picked up. After pickup, changes are handled in the field.
                 </p>
               )}
               <JobActions

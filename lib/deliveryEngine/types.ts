@@ -149,13 +149,18 @@ export type DeliveryPersonInput = {
 // Full status set declared for forward-compat.
 //   2B-1/2B-2 SET only "Created". 2B-3 (provider assignment) additionally SETS
 //   "AssignedToYomico" (Admin assigned a YOMICO person), "OfferedToCompany"
-//   (Admin handed off; awaiting the company's own person), "AssignedToCompany"
-//   (the company assigned its own person) and "RejectedByCompany" (company
-//   declined a handoff). "InProgress" is reserved for the LATER physical
-//   execution phase and is NOT set by assignment — assignment is not custody.
+//   (Admin handed off; awaiting the company's response) and "RejectedByCompany"
+//   (company declined a handoff). Phase 2A adds an explicit two-step company
+//   handoff response: "AcceptedByCompany" (the company accepted the offer but has
+//   not yet assigned one of its own people) then "AssignedToCompany" (the company
+//   assigned its own person). Acceptance is required before assignment —
+//   OfferedToCompany can no longer go straight to AssignedToCompany. "InProgress"
+//   is reserved for the LATER physical execution phase and is NOT set by
+//   assignment — neither acceptance nor assignment is custody.
 export type DeliveryJobStatus =
   | "Created"
   | "OfferedToCompany"
+  | "AcceptedByCompany"
   | "AssignedToYomico"
   | "AssignedToCompany"
   | "InProgress"

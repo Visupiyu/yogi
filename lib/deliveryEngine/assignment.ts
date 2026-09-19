@@ -56,6 +56,7 @@ export class AssignmentError extends Error {
 const PRE_EXECUTION_STATUSES: ReadonlySet<string> = new Set([
   "Created",
   "OfferedToCompany",
+  "AcceptedByCompany",
   "AssignedToYomico",
   "AssignedToCompany",
   "RejectedByCompany",
@@ -493,6 +494,73 @@ export async function handoffToCompany(
 }
 
 // ===========================================================================
+// 2a) Company -> ACCEPT a handoff (Phase 2A)
+// Explicit acceptance step: the company acknowledges the offer BEFORE assigning
+// one of its own people. No leg / person / custody / stage change — this only
+// advances the job OfferedToCompany -> AcceptedByCompany so assignment can
+// follow. Rejection stays available from OfferedToCompany OR AcceptedByCompany
+// via rejectCompanyHandoff. Idempotent: re-accepting an accepted job is a no-op.
+// ===========================================================================
+export async function acceptCompanyHandoff(
+  tx: Transaction,
+  db: Firestore,
+  args: { jobId: string; companyId: string; actorUid: string }
+): Promise<{ changed: boolean; jobId: string }> {
+  // ---- READS ----
+  const { ref: jobRef, job } = await readJob(tx, db, args.jobId);
+  if (!job.currentLegId) throw new AssignmentError("Job has no current leg.", 409);
+
+  // Ownership: the job must belong to THIS company.
+  if (job.providerType !== "COMPANY" || job.companyId !== args.companyId) {
+    throw new AssignmentError("This job is not assigned to your company.", 403);
+  }
+
+  // Idempotent: already accepted (and not yet assigned) is a no-op success.
+  if (job.status === "AcceptedByCompany") {
+    return { changed: false, jobId: args.jobId };
+  }
+
+  // Only an outstanding offer may be accepted. Anything else (already assigned,
+  // in progress, rejected, terminal, …) is refused — acceptance is the FIRST
+  // company response to a fresh handoff.
+  if (job.status !== "OfferedToCompany") {
+    throw new AssignmentError(`Job status "${job.status}" cannot be accepted.`, 409);
+  }
+
+  // ---- WRITES ----
+  // Acceptance is not custody and not assignment: no leg, person, responsibleParty
+  // or stage change. Only the job status advances, with an append-only event.
+  const now = Timestamp.now();
+  const eventId = writeAssignmentEvent(tx, db, {
+    job,
+    jobId: args.jobId,
+    legId: job.currentLegId,
+    actorUid: args.actorUid,
+    role: "company",
+    providerType: "COMPANY",
+    companyId: args.companyId,
+    personId: null,
+    action: "AcceptedByCompany",
+    fromStatus: job.status,
+    toStatus: "AcceptedByCompany",
+    now,
+  });
+
+  tx.set(
+    jobRef,
+    {
+      status: "AcceptedByCompany",
+      lastEventId: eventId,
+      lastEventAt: now,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  return { changed: true, jobId: args.jobId };
+}
+
+// ===========================================================================
 // 3) Company -> its OWN person
 // ===========================================================================
 export async function assignCompanyPerson(
@@ -508,8 +576,16 @@ export async function assignCompanyPerson(
   if (job.providerType !== "COMPANY" || job.companyId !== args.companyId) {
     throw new AssignmentError("This job is not assigned to your company.", 403);
   }
-  if (job.status !== "OfferedToCompany" && job.status !== "AssignedToCompany") {
-    throw new AssignmentError(`Job status "${job.status}" cannot be assigned by the company.`, 409);
+  // Phase 2A: the company must ACCEPT the offer before it can assign one of its
+  // own people, so OfferedToCompany no longer jumps straight to AssignedToCompany.
+  // AssignedToCompany stays allowed so an already-assigned job can be reassigned.
+  if (job.status !== "AcceptedByCompany" && job.status !== "AssignedToCompany") {
+    throw new AssignmentError(
+      job.status === "OfferedToCompany"
+        ? "Accept this handoff before assigning a delivery person."
+        : `Job status "${job.status}" cannot be assigned by the company.`,
+      409
+    );
   }
 
   // Idempotent: already assigned to exactly this person.
@@ -626,7 +702,10 @@ export async function rejectCompanyHandoff(
   if (job.providerType !== "COMPANY" || job.companyId !== args.companyId) {
     throw new AssignmentError("This job is not assigned to your company.", 403);
   }
-  if (job.status !== "OfferedToCompany" && job.status !== "AssignedToCompany") {
+  // Approved state machine: a company may decline only an OUTSTANDING OFFER.
+  // Once it has accepted (AcceptedByCompany) or assigned (AssignedToCompany) the
+  // job it can no longer reject — there is no reject/cancel after acceptance.
+  if (job.status !== "OfferedToCompany") {
     throw new AssignmentError(`Job status "${job.status}" cannot be rejected.`, 409);
   }
 

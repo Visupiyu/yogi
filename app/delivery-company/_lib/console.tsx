@@ -115,7 +115,7 @@ export type CompanyPerson = {
 
 // Company-visible job statuses grouped for the operator. RejectedByCompany strips
 // the companyId server-side, so a rejected job leaves the company's list entirely.
-export const AWAITING_STATUSES: ReadonlySet<string> = new Set(["OfferedToCompany"]);
+export const AWAITING_STATUSES: ReadonlySet<string> = new Set(["OfferedToCompany", "AcceptedByCompany"]);
 export const ACTIVE_STATUSES: ReadonlySet<string> = new Set(["AssignedToCompany", "InProgress"]);
 export const COMPLETED_STATUSES: ReadonlySet<string> = new Set([
   "Delivered", "DeliveryFailed", "Returned", "Cancelled",
@@ -124,12 +124,13 @@ export const COMPLETED_STATUSES: ReadonlySet<string> = new Set([
 // Statuses at which the existing assign/reject APIs still accept an operation
 // (mirrors the backend pre-execution gate — the server re-validates and wins).
 export const COMPANY_ACTIONABLE_STATUSES: ReadonlySet<string> = new Set([
-  "OfferedToCompany", "AssignedToCompany",
+  "OfferedToCompany", "AcceptedByCompany", "AssignedToCompany",
 ]);
 
 export function statusMeta(status: string): { label: string; tone: string } {
   switch (status) {
     case "OfferedToCompany": return { label: "Awaiting your action", tone: "bg-amber-100 text-amber-800" };
+    case "AcceptedByCompany": return { label: "Accepted — assign a person", tone: "bg-sky-100 text-sky-800" };
     case "AssignedToCompany": return { label: "Assigned", tone: "bg-indigo-100 text-indigo-800" };
     case "InProgress": return { label: "In progress", tone: "bg-blue-100 text-blue-800" };
     case "Delivered": return { label: "Delivered", tone: "bg-green-100 text-green-800" };
