@@ -5,6 +5,10 @@ import {
   recordUnmatchedPayment,
   type PaymentIntent,
 } from "@/lib/onlineOrder";
+import {
+  finalizeMobileOnlineOrder,
+  type MobilePaymentIntent,
+} from "@/lib/mobileOnlineOrder";
 
 // ---------------------------------------------------------------------------
 // Razorpay webhook — server-to-server reconciliation.
@@ -16,10 +20,13 @@ import {
 // lived in the Razorpay dashboard.
 //
 // Razorpay calls this directly, so it does not depend on the customer's
-// device surviving. It finalises through exactly the same
-// lib/onlineOrder.ts#finalizeOnlineOrder as the browser path, keyed on the
-// same deterministic order id (the Razorpay payment id), so whichever arrives
-// first creates the order and the other becomes a no-op.
+// device surviving. It finalises through exactly the same finalizer the
+// corresponding callback path uses — lib/onlineOrder.ts#finalizeOnlineOrder
+// for a web-created intent, lib/mobileOnlineOrder.ts#finalizeMobileOnlineOrder
+// for a mobile-created one (see the `platform` branch below) — keyed on the
+// same deterministic order id (the Razorpay payment id) either way, so
+// whichever caller arrives first creates the order and the other becomes a
+// no-op.
 //
 // ---------------------------------------------------------------------------
 // CONFIGURATION REQUIRED BEFORE THIS DOES ANYTHING
@@ -106,7 +113,16 @@ export async function POST(request: Request) {
       return Response.json({ received: true, unmatched: true });
     }
 
-    const intent = intentSnap.data() as PaymentIntent;
+    // Untyped here on purpose: this doc can be either a web intent
+    // (lib/onlineOrder.ts#PaymentIntent, app/api/create-order) or a mobile
+    // intent (lib/mobileOnlineOrder.ts#MobilePaymentIntent,
+    // app/api/mobile/create-payment-order) — the two are distinguished below
+    // by the `platform` field, which only the mobile shape carries. Every
+    // existing web intent simply lacks that field, so its path through this
+    // route is completely unchanged.
+    const rawIntent = intentSnap.data() as Record<string, unknown>;
+    const isMobileIntent = rawIntent.platform === "mobile";
+    const intent = rawIntent as unknown as PaymentIntent;
 
     // The expected amount was stamped into the intent server-side at
     // create-order time. The webhook never sees the checkout HMAC, so this is
@@ -139,13 +155,21 @@ export async function POST(request: Request) {
       return Response.json({ received: true, mismatch: true });
     }
 
-    const result = await finalizeOnlineOrder({
-      razorpayPaymentId: paymentId,
-      razorpayOrderId: orderId,
-      intent,
-      capturedAmountPaise: amountPaise,
-      source: "webhook",
-    });
+    const result = isMobileIntent
+      ? await finalizeMobileOnlineOrder({
+          razorpayPaymentId: paymentId,
+          razorpayOrderId: orderId,
+          intent: rawIntent as unknown as MobilePaymentIntent,
+          capturedAmountPaise: amountPaise,
+          source: "webhook",
+        })
+      : await finalizeOnlineOrder({
+          razorpayPaymentId: paymentId,
+          razorpayOrderId: orderId,
+          intent,
+          capturedAmountPaise: amountPaise,
+          source: "webhook",
+        });
 
     if (result.kind === "error") {
       console.error("razorpay/webhook: finalisation failed:", result.error);
