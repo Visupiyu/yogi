@@ -2,7 +2,13 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { mintNumbers } from "@/lib/humanIds";
 import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
-import { hasStockBearingVariants } from "@/lib/products/inventory";
+import {
+  hasStockBearingVariants,
+  planVariantDecrements,
+  sumVariantStock,
+  type VariantStockEntry,
+} from "@/lib/products/inventory";
+import { findVariantById, variantAttributes } from "@/lib/products/variantSelection";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -34,9 +40,10 @@ import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestor
 //     minOrderValue} (services/couponService.ts's schema); place-order reads
 //     a flat 0-100 percentage off `coupon.discount` and has no maxDiscount/
 //     minOrderValue concept
-//   - variants here are an arbitrary {label: value} map
-//     (selectedVariants, matching product.variants' {label, options[]}
-//     shape); place-order only knows two fixed optional fields, size/color
+//   - variants here are `variantId` (the seller's real Strategy-1 variant
+//     id, product.variants[].id) plus a `selectedVariants` {dimension: value}
+//     display map resolved server-side from that id; place-order only knows
+//     two fixed optional fields, size/color
 // Rebuilding the mobile order shape on top of place-order's pricing would
 // have silently dropped deliverySlot/gstAmount and broken every screen that
 // reads `total` (OrdersScreen, OrderDetailsScreen, Buy Again, cancellation's
@@ -281,6 +288,15 @@ export async function POST(request: Request) {
       // independently, or two lines can each pass a check that their sum
       // does not. Mirrors CheckoutScreen.tsx's placeOrder() exactly.
       const qtyByProduct = new Map<string, number>();
+      // Per-(product, variant) demand — Strategy 1, same shape the web COD
+      // path (app/api/place-order) and the Razorpay finalizer
+      // (lib/onlineOrder.ts) already use. A product is only decremented via
+      // the variant path when EVERY line for it carries a variantId;
+      // otherwise the product-level path below is kept, exactly mirroring
+      // lib/orderPricing.ts's computeOrderPricing().
+      const variantDemandByProduct = new Map<string, Map<string, number>>();
+      const productHasNonVariantLine = new Set<string>();
+
       for (const cartDoc of cartDocs) {
         const data = cartDoc.data();
         const productId = typeof data.productId === "string" ? data.productId : "";
@@ -291,6 +307,18 @@ export async function POST(request: Request) {
         }
 
         qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + qty);
+
+        const variantId = typeof data.variantId === "string" ? data.variantId : "";
+        if (variantId) {
+          let m = variantDemandByProduct.get(productId);
+          if (!m) {
+            m = new Map();
+            variantDemandByProduct.set(productId, m);
+          }
+          m.set(variantId, (m.get(variantId) || 0) + qty);
+        } else {
+          productHasNonVariantLine.add(productId);
+        }
       }
 
       const productIds = [...qtyByProduct.keys()];
@@ -298,6 +326,17 @@ export async function POST(request: Request) {
       const productSnaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
 
       const liveProducts = new Map<string, ReturnType<typeof normalizeProduct>>();
+      // Precomputed per-product variant decrement plan, carried from this
+      // validation pass into the WRITES section below — planVariantDecrements
+      // is pure, so running it twice would just waste work, not diverge, but
+      // there is no reason to.
+      const variantPlanByProduct = new Map<string, ReturnType<typeof planVariantDecrements>>();
+      // The seller's raw variants[] for products on the variant path, kept so
+      // the items map below can resolve each line's SERVER-verified
+      // attributes rather than trusting the cart doc's own selectedVariants
+      // (client-written, display-only) for what gets permanently stored on
+      // the order.
+      const variantsByProduct = new Map<string, VariantStockEntry[]>();
 
       for (let i = 0; i < productIds.length; i++) {
         const productId = productIds[i];
@@ -317,23 +356,58 @@ export async function POST(request: Request) {
           return { kind: "error", status: 409, error: `${label} is no longer available.` };
         }
 
+        const rawVariants = (snap.data() as { variants?: unknown })?.variants;
+
         // Inventory + Order Consistency V1 — this product's REAL stock lives
         // per-variant (Strategy 1: see lib/products/inventory.ts's
-        // hasStockBearingVariants), not on product.stock. This route has no
-        // variantId to decrement against (the mobile catalog's own
-        // `selectedVariants` is a display-only {label: value} map, never a
-        // Strategy-1 variant id — see that same file's own comment on this
-        // exact distinction) — decrementing product.stock directly here would
-        // silently desync it from the variant array app/api/place-order (web)
-        // correctly maintains, and a later web variant purchase would
-        // overwrite product.stock back up, resurrecting units already sold
-        // here. Fail safe and loud instead of corrupting shared inventory.
-        if (hasStockBearingVariants((snap.data() as { variants?: unknown })?.variants)) {
-          return {
-            kind: "error",
-            status: 409,
-            error: `${label} has options that must be selected on the YOMICO website — please order it from yomico.in.`,
-          };
+        // hasStockBearingVariants), not on product.stock.
+        if (hasStockBearingVariants(rawVariants)) {
+          // Every cart line for this product must carry the seller's own
+          // variantId (screens/ProductDetailsScreen.tsx now always attaches
+          // one for a variant product) — a line without one is a stale cart
+          // entry added before that fix, or tampered, and must not fall back
+          // to decrementing product.stock, which would desync it from the
+          // variants[] array the web path maintains.
+          if (productHasNonVariantLine.has(productId)) {
+            return {
+              kind: "error",
+              status: 409,
+              error: `Please choose an option (such as size or colour) for ${label} before checking out.`,
+            };
+          }
+
+          const variantDemand = variantDemandByProduct.get(productId)!;
+          const variants = rawVariants as VariantStockEntry[];
+
+          // A demanded variantId absent from the seller's current variants —
+          // stale (deleted/edited since it was added to the cart) or
+          // tampered. Refused rather than silently dropped or resolved to
+          // "whichever variant", same as the web pricing path.
+          for (const variantId of variantDemand.keys()) {
+            if (!findVariantById(variants as unknown as { id?: string }[], variantId)) {
+              return {
+                kind: "error",
+                status: 409,
+                error: `One of the options selected for ${label} is no longer available. Please remove it from your cart and select again.`,
+              };
+            }
+          }
+
+          const plan = planVariantDecrements(variants, variantDemand);
+
+          if (!plan.allSatisfied) {
+            const shortfall = plan.shortfalls[0];
+            return {
+              kind: "error",
+              status: 409,
+              error: `Only ${shortfall?.available ?? 0} left for ${label} in the selected option.`,
+            };
+          }
+
+          variantPlanByProduct.set(productId, plan);
+          variantsByProduct.set(productId, variants);
+          liveProducts.set(productId, product);
+          continue;
         }
 
         const availableStock = Number(product.stock ?? 0);
@@ -355,6 +429,25 @@ export async function POST(request: Request) {
       const items = cartDocs.map((cartDoc) => {
         const data = cartDoc.data();
         const product = liveProducts.get(data.productId as string)!;
+        const variantId = typeof data.variantId === "string" ? data.variantId : "";
+
+        // Server-verified attributes when this line resolved to a real
+        // variant, rather than trusting the cart doc's own selectedVariants
+        // (client-written at add-to-cart time) for what gets permanently
+        // stored on the order. Falls back to the client-supplied map only for
+        // a non-variant product's legacy free-text display, if any.
+        const resolvedVariant = variantId
+          ? findVariantById(
+              (variantsByProduct.get(data.productId as string) || []) as unknown as {
+                id?: string;
+              }[],
+              variantId
+            )
+          : null;
+
+        const selectedVariants = resolvedVariant
+          ? variantAttributes(resolvedVariant as { attributes?: Record<string, string> | null })
+          : data.selectedVariants;
 
         return {
           id: cartDoc.id,
@@ -370,7 +463,8 @@ export async function POST(request: Request) {
           vendorId: product.vendorId,
           vendorName: product.vendorName,
           savedForLater: false,
-          ...(data.selectedVariants ? { selectedVariants: data.selectedVariants } : {}),
+          ...(selectedVariants ? { selectedVariants } : {}),
+          ...(variantId ? { variantId } : {}),
         };
       });
 
@@ -437,7 +531,22 @@ export async function POST(request: Request) {
 
       // ---- WRITES ----
       for (let i = 0; i < productIds.length; i++) {
-        const required = qtyByProduct.get(productIds[i]) || 0;
+        const productId = productIds[i];
+        const plan = variantPlanByProduct.get(productId);
+
+        if (plan) {
+          // Variant-path products: write the decremented variants[] and the
+          // derived product.stock together, so the two ledgers stay
+          // consistent — mirrors lib/onlineOrder.ts's finalizeOnlineOrder.
+          tx.update(productRefs[i], {
+            variants: plan.newVariants,
+            stock: sumVariantStock(plan.newVariants),
+            sales: FieldValue.increment(plan.totalTaken),
+          });
+          continue;
+        }
+
+        const required = qtyByProduct.get(productId) || 0;
         tx.update(productRefs[i], {
           stock: FieldValue.increment(-required),
           sales: FieldValue.increment(required),
