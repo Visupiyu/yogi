@@ -2,6 +2,11 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import { onlineOrderIdFor, type FinalizeResult } from "@/lib/onlineOrder";
+import {
+  planVariantDecrements,
+  sumVariantStock,
+  type VariantStockEntry,
+} from "@/lib/products/inventory";
 
 // SERVER-ONLY.
 //
@@ -27,11 +32,13 @@ import { onlineOrderIdFor, type FinalizeResult } from "@/lib/onlineOrder";
 // create the order. A shortfall is recorded and flagged for review, never
 // used as grounds to reject.
 //
-// Mobile forbids Strategy-1 (stock-bearing) variant products at pricing time
-// (app/api/mobile/place-order, app/api/mobile/create-payment-order both
-// reject them before a customer can pay), so unlike finalizeOnlineOrder there
-// is no variant-decrement path to mirror here — every line decrements
-// product.stock directly, exactly as app/api/mobile/place-order does.
+// Stock-bearing (Strategy 1) variant products are supported on the mobile
+// ONLINE path exactly as on COD: create-payment-order validated the variantId
+// and per-variant stock before charging, and stored the variantId + server-
+// verified attributes on each intent item. This finalizer decrements the
+// SELECTED variant (never product.stock directly) via planVariantDecrements,
+// mirroring lib/onlineOrder.ts#finalizeOnlineOrder. Non-variant lines still
+// decrement product.stock directly.
 
 export type MobilePricedItem = {
   id: string;
@@ -48,6 +55,10 @@ export type MobilePricedItem = {
   vendorName: string;
   savedForLater: false;
   selectedVariants?: Record<string, string>;
+  /** The seller's own id for this exact variant combination (Strategy 1),
+   *  server-verified at create-payment-order time. Present only for a line on
+   *  a stock-bearing variant product; drives per-variant stock decrement here. */
+  variantId?: string;
 };
 
 /**
@@ -138,9 +149,22 @@ export async function finalizeMobileOnlineOrder(params: {
       // product, and each must be checked against the COMBINED demand.
       const qtyByProduct = new Map<string, number>();
       const nameByProduct = new Map<string, string>();
+      // Per-(product, variant) demand — Strategy 1, the SAME shape
+      // lib/onlineOrder.ts#finalizeOnlineOrder uses. Variant-authoritative only
+      // when the product has variants AND every intent line for it carries a
+      // variantId; otherwise the product-level path below is kept.
+      const variantDemandByProduct = new Map<string, Map<string, number>>();
+      const productHasNonVariantLine = new Set<string>();
       for (const item of intent.items) {
         qtyByProduct.set(item.productId, (qtyByProduct.get(item.productId) || 0) + item.quantity);
         if (!nameByProduct.has(item.productId)) nameByProduct.set(item.productId, item.name);
+        if (item.variantId) {
+          let m = variantDemandByProduct.get(item.productId);
+          if (!m) { m = new Map(); variantDemandByProduct.set(item.productId, m); }
+          m.set(item.variantId, (m.get(item.variantId) || 0) + item.quantity);
+        } else {
+          productHasNonVariantLine.add(item.productId);
+        }
       }
 
       const productIds = [...qtyByProduct.keys()];
@@ -148,8 +172,16 @@ export async function finalizeMobileOnlineOrder(params: {
       const productSnaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
 
       // ---- Assess, but never reject: the money is already taken ----
+      // A product-level decrement (non-variant lines). A variant-path product
+      // records its full decremented variants[] plan instead, applied at write
+      // time — identical to lib/onlineOrder.ts#finalizeOnlineOrder.
       const shortfalls: Shortfall[] = [];
       const decrements: { ref: FirebaseFirestore.DocumentReference; qty: number }[] = [];
+      const variantWrites: {
+        ref: FirebaseFirestore.DocumentReference;
+        newVariants: VariantStockEntry[];
+        taken: number;
+      }[] = [];
 
       for (let i = 0; i < productIds.length; i++) {
         const id = productIds[i];
@@ -162,7 +194,27 @@ export async function finalizeMobileOnlineOrder(params: {
           continue;
         }
 
-        const data = snap.data() as { stock?: unknown };
+        const data = snap.data() as { stock?: unknown; variants?: VariantStockEntry[] };
+        const variantDemand = variantDemandByProduct.get(id);
+        const useVariantPath =
+          Array.isArray(data.variants) &&
+          data.variants.length > 0 &&
+          !!variantDemand &&
+          !productHasNonVariantLine.has(id);
+
+        if (useVariantPath) {
+          // Take what each chosen variant has; a shortage is recorded and the
+          // order flagged for review — never rejected, because the payment is
+          // already captured. product.stock is derived from the new variant
+          // totals at write time.
+          const plan = planVariantDecrements(data.variants!, variantDemand!);
+          for (const sf of plan.shortfalls) {
+            shortfalls.push({ id, name: label, wanted: sf.wanted, available: sf.available });
+          }
+          variantWrites.push({ ref: productRefs[i], newVariants: plan.newVariants, taken: plan.totalTaken });
+          continue;
+        }
+
         const available = Number(data.stock ?? 0);
 
         if (available < wanted) {
@@ -192,6 +244,16 @@ export async function finalizeMobileOnlineOrder(params: {
           sales: FieldValue.increment(qty),
         });
       }
+      // Variant-path products: write the decremented variants[] and the derived
+      // product.stock together, so the two ledgers stay consistent — never
+      // decrement product.stock directly for a stock-bearing variant.
+      for (const { ref, newVariants, taken } of variantWrites) {
+        tx.update(ref, {
+          variants: newVariants,
+          stock: sumVariantStock(newVariants),
+          sales: FieldValue.increment(taken),
+        });
+      }
 
       // Inventory + Order Consistency V1 — only present when a shortfall
       // happened, mirroring finalizeOnlineOrder's own stockDeductedQty.
@@ -199,6 +261,9 @@ export async function finalizeMobileOnlineOrder(params: {
       if (shortfalls.length > 0) {
         for (const { ref, qty } of decrements) {
           stockDeductedQty[ref.id] = (stockDeductedQty[ref.id] || 0) + qty;
+        }
+        for (const { ref, taken } of variantWrites) {
+          stockDeductedQty[ref.id] = (stockDeductedQty[ref.id] || 0) + taken;
         }
       }
 

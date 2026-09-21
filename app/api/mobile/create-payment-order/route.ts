@@ -2,7 +2,12 @@ import Razorpay from "razorpay";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
-import { hasStockBearingVariants } from "@/lib/products/inventory";
+import {
+  hasStockBearingVariants,
+  planVariantDecrements,
+  type VariantStockEntry,
+} from "@/lib/products/inventory";
+import { findVariantById, variantAttributes } from "@/lib/products/variantSelection";
 import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import { Timestamp } from "firebase-admin/firestore";
 import type { MobilePaymentIntent, MobilePricedItem } from "@/lib/mobileOnlineOrder";
@@ -173,6 +178,12 @@ export async function POST(request: Request) {
     const cartDocs = cartSnap.docs;
 
     const qtyByProduct = new Map<string, number>();
+    // Per-(product, variant) demand — Strategy 1, the SAME shape and rule
+    // app/api/mobile/place-order uses for COD: a product is validated on the
+    // variant path only when EVERY cart line for it carries a variantId.
+    const variantDemandByProduct = new Map<string, Map<string, number>>();
+    const productHasNonVariantLine = new Set<string>();
+
     for (const cartDoc of cartDocs) {
       const data = cartDoc.data();
       const productId = typeof data.productId === "string" ? data.productId : "";
@@ -183,6 +194,18 @@ export async function POST(request: Request) {
       }
 
       qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + qty);
+
+      const variantId = typeof data.variantId === "string" ? data.variantId : "";
+      if (variantId) {
+        let m = variantDemandByProduct.get(productId);
+        if (!m) {
+          m = new Map();
+          variantDemandByProduct.set(productId, m);
+        }
+        m.set(variantId, (m.get(variantId) || 0) + qty);
+      } else {
+        productHasNonVariantLine.add(productId);
+      }
     }
 
     const productIds = [...qtyByProduct.keys()];
@@ -190,6 +213,10 @@ export async function POST(request: Request) {
     const productSnaps = await Promise.all(productRefs.map((ref) => ref.get()));
 
     const liveProducts = new Map<string, ReturnType<typeof normalizeProduct>>();
+    // Seller's raw variants[] for products on the variant path, kept so the
+    // items map below stores SERVER-verified attributes rather than trusting
+    // the cart's client-written selectedVariants — mirrors place-order.
+    const variantsByProduct = new Map<string, VariantStockEntry[]>();
 
     for (let i = 0; i < productIds.length; i++) {
       const productId = productIds[i];
@@ -209,17 +236,57 @@ export async function POST(request: Request) {
         return Response.json({ error: `${label} is no longer available.` }, { status: 409 });
       }
 
-      // Same Strategy-1 restriction app/api/mobile/place-order enforces — the
-      // mobile catalogue's selectedVariants is display-only, never a real
-      // variant id, so a stock-bearing variant product cannot be safely
-      // decremented from this route either.
-      if (hasStockBearingVariants((snap.data() as { variants?: unknown })?.variants)) {
-        return Response.json(
-          {
-            error: `${label} has options that must be selected on the YOMICO website — please order it from yomico.in.`,
-          },
-          { status: 409 }
-        );
+      const rawVariants = (snap.data() as { variants?: unknown })?.variants;
+
+      // Stock-bearing (Strategy 1) variant product — validate the SAME way
+      // app/api/mobile/place-order does for COD, so ONLINE and COD enforce one
+      // identical variant contract. This route only VALIDATES (and prices);
+      // inventory is decremented later, at finalize-payment time.
+      if (hasStockBearingVariants(rawVariants)) {
+        // Every line for this product must carry the seller's own variantId. A
+        // line without one is a stale cart entry (added before variant support)
+        // or tampered — reject rather than fall back to product.stock.
+        if (productHasNonVariantLine.has(productId)) {
+          return Response.json(
+            {
+              error: `Please choose an option (such as size or colour) for ${label} before checking out.`,
+            },
+            { status: 409 }
+          );
+        }
+
+        const variantDemand = variantDemandByProduct.get(productId)!;
+        const variants = rawVariants as VariantStockEntry[];
+
+        // A demanded variantId absent from the seller's current variants —
+        // stale (deleted/edited since add-to-cart) or tampered. Refuse.
+        for (const variantId of variantDemand.keys()) {
+          if (!findVariantById(variants as unknown as { id?: string }[], variantId)) {
+            return Response.json(
+              {
+                error: `One of the options selected for ${label} is no longer available. Please remove it from your cart and select again.`,
+              },
+              { status: 409 }
+            );
+          }
+        }
+
+        // Per-variant stock check. Unlike place-order the plan is discarded —
+        // nothing is decremented on this route — but the availability rule is
+        // identical, so an out-of-stock variant is refused BEFORE any Razorpay
+        // order is created.
+        const plan = planVariantDecrements(variants, variantDemand);
+        if (!plan.allSatisfied) {
+          const shortfall = plan.shortfalls[0];
+          return Response.json(
+            { error: `Only ${shortfall?.available ?? 0} left for ${label} in the selected option.` },
+            { status: 409 }
+          );
+        }
+
+        variantsByProduct.set(productId, variants);
+        liveProducts.set(productId, product);
+        continue;
       }
 
       const availableStock = Number(product.stock ?? 0);
@@ -234,6 +301,26 @@ export async function POST(request: Request) {
     const items: MobilePricedItem[] = cartDocs.map((cartDoc) => {
       const data = cartDoc.data();
       const product = liveProducts.get(data.productId as string)!;
+      const variantId = typeof data.variantId === "string" ? data.variantId : "";
+
+      // Server-verified attributes when this line resolved to a real variant,
+      // rather than trusting the cart's client-written selectedVariants for
+      // what gets stored on the payment intent (and later the order). Mirrors
+      // app/api/mobile/place-order exactly.
+      const resolvedVariant = variantId
+        ? findVariantById(
+            (variantsByProduct.get(data.productId as string) || []) as unknown as {
+              id?: string;
+            }[],
+            variantId
+          )
+        : null;
+
+      const selectedVariants = resolvedVariant
+        ? variantAttributes(
+            resolvedVariant as { attributes?: Record<string, string> | null }
+          )
+        : data.selectedVariants;
 
       return {
         id: cartDoc.id,
@@ -249,7 +336,8 @@ export async function POST(request: Request) {
         vendorId: product.vendorId,
         vendorName: product.vendorName,
         savedForLater: false,
-        ...(data.selectedVariants ? { selectedVariants: data.selectedVariants } : {}),
+        ...(selectedVariants ? { selectedVariants } : {}),
+        ...(variantId ? { variantId } : {}),
       };
     });
 
