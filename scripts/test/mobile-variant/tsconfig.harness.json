@@ -1,0 +1,12 @@
+{
+  "//": "LOCAL TEST ONLY. Extends the app tsconfig but aliases the `razorpay`",
+  "//2": "package to a controllable fake so the harness never calls the real API.",
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../..",
+    "paths": {
+      "@/*": ["./*"],
+      "razorpay": ["./scripts/test/mobile-variant/razorpay-fake.mjs"]
+    }
+  }
+}
