@@ -109,6 +109,34 @@ export function optionsForDimension(
   return values;
 }
 
+/**
+ * Whether a dimension value has at least one IN-STOCK variant compatible with
+ * the current selection. Combination-aware exactly like optionsForDimension,
+ * plus a per-variant stock check: the option stays a valid CHOICE but is
+ * unavailable to BUY, so the UI can disable (never hide) sold-out options.
+ * Deliberately does NOT use the product's total stock.
+ */
+export function isOptionInStock(
+  variants: SelectableVariant[] | null | undefined,
+  dimension: string,
+  value: string,
+  selection: VariantSelection = {}
+): boolean {
+  if (!Array.isArray(variants)) return false;
+
+  return variants.some((variant) => {
+    const attrs = attributesOf(variant);
+    if (attrs[dimension] !== value) return false;
+
+    const compatible = Object.entries(selection).every(
+      ([key, chosen]) => key === dimension || !chosen || attrs[key] === chosen
+    );
+    if (!compatible) return false;
+
+    return Number(variant.stock) > 0;
+  });
+}
+
 /** Whether every dimension this product varies on has been chosen. */
 export function isSelectionComplete(
   variants: SelectableVariant[] | null | undefined,

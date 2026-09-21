@@ -13,6 +13,7 @@ import { addToCart as addToCartHelper } from "@/lib/cart";
 import {
   variantDimensions,
   optionsForDimension,
+  isOptionInStock,
   isSelectionComplete,
   resolveVariant,
   variantAttributes,
@@ -405,6 +406,15 @@ questionSnap.forEach((d) => {
     // an ambiguous variant — refuse rather than guess which one they meant.
     if (!selectedVariant) {
       alert("That combination isn't available. Please choose another.");
+      return false;
+    }
+
+    // The chosen variant may have sold out since the page loaded (another order
+    // took the last unit). product.stock is the TOTAL across variants and can
+    // still be > 0, so it is not the right gate — check this variant's own
+    // stock. The server re-checks and stays the final authority.
+    if (!(Number(selectedVariant.stock) > 0)) {
+      alert("This option is out of stock. Please choose another.");
       return false;
     }
   } else {
@@ -1247,20 +1257,28 @@ Easy Returns
                           </div>
 
                           <div className="flex gap-2 flex-wrap">
-                            {options.map((option) => (
+                            {options.map((option) => {
+                              // Combination-aware AND stock-aware: an option
+                              // with no in-stock compatible variant stays
+                              // VISIBLE but disabled (never hidden/removed).
+                              const available = isOptionInStock(variantList, dimension, option, selection);
+                              const isActive = selection[dimension] === option;
+                              return (
                               <button
                                 key={dimension + "-" + option}
                                 type="button"
-                                onClick={() => chooseDimension(dimension, option)}
+                                disabled={!available}
+                                onClick={() => { if (available) chooseDimension(dimension, option); }}
                                 className={`min-w-12 px-4 py-2 border rounded-2xl font-medium transition ${
-                                  selection[dimension] === option
+                                  isActive
                                     ? "bg-green-600 text-white border-green-600"
                                     : "bg-white border-gray-300 hover:border-green-500"
-                                }`}
+                                }${!available ? " opacity-40 line-through cursor-not-allowed hover:border-gray-300" : ""}`}
                               >
                                 {option}
                               </button>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
