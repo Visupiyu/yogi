@@ -1,4 +1,5 @@
 import Razorpay from "razorpay";
+import { assertRazorpayTestKeyInPreview } from "@/lib/razorpayEnv";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
@@ -391,6 +392,10 @@ export async function POST(request: Request) {
     // itself rejects) — app/api/mobile/place-order has no such guard because
     // Pay on Delivery never touches Razorpay.
     const finalTotal = Math.max(1, Math.round(subtotal + shipping + gstAmount - discountAmount));
+
+    // Preview must never touch the LIVE Razorpay account — fail closed before
+    // creating the order if a Preview deployment was given a non-test key.
+    assertRazorpayTestKeyInPreview();
 
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID!,

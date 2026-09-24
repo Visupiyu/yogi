@@ -13,32 +13,15 @@ import {
   getStorage
 } from "firebase/storage";
 
+import { selectFirebaseConfig } from "@/lib/firebaseConfig";
 
 
-export const firebaseConfig = {
 
-  apiKey:
-    "AIzaSyC_RpmkFRJfWkcg6apFXufz5dz8NvT2P4Q",
-
-  authDomain:
-    "yogi-mart.firebaseapp.com",
-
-  projectId:
-    "yogi-mart",
-
-  storageBucket:
-  "yogi-mart.firebasestorage.app",
-
-  messagingSenderId:
-    "507607355701",
-
-  appId:
-    "1:507607355701:web:555f8fd6710804af533c7c",
-
-  measurementId:
-    "G-6KZGLS4651"
-
-};
+// Production and local development use the original hard-coded production
+// project unchanged; a Vercel Preview (NEXT_PUBLIC_VERCEL_ENV === "preview")
+// supplies its own project via NEXT_PUBLIC_FIREBASE_* and fails closed if any
+// are missing — see lib/firebaseConfig.ts.
+export const firebaseConfig = selectFirebaseConfig();
 
 const app = initializeApp(firebaseConfig);
 

@@ -64,10 +64,31 @@ export function getAdminApp(): App {
   const existing = getApps().find((a) => a.name === "yomico-admin");
   if (existing) return existing;
 
-  return initializeApp(
-    { credential: cert(readServiceAccount()) },
-    "yomico-admin"
-  );
+  const serviceAccount = readServiceAccount();
+
+  // Preview fail-safe: a Vercel Preview must run its Admin SDK against the SAME
+  // Firebase project its client config points at — never a production service
+  // account accidentally paired with a Preview (test) client config. VERCEL_ENV
+  // is server-only; production and local development are unaffected. project_id
+  // is a public identifier, not a secret.
+  if (process.env.VERCEL_ENV === "preview") {
+    const adminProjectId = (serviceAccount as { project_id?: unknown }).project_id;
+    const clientProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    if (!clientProjectId) {
+      throw new Error(
+        "Preview misconfigured: NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set, so the Admin service account project cannot be verified."
+      );
+    }
+    if (adminProjectId !== clientProjectId) {
+      throw new Error(
+        `Preview Firebase project mismatch: FIREBASE_SERVICE_ACCOUNT_KEY project_id (${String(
+          adminProjectId
+        )}) does not match NEXT_PUBLIC_FIREBASE_PROJECT_ID (${clientProjectId}). Refusing to pair a service account with a different Firebase project in Preview.`
+      );
+    }
+  }
+
+  return initializeApp({ credential: cert(serviceAccount) }, "yomico-admin");
 }
 
 export function getAdminDb() {
