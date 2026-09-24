@@ -71,19 +71,27 @@ export function getAdminApp(): App {
   // account accidentally paired with a Preview (test) client config. VERCEL_ENV
   // is server-only; production and local development are unaffected. project_id
   // is a public identifier, not a secret.
-  if (process.env.VERCEL_ENV === "preview") {
+  const clientProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  // Fire whenever the client config is env-driven (its own project id is set) or
+  // this is a Vercel Preview — mirrors selectFirebaseConfig's own detection, so
+  // client and admin can never point at different Firebase projects. VERCEL_ENV
+  // is server-only. Production/dev (no project id, not a preview) are unaffected.
+  const isPreviewLike =
+    process.env.VERCEL_ENV === "preview" ||
+    process.env.NEXT_PUBLIC_VERCEL_ENV === "preview" ||
+    !!clientProjectId;
+  if (isPreviewLike) {
     const adminProjectId = (serviceAccount as { project_id?: unknown }).project_id;
-    const clientProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
     if (!clientProjectId) {
       throw new Error(
-        "Preview misconfigured: NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set, so the Admin service account project cannot be verified."
+        "Preview misconfigured: NEXT_PUBLIC_FIREBASE_PROJECT_ID is not set, so the Admin service account project cannot be verified against the client config."
       );
     }
     if (adminProjectId !== clientProjectId) {
       throw new Error(
         `Preview Firebase project mismatch: FIREBASE_SERVICE_ACCOUNT_KEY project_id (${String(
           adminProjectId
-        )}) does not match NEXT_PUBLIC_FIREBASE_PROJECT_ID (${clientProjectId}). Refusing to pair a service account with a different Firebase project in Preview.`
+        )}) does not match NEXT_PUBLIC_FIREBASE_PROJECT_ID (${clientProjectId}). Refusing to pair a service account with a different Firebase project.`
       );
     }
   }

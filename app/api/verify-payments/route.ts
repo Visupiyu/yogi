@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import Razorpay from "razorpay";
+import { assertRazorpayTestKeyInPreview } from "@/lib/razorpayEnv";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 
@@ -103,6 +104,10 @@ export async function POST(
     // The signature only proves order_id/payment_id weren't tampered
     // with in transit — it says nothing about whether the payment was
     // actually captured, or for how much. Ask Razorpay directly.
+    // Preview must never touch the LIVE Razorpay account — fail closed before
+    // any Razorpay client is constructed if a Preview was given a non-test key.
+    assertRazorpayTestKeyInPreview();
+
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID!,
       key_secret: process.env.RAZORPAY_KEY_SECRET!,

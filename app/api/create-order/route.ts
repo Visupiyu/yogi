@@ -1,4 +1,5 @@
 import Razorpay from "razorpay";
+import { assertRazorpayTestKeyInPreview } from "@/lib/razorpayEnv";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 // The one trusted pricing computation, shared with every other server path
@@ -150,6 +151,10 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
         { status: 400 }
       );
     }
+
+    // Preview must never touch the LIVE Razorpay account — fail closed before
+    // any Razorpay client is constructed if a Preview was given a non-test key.
+    assertRazorpayTestKeyInPreview();
 
     const razorpay =
       new Razorpay({

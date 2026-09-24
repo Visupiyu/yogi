@@ -4,10 +4,13 @@
 // SDK, no server imports) so it can be unit-tested directly.
 //
 // PRODUCTION and local development use the hard-coded production project below,
-// exactly as before. Only a Vercel PREVIEW deployment
-// (NEXT_PUBLIC_VERCEL_ENV === "preview") switches to environment-supplied
-// values — and it FAILS CLOSED: if any required Preview variable is missing it
-// throws, so a Preview can never silently fall back to the production Firebase
+// exactly as before. A deployment switches to environment-supplied values when
+// it explicitly provides its own Firebase project id
+// (NEXT_PUBLIC_FIREBASE_PROJECT_ID) or runs as a Vercel Preview
+// (NEXT_PUBLIC_VERCEL_ENV === "preview") — this deliberately does NOT depend on
+// Vercel's "Automatically expose System Environment Variables" setting. In that
+// mode it FAILS CLOSED: if any required variable is missing it throws, so a
+// Preview/test target can never silently fall back to the production Firebase
 // project. No server secret is read here (only NEXT_PUBLIC_* client config,
 // which is public by design).
 
@@ -43,7 +46,8 @@ const REQUIRED_PREVIEW_VARS = [
 
 /**
  * Returns the Firebase Web config for the current environment.
- *   - Vercel Preview (NEXT_PUBLIC_VERCEL_ENV === "preview"): built from the
+ *   - Env-driven (NEXT_PUBLIC_FIREBASE_PROJECT_ID set, OR
+ *     NEXT_PUBLIC_VERCEL_ENV === "preview"): built from the
  *     NEXT_PUBLIC_FIREBASE_* variables; throws if any required one is missing
  *     (fail closed — never falls back to production).
  *   - Everything else (production, development, tests): the unchanged
@@ -52,7 +56,19 @@ const REQUIRED_PREVIEW_VARS = [
 export function selectFirebaseConfig(
   env: Record<string, string | undefined> = process.env
 ): FirebaseWebConfig {
-  if (env.NEXT_PUBLIC_VERCEL_ENV !== "preview") {
+  // Detection is NOT tied to NEXT_PUBLIC_VERCEL_ENV alone, because that variable
+  // exists only when Vercel's "Automatically expose System Environment
+  // Variables" setting is on — an assumption we must not depend on. A deployment
+  // is env-driven when it deliberately carries its own Firebase project id
+  // (NEXT_PUBLIC_FIREBASE_PROJECT_ID) OR is flagged as a Vercel Preview. Setting
+  // a single unrelated NEXT_PUBLIC_FIREBASE_* var (e.g. only an api key) does
+  // NOT trigger this — only the deliberate project id (or the preview flag) — so
+  // local development is never accidentally forced onto this path.
+  const wantsEnvConfig =
+    !!env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    env.NEXT_PUBLIC_VERCEL_ENV === "preview";
+
+  if (!wantsEnvConfig) {
     return PRODUCTION_FIREBASE_CONFIG;
   }
 
