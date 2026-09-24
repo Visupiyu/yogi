@@ -8,7 +8,7 @@ import {
   sumVariantStock,
   type VariantStockEntry,
 } from "@/lib/products/inventory";
-import { findVariantById, variantAttributes } from "@/lib/products/variantSelection";
+import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib/products/variantSelection";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -455,7 +455,9 @@ export async function POST(request: Request) {
           productId: data.productId,
           name: product.name,
           image: product.image,
-          price: product.price,
+          // Per-variant price when the seller set one (> 0), else the product's
+          // base price — the same rule the web path uses (effectiveVariantPrice).
+          price: effectiveVariantPrice(product.price, resolvedVariant),
           mrp: product.mrp,
           discountPercent: product.discountPercent,
           gstPercent: product.gstPercent,

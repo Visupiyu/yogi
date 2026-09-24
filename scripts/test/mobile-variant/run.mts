@@ -76,6 +76,7 @@ const { getAdminDb } = await import("../../../lib/firebaseAdmin.ts");
 const { POST: createPaymentOrder } = await import("../../../app/api/mobile/create-payment-order/route.ts");
 const { POST: finalizePayment } = await import("../../../app/api/mobile/finalize-payment/route.ts");
 const { finalizeMobileOnlineOrder } = await import("../../../lib/mobileOnlineOrder.ts");
+const { POST: placeOrder } = await import("../../../app/api/mobile/place-order/route.ts");
 const { control } = await import("./control.mjs");
 const { Timestamp } = await import("firebase-admin/firestore");
 
@@ -86,6 +87,7 @@ const TEST_UID = "user_test_123";
 const OTHER_UID = "user_other_999";
 const P_NONVAR = "prod_coffee_nonvar";
 const P_VAR = "prod_shirt_var";
+const P_PRICE = "prod_priced";
 
 type Res = { name: string; pass: boolean; detail: string };
 const results: Res[] = [];
@@ -117,6 +119,18 @@ async function seedProducts() {
     name: "Test Shirt", price: 599, mrp: 1599, discountPercent: 63, gstPercent: 0,
     vendorId: "vendor_1", vendorName: "Yogi Traders", stock: 7, active: true, sales: 0,
     variants: freshVariants(),
+  });
+}
+async function seedPricingProduct() {
+  // Base price 100; variants priced 150 (>base), 80 (<base), 0 (fallback).
+  await db.collection("products").doc(P_PRICE).set({
+    name: "Priced Shirt", price: 100, mrp: 200, discountPercent: 0, gstPercent: 0,
+    vendorId: "vendor_1", vendorName: "Yogi Traders", stock: 30, active: true, sales: 0,
+    variants: [
+      { id: "vp_hi", attributes: { Size: "Hi" }, stock: 10, price: 150 },
+      { id: "vp_lo", attributes: { Size: "Lo" }, stock: 10, price: 80 },
+      { id: "vp_zero", attributes: { Size: "Zero" }, stock: 10, price: 0 },
+    ],
   });
 }
 async function addCartLine(fields: Record<string, unknown>) {
@@ -323,6 +337,60 @@ async function main() {
     record("6 webhook/callback race -> one order (deterministic id), loser idempotent, single decrement",
       res.status === 200 && jr?.success === true && wh.kind === "already" && orders.size === 1 && orders.docs[0].id === pay && vM.stock === 4,
       `callbackStatus=${res.status} webhookKind=${wh.kind} orders=${orders.size} orderId=${orders.docs[0]?.id} vM=${vM.stock}`);
+  }
+
+  // ---------- PRICING — per-variant price (ONLINE create-payment-order + COD) ----------
+  async function onlineIntent(variantId: string, qty: number, extra: Record<string, unknown> = {}) {
+    await deleteCollection("cart"); await deleteCollection("paymentIntents"); await seedPricingProduct();
+    await addCartLine({ productId: P_PRICE, name: "Priced Shirt", price: 100, variantId, quantity: qty, ...extra });
+    const r = await callCPO();
+    const doc = (await db.collection("paymentIntents").get()).docs[0]?.data() as any;
+    return { status: r.status, amount: r.json?.amount, item: doc?.items?.[0], subtotal: doc?.subtotal };
+  }
+
+  { // PA — variant price ABOVE base (150 vs 100), qty 2
+    const o = await onlineIntent("vp_hi", 2);
+    record("PA online variant price>base -> item 150, subtotal 300, amount from 300 (+49 ship)",
+      o.status === 200 && o.item?.price === 150 && o.subtotal === 300 && o.amount === (300 + 49) * 100,
+      `status=${o.status} price=${o.item?.price} subtotal=${o.subtotal} amount=${o.amount}`);
+  }
+  { // PB — variant price BELOW base (80 vs 100), qty 2
+    const o = await onlineIntent("vp_lo", 2);
+    record("PB online variant price<base -> item 80, subtotal 160",
+      o.status === 200 && o.item?.price === 80 && o.subtotal === 160,
+      `status=${o.status} price=${o.item?.price} subtotal=${o.subtotal}`);
+  }
+  { // PC — variant price 0 -> fallback to base 100
+    const o = await onlineIntent("vp_zero", 2);
+    record("PC online variant price=0 -> fallback base 100, subtotal 200",
+      o.status === 200 && o.item?.price === 100 && o.subtotal === 200,
+      `status=${o.status} price=${o.item?.price} subtotal=${o.subtotal}`);
+  }
+  { // PD — non-variant product price unchanged
+    await deleteCollection("cart"); await deleteCollection("paymentIntents"); await seedProducts();
+    await addCartLine({ productId: P_NONVAR, name: "Test Coffee", price: 620, quantity: 1 });
+    const r = await callCPO();
+    const item = (await db.collection("paymentIntents").get()).docs[0]?.data()?.items?.[0] as any;
+    record("PD non-variant price unchanged -> 620, no variantId",
+      r.status === 200 && item?.price === 620 && !item?.variantId,
+      `status=${r.status} price=${item?.price} variantId=${item?.variantId ?? "(none)"}`);
+  }
+  { // PE — client-supplied price is ignored
+    const o = await onlineIntent("vp_hi", 1, { price: 999999 });
+    record("PE client-supplied price ignored -> server uses variant 150",
+      o.status === 200 && o.item?.price === 150,
+      `status=${o.status} price=${o.item?.price} (client sent 999999)`);
+  }
+  { // PF — COD uses the SAME variant-price semantics as ONLINE
+    await deleteCollection("cart"); await deleteCollection("orders"); await seedPricingProduct();
+    await addCartLine({ productId: P_PRICE, name: "Priced Shirt", price: 100, variantId: "vp_hi", quantity: 2 });
+    const res = await placeOrder(reqFor("http://x/api/mobile/place-order", { ...CPO_BODY, idempotencyKey: "idem_price_cod_1", deliverySlot: "" }, TEST_UID));
+    await res.json().catch(() => ({}));
+    const orders = await db.collection("orders").get();
+    const codItem = orders.docs[0]?.data()?.items?.[0] as any;
+    record("PF COD variant price == ONLINE (150), exactly one order",
+      res.status === 200 && orders.size === 1 && codItem?.price === 150,
+      `status=${res.status} orders=${orders.size} price=${codItem?.price}`);
   }
 
   await clearAll();

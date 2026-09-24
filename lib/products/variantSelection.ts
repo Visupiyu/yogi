@@ -181,6 +181,27 @@ export function findVariantById<T extends SelectableVariant>(
 }
 
 /**
+ * The authoritative unit price for a line: the resolved variant's OWN price
+ * when it is a finite number > 0, otherwise the product's base price. This is
+ * the single rule the web pricing path (lib/orderPricing.ts) and both mobile
+ * order routes (create-payment-order, place-order) share, so per-variant
+ * pricing is charged identically everywhere. `basePrice` is supplied by the
+ * caller so each platform keeps its own base-price source (web: sellingPrice;
+ * mobile: the normalized product.price) — this only decides variant-vs-base,
+ * and never reads anything the client sent.
+ */
+export function effectiveVariantPrice(
+  basePrice: number,
+  variant: unknown
+): number {
+  const variantPrice =
+    variant && typeof variant === "object"
+      ? Number((variant as { price?: unknown }).price)
+      : NaN;
+  return Number.isFinite(variantPrice) && variantPrice > 0 ? variantPrice : basePrice;
+}
+
+/**
  * The attributes of a variant, cleaned — what gets stored on a cart line and,
  * once the server has re-resolved it, on the order item.
  */

@@ -33,6 +33,7 @@ import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import {
   findVariantById,
   variantAttributes,
+  effectiveVariantPrice,
 } from "@/lib/products/variantSelection";
 import {
   hasStockBearingVariants,
@@ -366,14 +367,11 @@ export async function computeOrderPricing(
       typeof product.sellingPrice === "number"
         ? product.sellingPrice
         : Number(product.price || 0);
-    const variantPrice = resolvedVariant
-      ? Number((resolvedVariant as { price?: unknown }).price)
-      : NaN;
-    const effectiveUnitPrice =
-      Number.isFinite(variantPrice) && variantPrice > 0
-        ? variantPrice
-        : sellingPrice;
-    const price = effectiveUnitPrice;
+    // Single shared rule (lib/products/variantSelection.ts#effectiveVariantPrice):
+    // the resolved variant's own price when > 0, else the base sellingPrice.
+    // Behavior is unchanged — this replaces the identical inline computation so
+    // the web and the mobile order routes cannot drift.
+    const price = effectiveVariantPrice(sellingPrice, resolvedVariant);
 
     subtotal += price * qty;
 
