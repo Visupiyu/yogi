@@ -9,6 +9,7 @@ type OrderItem = {
 type Order = {
   items?: OrderItem[];
   total?: number;
+  itemsSubtotal?: number;
   finalTotal?: number;
   discount?: number;
   rewardValue?: number;
@@ -26,6 +27,52 @@ export type VendorShare = {
   vendorCommission: number;
   vendorEarning: number;
 };
+
+/**
+ * The order's merchandise subtotal — the base a coupon/reward discount is
+ * split across sellers by, and the base forward delivery cost is allocated by.
+ *
+ * Web orders store it as `total` (their pre-shipping subtotal). Mobile orders
+ * use `total` for the GRAND total, so new mobile orders also write an
+ * explicit `itemsSubtotal`, which wins when present. Orders without it —
+ * every web order and every historical mobile order — resolve exactly as
+ * before (`total`), so no stored order's payout changes.
+ */
+export function orderItemsSubtotalBasis(order: {
+  itemsSubtotal?: unknown;
+  total?: unknown;
+}): number {
+  const explicit = order?.itemsSubtotal;
+  if (typeof explicit === "number" && Number.isFinite(explicit) && explicit >= 0) {
+    return explicit;
+  }
+  const legacy = Number(order?.total);
+  return Number.isFinite(legacy) ? legacy : 0;
+}
+
+/**
+ * Read-time normalisation the admin dashboard applies before computing seller
+ * shares: historical orders that stored a line's quantity as `quantity` (not
+ * `qty`) and any non-numeric price become numbers, so one malformed order
+ * cannot poison a dashboard total with NaN. Extracted verbatim from
+ * app/admin/page.tsx so tests can prove the admin view and the seller payout
+ * engine agree for new orders (which carry `qty` natively).
+ */
+export function normalizeOrderForEarnings(
+  order: Record<string, any>
+): Record<string, any> & {
+  items: Array<Record<string, any> & { qty: number; price: number }>;
+} {
+  const items: any[] = Array.isArray(order?.items) ? order.items : [];
+  return {
+    ...order,
+    items: items.map((item: any) => ({
+      ...item,
+      qty: Number(item?.qty ?? item?.quantity ?? 0) || 0,
+      price: Number(item?.price ?? 0) || 0,
+    })),
+  };
+}
 
 // order.commission/sellerEarning/discount are whole-order figures computed
 // once at checkout for the entire (possibly multi-vendor) cart — crediting
@@ -49,7 +96,7 @@ export function computeVendorShare(
     0
   );
 
-  const orderRawSubtotal = order.total || 0;
+  const orderRawSubtotal = orderItemsSubtotalBasis(order);
   const totalDiscount = (order.discount || 0) + (order.rewardValue || 0);
 
   const vendorDiscountShare =

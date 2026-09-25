@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import { onlineOrderIdFor, type FinalizeResult } from "@/lib/onlineOrder";
+import { getAdminCommissionRate } from "@/lib/orderPricing";
 import {
   planVariantDecrements,
   sumVariantStock,
@@ -94,6 +95,9 @@ export type MobilePaymentIntent = {
   deliveryCost: number;
   freeDeliveryApplied: boolean;
   discountAmount: number;
+  /** settings/global commission rate at create-payment-order time. Optional
+   *  only because intents created before this field existed lack it. */
+  commissionRate?: number;
   finalTotal: number;
   expectedAmountPaise: number;
   razorpayOrderId: string;
@@ -131,6 +135,16 @@ export async function finalizeMobileOnlineOrder(params: {
       finalTotal: Number(preexisting.data()?.total || 0),
     };
   }
+
+  // The rate captured with the priced intent; an intent from before that
+  // field existed falls back to the current configured rate (same rule),
+  // never to the legacy 10% the payout engine applies when it is absent.
+  const commissionRate =
+    typeof intent.commissionRate === "number" &&
+    intent.commissionRate >= 0 &&
+    intent.commissionRate <= 1
+      ? intent.commissionRate
+      : await getAdminCommissionRate();
 
   const outcome = await db.runTransaction<FinalizeResult & { shortfalls?: Shortfall[] }>(
     async (tx: Transaction) => {
@@ -277,7 +291,10 @@ export async function finalizeMobileOnlineOrder(params: {
         address: intent.address,
         vendorIds: intent.vendorIds,
         deliverySlot: intent.deliverySlot,
-        items: intent.items,
+        // Each line also carries `qty` (== quantity, already validated as a
+        // whole number at create-payment-order) — the name the seller payout
+        // engine reads. `quantity` stays for the mobile app.
+        items: intent.items.map((item) => ({ ...item, qty: item.quantity })),
         subtotal: intent.subtotal,
         shipping: intent.shipping,
         deliveryCost: intent.deliveryCost,
@@ -305,6 +322,15 @@ export async function finalizeMobileOnlineOrder(params: {
         razorpayPaymentId,
         razorpayOrderId,
         finalizedBy: source,
+
+        // ---- Seller-payout compatibility (same as mobile place-order) ----
+        // Items subtotal as the coupon-split base, the coupon under the
+        // payout engine's `discount` name, and the stamped commission rate.
+        // No paymentAmount: this order is already paid online, there is
+        // nothing to collect on delivery.
+        itemsSubtotal: intent.subtotal,
+        discount: intent.discountAmount,
+        commissionRate,
 
         ...(shortfalls.length > 0 ? { stockShortfall: shortfalls } : {}),
         ...(Object.keys(stockDeductedQty).length > 0 ? { stockDeductedQty } : {}),

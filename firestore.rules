@@ -342,6 +342,19 @@ service cloud.firestore {
           && unchanged('approved')
           && unchanged('featured')
           && unchanged('active')
+          // Price, stock and tax fields are server-validated only: sellers
+          // change them through /api/seller/update-product (and create
+          // through /api/seller/create-product), which validate every value
+          // including each variants[] entry — something rules cannot loop
+          // over. A direct client write may not touch them at all, so no
+          // seller can write a negative/zero price, a fractional stock or an
+          // off-slab GST rate by bypassing the form.
+          && unchanged('sellingPrice')
+          && unchanged('price')
+          && unchanged('variants')
+          && unchanged('stock')
+          && unchanged('gstRate')
+          && unchanged('gstPercent')
           && isValidProduct()
         )
         || isCheckoutStockUpdate()

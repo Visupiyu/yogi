@@ -4,6 +4,7 @@ import { isWithinRateLimit } from "@/lib/rateLimit";
 import { Timestamp } from "firebase-admin/firestore";
 import { mintSequential } from "@/lib/humanIds";
 import { canSellerList, sellerListingBlockReason } from "@/lib/sellerTax";
+import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
 
 // ---------------------------------------------------------------------------
 // Server-authoritative product creation.
@@ -89,6 +90,18 @@ export async function POST(request: Request) {
     void _reviewCount;
     void _views;
     void _wishlistCount;
+
+    // Price / stock / GST fields are validated here, server-side — this route
+    // writes with the Admin SDK, so firestore.rules' product checks never run
+    // on it. Invalid values are refused, never coerced (a negative or zero
+    // price, a fractional stock, a non-slab GST rate, a malformed variant).
+    const moneyCheck = validateSellerProductMoney(productFields);
+    if (!moneyCheck.ok) {
+      return Response.json(
+        { error: moneyCheck.errors.join("\n"), errors: moneyCheck.errors },
+        { status: 400 }
+      );
+    }
 
     const db = getAdminDb();
 

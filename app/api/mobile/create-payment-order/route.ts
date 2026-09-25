@@ -9,6 +9,8 @@ import {
   type VariantStockEntry,
 } from "@/lib/products/inventory";
 import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib/products/variantSelection";
+import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
+import { resolveCommissionRate } from "@/lib/orderPricing";
 import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import { Timestamp } from "firebase-admin/firestore";
 import type { MobilePaymentIntent, MobilePricedItem } from "@/lib/mobileOnlineOrder";
@@ -188,10 +190,16 @@ export async function POST(request: Request) {
     for (const cartDoc of cartDocs) {
       const data = cartDoc.data();
       const productId = typeof data.productId === "string" ? data.productId : "";
-      const qty = Number(data.quantity);
+      const qty = data.quantity;
 
-      if (!productId || !(qty > 0)) {
+      if (!productId) {
         return Response.json({ error: "Invalid item in cart." }, { status: 400 });
+      }
+
+      // Whole units only — refused before any Razorpay order exists
+      // (lib/orderQuantity, the same rule every checkout path applies).
+      if (!isValidOrderQuantity(qty)) {
+        return Response.json({ error: INVALID_QUANTITY_MESSAGE }, { status: 400 });
       }
 
       qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + qty);
@@ -368,6 +376,10 @@ export async function POST(request: Request) {
 
     const shipping = subtotal >= freeShippingThreshold ? 0 : standardShippingCharge;
 
+    // Captured with the priced intent so the finalizer stamps the rate that
+    // was in effect when the customer was charged (see mobile place-order).
+    const commissionRate = resolveCommissionRate(settingsData);
+
     const deliveryCost =
       typeof settingsData?.deliveryCost === "number" ? settingsData.deliveryCost : DEFAULT_DELIVERY_COST;
     const freeDeliveryApplied = subtotal >= freeShippingThreshold;
@@ -443,6 +455,7 @@ export async function POST(request: Request) {
       deliveryCost,
       freeDeliveryApplied,
       discountAmount,
+      commissionRate,
       finalTotal,
       expectedAmountPaise: finalTotal * 100,
       razorpayOrderId: order.id,

@@ -9,6 +9,8 @@ import {
   type VariantStockEntry,
 } from "@/lib/products/inventory";
 import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib/products/variantSelection";
+import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
+import { resolveCommissionRate } from "@/lib/orderPricing";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -300,10 +302,17 @@ export async function POST(request: Request) {
       for (const cartDoc of cartDocs) {
         const data = cartDoc.data();
         const productId = typeof data.productId === "string" ? data.productId : "";
-        const qty = Number(data.quantity);
+        const qty = data.quantity;
 
-        if (!productId || !(qty > 0)) {
+        if (!productId) {
           return { kind: "error", status: 400, error: "Invalid item in cart." };
+        }
+
+        // Whole units only — the same rule the web checkout applies
+        // (lib/orderQuantity). The cart doc is client-writable, so a
+        // fractional/zero/negative quantity is refused, never rounded.
+        if (!isValidOrderQuantity(qty)) {
+          return { kind: "error", status: 400, error: INVALID_QUANTITY_MESSAGE };
         }
 
         qtyByProduct.set(productId, (qtyByProduct.get(productId) || 0) + qty);
@@ -462,6 +471,11 @@ export async function POST(request: Request) {
           discountPercent: product.discountPercent,
           gstPercent: product.gstPercent,
           quantity: Number(data.quantity),
+          // Same whole-number quantity under the web field name. The seller
+          // payout engine (lib/vendorEarnings#computeVendorShare) reads
+          // items[].qty; without it a mobile line counted as 0 units and the
+          // seller was never credited. `quantity` stays for the mobile app.
+          qty: Number(data.quantity),
           vendorId: product.vendorId,
           vendorName: product.vendorName,
           savedForLater: false,
@@ -493,6 +507,12 @@ export async function POST(request: Request) {
           : STANDARD_SHIPPING_CHARGE;
 
       const shipping = subtotal >= freeShippingThreshold ? 0 : standardShippingCharge;
+
+      // The commission rate in effect now, by the exact rule the web pricing
+      // pass uses — stamped on the order so a later settings change never
+      // re-prices it, and so the payout engine does not fall back to the
+      // legacy 10% it applies to orders with no commissionRate.
+      const commissionRate = resolveCommissionRate(settingsData);
 
       // Delivery-cost snapshot (concepts B/C), matching the web paths so a
       // mobile free-delivery order deducts the seller's delivery cost the same
@@ -624,6 +644,27 @@ export async function POST(request: Request) {
         userEmail: requester.email || "",
         rewardPointsStatus: "pending",
         updatedAt: Timestamp.now(),
+
+        // ---- COD amount due ----
+        //
+        // The Pay on Delivery (UPI Only) collection flows — the delivery
+        // engine (lib/deliveryEngine/codPayment.ts) and the web delivery-
+        // partner page — read ONLY paymentAmount as the amount to collect.
+        // Without it a mobile COD order showed ₹0 due and a rider could not
+        // record the real amount. Equal to the server-computed grand total
+        // above; never read from the request.
+        paymentAmount: total,
+
+        // ---- Seller-payout compatibility (web-schema meanings) ----
+        //
+        // lib/vendorEarnings#computeVendorShare splits a coupon across sellers
+        // by value, using the items subtotal as the base and `discount` as the
+        // coupon rupees. Mobile `total` is the GRAND total and the coupon
+        // lives in `discountAmount`, so both are given here under the payout
+        // engine's names, alongside the commission rate stamped above.
+        itemsSubtotal: subtotal,
+        discount: discountAmount,
+        commissionRate,
       });
 
       for (const cartDoc of cartDocs) {

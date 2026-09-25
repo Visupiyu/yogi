@@ -39,6 +39,7 @@ import {
   hasStockBearingVariants,
   planVariantDecrements,
 } from "@/lib/products/inventory";
+import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
 
 // size/color are variant intent, not money — the only client-supplied
 // fields that survive into the order line, and neither affects pricing.
@@ -124,6 +125,25 @@ type GlobalSettings = {
   commissionRate: number;
 };
 
+/**
+ * The commission rate a NEW order is stamped with, from settings/global's
+ * {commissionEnabled, commissionRate}. 0 unless commission is explicitly
+ * enabled with a well-formed 0–1 rate — the zero-commission launch default.
+ * Exported so the mobile order writers stamp the exact same rate the web
+ * pricing pass does (seller payouts read order.commissionRate).
+ */
+export function resolveCommissionRate(
+  data: Record<string, unknown> | null | undefined
+): number {
+  const rawRate = data?.commissionRate;
+  return data?.commissionEnabled === true &&
+    typeof rawRate === "number" &&
+    rawRate >= 0 &&
+    rawRate <= 1
+    ? rawRate
+    : 0;
+}
+
 // settings/global carries both the shipping thresholds and the commission
 // configuration, so it is read once per pricing call rather than once per
 // concern. Every field fails toward the safe default independently: a
@@ -136,14 +156,7 @@ async function readGlobalSettings(): Promise<GlobalSettings> {
     const snap = await getAdminDb().collection("settings").doc("global").get();
     const data = snap.exists ? (snap.data() as Record<string, unknown>) : null;
 
-    const rawRate = data?.commissionRate;
-    const commissionRate =
-      data?.commissionEnabled === true &&
-      typeof rawRate === "number" &&
-      rawRate >= 0 &&
-      rawRate <= 1
-        ? rawRate
-        : 0;
+    const commissionRate = resolveCommissionRate(data);
 
     return {
       freeShippingThreshold:
@@ -221,8 +234,15 @@ export async function computeOrderPricing(
   const productHasNonVariantLine = new Set<string>();
 
   for (const item of items) {
-    if (!item.id || !(Number(item.qty) > 0)) {
+    if (!item.id) {
       return { ok: false, error: "Invalid item in cart", status: 400 };
+    }
+
+    // Whole units only (lib/orderQuantity) — 0, negatives, NaN, Infinity and
+    // fractions are refused, never rounded. This is the one check BOTH web
+    // entry points (place-order COD, create-order ONLINE) pass through.
+    if (!isValidOrderQuantity(item.qty)) {
+      return { ok: false, error: INVALID_QUANTITY_MESSAGE, status: 400 };
     }
 
     qtyByProduct.set(

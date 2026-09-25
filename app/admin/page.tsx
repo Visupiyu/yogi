@@ -20,7 +20,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { db, auth } from "@/lib/firebase";
-import { computeVendorShare } from "@/lib/vendorEarnings";
+import { computeVendorShare, normalizeOrderForEarnings } from "@/lib/vendorEarnings";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -126,14 +126,9 @@ export default function AdminPage() {
       // for every vendor row. Normalising here (read-time, dashboard-only)
       // fixes the arithmetic without rewriting stored documents or
       // changing the shared helpers.
-      const normalizedOrder = {
-        ...order,
-        items: (order.items || []).map((item: any) => ({
-          ...item,
-          qty: Number(item?.qty ?? item?.quantity ?? 0) || 0,
-          price: Number(item?.price ?? 0) || 0,
-        })),
-      };
+      // Now shared from lib/vendorEarnings (identical logic) so the admin
+      // figure provably matches the seller payout engine for new orders.
+      const normalizedOrder: any = normalizeOrderForEarnings(order);
 
       const isCancelled = order.status === "Cancelled";
 

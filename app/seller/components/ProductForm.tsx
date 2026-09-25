@@ -15,9 +15,10 @@ import SpecificationForm from "./SpecificationForm";
 import ProductPreview from "./ProductPreview";
 import {validateProduct} from "@/lib/products/validation";
 import { findDuplicateVariantGroups } from "@/lib/products/variantSelection";
-import { auth, db, storage } from "@/lib/firebase";
+import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
+import { auth, storage } from "@/lib/firebase";
 import { productImagePath } from "@/lib/storagePaths";
-import { doc,updateDoc,serverTimestamp,} from "firebase/firestore";
+import { serverTimestamp } from "firebase/firestore";
 import {ref,uploadBytes,getDownloadURL,} from "firebase/storage";
 import { useRouter } from "next/navigation";
 
@@ -491,6 +492,17 @@ const handleSubmit = async (
     return;
   }
 
+  // Same price/stock/GST rule the server enforces (lib/products/
+  // sellerProductValidation) — checked here too so images are not uploaded
+  // for a product the server will refuse. The server remains the authority.
+  const moneyCheck = validateSellerProductMoney(
+    product as unknown as Record<string, unknown>
+  );
+  if (!moneyCheck.ok) {
+    setError(moneyCheck.errors.join("\n"));
+    return;
+  }
+
   // Two variants with identical values on every dimension cannot be told
   // apart by a customer, and the order would not record which one was
   // bought. Refused rather than merged: merging would silently discard the
@@ -604,20 +616,47 @@ const handleSubmit = async (
       // unchanged('active'/'approved'/'featured') rule with a permission
       // error. Omitting them lets Firestore's partial-update semantics
       // preserve whatever the current stored value actually is.
+      //
+      // Saved through /api/seller/update-product, not updateDoc(): price,
+      // stock, variants and GST fields are validated server-side there, and
+      // firestore.rules now refuses any direct seller write to them.
+      // updatedAt is stamped by the server (a serverTimestamp() sentinel
+      // cannot be sent as JSON).
       const {
         id,
         createdAt,
         active,
         approved,
         featured,
+        updatedAt,
         ...updatePayload
       } = finalProduct as typeof finalProduct & {
         id?: string;
       };
-      await updateDoc(
-        doc(db, "products", existingProduct.id),
-        updatePayload
-      );
+      const editUser = auth.currentUser;
+      if (!editUser) {
+        setError("Please sign in again.");
+        setLoading(false);
+        return;
+      }
+      const editToken = await editUser.getIdToken();
+      const editResponse = await fetch("/api/seller/update-product", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${editToken}`,
+        },
+        body: JSON.stringify({
+          productId: existingProduct.id,
+          product: updatePayload,
+        }),
+      });
+      if (!editResponse.ok) {
+        const data = await editResponse.json().catch(() => ({}));
+        setError(data?.error || "Failed to update product.");
+        setLoading(false);
+        return;
+      }
 
       setSuccess(
         "Product Updated Successfully."

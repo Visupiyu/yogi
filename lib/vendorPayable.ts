@@ -1,4 +1,4 @@
-import { computeVendorShare } from "@/lib/vendorEarnings";
+import { computeVendorShare, orderItemsSubtotalBasis } from "@/lib/vendorEarnings";
 import { sellerForwardDeliveryForOrder } from "@/lib/deliveryRules";
 
 // ---------------------------------------------------------------------------
@@ -244,7 +244,10 @@ export function computeVendorAdjustedEarnings(params: {
     deliveryDeduction += sellerForwardDeliveryForOrder(
       order,
       share.vendorRawSubtotal,
-      toNum(order?.total)
+      // The order's merchandise subtotal — `total` on web and historical
+      // orders (unchanged), the explicit itemsSubtotal on new mobile orders
+      // whose `total` is the grand total.
+      orderItemsSubtotalBasis(order)
     );
 
     const vendorEarning = share.vendorEarning;

@@ -145,7 +145,10 @@ export async function POST(request: Request) {
 
     const items: PricedItemInput[] = rawItems.map((i: any) => ({
       id: typeof i?.id === "string" ? i.id : "",
-      qty: Number(i?.qty),
+      // Passed through as sent — NOT Number()-coerced — so computeOrderPricing's
+      // whole-number check (lib/orderQuantity) sees exactly what the client
+      // sent and refuses "2", 1.5, 0.01, 0 and negatives alike.
+      qty: i?.qty,
       size: typeof i?.size === "string" ? i.size : undefined,
       color: typeof i?.color === "string" ? i.color : undefined,
       // A lookup key only — computeOrderPricing resolves it against the
