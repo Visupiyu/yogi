@@ -1303,9 +1303,13 @@ service cloud.firestore {
       allow read: if isAdmin()
         || (isSignedIn() && redemptionId.split('_')[0] == request.auth.uid)
         || isOwnerUid(resource.data.userId);
-      allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid
-        && isValidString('code', 50);
+      // Server-only. Every legitimate claim is written by the order routes
+      // and finalizers with the Admin SDK (app/api/place-order,
+      // app/api/mobile/place-order, lib/onlineOrder.ts, lib/mobileOnlineOrder.ts),
+      // which bypasses these rules. A client create let any signed-in user
+      // pre-create couponRedemptions/{otherUid}_{CODE} with their own userId
+      // and so block another customer's coupon.
+      allow create: if false;
       allow update: if isAdmin();
       allow delete: if isAdmin() || isCancelledCouponReversal();
     }
