@@ -43,6 +43,7 @@ import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuant
 import { isProductVisible } from "@/lib/products/visibility";
 import { evaluateCoupon, normalizeCouponCode } from "@/lib/coupons/couponRules";
 import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
+import { productBasePrice } from "@/lib/pricing/priceRules";
 
 // size/color are variant intent, not money — the only client-supplied
 // fields that survive into the order line, and neither affects pricing.
@@ -383,20 +384,19 @@ export async function computeOrderPricing(
     // the SERVER from the seller's own Firestore product document, never from
     // anything the client sent:
     //   - a resolved variant with a numeric price > 0  -> that variant's price
-    //   - otherwise (no variant, or variant price 0/absent) -> sellingPrice
+    //   - otherwise (no variant, or variant price 0/absent) -> the base price
     // The `> 0` fallback is deliberate: the Color+Size seller flow stores
     // variant.price = 0 and relies on the main sellingPrice, so a zero must
     // never charge zero. resolvedVariant is already validated above (a stale/
     // unknown variantId was refused), so this only ever reads a real variant.
-    const sellingPrice =
-      typeof product.sellingPrice === "number"
-        ? product.sellingPrice
-        : Number(product.price || 0);
+    // Base price by the shared rule (lib/pricing/priceRules.ts): sellingPrice,
+    // else the legacy price field — the same rule both mobile routes use.
+    const basePrice = productBasePrice(product);
     // Single shared rule (lib/products/variantSelection.ts#effectiveVariantPrice):
-    // the resolved variant's own price when > 0, else the base sellingPrice.
+    // the resolved variant's own price when > 0, else the base price.
     // Behavior is unchanged — this replaces the identical inline computation so
     // the web and the mobile order routes cannot drift.
-    const price = effectiveVariantPrice(sellingPrice, resolvedVariant);
+    const price = effectiveVariantPrice(basePrice, resolvedVariant);
 
     subtotal += price * qty;
 

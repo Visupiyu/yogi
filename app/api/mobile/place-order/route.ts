@@ -14,6 +14,7 @@ import { isProductVisible } from "@/lib/products/visibility";
 import { resolveCommissionRate } from "@/lib/orderPricing";
 import { evaluateCoupon, normalizeCouponCode, couponRedemptionId } from "@/lib/coupons/couponRules";
 import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
+import { productBasePrice, payableTotal } from "@/lib/pricing/priceRules";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -39,8 +40,8 @@ import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestor
 //   - `discountAmount` here, `discount` there
 //   - `deliverySlot` (a delivery time window string) exists only here;
 //     place-order has no such field, only a formatted `deliveryDate`
-//   - `gstAmount` exists only here — place-order's pricing has no GST concept
-//     at all
+//   - `gstAmount` exists only here (always 0: prices are GST-inclusive, see
+//     lib/pricing/priceRules.ts) — place-order's pricing has no GST field
 //   - coupons here are {discountType, discountValue, maxDiscount,
 //     minOrderValue} (services/couponService.ts's schema); place-order reads
 //     a flat 0-100 percentage off `coupon.discount` and has no maxDiscount/
@@ -111,13 +112,14 @@ const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 const FREE_SHIPPING_THRESHOLD = 499;
 const STANDARD_SHIPPING_CHARGE = 49;
 
-// Mirrors services/productService.ts's normalizeProduct() field precedence
-// exactly, so a line built here is indistinguishable from what the mobile
-// client itself would have read for the same product.
+// Mirrors services/productService.ts's normalizeProduct() field precedence,
+// so a line built here matches what the mobile client read for the same
+// product — except the base price, which follows the one server-side rule
+// every order path shares (lib/pricing/priceRules.ts: sellingPrice first).
 function normalizeProduct(data: FirebaseFirestore.DocumentData) {
   return {
     name: data.name || data.title || "",
-    price: typeof data.price === "number" ? data.price : Number(data.sellingPrice ?? 0),
+    price: productBasePrice(data),
     image:
       data.image ||
       data.thumbnail ||
@@ -469,10 +471,11 @@ export async function POST(request: Request) {
 
       const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-      const gstAmount = items.reduce(
-        (sum, i) => sum + (i.price * i.quantity * (i.gstPercent || 0)) / 100,
-        0
-      );
+      // Prices are GST-inclusive (lib/pricing/priceRules.ts), exactly as on the
+      // web: GST is never added on top. Its component is extracted from the
+      // line amounts when the order is confirmed (lib/sellerTax.ts). gstAmount
+      // stays on the order for the mobile screens that read it, always 0.
+      const gstAmount = 0;
 
       const settingsSnap = await db.collection("settings").doc("global").get();
       const settingsData = settingsSnap.exists ? settingsSnap.data() : null;
@@ -523,7 +526,11 @@ export async function POST(request: Request) {
         resolvedCouponCode = couponCode;
       }
 
-      const total = subtotal + shipping + gstAmount - discountAmount;
+      // The customer-payable amount: whole rupees, minimum ₹1 — the same rule
+      // as the web checkout and the mobile ONLINE (Razorpay) amount, so the
+      // stored paymentAmount is exactly what the customer is shown and asked
+      // to pay. itemsSubtotal/discount below stay exact for seller settlement.
+      const total = payableTotal(subtotal + shipping - discountAmount);
 
       // Human-readable numbers, minted after all reads/validation above and
       // BEFORE the first write below. mintNumbers reads its counters (tx.get)

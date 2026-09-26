@@ -14,6 +14,7 @@ import { isProductVisible } from "@/lib/products/visibility";
 import { resolveCommissionRate } from "@/lib/orderPricing";
 import { evaluateCoupon, normalizeCouponCode } from "@/lib/coupons/couponRules";
 import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
+import { productBasePrice, payableTotal } from "@/lib/pricing/priceRules";
 import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import { Timestamp } from "firebase-admin/firestore";
 import type { MobilePaymentIntent, MobilePricedItem } from "@/lib/mobileOnlineOrder";
@@ -26,7 +27,8 @@ import type { MobilePaymentIntent, MobilePricedItem } from "@/lib/mobileOnlineOr
 // live Firestore `cart` collection (the mobile cart) rather than an items
 // array in the request body (the web cart lives client-side), and prices
 // using the SAME formula app/api/mobile/place-order already established for
-// the mobile catalogue — subtotal + shipping + gstAmount - discountAmount —
+// the mobile catalogue — subtotal + shipping - discountAmount (prices are
+// GST-inclusive; gstAmount is always 0) —
 // since that is what CheckoutScreen.tsx's Bill Details actually shows the
 // customer before they tap Pay Online. computeOrderPricing (lib/orderPricing)
 // is deliberately NOT reused here: its OrderPricing type has no GST concept
@@ -53,12 +55,13 @@ const RATE_LIMIT_MAX = 20;
 const FREE_SHIPPING_THRESHOLD = 499;
 const STANDARD_SHIPPING_CHARGE = 49;
 
-// Mirrors services/productService.ts's normalizeProduct() field precedence —
-// see app/api/mobile/place-order/route.ts's identical copy.
+// Mirrors services/productService.ts's normalizeProduct() field precedence,
+// except the base price (lib/pricing/priceRules.ts: sellingPrice first) — see
+// app/api/mobile/place-order/route.ts's identical copy.
 function normalizeProduct(data: FirebaseFirestore.DocumentData) {
   return {
     name: data.name || data.title || "",
-    price: typeof data.price === "number" ? data.price : Number(data.sellingPrice ?? 0),
+    price: productBasePrice(data),
     image:
       data.image ||
       data.thumbnail ||
@@ -315,10 +318,8 @@ export async function POST(request: Request) {
 
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-    const gstAmount = items.reduce(
-      (sum, i) => sum + (i.price * i.quantity * (i.gstPercent || 0)) / 100,
-      0
-    );
+    // GST-inclusive prices: never added on top (see mobile place-order).
+    const gstAmount = 0;
 
     const settingsSnap = await db.collection("settings").doc("global").get();
     const settingsData = settingsSnap.exists ? settingsSnap.data() : null;
@@ -362,10 +363,9 @@ export async function POST(request: Request) {
       resolvedCouponCode = couponCode;
     }
 
-    // Math.max(1, ...) guards against a ₹0 Razorpay order (which Razorpay
-    // itself rejects) — app/api/mobile/place-order has no such guard because
-    // Pay on Delivery never touches Razorpay.
-    const finalTotal = Math.max(1, Math.round(subtotal + shipping + gstAmount - discountAmount));
+    // payableTotal(): whole rupees, minimum ₹1 (Razorpay rejects a ₹0 order) —
+    // the same rule mobile Pay on Delivery and the web checkout apply.
+    const finalTotal = payableTotal(subtotal + shipping - discountAmount);
 
     // Preview must never touch the LIVE Razorpay account — fail closed before
     // creating the order if a Preview deployment was given a non-test key.

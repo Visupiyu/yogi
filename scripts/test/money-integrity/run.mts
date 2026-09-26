@@ -354,13 +354,15 @@ async function main() {
   const codRef = db.collection("orders").doc(codJson.orderId || "missing");
   const cod = (await codRef.get()).data() as any;
   // Hand-computed expectation: 2 x ₹1000 = 2000; free shipping (>= 499);
-  // GST 5% = 100; coupon 10% of 2000 = 200; amount due = 2000 + 0 + 100 - 200.
-  const EXPECTED_DUE = 1900;
+  // prices are GST-inclusive (lib/pricing/priceRules.ts), so the product's
+  // gstPercent 5 adds nothing on top (gstAmount 0); coupon 10% of 2000 = 200;
+  // amount due = 2000 + 0 - 200.
+  const EXPECTED_DUE = 1800;
 
   // Test 9 — paymentAmount equals the authoritative total/finalTotal
-  record("T9 mobile COD paymentAmount == authoritative finalTotal == total (1900, incl. GST 100, coupon -200)",
+  record("T9 mobile COD paymentAmount == authoritative finalTotal == total (1800: GST-inclusive, gstPercent not added; coupon -200)",
     codRes.status === 200 && cod?.paymentAmount === EXPECTED_DUE && cod?.finalTotal === EXPECTED_DUE &&
-    cod?.total === EXPECTED_DUE && cod?.gstAmount === 100 && cod?.discountAmount === 200 && cod?.paymentMethod === "PAY_ON_DELIVERY_UPI",
+    cod?.total === EXPECTED_DUE && cod?.gstAmount === 0 && cod?.discountAmount === 200 && cod?.paymentMethod === "PAY_ON_DELIVERY_UPI",
     `status=${codRes.status} paymentAmount=${cod?.paymentAmount} finalTotal=${cod?.finalTotal} total=${cod?.total}`);
 
   // Test 9b — the rider-side COD engine now shows and accepts the real non-zero amount
@@ -381,7 +383,7 @@ async function main() {
     } catch (e: any) { wrongRejected = e?.status === 409; }
     const ok = await db.runTransaction((tx) => applyCodPaymentVerification(tx as any, db as any, { jobId: "job_money_1", actor, reference: "UPIREF123", clientAmount: EXPECTED_DUE }));
     const after = (await codRef.get()).data() as any;
-    record("T9b delivery COD engine: amountDue 1900 shown to rider, ₹0 rejected, correct non-zero amount accepted",
+    record("T9b delivery COD engine: amountDue 1800 shown to rider, ₹0 rejected, correct non-zero amount accepted",
       info.isCod && info.amountDue === EXPECTED_DUE && info.canVerify && wrongRejected &&
       ok.ok && ok.amount === EXPECTED_DUE && after.paymentStatus === "AwaitingVerification",
       `amountDue=${info.amountDue} canVerify=${info.canVerify} zeroRejected=${wrongRejected} accepted=${ok.status} orderPaymentStatus=${after.paymentStatus}`);
@@ -415,7 +417,7 @@ async function main() {
       cod?.itemsSubtotal === 2000 && cod?.discount === 200 && cod?.commissionRate === 0.1 && cod?.vendorIds?.[0] === SELLER;
     const onlineFields = fin.kind === "created" && onlineOrder?.items?.[0]?.qty === 2 && onlineOrder?.items?.[0]?.quantity === 2 &&
       onlineOrder?.itemsSubtotal === 2000 && onlineOrder?.discount === 200 && onlineOrder?.commissionRate === 0.1 &&
-      onlineOrder?.finalTotal === 1900 && onlineOrder?.paymentStatus === "Paid" && !("paymentAmount" in onlineOrder);
+      onlineOrder?.finalTotal === 1800 && onlineOrder?.paymentStatus === "Paid" && !("paymentAmount" in onlineOrder);
     record("T10 new mobile orders carry payout fields: items[].qty (+quantity), itemsSubtotal, discount, commissionRate; ONLINE has no paymentAmount",
       codFields && onlineFields && intent?.commissionRate === 0.1 && legacyOrder?.commissionRate === 0.1,
       `COD qty=${cod?.items?.[0]?.qty} itemsSubtotal=${cod?.itemsSubtotal} discount=${cod?.discount} rate=${cod?.commissionRate} | ONLINE qty=${onlineOrder?.items?.[0]?.qty} rate=${onlineOrder?.commissionRate} paymentAmount=${onlineOrder?.paymentAmount} | legacy-intent rate=${legacyOrder?.commissionRate}`);
