@@ -104,8 +104,10 @@ service firebase.storage {
     // any signed-in user could overwrite or delete another vendor's images
     // with no discovery step (ST-2).
     //
-    // Reads stay exactly as they were: existing Firestore documents still
-    // reference these URLs and the storefront must keep rendering them.
+    // Public reads (products/, vendor-store/) stay exactly as they were:
+    // existing Firestore documents still reference these URLs and the
+    // storefront must keep rendering them. chat/ and delivery-proof/ reads
+    // are admin-only — see those blocks.
     // Nothing is moved, renamed or deleted — only new writes are refused.
     // Every application upload site now writes the uid-scoped equivalents
     // below (lib/storagePaths.ts), so nothing legitimate targets these
@@ -118,14 +120,21 @@ service firebase.storage {
     }
 
     match /chat/{fileName} {
-      // Authenticated read preserved — existing chat attachments.
-      allow read: if isSignedIn();
+      // Admin only. These objects carry no owner, so no narrower rule is
+      // possible — and a signed-in read let ANY account list and download
+      // every private chat attachment. In-app viewers are unaffected: they
+      // open attachments through the tokenized download URL stored on the
+      // message (messages/ is participant-only in firestore.rules), which
+      // does not go through these rules.
+      allow read: if isAdmin();
       allow write: if false;
     }
 
     match /delivery-proof/{fileName} {
-      // Authenticated read preserved — existing proof-of-delivery photos.
-      allow read: if isSignedIn();
+      // Admin only, for the same reason as chat/ above. Viewers use the
+      // tokenized URL stored on the order (orders/ is restricted to the
+      // buyer, the order's sellers and admin in firestore.rules).
+      allow read: if isAdmin();
       allow write: if false;
     }
 
@@ -179,14 +188,21 @@ service firebase.storage {
         && isImageUnderLimit(5);
     }
 
+    // chat/ and delivery-proof/ are PRIVATE: only the uploader (the uid in
+    // the path) and the admin may read or list them. The only in-app read is
+    // the uploader's own getDownloadURL() right after upload
+    // (app/chat/[id], app/seller/chat/[id], app/delivery/[id]); everyone else
+    // views them through the tokenized URL stored on the chat message / order,
+    // which the Firestore rules already restrict to the participants. A plain
+    // signed-in read here let any account enumerate and download them all.
     match /chat/{uid}/{fileName} {
-      allow read: if isSignedIn();
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
       allow write: if isSignedIn() && request.auth.uid == uid
         && isImageUnderLimit(5);
     }
 
     match /delivery-proof/{uid}/{fileName} {
-      allow read: if isSignedIn();
+      allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
       allow write: if isSignedIn() && request.auth.uid == uid
         && isImageUnderLimit(5);
     }
