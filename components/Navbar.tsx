@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { ShoppingCart, Heart, User, Search } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isProductVisible } from "@/lib/products/visibility";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -150,6 +151,9 @@ useEffect(() => {
         const items: ProductSuggestion[] = [];
         snapshot.forEach((doc) => {
   const data = doc.data();
+  // Only customer-visible products may be suggested — never one pending
+  // review, rejected or blocked (lib/products/visibility.ts).
+  if (!isProductVisible(data)) return;
   const fullTitle: string = data.title || data.name || "";
   const shortTitle: string = data.shortTitle || "";
   const q = trimmed.toLowerCase();

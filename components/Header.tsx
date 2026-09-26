@@ -7,6 +7,7 @@ import { ShoppingCart, Heart, User, Search } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import NotificationBell from "@/components/NotificationBell";
 import { db } from "@/lib/firebase";
+import { isProductVisible } from "@/lib/products/visibility";
 import Image from "next/image";
 
 interface Product {
@@ -36,6 +37,9 @@ export default function Header() {
         const items: Product[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
+          // Only customer-visible products may be suggested — never one
+          // pending review, rejected or blocked (lib/products/visibility.ts).
+          if (!isProductVisible(data)) return;
           const title: string = data.title || data.name || "";
           if (
   title.toLowerCase().includes(search.toLowerCase()) &&

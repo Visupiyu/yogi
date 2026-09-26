@@ -13,6 +13,7 @@ import {
 
 import { db } from "@/lib/firebase";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
+import { isProductVisible } from "@/lib/products/visibility";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 
 // "Men Fashion"/"Women Fashion" are display-only labels; the catalog tree
@@ -71,6 +72,10 @@ const [category, setCategory] = useState("All");
         const items: any[] = [];
 
         productSnap.forEach((docSnap) => {
+
+          // Public storefront: customer-visible products only — never one
+          // pending review, rejected or blocked (lib/products/visibility.ts).
+          if (!isProductVisible(docSnap.data())) return;
 
           items.push(toLegacyProduct(docSnap.id, docSnap.data()));
 
