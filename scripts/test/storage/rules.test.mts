@@ -6,7 +6,9 @@
  * chat/ and delivery-proof/ objects are admin-only, and that uploads, the
  * public product / store / review images and the default-deny fallback are
  * unchanged. Also proves chat attachments and proof photos are immutable once
- * uploaded: no overwrite, metadata change or delete by anyone. Loads the
+ * uploaded: no overwrite, metadata change or delete by anyone, and that
+ * review photos are likewise create-only (owner creates, nobody overwrites,
+ * changes metadata or deletes; public read unchanged). Loads the
  * repository's storage.rules into the emulator and uses tiny synthetic files
  * only.
  *
@@ -152,6 +154,26 @@ await check("W12 proof: admin CANNOT overwrite a proof", () => assertFails(put(a
 await check("W13 proof: unrelated user CANNOT overwrite a proof", () => assertFails(put(rider2(), PROOF)));
 await check("W14 proof: owner creates a 1MB proof", () =>
   assertSucceeds(put(rider1(), "delivery-proof/rider1/order9-1900000000000-w14big-proof.jpg", ONE_MB)));
+
+// ============ REVIEW PHOTOS (reviews/{uid}/..., create-only) ============
+// Paths shaped like OrderDetailsScreen.tsx builds them: {Date.now()}-{i}.jpg
+const REVIEW = "reviews/alice/1700-0.jpg";
+const OVER_5MB_STRICT = new Uint8Array(5 * 1024 * 1024 + 1);
+await check("R1  reviews: owner creates a valid photo", () => assertSucceeds(put(alice(), "reviews/alice/1900000000000-0.jpg")));
+await check("R2  reviews: owner creates a second photo at a different path", () =>
+  assertSucceeds(put(alice(), "reviews/alice/1900000000000-1.jpg", ONE_MB)));
+await check("R3  reviews: owner CANNOT overwrite an existing photo (was allowed)", () => assertFails(put(alice(), REVIEW)));
+await check("R4  reviews: owner CANNOT change a photo's metadata (was allowed)", () =>
+  assertFails(alice().ref(REVIEW).updateMetadata({ customMetadata: { edited: "yes" } })));
+await check("R5  reviews: owner CANNOT delete a photo", () => assertFails(alice().ref(REVIEW).delete()));
+await check("R6  reviews: another user CANNOT overwrite the owner's photo", () => assertFails(put(bob(), REVIEW)));
+await check("R6b reviews: another user CANNOT write into the owner's folder", () => assertFails(put(bob(), "reviews/alice/1900000000000-evil.jpg")));
+await check("R7  reviews: admin CANNOT overwrite a photo", () => assertFails(put(admin(), REVIEW)));
+await check("R8  reviews: signed-out user CANNOT create a photo", () => assertFails(put(anon(), "reviews/alice/1900000000000-anon.jpg")));
+await check("R9  reviews: non-image upload refused", () => assertFails(put(alice(), "reviews/alice/1900000000000-x.pdf", tiny, PDF)));
+await check("R10 reviews: upload over 5MB refused", () => assertFails(put(alice(), "reviews/alice/1900000000000-big.jpg", OVER_5MB_STRICT)));
+await check("R11 reviews: signed-out user can still read an existing photo", () => assertSucceeds(read(anon(), REVIEW)));
+await check("R11b reviews: the new photo is still publicly readable", () => assertSucceeds(read(anon(), "reviews/alice/1900000000000-0.jpg")));
 
 await env.cleanup();
 console.log(`\n${pass}/${pass + fail} storage rules checks passed`);

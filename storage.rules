@@ -230,11 +230,16 @@ service firebase.storage {
     }
 
     // Mobile app's product-review photos — see the path-model note above.
-    // Public read (shown on the product page next to the review), write
-    // restricted to the customer whose uid the path carries.
+    // Public read (shown on the product page next to the review), create
+    // restricted to the customer whose uid the path carries. Create-only:
+    // each photo is uploaded once to a fresh {timestamp}-{index} name and the
+    // review document that links it is immutable, so no overwrite, metadata
+    // change or delete (`resource == null` — an upload over an existing
+    // object is evaluated as a create).
     match /reviews/{uid}/{fileName} {
       allow read: if true;
-      allow write: if isSignedIn() && request.auth.uid == uid
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && resource == null
         && isImageUnderLimit(5);
     }
 
