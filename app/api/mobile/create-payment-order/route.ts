@@ -10,6 +10,7 @@ import {
 } from "@/lib/products/inventory";
 import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib/products/variantSelection";
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
+import { isProductVisible } from "@/lib/products/visibility";
 import { resolveCommissionRate } from "@/lib/orderPricing";
 import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import { Timestamp } from "firebase-admin/firestore";
@@ -241,7 +242,8 @@ export async function POST(request: Request) {
 
       const product = normalizeProduct(snap.data()!);
 
-      if (product.active === false) {
+      // Publication gate — refused before any Razorpay order is created.
+      if (!isProductVisible(snap.data())) {
         return Response.json({ error: `${label} is no longer available.` }, { status: 409 });
       }
 

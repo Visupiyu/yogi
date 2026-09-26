@@ -15,6 +15,19 @@ const nextConfig: NextConfig = {
         hostname: "firebasestorage.googleapis.com",
         pathname: "/**",
       },
+      // LOCAL TEST ONLY: images uploaded to the Storage emulator. Present
+      // only when the opt-in emulator switch is on (see lib/firebase.ts);
+      // otherwise this list is exactly the production one above.
+      ...(process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true"
+        ? [
+            {
+              protocol: "http" as const,
+              hostname: "127.0.0.1",
+              port: "9199",
+              pathname: "/v0/b/**",
+            },
+          ]
+        : []),
     ],
   },
 };

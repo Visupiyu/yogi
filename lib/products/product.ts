@@ -81,6 +81,11 @@ variants: ProductVariant[];
   featured: boolean;
   approved: boolean;
 
+  // Moderation — server/admin-written only (see lib/products/visibility.ts).
+  // Absent on products created before the approval gate.
+  approvalStatus?: "pending" | "approved" | "rejected";
+  rejectionReason?: string | null;
+
   // Ratings
   rating?: number;
   reviewCount?: number;

@@ -42,6 +42,11 @@ const SERVER_OWNED_FIELDS = new Set([
   "reviewCount",
   "views",
   "wishlistCount",
+  // Approval moderation — written only by the admin moderation route.
+  "approvalStatus",
+  "rejectionReason",
+  "moderatedAt",
+  "moderatedBy",
 ]);
 
 type Outcome =

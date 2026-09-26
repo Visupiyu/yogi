@@ -342,6 +342,13 @@ service cloud.firestore {
           && unchanged('approved')
           && unchanged('featured')
           && unchanged('active')
+          // Approval moderation fields are admin-only, written solely by
+          // app/api/admin/products/[id]/moderation (Admin SDK). A seller can
+          // never mark their own product approved or forge a moderation record.
+          && unchanged('approvalStatus')
+          && unchanged('rejectionReason')
+          && unchanged('moderatedAt')
+          && unchanged('moderatedBy')
           // Price, stock and tax fields are server-validated only: sellers
           // change them through /api/seller/update-product (and create
           // through /api/seller/create-product), which validate every value

@@ -13,20 +13,28 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import { isProductVisible } from "@/lib/products/visibility";
+
+const TRENDING_LIMIT = 8;
 
 async function fetchTrendingProducts() {
+  // Over-fetch and filter hidden products (lib/products/visibility.ts)
+  // BEFORE slicing to the display size.
   const q = query(
     collection(db, "products"),
     orderBy("views", "desc"),
-    limit(8)
+    limit(TRENDING_LIMIT * 4)
   );
 
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((doc) => ({
-    ...doc.data(),
-    id: doc.id,
-  }));
+  return snapshot.docs
+    .filter((doc) => isProductVisible(doc.data()))
+    .slice(0, TRENDING_LIMIT)
+    .map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+    }));
 }
 
 function ProductSkeleton() {

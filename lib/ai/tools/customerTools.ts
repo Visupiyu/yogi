@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import type { ToolDefinition } from "@/lib/ai/tools/types";
 import type { Query, DocumentData } from "firebase-admin/firestore";
+import { isProductVisible } from "@/lib/products/visibility";
 
 function summarizeProduct(id: string, data: DocumentData) {
   return {
@@ -58,7 +59,7 @@ const searchProducts: ToolDefinition = {
 
     const scored = snap.docs
       .map((doc) => ({ id: doc.id, data: doc.data() }))
-      .filter(({ data }) => data.active !== false)
+      .filter(({ data }) => isProductVisible(data))
       .map(({ id, data }) => {
         const haystack = `${data.title || data.name || ""} ${data.description || ""} ${data.category || data.categoryId || ""} ${data.brand || ""}`.toLowerCase();
         const score = terms.reduce((s, term) => (haystack.includes(term) ? s + 1 : s), 0);
@@ -100,6 +101,9 @@ const getProduct: ToolDefinition = {
     if (!snap.exists) return { error: "Product not found" };
 
     const data = snap.data() as DocumentData;
+
+    // Pending review, rejected or blocked products are not customer products.
+    if (!isProductVisible(data)) return { error: "Product not found" };
 
     return {
       id: snap.id,
@@ -151,15 +155,19 @@ const getProductRecommendations: ToolDefinition = {
       }
     }
 
-    let q: Query = db.collection("products").where("active", "!=", false);
+    // Visibility is filtered in code, not in the query: the old
+    // where("active", "!=", false) was silently REPLACED (and so dropped)
+    // whenever a category was given, and it also excluded products with no
+    // `active` field. Over-fetch so hidden products don't shrink the result.
+    let q: Query = db.collection("products");
     if (category) {
-      q = db.collection("products").where("categoryId", "==", category);
+      q = q.where("categoryId", "==", category);
     }
 
-    const snap = await q.limit(limit + 1).get();
+    const snap = await q.limit((limit + 1) * 4).get();
 
     const results = snap.docs
-      .filter((doc) => doc.id !== excludeId)
+      .filter((doc) => doc.id !== excludeId && isProductVisible(doc.data()))
       .slice(0, limit)
       .map((doc) => summarizeProduct(doc.id, doc.data()));
 

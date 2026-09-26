@@ -23,6 +23,7 @@ import {
 } from "@/lib/shipping";
 import { getEffectiveCommissionRate } from "@/lib/commission";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
+import { isProductVisible } from "@/lib/products/visibility";
 
 // Business rule: pay-on-delivery orders are settled via UPI only at the
 // moment of delivery — cash is never accepted. This is the stored
@@ -802,10 +803,11 @@ setAddress(userData.address || "");
 
     const product = snap.data();
 
-    // The real moderation gate is `active` (see admin/products/page.tsx) —
-    // `status`/`approved` are dead fields nothing in the app ever sets to
-    // enable a product, so checking them here blocked every product.
-    if (product.active === false) {
+    // Same publication rule the server enforces (lib/products/visibility.ts):
+    // approved for sale AND active !== false. The legacy `approved` boolean is
+    // deliberately NOT read — most existing products store approved:false.
+    // UX only; the order routes re-check this server-side.
+    if (!isProductVisible(product)) {
       alert(`${name} is currently unavailable.`);
       return false;
     }

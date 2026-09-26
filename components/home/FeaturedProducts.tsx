@@ -12,6 +12,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isProductVisible } from "@/lib/products/visibility";
 
 type Product = {
   id: string;
@@ -66,12 +67,18 @@ export default function FeaturedProducts() {
       const featuredQuery = query(
         collection(db, "products"),
         where("featured", "==", true),
-        limit(FEATURED_LIMIT)
+        limit(FEATURED_LIMIT * 4)
       );
       const featuredSnapshot = await getDocs(featuredQuery);
 
-      if (!featuredSnapshot.empty) {
-        setProducts(featuredSnapshot.docs.map(toProduct));
+      // A featured product that is pending review, rejected or blocked is
+      // never shown (lib/products/visibility.ts); filtered before slicing.
+      const featuredVisible = featuredSnapshot.docs
+        .filter((doc) => isProductVisible(doc.data()))
+        .slice(0, FEATURED_LIMIT);
+
+      if (featuredVisible.length > 0) {
+        setProducts(featuredVisible.map(toProduct));
         return;
       }
 
@@ -94,7 +101,7 @@ export default function FeaturedProducts() {
       const ranked = fallbackSnapshot.docs
         .filter((doc) => {
           const data = doc.data();
-          return data.active !== false && Number(data.stock || 0) > 0;
+          return isProductVisible(data) && Number(data.stock || 0) > 0;
         })
         .map((doc) => {
           const data = doc.data();

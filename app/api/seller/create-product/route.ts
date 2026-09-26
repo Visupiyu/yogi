@@ -5,6 +5,7 @@ import { Timestamp } from "firebase-admin/firestore";
 import { mintSequential } from "@/lib/humanIds";
 import { canSellerList, sellerListingBlockReason } from "@/lib/sellerTax";
 import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
+import { NEW_PRODUCT_MODERATION } from "@/lib/products/visibility";
 
 // ---------------------------------------------------------------------------
 // Server-authoritative product creation.
@@ -71,6 +72,13 @@ export async function POST(request: Request) {
       vendorId: _v,
       approved: _a,
       featured: _f,
+      // Moderation is admin-only: a seller can never create a live, approved
+      // or featured product, whatever the request says.
+      active: _active,
+      approvalStatus: _approvalStatus,
+      rejectionReason: _rejectionReason,
+      moderatedAt: _moderatedAt,
+      moderatedBy: _moderatedBy,
       createdAt: _c,
       sales: _sales,
       rating: _rating,
@@ -90,6 +98,11 @@ export async function POST(request: Request) {
     void _reviewCount;
     void _views;
     void _wishlistCount;
+    void _active;
+    void _approvalStatus;
+    void _rejectionReason;
+    void _moderatedAt;
+    void _moderatedBy;
 
     // Price / stock / GST fields are validated here, server-side — this route
     // writes with the Admin SDK, so firestore.rules' product checks never run
@@ -165,6 +178,12 @@ export async function POST(request: Request) {
       const number = await mintSequential(tx, db, "product");
       tx.set(ref, {
         ...productFields,
+        // Every new product starts pending admin review and hidden:
+        // approvalStatus "pending", approved/active/featured false. Only
+        // app/api/admin/products/[id]/moderation can publish it. This also
+        // means deleting and re-creating a blocked product never makes it
+        // live again.
+        ...NEW_PRODUCT_MODERATION,
         vendorId: requester.uid, // server-authoritative identity
         productNumber: number,
         createdAt: Timestamp.now(),

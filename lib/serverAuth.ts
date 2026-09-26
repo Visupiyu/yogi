@@ -36,8 +36,17 @@ export async function verifyRequestUser(
   if (!match) return null;
 
   try {
+    // LOCAL TEST ONLY: FIREBASE_AUTH_EMULATOR_HOST is the standard Firebase
+    // variable for the local Auth emulator and is never set in a deployed
+    // environment. When present, the token is looked up on the emulator's
+    // Identity Toolkit REST endpoint; otherwise Google's, exactly as before.
+    const authEmulatorHost = process.env.FIREBASE_AUTH_EMULATOR_HOST;
+    const identityToolkitBase = authEmulatorHost
+      ? `http://${authEmulatorHost}/identitytoolkit.googleapis.com`
+      : "https://identitytoolkit.googleapis.com";
+
     const response = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseConfig.apiKey}`,
+      `${identityToolkitBase}/v1/accounts:lookup?key=${firebaseConfig.apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

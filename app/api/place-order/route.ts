@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { computeOrderPricing, type PricedItemInput } from "@/lib/orderPricing";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
+import { isProductVisible } from "@/lib/products/visibility";
 import { mintNumbers } from "@/lib/humanIds";
 import {
   hasStockBearingVariants,
@@ -305,11 +306,14 @@ export async function POST(request: Request) {
 
         const product = snap.data() as {
           active?: unknown;
+          approvalStatus?: unknown;
           stock?: unknown;
           variants?: VariantStockEntry[];
         };
 
-        if (product.active === false) {
+        // Same publication gate computeOrderPricing applied, re-checked on
+        // the transactional snapshot that governs the write.
+        if (!isProductVisible(product)) {
           return {
             kind: "error",
             status: 409,

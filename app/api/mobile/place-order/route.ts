@@ -10,6 +10,7 @@ import {
 } from "@/lib/products/inventory";
 import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib/products/variantSelection";
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
+import { isProductVisible } from "@/lib/products/visibility";
 import { resolveCommissionRate } from "@/lib/orderPricing";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
@@ -361,7 +362,9 @@ export async function POST(request: Request) {
 
         const product = normalizeProduct(snap.data()!);
 
-        if (product.active === false) {
+        // Publication gate (lib/products/visibility.ts): pending review,
+        // rejected or blocked products cannot be ordered.
+        if (!isProductVisible(snap.data())) {
           return { kind: "error", status: 409, error: `${label} is no longer available.` };
         }
 

@@ -10,7 +10,9 @@ import {
   deleteDoc,
   doc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { productModerationStatus, type ModerationStatus } from "@/lib/products/visibility";
+import type { ModerationAction } from "@/lib/products/moderation";
 import { toast } from "sonner";
 import Image from "next/image";
 
@@ -24,7 +26,33 @@ type Product = {
   stock: number;
   sales: number;
   status?: string;
+  moderation: ModerationStatus;
+  rejectionReason?: string | null;
   featured?: boolean;
+};
+
+// Labels for the moderation state from lib/products/visibility.ts. "Active"
+// is kept as the label for live products so the existing stats/CSV read the
+// same as before.
+const STATUS_LABEL: Record<ModerationStatus, string> = {
+  live: "Active",
+  pending: "Pending",
+  rejected: "Rejected",
+  blocked: "Blocked",
+};
+
+const STATUS_BADGE_CLASS: Record<ModerationStatus, string> = {
+  live: "bg-green-100 text-green-700",
+  pending: "bg-yellow-100 text-yellow-700",
+  rejected: "bg-red-100 text-red-700",
+  blocked: "bg-gray-200 text-gray-700",
+};
+
+const MODERATION_TOAST: Record<ModerationAction, string> = {
+  approve: "Product approved and live.",
+  reject: "Product rejected.",
+  block: "Product blocked.",
+  unblock: "Product unblocked.",
 };
 
 export default function AdminProductsPage() {
@@ -33,6 +61,7 @@ export default function AdminProductsPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [vendorFilter, setVendorFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
   
 
   useEffect(() => {
@@ -60,9 +89,12 @@ export default function AdminProductsPage() {
           price: typeof data.sellingPrice === "number" ? data.sellingPrice : data.price || 0,
           stock: data.stock || 0,
           sales: data.sales || 0,
-          // Real schema gates visibility via `active` (bool), not a status
-          // string — derive the display label from that.
-          status: data.active === false ? "Blocked" : "Active",
+          // Moderation state from the shared publication rule
+          // (lib/products/visibility.ts): pending / rejected / blocked / live.
+          moderation: productModerationStatus(data),
+          status: STATUS_LABEL[productModerationStatus(data)],
+          rejectionReason:
+            typeof data.rejectionReason === "string" ? data.rejectionReason : null,
           featured: data.featured === true,
         });
       });
@@ -74,12 +106,48 @@ export default function AdminProductsPage() {
     }
   };
 
-  const toggleStatus = async (product: Product) => {
+  // Approve / reject / block / unblock go through the server moderation
+  // route (app/api/admin/products/[id]/moderation), which checks the admin,
+  // validates the transition and stamps moderatedAt/moderatedBy. The browser
+  // no longer writes approval or visibility fields directly.
+  const moderate = async (product: Product, action: ModerationAction) => {
+    let reason: string | undefined;
+    if (action === "reject") {
+      const input = window.prompt(
+        `Reason for rejecting "${product.name}" (shown to the seller):`
+      );
+      if (input === null) return;
+      reason = input.trim();
+      if (!reason) {
+        toast.error("A rejection reason is required.");
+        return;
+      }
+    }
+
     try {
-      await updateDoc(doc(db, "products", product.id), {
-        active: product.status !== "Active",
-      });
-      toast.success("Product updated.");
+      const user = auth.currentUser;
+      if (!user) {
+        toast.error("Please sign in again.");
+        return;
+      }
+      const token = await user.getIdToken();
+      const response = await fetch(
+        `/api/admin/products/${encodeURIComponent(product.id)}/moderation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action, ...(reason ? { reason } : {}) }),
+        }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data?.error || "Failed to update product.");
+        return;
+      }
+      toast.success(MODERATION_TOAST[action]);
       loadProducts();
     } catch (error) {
       console.error(error);
@@ -126,11 +194,14 @@ export default function AdminProductsPage() {
       categoryFilter === "All" || item.category === categoryFilter;
     const vendorMatch =
       vendorFilter === "All" || item.vendorName === vendorFilter;
-    return searchMatch && categoryMatch && vendorMatch;
+    const statusMatch =
+      statusFilter === "All" || item.status === statusFilter;
+    return searchMatch && categoryMatch && vendorMatch && statusMatch;
   });
 
   const totalProducts = products.length;
   const activeProducts = products.filter((p) => p.status === "Active").length;
+  const pendingProducts = products.filter((p) => p.moderation === "pending").length;
   const outOfStock = products.filter((p) => p.stock <= 0).length;
   const lowStock = products.filter((p) => p.stock > 0 && p.stock <= 5).length;
 
@@ -169,7 +240,7 @@ export default function AdminProductsPage() {
         </div>
 
         {/* STATS */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-5 mb-8">
           <div className="bg-white rounded-2xl shadow p-6">
             <p>Total Products</p>
             <h2 className="text-3xl font-bold">{totalProducts}</h2>
@@ -180,6 +251,16 @@ export default function AdminProductsPage() {
               {activeProducts}
             </h2>
           </div>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("Pending")}
+            className="bg-white rounded-2xl shadow p-6 text-left hover:ring-2 hover:ring-yellow-400 transition"
+          >
+            <p>Pending Review</p>
+            <h2 className="text-3xl font-bold text-yellow-600">
+              {pendingProducts}
+            </h2>
+          </button>
           <div className="bg-white rounded-2xl shadow p-6">
             <p>Low Stock</p>
             <h2 className="text-3xl font-bold text-yellow-600">{lowStock}</h2>
@@ -200,7 +281,7 @@ export default function AdminProductsPage() {
         </div>
 
         {/* FILTERS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <input
             placeholder="Search product or vendor..."
             value={search}
@@ -228,6 +309,17 @@ export default function AdminProductsPage() {
                 {vendor}
               </option>
             ))}
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border rounded-xl p-4"
+          >
+            <option value="All">All Status</option>
+            <option value="Pending">Pending Review</option>
+            <option value="Active">Active</option>
+            <option value="Blocked">Blocked</option>
+            <option value="Rejected">Rejected</option>
           </select>
         </div>
 
@@ -268,9 +360,7 @@ export default function AdminProductsPage() {
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      product.status === "Active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
+                      STATUS_BADGE_CLASS[product.moderation]
                     }`}
                   >
                     {product.status}
@@ -287,17 +377,49 @@ export default function AdminProductsPage() {
                   ) : null}
                 </div>
 
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={() => toggleStatus(product)}
-                    className={`flex-1 py-1.5 text-sm rounded-lg text-white transition ${
-                      product.status === "Active"
-                        ? "bg-yellow-600 hover:bg-yellow-700"
-                        : "bg-green-600 hover:bg-green-700"
-                    }`}
-                  >
-                    {product.status === "Active" ? "Block" : "Activate"}
-                  </button>
+                {product.moderation === "rejected" && product.rejectionReason ? (
+                  <p className="text-xs text-red-600 mt-1 line-clamp-2">
+                    Rejected: {product.rejectionReason}
+                  </p>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {(product.moderation === "pending" ||
+                    product.moderation === "rejected") && (
+                    <button
+                      onClick={() => moderate(product, "approve")}
+                      className="flex-1 py-1.5 text-sm rounded-lg text-white transition bg-green-600 hover:bg-green-700"
+                    >
+                      Approve
+                    </button>
+                  )}
+
+                  {product.moderation !== "rejected" && (
+                    <button
+                      onClick={() => moderate(product, "reject")}
+                      className="flex-1 py-1.5 text-sm rounded-lg text-white transition bg-orange-600 hover:bg-orange-700"
+                    >
+                      Reject
+                    </button>
+                  )}
+
+                  {product.moderation === "live" && (
+                    <button
+                      onClick={() => moderate(product, "block")}
+                      className="flex-1 py-1.5 text-sm rounded-lg text-white transition bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      Block
+                    </button>
+                  )}
+
+                  {product.moderation === "blocked" && (
+                    <button
+                      onClick={() => moderate(product, "unblock")}
+                      className="flex-1 py-1.5 text-sm rounded-lg text-white transition bg-green-600 hover:bg-green-700"
+                    >
+                      Unblock
+                    </button>
+                  )}
 
                   <button
                     onClick={() => toggleFeatured(product)}

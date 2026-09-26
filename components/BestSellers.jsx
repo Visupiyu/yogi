@@ -3,24 +3,33 @@
 import { useQuery } from "@tanstack/react-query";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isProductVisible } from "@/lib/products/visibility";
 import ProductCard from "./ProductCard";
 import { motion } from "framer-motion";
 
 // Was sorting by createdAt (making this a second "New Arrivals" row
 // under a "Best Sellers" heading) even though `sales` is a real,
 // live-tracked field — checkout increments it on every purchase.
+const BEST_SELLERS_LIMIT = 12;
+
 async function fetchBestSellers() {
+  // Over-fetch, then drop products customers must not see (pending review,
+  // rejected, blocked — lib/products/visibility.ts) BEFORE slicing, so the
+  // row still fills when some top sellers are hidden.
   const q = query(
     collection(db, "products"),
     orderBy("sales", "desc"),
-    limit(12)
+    limit(BEST_SELLERS_LIMIT * 4)
   );
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((doc) => ({
-    ...doc.data(),
-    id: doc.id,
-  }));
+  return snapshot.docs
+    .filter((doc) => isProductVisible(doc.data()))
+    .slice(0, BEST_SELLERS_LIMIT)
+    .map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+    }));
 }
 
 function ProductSkeleton() {

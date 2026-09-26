@@ -10,6 +10,8 @@
 // one of those pages, this maps a raw Firestore product doc into the shape
 // they already expect.
 
+import { isProductVisible } from "@/lib/products/visibility";
+
 export type LegacyProductView = {
   id: string;
   name: string;
@@ -39,8 +41,14 @@ export type LegacyProductView = {
 // that product live and matches the server exactly — a `where("active","==",true)`
 // query would silently drop it, and would need a new composite index on
 // the category page besides.
+//
+// Now delegates to the canonical publication rule in lib/products/visibility.ts
+// (approved for sale AND active !== false), so every storefront page that
+// already calls this also hides products pending review or rejected. A product
+// with no approvalStatus (the pre-gate catalog) is still visible exactly as
+// before.
 export function isStorefrontVisible(data: any): boolean {
-  return data?.active !== false;
+  return isProductVisible(data);
 }
 
 export function toLegacyProduct(id: string, data: any): LegacyProductView {

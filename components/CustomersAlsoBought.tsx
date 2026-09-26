@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { isProductVisible } from "@/lib/products/visibility";
 
 type Product = {
   id: string;
@@ -39,7 +40,8 @@ export default function CustomersAlsoBought({
       snap.forEach((doc) => {
         const data = doc.data();
 
-        if (doc.id !== currentProductId) {
+        // Only customer-visible products (lib/products/visibility.ts).
+        if (doc.id !== currentProductId && isProductVisible(data)) {
           items.push({
             id: doc.id,
             name: data.shortTitle || data.title || data.name || "",

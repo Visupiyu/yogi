@@ -10,6 +10,7 @@ import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
 import { addToCart as addToCartHelper } from "@/lib/cart";
+import { isProductVisible } from "@/lib/products/visibility";
 import {
   variantDimensions,
   optionsForDimension,
@@ -23,7 +24,7 @@ import { categoryFields } from "@/lib/catalog/categoryFields";
 import { findNodeById } from "@/lib/catalog/categoryUtils";
 import { UNIVERSAL_SPEC_FIELDS } from "@/lib/catalog/universalSpecFields";
 
-type Product = { id: string; name: string; active?: boolean; image?: string;  images?: string[];  price: number;  mrp?: number;
+type Product = { id: string; name: string; active?: boolean; approvalStatus?: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
   color?: string;  sizes?: string[];  material?: string;  brand?: string;  countryOfOrigin?: string;
   rating?: number;  reviewCount?: number;
@@ -86,6 +87,8 @@ function normalizeProduct(id: string, data: any): Product {
     // add-to-cart guard below can refuse it, and so related-product
     // listings can filter it out.
     active: data.active,
+    // Publication gate state (lib/products/visibility.ts).
+    approvalStatus: data.approvalStatus,
     name: data.title || data.name || "",
     image:
       data.thumbnail ||
@@ -124,6 +127,9 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  // Set when the product exists but is not customer-visible (pending review,
+  // rejected or blocked) — rendered as "unavailable", never as a product.
+  const [unavailable, setUnavailable] = useState(false);
   const [selectedImage, setSelectedImage] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
@@ -160,6 +166,13 @@ const [quantity, setQuantity] = useState(1);
 
         if (snap.exists()) {
           const productData = snap.data();
+
+          // Pending review, rejected or blocked: not a customer product. No
+          // product view, no view count, no recently-viewed entry.
+          if (!isProductVisible(productData)) {
+            setUnavailable(true);
+            return;
+          }
          const fullProduct: Product = normalizeProduct(snap.id, productData);
 
 setProduct(fullProduct);
@@ -213,8 +226,8 @@ setSelectedImage(
           const related: Product[] = [];
 
 relatedSnap.forEach((d) => {
-  // Blocked products must not be recommended either.
-  if (d.id !== snap.id && d.data()?.active !== false) {
+  // Hidden products (pending/rejected/blocked) must not be recommended either.
+  if (d.id !== snap.id && isProductVisible(d.data())) {
     related.push(normalizeProduct(d.id, d.data()));
   }
 });
@@ -387,7 +400,7 @@ questionSnap.forEach((d) => {
   // caught only at checkout (computeOrderPricing / validateStock), so the
   // customer could browse it, add it, and reach payment before being told
   // it was unavailable. Matches the server's own `active === false` test.
-  if (product.active === false) {
+  if (!isProductVisible(product)) {
     alert("This product is currently unavailable.");
     return false;
   }
@@ -730,6 +743,19 @@ questionSnap.forEach((d) => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         Loading Product...
+      </div>
+    );
+  }
+
+  if (unavailable) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 px-4 text-center">
+        <p className="text-lg font-semibold text-gray-800">
+          This product is currently unavailable.
+        </p>
+        <Link href="/" className="text-indigo-600 hover:underline">
+          Continue shopping
+        </Link>
       </div>
     );
   }

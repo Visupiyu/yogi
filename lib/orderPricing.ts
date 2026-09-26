@@ -40,6 +40,7 @@ import {
   planVariantDecrements,
 } from "@/lib/products/inventory";
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
+import { isProductVisible } from "@/lib/products/visibility";
 
 // size/color are variant intent, not money — the only client-supplied
 // fields that survive into the order line, and neither affects pricing.
@@ -278,7 +279,9 @@ export async function computeOrderPricing(
 
     const product: any = snap.data();
 
-    if (product.active === false) {
+    // Publication gate (lib/products/visibility.ts): not orderable while
+    // pending review, rejected or blocked.
+    if (!isProductVisible(product)) {
       return {
         ok: false,
         error: "One or more products are currently unavailable",

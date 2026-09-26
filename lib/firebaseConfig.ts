@@ -35,14 +35,40 @@ export const PRODUCTION_FIREBASE_CONFIG: FirebaseWebConfig = {
   measurementId: "G-6KZGLS4651",
 };
 
-const REQUIRED_PREVIEW_VARS = [
-  "NEXT_PUBLIC_FIREBASE_API_KEY",
-  "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN",
-  "NEXT_PUBLIC_FIREBASE_PROJECT_ID",
-  "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET",
-  "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID",
-  "NEXT_PUBLIC_FIREBASE_APP_ID",
-] as const;
+/** The public (NEXT_PUBLIC_*) variables that select the Firebase Web config. */
+export type PublicFirebaseEnv = {
+  NEXT_PUBLIC_FIREBASE_API_KEY?: string;
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?: string;
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID?: string;
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?: string;
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?: string;
+  NEXT_PUBLIC_FIREBASE_APP_ID?: string;
+  NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?: string;
+  NEXT_PUBLIC_VERCEL_ENV?: string;
+};
+
+/**
+ * Reads every selector variable through a LITERAL `process.env.NEXT_PUBLIC_*`
+ * reference. This is required, not stylistic: Next.js only substitutes
+ * NEXT_PUBLIC_* values into the BROWSER bundle where the source spells out
+ * `process.env.NEXT_PUBLIC_X`. Reading them through a passed-around
+ * `process.env` object (the previous `env = process.env` default) worked on
+ * the server but saw an empty object in the browser, so the client silently
+ * fell back to the production project even when a Preview/test project was
+ * configured — and the fail-closed check below never ran there.
+ */
+export function readPublicFirebaseEnv(): PublicFirebaseEnv {
+  return {
+    NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+  };
+}
 
 /**
  * Returns the Firebase Web config for the current environment.
@@ -54,7 +80,7 @@ const REQUIRED_PREVIEW_VARS = [
  *     PRODUCTION_FIREBASE_CONFIG.
  */
 export function selectFirebaseConfig(
-  env: Record<string, string | undefined> = process.env
+  env: PublicFirebaseEnv = readPublicFirebaseEnv()
 ): FirebaseWebConfig {
   // Detection is NOT tied to NEXT_PUBLIC_VERCEL_ENV alone, because that variable
   // exists only when Vercel's "Automatically expose System Environment
@@ -72,7 +98,16 @@ export function selectFirebaseConfig(
     return PRODUCTION_FIREBASE_CONFIG;
   }
 
-  const missing = REQUIRED_PREVIEW_VARS.filter((k) => !env[k]);
+  // Same six required variables as before, checked by explicit name.
+  const required: [string, string | undefined][] = [
+    ["NEXT_PUBLIC_FIREBASE_API_KEY", env.NEXT_PUBLIC_FIREBASE_API_KEY],
+    ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN],
+    ["NEXT_PUBLIC_FIREBASE_PROJECT_ID", env.NEXT_PUBLIC_FIREBASE_PROJECT_ID],
+    ["NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET", env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET],
+    ["NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID", env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID],
+    ["NEXT_PUBLIC_FIREBASE_APP_ID", env.NEXT_PUBLIC_FIREBASE_APP_ID],
+  ];
+  const missing = required.filter(([, value]) => !value).map(([name]) => name);
   if (missing.length > 0) {
     throw new Error(
       "Preview Firebase configuration is incomplete — missing " +

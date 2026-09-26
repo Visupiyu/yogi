@@ -7,6 +7,17 @@ import { useVendor } from "@/hooks/useVendor";
 import { useRouter } from "next/navigation";
 
 import type { Product } from "@/lib/products/product";
+import { productModerationStatus, type ModerationStatus } from "@/lib/products/visibility";
+
+// Real moderation state (lib/products/visibility.ts), replacing the old
+// "Approved/Pending" badge that read the legacy `approved` boolean — which
+// nothing ever set to true, so every live product showed "Pending".
+const MODERATION_BADGE: Record<ModerationStatus, { text: string; className: string }> = {
+  live: { text: "Live", className: "bg-green-100 text-green-700" },
+  pending: { text: "Pending review", className: "bg-yellow-100 text-yellow-700" },
+  rejected: { text: "Rejected", className: "bg-red-100 text-red-700" },
+  blocked: { text: "Blocked", className: "bg-gray-200 text-gray-700" },
+};
 
 export default function SellerProductsPage() {
   const router = useRouter();
@@ -111,20 +122,22 @@ export default function SellerProductsPage() {
 
       let matchesStatus = true;
 
-      if (status === "Active") {
-        matchesStatus = product.active === true;
-      }
+      const moderation = productModerationStatus(product);
 
-      if (status === "Inactive") {
-        matchesStatus = product.active === false;
-      }
-
-      if (status === "Approved") {
-        matchesStatus = product.approved === true;
+      if (status === "Live") {
+        matchesStatus = moderation === "live";
       }
 
       if (status === "Pending") {
-        matchesStatus = product.approved === false;
+        matchesStatus = moderation === "pending";
+      }
+
+      if (status === "Rejected") {
+        matchesStatus = moderation === "rejected";
+      }
+
+      if (status === "Blocked") {
+        matchesStatus = moderation === "blocked";
       }
 
       if (status === "Out of Stock") {
@@ -250,9 +263,9 @@ export default function SellerProductsPage() {
         </div>
 
         <div className="rounded-2xl bg-white p-5 shadow-sm">
-          <p className="text-sm text-gray-500">Active</p>
+          <p className="text-sm text-gray-500">Live</p>
           <p className="mt-2 text-3xl font-bold text-green-600">
-            {products.filter((product) => product.active).length}
+            {products.filter((product) => productModerationStatus(product) === "live").length}
           </p>
         </div>
 
@@ -326,10 +339,10 @@ export default function SellerProductsPage() {
               className="w-full rounded-xl border border-gray-200 px-4 py-3 outline-none focus:border-indigo-500"
             >
               <option value="All">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-              <option value="Approved">Approved</option>
-              <option value="Pending">Pending</option>
+              <option value="Live">Live</option>
+              <option value="Pending">Pending review</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Blocked">Blocked</option>
               <option value="Out of Stock">Out of Stock</option>
             </select>
           </div>
@@ -451,25 +464,18 @@ export default function SellerProductsPage() {
                       <div className="space-y-1">
                         <span
                           className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                            product.active
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-700"
+                            MODERATION_BADGE[productModerationStatus(product)].className
                           }`}
                         >
-                          {product.active ? "Active" : "Inactive"}
+                          {MODERATION_BADGE[productModerationStatus(product)].text}
                         </span>
 
-                        <div>
-                          <span
-                            className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                              product.approved
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-yellow-100 text-yellow-700"
-                            }`}
-                          >
-                            {product.approved ? "Approved" : "Pending"}
-                          </span>
-                        </div>
+                        {productModerationStatus(product) === "rejected" &&
+                        product.rejectionReason ? (
+                          <p className="max-w-[16rem] text-xs text-red-600">
+                            Reason: {product.rejectionReason}
+                          </p>
+                        ) : null}
                       </div>
                     </td>
 

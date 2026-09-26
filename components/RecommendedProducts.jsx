@@ -15,6 +15,7 @@ import {
 import { db } from "@/lib/firebase";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
+import { isProductVisible } from "@/lib/products/visibility";
 
 const collections = [
   {
@@ -50,12 +51,17 @@ async function getCategoryProducts(category) {
       ? where("categoryId", "==", node.id)
       : where("subCategoryId", "==", node.id),
     orderBy("createdAt", "desc"),
-    limit(4)
+    // Over-fetch; hidden products (pending/rejected/blocked) are dropped
+    // below BEFORE slicing to the 4 shown.
+    limit(16)
   );
 
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((doc) => toLegacyProduct(doc.id, doc.data()));
+  return snapshot.docs
+    .filter((doc) => isProductVisible(doc.data()))
+    .slice(0, 4)
+    .map((doc) => toLegacyProduct(doc.id, doc.data()));
 
 }
 
