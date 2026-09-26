@@ -78,6 +78,12 @@ type Order = {
   }[];
   couponConflict?: boolean;
   rewardShortfall?: number;
+  // Set by lib/onlineOrder.ts#duplicateIntentPaymentRecord on the inert record
+  // for a SECOND captured payment against an already-paid checkout:
+  // duplicateIntentPayment is the original payment's id, razorpayPaymentId is
+  // this record's own (the one to refund).
+  duplicateIntentPayment?: string;
+  razorpayPaymentId?: string;
   // Set by app/api/cancel-order when a captured ONLINE payment is cancelled.
   // "Required" means real money is owed back and has NOT been returned yet —
   // YOMICO does not move the money itself in this phase, so these fields
@@ -298,6 +304,8 @@ export default function AdminOrdersPage() {
           stockShortfall: data.stockShortfall,
           couponConflict: data.couponConflict,
           rewardShortfall: data.rewardShortfall,
+          duplicateIntentPayment: data.duplicateIntentPayment,
+          razorpayPaymentId: data.razorpayPaymentId,
           // Same convention: absent means no refund is owed, so no default.
           refundStatus: data.refundStatus,
           refundAmountDue: data.refundAmountDue,
@@ -1110,6 +1118,16 @@ const filtered = orders.filter(
                                 <li>
                                   Reward shortfall: {order.rewardShortfall}{" "}
                                   points
+                                </li>
+                              )}
+                              {!!order.duplicateIntentPayment && (
+                                <li
+                                  title={`Refund payment ${order.razorpayPaymentId || order.id} · original payment ${order.duplicateIntentPayment}`}
+                                >
+                                  Duplicate payment — refund{" "}
+                                  {shortOrderLabel(order.razorpayPaymentId || order.id)};
+                                  original payment{" "}
+                                  {shortOrderLabel(order.duplicateIntentPayment)}
                                 </li>
                               )}
                             </ul>
