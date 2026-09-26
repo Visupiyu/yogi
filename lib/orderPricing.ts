@@ -41,6 +41,8 @@ import {
 } from "@/lib/products/inventory";
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
 import { isProductVisible } from "@/lib/products/visibility";
+import { evaluateCoupon, normalizeCouponCode } from "@/lib/coupons/couponRules";
+import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
 
 // size/color are variant intent, not money — the only client-supplied
 // fields that survive into the order line, and neither affects pricing.
@@ -436,51 +438,26 @@ export async function computeOrderPricing(
   const freeDeliveryApplied = subtotal >= settings.freeShippingThreshold;
   const deliveryCost = settings.deliveryCost;
 
-  // ---- Coupon: percentage read from the coupon document itself ----
-  // Mirrors app/checkout/page.tsx's applyCoupon() exactly, so a coupon the
-  // customer legitimately applied prices the same here: coupons are created
-  // with addDoc() (random id) so the code is a FIELD, not the id; the
-  // percentage applies to the pre-shipping subtotal; and the same
-  // userId+code redemption query rejects a code this customer already
-  // spent. Rejecting rather than silently dropping the discount matters —
-  // dropping it would charge more than the page displayed.
+  // ---- Coupon: the one shared evaluator (lib/coupons/couponRules.ts) ----
+  // The same rules the mobile routes and the web checkout preview apply: the
+  // admin coupon format { code, discount (percent), active: true }, applied
+  // to the pre-shipping subtotal. A code this customer already redeemed is
+  // rejected here; the order transaction then claims
+  // couponRedemptions/{uid}_{CODE} atomically. Rejecting rather than silently
+  // dropping the discount matters — dropping it would charge more than the
+  // page displayed.
   let couponDiscount = 0;
 
   if (couponCode) {
-    const couponSnap = await db
-      .collection("coupons")
-      .where("code", "==", couponCode)
-      .limit(1)
-      .get();
+    const code = normalizeCouponCode(couponCode);
+    const couponDoc = code ? await loadCouponByCode(db, code) : null;
+    const evaluated = evaluateCoupon(couponDoc, subtotal);
 
-    if (couponSnap.empty) {
-      return { ok: false, error: "Invalid coupon", status: 400 };
+    if (!evaluated.ok) {
+      return { ok: false, error: evaluated.message, status: 400 };
     }
 
-    const couponData: any = couponSnap.docs[0].data();
-
-    if (couponData.active !== true) {
-      return {
-        ok: false,
-        error: "This coupon is no longer active.",
-        status: 400,
-      };
-    }
-
-    const percent = Number(couponData.discount);
-
-    if (!Number.isFinite(percent) || percent <= 0 || percent > 100) {
-      return { ok: false, error: "This coupon is not valid.", status: 400 };
-    }
-
-    const priorRedemption = await db
-      .collection("couponRedemptions")
-      .where("userId", "==", uid)
-      .where("code", "==", couponCode)
-      .limit(1)
-      .get();
-
-    if (!priorRedemption.empty) {
+    if (await hasPriorCouponRedemption(db, uid, code!)) {
       return {
         ok: false,
         error: "You've already used this coupon.",
@@ -488,7 +465,7 @@ export async function computeOrderPricing(
       };
     }
 
-    couponDiscount = subtotal * (percent / 100);
+    couponDiscount = evaluated.discountAmount;
   }
 
   // ---- Reward points: the authenticated user's real stored balance ----

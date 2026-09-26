@@ -12,6 +12,8 @@ import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
 import { isProductVisible } from "@/lib/products/visibility";
 import { resolveCommissionRate } from "@/lib/orderPricing";
+import { evaluateCoupon, normalizeCouponCode } from "@/lib/coupons/couponRules";
+import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
 import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
 import { Timestamp } from "firebase-admin/firestore";
 import type { MobilePaymentIntent, MobilePricedItem } from "@/lib/mobileOnlineOrder";
@@ -75,54 +77,9 @@ function normalizeProduct(data: FirebaseFirestore.DocumentData) {
   };
 }
 
-// Mirrors services/couponService.ts's validateCoupon() — see
-// app/api/mobile/place-order/route.ts's identical copy.
-async function priceCoupon(
-  rawCode: string,
-  subtotal: number
-): Promise<{ code: string; discountAmount: number }> {
-  const code = rawCode.trim().toUpperCase();
-
-  const snap = await getAdminDb()
-    .collection("coupons")
-    .where("code", "==", code)
-    .limit(1)
-    .get();
-
-  if (snap.empty) {
-    throw new Error("This coupon code is invalid.");
-  }
-
-  const coupon = snap.docs[0].data();
-
-  if (coupon.active === false) {
-    throw new Error("This coupon is no longer active.");
-  }
-
-  if (coupon.expiresAt?.toDate && coupon.expiresAt.toDate() < new Date()) {
-    throw new Error("This coupon has expired.");
-  }
-
-  if (coupon.minOrderValue && subtotal < coupon.minOrderValue) {
-    throw new Error(`This coupon needs a minimum order of ₹${coupon.minOrderValue}.`);
-  }
-
-  let discountAmount = 0;
-
-  if (coupon.discountType === "percent") {
-    discountAmount = (subtotal * (coupon.discountValue || 0)) / 100;
-
-    if (coupon.maxDiscount) {
-      discountAmount = Math.min(discountAmount, coupon.maxDiscount);
-    }
-  } else {
-    discountAmount = coupon.discountValue || 0;
-  }
-
-  discountAmount = Math.min(discountAmount, subtotal);
-
-  return { code, discountAmount };
-}
+// Coupons are priced by the shared evaluator (lib/coupons/couponRules.ts) —
+// the same rules as the web checkout and mobile COD. Only the code is read
+// from the request; any client discount amount is ignored.
 
 export async function POST(request: Request) {
   try {
@@ -163,8 +120,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Please enter a valid mobile number." }, { status: 400 });
     }
 
-    const rawCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";
-    const couponCode = rawCode.length > 0 && rawCode.length <= 50 ? rawCode : null;
+    // Canonical UPPERCASE code; any discount amount in the body is ignored.
+    const couponCode = normalizeCouponCode(body.couponCode);
 
     const db = getAdminDb();
 
@@ -390,16 +347,19 @@ export async function POST(request: Request) {
     let resolvedCouponCode: string | null = null;
 
     if (couponCode) {
-      try {
-        const priced = await priceCoupon(couponCode, subtotal);
-        discountAmount = priced.discountAmount;
-        resolvedCouponCode = priced.code;
-      } catch (couponError: any) {
-        return Response.json(
-          { error: couponError?.message || "Unable to apply coupon." },
-          { status: 400 }
-        );
+      const evaluated = evaluateCoupon(await loadCouponByCode(db, couponCode), subtotal);
+      if (!evaluated.ok) {
+        return Response.json({ error: evaluated.message }, { status: 400 });
       }
+      // Refused BEFORE any Razorpay order exists. The redemption itself is
+      // claimed at finalisation (lib/mobileOnlineOrder.ts), exactly like the
+      // web ONLINE flow; a payment that races past this check is flagged
+      // couponConflict + needsReview there rather than silently discounted twice.
+      if (await hasPriorCouponRedemption(db, requester.uid, couponCode)) {
+        return Response.json({ error: "You've already used this coupon." }, { status: 400 });
+      }
+      discountAmount = evaluated.discountAmount;
+      resolvedCouponCode = couponCode;
     }
 
     // Math.max(1, ...) guards against a ₹0 Razorpay order (which Razorpay

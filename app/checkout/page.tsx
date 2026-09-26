@@ -24,6 +24,7 @@ import {
 import { getEffectiveCommissionRate } from "@/lib/commission";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { isProductVisible } from "@/lib/products/visibility";
+import { evaluateCoupon } from "@/lib/coupons/couponRules";
 
 // Business rule: pay-on-delivery orders are settled via UPI only at the
 // moment of delivery — cash is never accepted. This is the stored
@@ -218,16 +219,18 @@ setAddress(userData.address || "");
         return;
       }
 
-      const couponData = snapshot.docs[0].data();
-      if (!couponData.active) {
-        alert("Coupon inactive");
+      // Preview with the same evaluator the server prices with
+      // (lib/coupons/couponRules.ts), so the page never shows a discount the
+      // order routes would refuse or price differently.
+      const evaluated = evaluateCoupon(snapshot.docs[0].data(), total);
+      if (!evaluated.ok) {
+        alert(evaluated.message);
         return;
       }
 
-      const discountAmount = total * (couponData.discount / 100);
-      setDiscount(discountAmount);
+      setDiscount(evaluated.discountAmount);
       setCouponApplied(true);
-      alert(`${couponData.discount}% discount applied`);
+      alert(`${evaluated.percent}% discount applied`);
     } catch (error) {
       console.error(error);
       alert("Coupon check failed");

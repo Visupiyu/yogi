@@ -137,12 +137,13 @@ async function seedMobileProduct(stock = 10) {
   });
 }
 async function seedMobileCoupon() {
-  await db.collection("coupons").add({ code: "SAVE10", discountType: "percent", discountValue: 10, active: true });
+  // Canonical admin coupon format (lib/coupons/couponRules.ts) — 10% off.
+  await db.collection("coupons").add({ code: "SAVE10", discount: 10, active: true });
 }
-async function setCart(quantity: unknown) {
+async function setCart(quantity: unknown, uid = BUYER) {
   await db.recursiveDelete(db.collection("cart"));
   await db.collection("cart").add({
-    userId: BUYER, savedForLater: false, productId: P_MOB, quantity,
+    userId: uid, savedForLater: false, productId: P_MOB, quantity,
     name: "Mobile Kettle", price: 1, // client price — must be ignored
   });
 }
@@ -389,9 +390,12 @@ async function main() {
   // Test 10 — new mobile orders carry payout-compatible fields (COD and ONLINE)
   let onlineOrder: any = null;
   {
-    await seedMobileProduct(10); await setCart(2);
+    // A second customer: SAVE10 is one-use-per-customer (lib/coupons), and
+    // BUYER already redeemed it on the T9 COD order above.
+    const BUYER_ONLINE = "buyer_money_online";
+    await seedMobileProduct(10); await setCart(2, BUYER_ONLINE);
     control.reset();
-    const cpo = await mobileCreatePaymentOrder(req("http://x/api/mobile/create-payment-order", { ...MOB_BODY, couponCode: "SAVE10" }));
+    const cpo = await mobileCreatePaymentOrder(req("http://x/api/mobile/create-payment-order", { ...MOB_BODY, couponCode: "SAVE10" }, BUYER_ONLINE));
     const cpoJson = await json(cpo);
     const intent = (await db.collection("paymentIntents").doc(cpoJson.razorpayOrderId || "missing").get()).data() as any;
     const fin = await finalizeMobileOnlineOrder({

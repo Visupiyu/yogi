@@ -3,6 +3,7 @@ import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import { onlineOrderIdFor, type FinalizeResult } from "@/lib/onlineOrder";
 import { getAdminCommissionRate } from "@/lib/orderPricing";
+import { couponRedemptionId } from "@/lib/coupons/couponRules";
 import {
   planVariantDecrements,
   sumVariantStock,
@@ -146,7 +147,14 @@ export async function finalizeMobileOnlineOrder(params: {
       ? intent.commissionRate
       : await getAdminCommissionRate();
 
-  const outcome = await db.runTransaction<FinalizeResult & { shortfalls?: Shortfall[] }>(
+  // Same one-use record the web flow claims at finalisation.
+  const couponRef = intent.couponCode
+    ? db.collection("couponRedemptions").doc(couponRedemptionId(intent.uid, intent.couponCode))
+    : null;
+
+  const outcome = await db.runTransaction<
+    FinalizeResult & { shortfalls?: Shortfall[]; couponConflict?: boolean }
+  >(
     async (tx: Transaction) => {
       // ---- ALL READS FIRST (Firestore transaction requirement) ----
       const orderSnap = await tx.get(orderRef);
@@ -184,6 +192,13 @@ export async function finalizeMobileOnlineOrder(params: {
       const productIds = [...qtyByProduct.keys()];
       const productRefs = productIds.map((id) => db.collection("products").doc(id));
       const productSnaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
+
+      // Already redeemed by another order (e.g. two payments raced past the
+      // create-payment-order pre-check). The money is captured, so — like
+      // lib/onlineOrder.ts — the order is still created, but flagged
+      // couponConflict + needsReview and the redemption is not re-claimed.
+      const couponSnap = couponRef ? await tx.get(couponRef) : null;
+      const couponConflict = !!couponSnap?.exists;
 
       // ---- Assess, but never reject: the money is already taken ----
       // A product-level decrement (non-variant lines). A variant-path product
@@ -334,8 +349,19 @@ export async function finalizeMobileOnlineOrder(params: {
 
         ...(shortfalls.length > 0 ? { stockShortfall: shortfalls } : {}),
         ...(Object.keys(stockDeductedQty).length > 0 ? { stockDeductedQty } : {}),
-        ...(shortfalls.length > 0 ? { needsReview: true } : {}),
+        ...(couponConflict ? { couponConflict: true } : {}),
+        ...(shortfalls.length > 0 || couponConflict ? { needsReview: true } : {}),
       });
+
+      if (couponRef && intent.couponCode && !couponConflict) {
+        tx.set(couponRef, {
+          userId: intent.uid,
+          userEmail: intent.email,
+          code: intent.couponCode,
+          orderId,
+          createdAt: Timestamp.now(),
+        });
+      }
 
       // The cart AT CHECKOUT TIME (captured into the intent), not whatever
       // the live cart holds now — a webhook can settle minutes after the
@@ -344,19 +370,28 @@ export async function finalizeMobileOnlineOrder(params: {
         tx.delete(db.collection("cart").doc(cartItemId));
       }
 
-      return { kind: "created", orderId, finalTotal: capturedRupees, shortfalls };
+      return { kind: "created", orderId, finalTotal: capturedRupees, shortfalls, couponConflict };
     }
   );
 
   if (outcome.kind !== "created") return outcome;
 
-  if (outcome.shortfalls?.length) {
+  if (outcome.shortfalls?.length || outcome.couponConflict) {
     try {
+      const parts: string[] = [];
+      if (outcome.shortfalls?.length) {
+        parts.push(
+          `oversold: ${outcome.shortfalls
+            .map((s) => `${s.name} (wanted ${s.wanted}, had ${s.available})`)
+            .join("; ")}`
+        );
+      }
+      if (outcome.couponConflict) parts.push(`coupon ${intent.couponCode} already redeemed`);
       await db.collection("notifications").add({
         title: "⚠ Paid mobile order needs review",
-        message: `Order ${orderId.slice(0, 12)} was paid but oversold: ${outcome.shortfalls
-          .map((s) => `${s.name} (wanted ${s.wanted}, had ${s.available})`)
-          .join("; ")}. Payment was captured and the order was NOT rejected. Needs manual review.`,
+        message: `Order ${orderId.slice(0, 12)} was paid but ${parts.join(
+          " · "
+        )}. Payment was captured and the order was NOT rejected. Needs manual review.`,
         role: "admin",
         type: "order",
         read: false,

@@ -12,6 +12,8 @@ import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
 import { isProductVisible } from "@/lib/products/visibility";
 import { resolveCommissionRate } from "@/lib/orderPricing";
+import { evaluateCoupon, normalizeCouponCode, couponRedemptionId } from "@/lib/coupons/couponRules";
+import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 
 // ---------------------------------------------------------------------------
@@ -134,57 +136,11 @@ function normalizeProduct(data: FirebaseFirestore.DocumentData) {
   };
 }
 
-// Mirrors services/couponService.ts's validateCoupon() exactly — same
-// schema, same discount computation, same error conditions. Re-run
-// server-side rather than trusting the client's own "Apply" result, since
-// nothing stops the coupon code (or a forged discountAmount) arriving in
-// the request body from being stale, expired, or invented outright.
-async function priceCoupon(
-  rawCode: string,
-  subtotal: number
-): Promise<{ code: string; discountAmount: number }> {
-  const code = rawCode.trim().toUpperCase();
-
-  const snap = await getAdminDb()
-    .collection("coupons")
-    .where("code", "==", code)
-    .limit(1)
-    .get();
-
-  if (snap.empty) {
-    throw new Error("This coupon code is invalid.");
-  }
-
-  const coupon = snap.docs[0].data();
-
-  if (coupon.active === false) {
-    throw new Error("This coupon is no longer active.");
-  }
-
-  if (coupon.expiresAt?.toDate && coupon.expiresAt.toDate() < new Date()) {
-    throw new Error("This coupon has expired.");
-  }
-
-  if (coupon.minOrderValue && subtotal < coupon.minOrderValue) {
-    throw new Error(`This coupon needs a minimum order of ₹${coupon.minOrderValue}.`);
-  }
-
-  let discountAmount = 0;
-
-  if (coupon.discountType === "percent") {
-    discountAmount = (subtotal * (coupon.discountValue || 0)) / 100;
-
-    if (coupon.maxDiscount) {
-      discountAmount = Math.min(discountAmount, coupon.maxDiscount);
-    }
-  } else {
-    discountAmount = coupon.discountValue || 0;
-  }
-
-  discountAmount = Math.min(discountAmount, subtotal);
-
-  return { code, discountAmount };
-}
+// Coupons are priced by the shared evaluator (lib/coupons/couponRules.ts) —
+// the same rules as the web checkout — and re-evaluated here rather than
+// trusting the client's own "Apply" result, since nothing stops the coupon
+// code (or a forged discountAmount) arriving in the request body from being
+// stale, expired, or invented outright. Only the code is read from the body.
 
 type PlaceOutcome =
   | { kind: "error"; status: number; error: string }
@@ -239,8 +195,9 @@ export async function POST(request: Request) {
       return Response.json({ error: "Please enter a valid mobile number." }, { status: 400 });
     }
 
-    const rawCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";
-    const couponCode = rawCode.length > 0 && rawCode.length <= 50 ? rawCode : null;
+    // Canonical UPPERCASE code (the same form web stores); anything else
+    // in the body — including any discount amount — is ignored.
+    const couponCode = normalizeCouponCode(body.couponCode);
 
     const db = getAdminDb();
     const orderId = orderIdFor(requester.uid, idempotencyKey);
@@ -275,6 +232,22 @@ export async function POST(request: Request) {
     }
 
     const cartDocs = cartSnap.docs;
+
+    // Coupon lookups that cannot run inside a transaction (queries). The
+    // one-use guarantee itself is the deterministic
+    // couponRedemptions/{uid}_{CODE} record read and written atomically in
+    // the transaction below; this pre-check also catches legacy random-id
+    // redemptions, exactly as the web pricing pass does.
+    const couponDoc = couponCode ? await loadCouponByCode(db, couponCode) : null;
+    if (couponCode && !couponDoc) {
+      return Response.json({ error: "Invalid coupon" }, { status: 400 });
+    }
+    if (couponCode && (await hasPriorCouponRedemption(db, requester.uid, couponCode))) {
+      return Response.json({ error: "You've already used this coupon." }, { status: 400 });
+    }
+    const couponRef = couponCode
+      ? db.collection("couponRedemptions").doc(couponRedemptionId(requester.uid, couponCode))
+      : null;
 
     const outcome = await db.runTransaction<PlaceOutcome>(async (tx: Transaction) => {
       // ---- ALL READS FIRST (Firestore transaction requirement) ----
@@ -334,6 +307,11 @@ export async function POST(request: Request) {
       const productIds = [...qtyByProduct.keys()];
       const productRefs = productIds.map((id) => db.collection("products").doc(id));
       const productSnaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
+
+      // Read (and so lock) the redemption record under this transaction:
+      // two concurrent orders with the same coupon cannot both see it absent
+      // and both commit — the loser retries, finds it, and is refused.
+      const couponClaimSnap = couponRef ? await tx.get(couponRef) : null;
 
       const liveProducts = new Map<string, ReturnType<typeof normalizeProduct>>();
       // Precomputed per-product variant decrement plan, carried from this
@@ -530,17 +508,19 @@ export async function POST(request: Request) {
       let resolvedCouponCode: string | null = null;
 
       if (couponCode) {
-        try {
-          const priced = await priceCoupon(couponCode, subtotal);
-          discountAmount = priced.discountAmount;
-          resolvedCouponCode = priced.code;
-        } catch (couponError: any) {
+        if (couponClaimSnap?.exists) {
           return {
             kind: "error",
-            status: 400,
-            error: couponError?.message || "Unable to apply coupon.",
+            status: 409,
+            error: "This coupon has already been used. Please remove it and try again.",
           };
         }
+        const evaluated = evaluateCoupon(couponDoc, subtotal);
+        if (!evaluated.ok) {
+          return { kind: "error", status: 400, error: evaluated.message };
+        }
+        discountAmount = evaluated.discountAmount;
+        resolvedCouponCode = couponCode;
       }
 
       const total = subtotal + shipping + gstAmount - discountAmount;
@@ -672,6 +652,19 @@ export async function POST(request: Request) {
 
       for (const cartDoc of cartDocs) {
         tx.delete(cartDoc.ref);
+      }
+
+      // One use per customer: the same couponRedemptions/{uid}_{CODE} record
+      // (same fields) the web checkout writes, committed atomically with the
+      // order. app/api/cancel-order releases it if this order is cancelled.
+      if (couponRef && resolvedCouponCode) {
+        tx.set(couponRef, {
+          userId: requester.uid,
+          userEmail: requester.email,
+          code: resolvedCouponCode,
+          orderId,
+          createdAt: Timestamp.now(),
+        });
       }
 
       return { kind: "created", orderId, total };
