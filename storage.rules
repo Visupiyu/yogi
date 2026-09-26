@@ -64,34 +64,44 @@ service firebase.storage {
       // The header comment already claimed "owner + admin read only" — this
       // makes the rule match the documented intent.
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
-      // request.resource is null on delete requests, so folding the size
-      // check into a single `write` rule made every delete evaluate to
-      // false (storage/unauthorized) even for the file's own owner.
+      // CREATE-ONLY for the owner. Every upload writes a new, uniquely named
+      // object (app/vendor-register: {label}-{timestamp}-{name}) and the app
+      // never overwrites or deletes one, so there is deliberately no update
+      // or delete rule: once a document is uploaded — and possibly verified
+      // by the admin — its owner can neither replace nor remove it.
+      // `resource == null` is what refuses the replacement: in Storage rules
+      // an upload over an existing object is evaluated as `create` (`update`
+      // only covers metadata changes).
+      // firestore.rules separately freezes the vendor's gstDocUrl /
+      // aadhaarDocUrl / chequeDocUrl pointers, so the record cannot be
+      // repointed at a different file either.
       //
-      // Content type is now restricted to exactly what the upload control
+      // Content type is restricted to exactly what the upload control
       // offers (app/vendor-register: accept="image/*,application/pdf"), so
       // this path cannot be used to park arbitrary files. Content type is
       // client-declared, so this bounds abuse rather than proving the
       // format.
-      allow create, update: if isSignedIn() && request.auth.uid == uid
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && resource == null
         && request.resource.size < 10 * 1024 * 1024
         && isKycDocument();
-      allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
     // Delivery-partner freelancer KYC — Aadhaar card + bank cancelled cheque.
     // Same locked model as vendor-kyc above: owner + admin read only, never
-    // public. The applicant (uid in the path) may upload/replace/remove ONLY
-    // their own documents; another applicant can neither read, write nor delete
-    // them. Admin (the reviewer) can read to verify. Bounded to 10MB and to
+    // public. The applicant (uid in the path) may only upload NEW documents
+    // to their own folder — create-only, never replace or remove one (uploads
+    // use unique names via lib/storagePaths.ts#deliveryKycPath, and the
+    // application record's aadhaarDocPath/chequeDocPath are already frozen in
+    // firestore.rules); another applicant can neither read nor write them. Admin (the reviewer) can read to verify. Bounded to 10MB and to
     // image/PDF via the shared isKycDocument() gate (content type is
     // client-declared, so this bounds abuse rather than proving format).
     match /delivery-kyc/{uid}/{fileName} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
-      allow create, update: if isSignedIn() && request.auth.uid == uid
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && resource == null
         && request.resource.size < 10 * 1024 * 1024
         && isKycDocument();
-      allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
     // ---------------------------------------------------------------

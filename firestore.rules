@@ -720,6 +720,13 @@ service cloud.firestore {
           && unchanged('uid')
           && unchanged('status')
           && unchanged('kycStatus')
+          // KYC document pointers are written once, at registration
+          // (app/vendor-register), and never by the owner afterwards — so a
+          // vendor cannot upload a new file and repoint their record at it.
+          // storage.rules separately makes vendor-kyc/ create-only.
+          && unchanged('gstDocUrl')
+          && unchanged('aadhaarDocUrl')
+          && unchanged('chequeDocUrl')
           && unchanged('commissionRate')
           && unchanged('totalSales')
           && unchanged('totalOrders')
