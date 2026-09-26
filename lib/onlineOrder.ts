@@ -82,6 +82,154 @@ export function onlineOrderIdFor(razorpayPaymentId: string): string {
   return razorpayPaymentId;
 }
 
+// ---------------------------------------------------------------------------
+// ONE NORMAL PAYMENT PER INTENT
+// ---------------------------------------------------------------------------
+// orders/{paymentId} makes each PAYMENT idempotent, but nothing tied an intent
+// (= one Razorpay order, one checkout) to a single payment: if Razorpay ever
+// captured a second, different payment against the same Razorpay order, it
+// would have become a second full order — stock, sales, coupon, reward points,
+// seller earnings, notifications all over again. Both finalizers now claim
+// paymentIntents/{razorpayOrderId}.finalizedPaymentId inside the SAME
+// transaction that creates the normal order, so two payments racing against
+// one intent cannot both become the normal order.
+//
+// A second payment is never rejected (see MONEY-SAFETY RULE): it is recorded
+// at orders/{itsPaymentId} as an inert, already-cancelled, refund-owed record
+// — the exact state app/api/cancel-order leaves a paid ONLINE order in — so
+// the captured money is visible in the admin refund queue, while no normal
+// economic or fulfilment effect runs: no stock/sales, no order/payment number,
+// no coupon claim, no reward spend or ledger, no cart clearing, no customer or
+// seller notification or email. vendorIds/items are empty so no seller sees
+// it or earns from it, it has no rewardPointsStatus so it is never credited
+// points, and Cancelled cannot be cancelled, confirmed or dispatched.
+
+/** Firestore record for a second captured payment against an already-finalized intent. */
+export function duplicateIntentPaymentRecord(params: {
+  razorpayPaymentId: string;
+  razorpayOrderId: string;
+  /** The payment that already finalized this intent. */
+  duplicateOf: string;
+  capturedRupees: number;
+  source: string;
+  uid: string;
+  email: string | null;
+  customerName: string;
+  phone: string;
+  address: string;
+}): Record<string, unknown> {
+  const now = Timestamp.now();
+  return {
+    userId: params.uid,
+    userEmail: params.email || "",
+    customerEmail: params.email || "",
+    customerName: params.customerName,
+    phone: params.phone,
+    address: params.address,
+    vendorIds: [],
+    items: [],
+    paymentMethod: "ONLINE",
+    paymentStatus: "Paid",
+    status: "Cancelled",
+    total: params.capturedRupees,
+    finalTotal: params.capturedRupees,
+    refundStatus: "Required",
+    refundAmountDue: params.capturedRupees,
+    refundRequestedAt: now,
+    needsReview: true,
+    duplicateIntentPayment: params.duplicateOf,
+    razorpayPaymentId: params.razorpayPaymentId,
+    razorpayOrderId: params.razorpayOrderId,
+    finalizedBy: params.source,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+/**
+ * Whether an order document is the NORMAL order a captured payment produced
+ * for this checkout — i.e. what a finalizer writes, not the inert duplicate
+ * record above. Finalizers key the order on its own Razorpay payment id and
+ * only ever do so after Razorpay confirmed the capture, so id === the stored
+ * razorpayPaymentId is the capture evidence. paymentStatus / status are
+ * deliberately NOT consulted: a later cancellation or refund of that first
+ * payment does not undo the fact that it was captured and finalized.
+ */
+function isFinalizedPaymentOrder(
+  id: string,
+  data: FirebaseFirestore.DocumentData,
+  razorpayOrderId: string
+): boolean {
+  return (
+    data.paymentMethod === "ONLINE" &&
+    data.razorpayOrderId === razorpayOrderId &&
+    typeof data.razorpayPaymentId === "string" &&
+    data.razorpayPaymentId === id &&
+    !data.duplicateIntentPayment
+  );
+}
+
+/**
+ * Which payment already finalized this intent, read INSIDE the caller's
+ * transaction (reads only — call before any write).
+ *
+ * Intents finalized before finalizedPaymentId existed carry no claim, and
+ * intents never expire, so an unclaimed intent is also checked for a normal
+ * order it already produced (orders where razorpayOrderId == this intent).
+ * When one exists, its payment is the finalized one; `legacyFinalizedAt` is
+ * then set so the caller records the missing claim in the same transaction.
+ */
+export async function readIntentFinalization(
+  tx: Transaction,
+  db: FirebaseFirestore.Firestore,
+  intentRef: FirebaseFirestore.DocumentReference,
+  razorpayOrderId: string
+): Promise<{ intentExists: boolean; finalizedPaymentId: string | null; legacyFinalizedAt: Timestamp | null }> {
+  const intentSnap = await tx.get(intentRef);
+  if (!intentSnap.exists) {
+    return { intentExists: false, finalizedPaymentId: null, legacyFinalizedAt: null };
+  }
+  const claimed = intentSnap.data()?.finalizedPaymentId;
+  if (typeof claimed === "string" && claimed) {
+    return { intentExists: true, finalizedPaymentId: claimed, legacyFinalizedAt: null };
+  }
+  const legacy = await tx.get(
+    db.collection("orders").where("razorpayOrderId", "==", razorpayOrderId).limit(20)
+  );
+  const finalized = legacy.docs
+    .filter((d) => isFinalizedPaymentOrder(d.id, d.data(), razorpayOrderId))
+    .map((d) => ({ id: d.id, createdAt: d.data().createdAt }))
+    .sort((a, b) => (a.createdAt?.toMillis?.() ?? 0) - (b.createdAt?.toMillis?.() ?? 0));
+  if (finalized.length === 0) {
+    return { intentExists: true, finalizedPaymentId: null, legacyFinalizedAt: null };
+  }
+  const first = finalized[0];
+  return {
+    intentExists: true,
+    finalizedPaymentId: first.id,
+    legacyFinalizedAt: first.createdAt instanceof Timestamp ? first.createdAt : Timestamp.now(),
+  };
+}
+
+/** Admin review alert for a duplicate payment — the same notifications shape the finalizers already use. */
+export async function notifyDuplicateIntentPayment(
+  db: FirebaseFirestore.Firestore,
+  params: { razorpayPaymentId: string; razorpayOrderId: string; duplicateOf: string; capturedRupees: number }
+): Promise<void> {
+  try {
+    await db.collection("notifications").add({
+      title: "⚠ Duplicate payment needs refund",
+      message: `Payment ${params.razorpayPaymentId} (₹${params.capturedRupees}) was captured for checkout ${params.razorpayOrderId}, which was already paid by ${params.duplicateOf}. No second order was placed; record ${params.razorpayPaymentId.slice(0, 12)} is marked Refund Required. Refund it in Razorpay, then record the refund.`,
+      role: "admin",
+      type: "order",
+      read: false,
+      createdAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error("notifyDuplicateIntentPayment: notification failed:", error);
+  }
+}
+
 type Shortfall = { id: string; name: string; wanted: number; available: number };
 
 export async function finalizeOnlineOrder(params: {
@@ -118,8 +266,15 @@ export async function finalizeOnlineOrder(params: {
         .doc(`${intent.uid}_${intent.couponCode}`)
     : null;
 
+  const intentRef = db.collection("paymentIntents").doc(razorpayOrderId);
+
   const outcome = await db.runTransaction<
-    FinalizeResult & { shortfalls?: Shortfall[]; couponConflict?: boolean; rewardShort?: number }
+    FinalizeResult & {
+      shortfalls?: Shortfall[];
+      couponConflict?: boolean;
+      rewardShort?: number;
+      duplicateOf?: string;
+    }
   >(async (tx: Transaction) => {
     // ---- ALL READS FIRST (Firestore transaction requirement) ----
 
@@ -132,6 +287,39 @@ export async function finalizeOnlineOrder(params: {
         orderId,
         finalTotal: Number(orderSnap.data()?.finalTotal || 0),
       };
+    }
+
+    // One normal payment per intent (see ONE NORMAL PAYMENT PER INTENT). A
+    // different payment already finalized this intent -> record this one as
+    // an inert duplicate and stop before any normal effect.
+    const finalization = await readIntentFinalization(tx, db, intentRef, razorpayOrderId);
+    const finalizedPaymentId = finalization.finalizedPaymentId;
+    if (finalizedPaymentId) {
+      const duplicateRupees = Math.round(capturedAmountPaise) / 100;
+      // A legacy intent (finalized before the claim existed): record the claim
+      // it is missing, atomically with the decision below.
+      if (finalization.legacyFinalizedAt) {
+        tx.update(intentRef, { finalizedPaymentId, finalizedAt: finalization.legacyFinalizedAt });
+      }
+      if (finalizedPaymentId === razorpayPaymentId) {
+        return { kind: "already", orderId, finalTotal: duplicateRupees };
+      }
+      tx.set(
+        orderRef,
+        duplicateIntentPaymentRecord({
+          razorpayPaymentId,
+          razorpayOrderId,
+          duplicateOf: finalizedPaymentId,
+          capturedRupees: duplicateRupees,
+          source,
+          uid: intent.uid,
+          email: intent.email,
+          customerName: intent.customerName,
+          phone: intent.phone,
+          address: intent.address,
+        })
+      );
+      return { kind: "created", orderId, finalTotal: duplicateRupees, duplicateOf: finalizedPaymentId };
     }
 
     // Inventory is per PRODUCT, not per order line: lib/cart.ts keys cart
@@ -370,6 +558,13 @@ export async function finalizeOnlineOrder(params: {
       });
     }
 
+    // This payment is now THE normal payment for the intent — committed
+    // atomically with the order above, so a racing second payment either sees
+    // it (duplicate path) or conflicts and retries into it.
+    if (finalization.intentExists) {
+      tx.update(intentRef, { finalizedPaymentId: razorpayPaymentId, finalizedAt: Timestamp.now() });
+    }
+
     // Same net movement the COD path performs: spend what was redeemed, and
     // nothing more. An ONLINE order is Paid at creation but not yet delivered
     // and nowhere near the end of its return window, so its points are not
@@ -390,6 +585,18 @@ export async function finalizeOnlineOrder(params: {
   });
 
   if (outcome.kind !== "created") return outcome;
+
+  // Duplicate payment: the admin refund alert is the ONLY effect. No reward
+  // ledger, no confirmation email, no order notifications.
+  if (outcome.duplicateOf) {
+    await notifyDuplicateIntentPayment(db, {
+      razorpayPaymentId,
+      razorpayOrderId,
+      duplicateOf: outcome.duplicateOf,
+      capturedRupees: outcome.finalTotal,
+    });
+    return { kind: "already", orderId, finalTotal: outcome.finalTotal };
+  }
 
   // ---- Best-effort, outside the transaction. None of these may fail an order
   // that has already committed and been paid for.

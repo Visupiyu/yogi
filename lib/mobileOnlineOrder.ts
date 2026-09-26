@@ -1,7 +1,13 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
-import { onlineOrderIdFor, type FinalizeResult } from "@/lib/onlineOrder";
+import {
+  duplicateIntentPaymentRecord,
+  notifyDuplicateIntentPayment,
+  onlineOrderIdFor,
+  readIntentFinalization,
+  type FinalizeResult,
+} from "@/lib/onlineOrder";
 import { getAdminCommissionRate } from "@/lib/orderPricing";
 import { couponRedemptionId } from "@/lib/coupons/couponRules";
 import {
@@ -152,8 +158,11 @@ export async function finalizeMobileOnlineOrder(params: {
     ? db.collection("couponRedemptions").doc(couponRedemptionId(intent.uid, intent.couponCode))
     : null;
 
+  // One normal payment per intent — same rule as lib/onlineOrder.ts.
+  const intentRef = db.collection("paymentIntents").doc(razorpayOrderId);
+
   const outcome = await db.runTransaction<
-    FinalizeResult & { shortfalls?: Shortfall[]; couponConflict?: boolean }
+    FinalizeResult & { shortfalls?: Shortfall[]; couponConflict?: boolean; duplicateOf?: string }
   >(
     async (tx: Transaction) => {
       // ---- ALL READS FIRST (Firestore transaction requirement) ----
@@ -164,6 +173,39 @@ export async function finalizeMobileOnlineOrder(params: {
           orderId,
           finalTotal: Number(orderSnap.data()?.total || 0),
         };
+      }
+
+      // One normal payment per intent (lib/onlineOrder.ts, ONE NORMAL PAYMENT
+      // PER INTENT): a different payment already finalized this intent ->
+      // record this one as an inert duplicate, before any normal effect.
+      const finalization = await readIntentFinalization(tx, db, intentRef, razorpayOrderId);
+      const finalizedPaymentId = finalization.finalizedPaymentId;
+      if (finalizedPaymentId) {
+        const duplicateRupees = Math.round(capturedAmountPaise) / 100;
+        // A legacy intent (finalized before the claim existed): record the claim
+        // it is missing, atomically with the decision below.
+        if (finalization.legacyFinalizedAt) {
+          tx.update(intentRef, { finalizedPaymentId, finalizedAt: finalization.legacyFinalizedAt });
+        }
+        if (finalizedPaymentId === razorpayPaymentId) {
+          return { kind: "already", orderId, finalTotal: duplicateRupees };
+        }
+        tx.set(
+          orderRef,
+          duplicateIntentPaymentRecord({
+            razorpayPaymentId,
+            razorpayOrderId,
+            duplicateOf: finalizedPaymentId,
+            capturedRupees: duplicateRupees,
+            source,
+            uid: intent.uid,
+            email: intent.email,
+            customerName: intent.customerName,
+            phone: intent.phone,
+            address: intent.address,
+          })
+        );
+        return { kind: "created", orderId, finalTotal: duplicateRupees, duplicateOf: finalizedPaymentId };
       }
 
       // Aggregate per PRODUCT — the same reason app/api/mobile/place-order
@@ -363,6 +405,12 @@ export async function finalizeMobileOnlineOrder(params: {
         });
       }
 
+      // This payment is now THE normal payment for the intent, committed
+      // atomically with the order above.
+      if (finalization.intentExists) {
+        tx.update(intentRef, { finalizedPaymentId: razorpayPaymentId, finalizedAt: Timestamp.now() });
+      }
+
       // The cart AT CHECKOUT TIME (captured into the intent), not whatever
       // the live cart holds now — a webhook can settle minutes after the
       // customer resumed shopping.
@@ -375,6 +423,17 @@ export async function finalizeMobileOnlineOrder(params: {
   );
 
   if (outcome.kind !== "created") return outcome;
+
+  // Duplicate payment: the admin refund alert is the ONLY effect.
+  if (outcome.duplicateOf) {
+    await notifyDuplicateIntentPayment(db, {
+      razorpayPaymentId,
+      razorpayOrderId,
+      duplicateOf: outcome.duplicateOf,
+      capturedRupees: outcome.finalTotal,
+    });
+    return { kind: "already", orderId, finalTotal: outcome.finalTotal };
+  }
 
   if (outcome.shortfalls?.length || outcome.couponConflict) {
     try {
