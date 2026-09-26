@@ -205,15 +205,27 @@ service firebase.storage {
     // views them through the tokenized URL stored on the chat message / order,
     // which the Firestore rules already restrict to the participants. A plain
     // signed-in read here let any account enumerate and download them all.
+    //
+    // Both are also CREATE-ONLY: once sent, an attachment or a proof photo
+    // can never be replaced, re-tagged or removed by its uploader.
+    // `resource == null` is what refuses the replacement — in Storage rules
+    // an upload over an existing object is evaluated as `create` — and with
+    // no update/delete rule, metadata changes and deletes are denied too.
+    // Every upload site writes a fresh unique path (lib/storagePaths.ts), so
+    // no legitimate flow overwrites; a corrected delivery proof is a NEW file
+    // that orders.proofImage is repointed to (final once Delivered — see
+    // firestore.rules).
     match /chat/{uid}/{fileName} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
-      allow write: if isSignedIn() && request.auth.uid == uid
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && resource == null
         && isImageUnderLimit(5);
     }
 
     match /delivery-proof/{uid}/{fileName} {
       allow read: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
-      allow write: if isSignedIn() && request.auth.uid == uid
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && resource == null
         && isImageUnderLimit(5);
     }
 

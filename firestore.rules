@@ -600,6 +600,12 @@ service cloud.firestore {
           isAssignedDeliveryPartner()
           && affectedKeysOnly(['status', 'deliveryNotes', 'proofImage', 'deliveredAt', 'updatedAt'])
           && isTrustedDeliveredAt()
+          // Proof of delivery is final once the order IS Delivered.
+          // `resource` is the order as it was before this write, so the
+          // save that moves an order INTO Delivered (and every re-attempt
+          // after Delivery Failed) can still attach or replace proofImage;
+          // only a later change or removal is refused. Admin is unaffected.
+          && (resource.data.status != 'Delivered' || unchanged('proofImage'))
           && (
             unchanged('status')
             || isLegalOrderStatusTransition(resource.data.status, request.resource.data.status)

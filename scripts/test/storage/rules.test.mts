@@ -5,8 +5,10 @@
  * readable and listable by ANY signed-in account), that the legacy flat
  * chat/ and delivery-proof/ objects are admin-only, and that uploads, the
  * public product / store / review images and the default-deny fallback are
- * unchanged. Loads the repository's storage.rules into the emulator and uses
- * tiny synthetic files only.
+ * unchanged. Also proves chat attachments and proof photos are immutable once
+ * uploaded: no overwrite, metadata change or delete by anyone. Loads the
+ * repository's storage.rules into the emulator and uses tiny synthetic files
+ * only.
  *
  * Run:
  *   npx firebase emulators:exec --only storage --project demo-yomico-storage \
@@ -128,6 +130,28 @@ await check("26 KYC unchanged: unrelated user cannot read, admin can", async () 
   await assertFails(read(bob(), "vendor-kyc/vendorV/gst-1700-cert.pdf"));
   await assertSucceeds(read(admin(), "vendor-kyc/vendorV/gst-1700-cert.pdf"));
 });
+
+// ============ IMMUTABILITY (create-only) ============
+// Unique names, so these never collide with objects the checks above wrote.
+const ONE_MB = new Uint8Array(1024 * 1024);
+await check("W1  chat: owner creates a new attachment", () => assertSucceeds(put(alice(), "chat/alice/1900000000000-w1new-photo.jpg")));
+await check("W2  chat: owner CANNOT overwrite an existing attachment (was allowed)", () => assertFails(put(alice(), CHAT)));
+await check("W3  chat: owner CANNOT change an attachment's metadata (was allowed)", () =>
+  assertFails(alice().ref(CHAT).updateMetadata({ customMetadata: { edited: "yes" } })));
+await check("W4  chat: owner CANNOT delete an attachment", () => assertFails(alice().ref(CHAT).delete()));
+await check("W5  chat: admin CANNOT overwrite an attachment", () => assertFails(put(admin(), CHAT)));
+await check("W6  chat: unrelated user CANNOT overwrite an attachment", () => assertFails(put(bob(), CHAT)));
+await check("W7  chat: owner creates a 1MB attachment", () => assertSucceeds(put(alice(), "chat/alice/1900000000000-w7big-photo.jpg", ONE_MB)));
+await check("W8  proof: owner creates a new proof", () =>
+  assertSucceeds(put(rider1(), "delivery-proof/rider1/order9-1900000000000-w8new-proof.jpg")));
+await check("W9  proof: owner CANNOT overwrite a submitted proof (was allowed)", () => assertFails(put(rider1(), PROOF)));
+await check("W10 proof: owner CANNOT change a proof's metadata (was allowed)", () =>
+  assertFails(rider1().ref(PROOF).updateMetadata({ customMetadata: { edited: "yes" } })));
+await check("W11 proof: owner CANNOT delete a proof", () => assertFails(rider1().ref(PROOF).delete()));
+await check("W12 proof: admin CANNOT overwrite a proof", () => assertFails(put(admin(), PROOF)));
+await check("W13 proof: unrelated user CANNOT overwrite a proof", () => assertFails(put(rider2(), PROOF)));
+await check("W14 proof: owner creates a 1MB proof", () =>
+  assertSucceeds(put(rider1(), "delivery-proof/rider1/order9-1900000000000-w14big-proof.jpg", ONE_MB)));
 
 await env.cleanup();
 console.log(`\n${pass}/${pass + fail} storage rules checks passed`);
