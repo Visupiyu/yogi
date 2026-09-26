@@ -733,6 +733,25 @@ service cloud.firestore {
           && unchanged('gstDocUrl')
           && unchanged('aadhaarDocUrl')
           && unchanged('chequeDocUrl')
+          // Identity numbers and payout bank details are fixed once KYC is
+          // Approved: the admin verified them together with the documents,
+          // and payouts are paid to these bank details. Before approval
+          // (Pending or Rejected) the applicant may still correct them.
+          // kycStatus is itself frozen for the owner (above), and blocking a
+          // vendor changes only `status`, so a blocked vendor stays frozen too.
+          // Admin (the isAdmin() branch) is unaffected.
+          && (
+            resource.data.kycStatus != 'Approved'
+            || (
+              unchanged('gstNumber')
+              && unchanged('panNumber')
+              && unchanged('aadhaarNumber')
+              && unchanged('accountHolder')
+              && unchanged('bankName')
+              && unchanged('accountNumber')
+              && unchanged('ifsc')
+            )
+          )
           && unchanged('commissionRate')
           && unchanged('totalSales')
           && unchanged('totalOrders')

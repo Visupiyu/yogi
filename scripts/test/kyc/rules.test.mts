@@ -3,7 +3,9 @@
  * Proves that a vendor's or delivery partner's KYC documents are create-only
  * for their owner (never replaced or removed once uploaded — including after
  * admin verification), that a vendor cannot repoint gstDocUrl /
- * aadhaarDocUrl / chequeDocUrl at a different file, and that initial
+ * aadhaarDocUrl / chequeDocUrl at a different file, that a KYC-Approved
+ * vendor cannot change, add or remove their identity numbers or payout bank
+ * details (a Pending vendor still can), and that initial
  * uploads, admin reads/moderation and ordinary vendor profile edits are
  * unchanged. Loads the repository's storage.rules and firestore.rules into the
  * emulators and uses tiny synthetic files and documents only.
@@ -65,6 +67,25 @@ const VENDOR = {
   chequeDocUrl: "https://example.invalid/vendor-kyc/cheque",
 };
 
+const APPROVED_VENDOR = {
+  uid: "vendorA",
+  businessName: "Approved Traders",
+  aboutStore: "About the store",
+  status: "Approved",
+  kycStatus: "Approved",
+  commissionRate: 0,
+  gstDocUrl: "https://example.invalid/vendor-kyc/gst-a",
+  aadhaarDocUrl: "https://example.invalid/vendor-kyc/aadhaar-a",
+  chequeDocUrl: "https://example.invalid/vendor-kyc/cheque-a",
+  gstNumber: "TESTGSTIN00000Z",
+  panNumber: "TESTP0000Q",
+  aadhaarNumber: "000000000000",
+  accountHolder: "Test Holder",
+  bankName: "Test Bank",
+  accountNumber: "0000000001",
+  ifsc: "TEST0000001",
+};
+
 async function reseed() {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (ctx) => {
@@ -74,6 +95,15 @@ async function reseed() {
     const { chequeDocUrl: _omit, ...withoutCheque } = VENDOR;
     void _omit;
     await setDoc(doc(ctx.firestore(), "vendors", "v_doc2"), { ...withoutCheque, uid: "vendorW" });
+    // Identity + bank freeze fixtures (obviously fake values).
+    await setDoc(doc(ctx.firestore(), "vendors", "v_approved"), APPROVED_VENDOR);
+    const { gstNumber: _g, panNumber: _p, aadhaarNumber: _a, ...bare } = APPROVED_VENDOR;
+    void _g; void _p; void _a;
+    await setDoc(doc(ctx.firestore(), "vendors", "v_approved_bare"), { ...bare, uid: "vendorB" });
+    await setDoc(doc(ctx.firestore(), "vendors", "v_blocked"), { ...APPROVED_VENDOR, uid: "vendorX", status: "Blocked" });
+    await setDoc(doc(ctx.firestore(), "vendors", "v_pending"), {
+      ...APPROVED_VENDOR, uid: "vendorP", status: "Pending", kycStatus: "Pending",
+    });
   });
 }
 
@@ -164,6 +194,56 @@ await check("24c vendor doc: new vendor application with KYC URLs still allowed 
   assertSucceeds(setDoc(doc(firestoreAs("newVendor"), "vendors", "v_new"), {
     uid: "newVendor", businessName: "New", status: "Pending", kycStatus: "Pending",
     gstDocUrl: "https://example.invalid/g", aadhaarDocUrl: "https://example.invalid/a", chequeDocUrl: "https://example.invalid/c",
+  })));
+
+// ============ FIRESTORE: identity + bank details frozen once KYC Approved ============
+const approved = () => doc(firestoreAs("vendorA"), "vendors", "v_approved");
+const approvedBare = () => doc(firestoreAs("vendorB"), "vendors", "v_approved_bare");
+const identity: [string, string][] = [["gstNumber", "TESTGSTIN99999Z"], ["panNumber", "TESTP9999Q"], ["aadhaarNumber", "999999999999"]];
+let n = 1;
+for (const [field, value] of identity) {
+  await check(`V${n++} approved vendor CANNOT change ${field} (was allowed)`, () => assertFails(updateDoc(approved(), { [field]: value })));
+  await check(`V${n++} approved vendor CANNOT remove ${field} (was allowed)`, () => assertFails(updateDoc(approved(), { [field]: deleteField() })));
+  await check(`V${n++} approved vendor CANNOT add ${field} when missing (was allowed)`, () => assertFails(updateDoc(approvedBare(), { [field]: value })));
+}
+const bank: [string, string][] = [["accountHolder", "Someone Else"], ["bankName", "Other Bank"], ["accountNumber", "9999999999"], ["ifsc", "OTHR0000009"]];
+for (const [field, value] of bank) {
+  await check(`V${n++} approved vendor CANNOT change ${field} (was allowed)`, () => assertFails(updateDoc(approved(), { [field]: value })));
+}
+await check("V13b approved vendor CANNOT remove accountNumber (was allowed)", () =>
+  assertFails(updateDoc(approved(), { accountNumber: deleteField() })));
+await check("V13c blocked vendor (status Blocked, kycStatus Approved) CANNOT change accountNumber (was allowed)", () =>
+  assertFails(updateDoc(doc(firestoreAs("vendorX"), "vendors", "v_blocked"), { accountNumber: "9999999999" })));
+await check("V14 approved vendor can still change an ordinary profile field (aboutStore)", () =>
+  assertSucceeds(updateDoc(approved(), { aboutStore: "Updated about" })));
+await check("V15 approved vendor whole-document save with protected values unchanged still allowed", async () => {
+  const current = (await getDoc(approved())).data() || {};
+  await assertSucceeds(updateDoc(approved(), { ...current, businessName: "Approved Traders Ltd" }));
+});
+await check("V16 approved vendor CANNOT change kycStatus (unchanged)", () => assertFails(updateDoc(approved(), { kycStatus: "Pending" })));
+await check("V17 approved vendor CANNOT change gstDocUrl (unchanged)", () =>
+  assertFails(updateDoc(approved(), { gstDocUrl: "https://example.invalid/x" })));
+await check("V18 approved vendor CANNOT change aadhaarDocUrl (unchanged)", () =>
+  assertFails(updateDoc(approved(), { aadhaarDocUrl: "https://example.invalid/x" })));
+await check("V19 approved vendor CANNOT change chequeDocUrl (unchanged)", () =>
+  assertFails(updateDoc(approved(), { chequeDocUrl: "https://example.invalid/x" })));
+const pending = () => doc(firestoreAs("vendorP"), "vendors", "v_pending");
+await check("V20 pending vendor can still correct identity and bank details (preserved)", () =>
+  assertSucceeds(updateDoc(pending(), {
+    gstNumber: "TESTGSTIN11111Z", panNumber: "TESTP1111Q", aadhaarNumber: "111111111111",
+    accountHolder: "Corrected Holder", bankName: "Corrected Bank", accountNumber: "1111111111", ifsc: "CORR0000001",
+  })));
+await check("V20b pending vendor still CANNOT change kycStatus (unchanged)", () =>
+  assertFails(updateDoc(pending(), { kycStatus: "Approved" })));
+await check("V21 admin can still update protected identity and bank fields", () =>
+  assertSucceeds(updateDoc(doc(firestoreAs("adminUid", ADMIN_EMAIL), "vendors", "v_approved"), {
+    gstNumber: "TESTGSTIN22222Z", accountNumber: "2222222222", ifsc: "ADMN0000002",
+  })));
+await check("V22 new vendor application with identity and bank fields still allowed (create unchanged)", () =>
+  assertSucceeds(setDoc(doc(firestoreAs("newVendor2"), "vendors", "v_new2"), {
+    uid: "newVendor2", businessName: "New Two", status: "Pending", kycStatus: "Pending",
+    gstNumber: "TESTGSTIN33333Z", panNumber: "TESTP3333Q", aadhaarNumber: "333333333333",
+    accountHolder: "New Holder", bankName: "New Bank", accountNumber: "3333333333", ifsc: "NEWB0000003",
   })));
 
 await env.cleanup();
