@@ -62,3 +62,45 @@ export async function loadVendorPayableBreakdown(
   const inputs = await loadVendorPayableInputs(db, vendorUid);
   return computeVendorPayableBreakdown({ vendorUid, ...inputs });
 }
+
+
+/**
+ * The inputs for ONE seller's statement on ONE order (lib/sellerOrderStatement.ts),
+ * or null when this seller may not see it: the order does not exist, has none
+ * of the seller's items, or is still Pending (firestore.rules hide a Pending
+ * order from its sellers until the admin confirms it). The seller identity is
+ * always the verified caller — never a client-supplied id.
+ */
+export async function loadVendorOrderStatementInputs(
+  db: Firestore,
+  vendorUid: string,
+  orderId: string
+): Promise<{
+  order: PayableOrder & { id: string };
+  sellerOrder: PayableSellerOrder | null;
+  itemRequests: PayableItemRequest[];
+  legacyReturns: PayableLegacyReturn[];
+} | null> {
+  const orderSnap = await db.collection("orders").doc(orderId).get();
+  if (!orderSnap.exists) return null;
+  const data = orderSnap.data() || {};
+  const items = Array.isArray(data.items) ? (data.items as { vendorId?: unknown }[]) : [];
+  if (!items.some((item) => item?.vendorId === vendorUid)) return null;
+  if (data.status === "Pending") return null;
+
+  const [sellerOrderSnap, itemReqSnap, legacyReturnSnap] = await Promise.all([
+    db.collection("sellerOrders").doc(`${orderId}_${vendorUid}`).get(),
+    // Same query shape as loadVendorPayableInputs, then narrowed to this order.
+    db.collection("itemRequests").where("vendorId", "==", vendorUid).get(),
+    db.collection("returns").where("orderId", "==", orderId).get(),
+  ]);
+
+  return {
+    order: { id: orderSnap.id, ...data },
+    sellerOrder: sellerOrderSnap.exists ? (sellerOrderSnap.data() as PayableSellerOrder) : null,
+    itemRequests: itemReqSnap.docs
+      .map((d) => d.data())
+      .filter((ir) => String((ir as { orderId?: unknown })?.orderId || "") === orderId),
+    legacyReturns: legacyReturnSnap.docs.map((d) => d.data()),
+  };
+}

@@ -17,8 +17,10 @@ export default function InvoiceFinance({
   const commission = YOMICO_COMMISSION_AMOUNT;
   void order.commission;
 
-  const sellerEarning =
-    Number(order.sellerEarning || 0);
+  // The tax invoice is NOT the seller settlement document: no seller
+  // earnings figure is shown here. The authoritative per-order settlement is
+  // the Seller Order Settlement Statement (/api/seller/order-statement).
+  void order.sellerEarning;
 
   return (
 
@@ -77,18 +79,11 @@ export default function InvoiceFinance({
           <tr>
 
             <td className="border border-black p-1 font-semibold">
-              Vendor Earnings
+              Seller Settlement
             </td>
 
-            <td className="border border-black p-1 text-right text-green-700 font-bold">
-              ₹
-              {sellerEarning.toLocaleString(
-                "en-IN",
-                {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                }
-              )}
+            <td className="border border-black p-1 text-right text-gray-700">
+              See Seller Order Settlement Statement (not part of this tax invoice)
             </td>
 
           </tr>

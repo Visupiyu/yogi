@@ -83,9 +83,9 @@ export default function SellerInvoicePage() {
             (item: any) => item.vendorId === user.uid
           );
 
-          // This seller's own figures from the shared payout helper — the
-          // same numbers app/seller/orders/[id]'s invoice embed shows. Its
-          // commission is always ₹0 (lib/commissionPolicy.ts).
+          // This seller's own item value from the shared helper. The seller's
+          // SETTLEMENT is deliberately not put on this GST tax invoice — it is
+          // on the Seller Order Settlement Statement (app/seller/orders/[id]).
           const share = computeVendorShare(data, user.uid);
           const vendorSubtotal = share?.vendorRawSubtotal ?? 0;
 
@@ -93,8 +93,6 @@ export default function SellerInvoicePage() {
             ...data,
             items: vendorItems,
             finalTotal: vendorSubtotal,
-            commission: share?.vendorCommission ?? 0,
-            sellerEarning: share?.vendorEarning ?? 0,
             // Shipping/coupon discount aren't split per vendor anywhere
             // in this app — showing the whole order's figures here would
             // overstate this seller's own invoice.

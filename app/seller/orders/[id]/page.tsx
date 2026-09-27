@@ -16,6 +16,7 @@ import {
 } from "@/lib/itemRequests";
 import ShippingLabel from "@/components/ShippingLabel";
 import Invoice from "@/components/invoice/Invoice";
+import SellerOrderStatement from "@/components/settlement/SellerOrderStatement";
 import { computeVendorShare } from "@/lib/vendorEarnings";
 import {
   ITEM_FULFILMENT_STAGES,
@@ -1294,19 +1295,8 @@ finally{ setSaving(false);} };
                     ₹
 
                     {vendorOrderSubtotal}
-                     <p>
-
-<strong>Seller Earnings :</strong>
-
-₹{vendorOrderEarning}
-
-</p>
-<p>
-
-<strong>Commission :</strong>
-
-₹{vendorOrderCommission}
-
+                     <p className="text-sm font-normal text-gray-500">
+Your earnings for this order: see the Settlement Statement below.
 </p>
 
                   </span>
@@ -1316,6 +1306,9 @@ finally{ setSaving(false);} };
               </div>
 
             </div>
+
+            {/* Seller settlement — the authoritative per-order figures */}
+            <SellerOrderStatement orderId={id} />
 
             {/* Order Status */}
 
