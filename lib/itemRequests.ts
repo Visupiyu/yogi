@@ -100,11 +100,12 @@ export function isTerminal(status: string): boolean {
 // The replace stages a SELLER (not just admin) may drive — the fulfilment
 // portion of the replacement lifecycle. Single-sourced so the transition
 // route's authorization and the seller UI's available actions cannot drift.
+// "DELIVERED" is deliberately NOT here: a replacement's delivery to the
+// customer is recorded by YOMICO (admin), never self-certified by the seller.
 export const SELLER_REPLACE_TARGETS: readonly string[] = [
   "SELLER_PREPARING",
   "READY_FOR_DELIVERY",
   "HANDED_OVER_TO_COURIER",
-  "DELIVERED",
 ];
 
 // The return stages a SELLER may drive. Once the item is physically back with

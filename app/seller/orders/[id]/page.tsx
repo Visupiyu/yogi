@@ -24,7 +24,7 @@ import {
   fulfilmentActionLabel,
   fulfilmentStageLabel,
   isStageComplete,
-  nextItemStage,
+  sellerNextItemStage,
   type ItemFulfilmentMap,
 } from "@/lib/itemFulfilment";
 import { requestItemAdvance } from "@/lib/sellerFulfilmentClient";
@@ -60,10 +60,6 @@ type SellerFulfilmentRecord = {
   shipmentWeightKg?: number;
 };
 
-// The ONLY paymentMethod a vendor may mark Paid by themselves. Kept as an
-// explicit allow-list so an unrecognised or newly-added method is refused
-// by default rather than silently permitted.
-const VENDOR_SELF_PAID_METHODS: string[] = ["COD"];
 
 // Badge colours for a customer's return/replace request status, by tone.
 const REQUEST_TONE_BADGE: Record<string, string> = {
@@ -271,7 +267,8 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
     if (!sellerRecord) return;
 
-    if (!nextItemStage(String(sellerRecord.itemFulfilment?.[itemKey]?.status))) {
+    const currentStage = String(sellerRecord.itemFulfilment?.[itemKey]?.status);
+    if (!sellerNextItemStage(currentStage)) {
       return;
     }
 
@@ -286,6 +283,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
         idToken: await user.getIdToken(),
         recordId: sellerRecord.id,
         itemKey,
+        fromStatus: currentStage,
       });
 
       if (!result.ok) {
@@ -412,71 +410,28 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
         return;
       }
 
-      const payload: any = {
-
-          status,
-
-          trackingNumber,
-
-          courierPartner,
-
-          dispatchDate,
-
-          expectedDelivery,
-
-          sellerNotes,
-
-          updatedAt:
-            serverTimestamp()
-
+      // Shipping details are this seller's own, so they are always saved on
+      // the seller's record (sellerOrders — firestore.rules let the owning
+      // seller write exactly these fields). The order-level copy, which a
+      // single-seller order's customer sees, is written only when this seller
+      // is the order's ONLY seller and the order is still open: on a shared
+      // order one seller must never overwrite another's tracking. No status,
+      // payment or delivery field is ever written from here.
+      const shipping = {
+        trackingNumber,
+        courierPartner,
+        dispatchDate,
+        expectedDelivery,
+        sellerNotes,
+        updatedAt: serverTimestamp(),
       };
-
-      // Legacy cash-COD orders collect payment on delivery — mark it paid
-      // in the same write, matching what the Firestore rule allows a
-      // seller to do.
-      //
-      // ALLOW-LIST, not a deny-list. This previously excluded only
-      // "ONLINE" and "PAY_ON_DELIVERY_UPI", so every other value defaulted
-      // to permitted — and production carries four distinct paymentMethod
-      // values, including "UPI" and the display string
-      // "Pay on Delivery (UPI Only)". That let a vendor self-certify
-      // payment on orders whose money had not been verified, which with
-      // the fulfilled+paid payout gate also unlocks their own earnings.
-      //
-      // "COD" is the only value that legitimately settles in cash at the
-      // door with no second party to verify it (see PaymentMethod in
-      // lib/payment.ts). Everything else — known or unknown, now or later
-      // — is blocked by default: Pay on Delivery (UPI Only) moves to Paid
-      // only via the delivery partner's transaction-reference write plus
-      // admin verification, and ONLINE is already Paid at creation.
-      if (
-        status === "Delivered" &&
-        VENDOR_SELF_PAID_METHODS.includes(order.paymentMethod) &&
-        order.paymentStatus !== "Paid"
-      ) {
-        payload.paymentStatus = "Paid";
+      if (sellerRecord) {
+        await updateDoc(doc(db, "sellerOrders", sellerRecord.id), shipping);
       }
-
-      // The 72h delivery clock is measured against deliveredAt, so every path
-      // that completes an order has to stamp it — previously only the
-      // delivery-partner screen did, leaving seller-completed orders with no
-      // completion time at all. serverTimestamp() is required: firestore.rules
-      // accepts deliveredAt only when it equals request.time.
-      if (status === "Delivered" && order.status !== "Delivered") {
-        payload.deliveredAt = serverTimestamp();
+      const soleSeller = Array.isArray(order.vendorIds) && order.vendorIds.length === 1;
+      if (soleSeller && !["Delivered", "Cancelled"].includes(order.status)) {
+        await updateDoc(doc(db, "orders", id), shipping);
       }
-
-      await updateDoc(
-
-        doc(
-          db,
-          "orders",
-          id
-        ),
-
-        payload
-
-      );
 
       // The client-side stock/sales restore that stood here is gone —
       // cancellation returns above, and /api/cancel-order performs the
@@ -993,7 +948,7 @@ finally{ setSaving(false);} };
                       const key = line.itemKey || `i${index}`;
                       const stage =
                         sellerRecord.itemFulfilment?.[key]?.status ?? "Confirmed";
-                      const next = nextItemStage(String(stage));
+                      const next = sellerNextItemStage(String(stage));
                       const busy = busyItemKey === key;
 
                       return (
@@ -1037,7 +992,7 @@ finally{ setSaving(false);} };
 
                               <span className="text-sm text-gray-400">
 
-                                Complete
+                                {stage === "Delivered" ? "Complete" : "With delivery partner"}
 
                               </span>
 
@@ -1343,7 +1298,7 @@ Your earnings for this order: see the Settlement Statement below.
 
                 }
 
-                disabled={!CANCELLABLE_BY_SELLER.includes(order.status)}
+                disabled={!(CANCELLABLE_BY_SELLER.includes(order.status) && Array.isArray(order.vendorIds) && order.vendorIds.length === 1)}
 
                 className="
                   w-full
@@ -1362,7 +1317,7 @@ Your earnings for this order: see the Settlement Statement below.
 
                 </option>
 
-                {CANCELLABLE_BY_SELLER.includes(order.status) && (
+                {(CANCELLABLE_BY_SELLER.includes(order.status) && Array.isArray(order.vendorIds) && order.vendorIds.length === 1) && (
 
                   <option value="Cancelled">Cancelled</option>
 

@@ -1,5 +1,6 @@
 import { verifyRequestUser, type VerifiedUser } from "@/lib/serverAuth";
 import { shouldReverseEarnedPoints } from "@/lib/rewardCredit";
+import { vendorsOnOrder } from "@/lib/sellerOrderRecord";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import {
   FieldValue,
@@ -30,6 +31,15 @@ import { emitDeliveryNotification } from "@/lib/deliveryEngine/notifications";
 // The client sends only an orderId. Authorization, cancellability, the items,
 // the quantities and every amount are read from Firestore server-side — none
 // of it is accepted from the request.
+//
+// Cancellability is judged per ITEM, not on orders.status alone: the parent
+// status is only the least-advanced item across every seller, so it can read
+// "Confirmed" while another seller's products are already shipped or
+// delivered. A seller or admin cancellation is refused once any item on the
+// order has been handed over (Shipped or later). A SELLER may cancel only an
+// order that is entirely their own, only while their account is Approved, and
+// not once a delivery company has collected it — on a multi-seller order,
+// cancelling would also cancel, restock and zero out other sellers' goods.
 //
 // NOTE: no caller is migrated yet, and no Firestore rule has changed, so the
 // existing client-side cancellation paths still work. Migrating them is the
@@ -107,6 +117,13 @@ type OrderRecord = {
 // admin "cancelling" a Delivered order would restore stock for goods the
 // customer already has.
 const CANCELLABLE_STATUSES = ["Pending", "Confirmed", "Packed"];
+
+// Item stages before handover (lib/itemFulfilment). Anything later means the
+// goods have left the seller.
+const PRE_HANDOVER_ITEM_STAGES = new Set(["Confirmed", "Packed"]);
+
+// Delivery Engine job states in which the company has (or had) the parcel.
+const COLLECTED_JOB_STATUSES = new Set(["InProgress", "Delivered", "DeliveryFailed", "Returned"]);
 
 type AuthzResult =
   | { ok: true; role: "customer" | "vendor" | "admin" }
@@ -231,6 +248,50 @@ export async function POST(request: Request) {
         const authz = authorize(order, requester);
         if (!authz.ok) {
           return { kind: "error", status: authz.status, error: authz.error };
+        }
+
+        // ---- seller & per-item guards (reads only) ----
+        if (authz.role === "vendor") {
+          const vendorSnap = await tx.get(
+            db.collection("vendors").where("uid", "==", requester.uid).limit(1)
+          );
+          if (
+            vendorSnap.empty ||
+            (vendorSnap.docs[0].data() as { status?: unknown })?.status !== "Approved"
+          ) {
+            return {
+              kind: "error",
+              status: 403,
+              error: "Your seller account is not approved to cancel orders.",
+            };
+          }
+          if (vendorsOnOrder(order as never).some((v) => v !== requester.uid)) {
+            return {
+              kind: "error",
+              status: 409,
+              error:
+                "This order includes products from other sellers. Please contact YOMICO support to cancel your items.",
+            };
+          }
+        }
+        if (authz.role !== "customer" && order.status !== "Pending") {
+          const recordsSnap = await tx.get(
+            db.collection("sellerOrders").where("orderId", "==", orderId)
+          );
+          const handedOver = recordsSnap.docs.some((d) =>
+            Object.values(
+              ((d.data() as { itemFulfilment?: Record<string, { status?: unknown }> })
+                .itemFulfilment) || {}
+            ).some((entry) => !PRE_HANDOVER_ITEM_STAGES.has(String(entry?.status)))
+          );
+          if (handedOver) {
+            return {
+              kind: "error",
+              status: 409,
+              error:
+                "Some products on this order have already been handed over for delivery, so it can't be cancelled.",
+            };
+          }
         }
 
         // ---- ALL READS FIRST (Firestore transaction requirement) ----
@@ -382,6 +443,20 @@ export async function POST(request: Request) {
         const deliveryJobsSnap = await tx.get(
           db.collection("deliveryJobs").where("orderId", "==", orderId)
         );
+        // A seller cannot cancel once the delivery company has the parcel.
+        if (
+          authz.role === "vendor" &&
+          deliveryJobsSnap.docs.some((d) =>
+            COLLECTED_JOB_STATUSES.has(String((d.data() as { status?: unknown }).status))
+          )
+        ) {
+          return {
+            kind: "error",
+            status: 409,
+            error:
+              "The delivery company has already collected this order, so it can't be cancelled. Please contact YOMICO support.",
+          };
+        }
         const DELIVERY_TERMINAL = new Set(["Delivered", "Cancelled", "Returned"]);
         type HaltPlan = {
           jobRef: FirebaseFirestore.DocumentReference;

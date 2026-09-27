@@ -69,6 +69,23 @@ export function nextItemStage(from: string): ItemFulfilmentStage | null {
   return stages[index + 1];
 }
 
+/**
+ * The stages a SELLER may move an item into: packing it, and handing it over
+ * for shipping. "Out For Delivery" and "Delivered" are delivery milestones —
+ * recorded by the Delivery Engine (DELIVER scan + commerce reconciliation) or
+ * by an admin — so a seller can never manufacture delivery completion, which
+ * is what makes an order settlement-eligible. "Shipped" is additionally
+ * refused by app/api/seller/advance-item when a Delivery Engine job covers the
+ * shipment: there the handover is the delivery company's own pickup scan.
+ */
+export const SELLER_ITEM_TARGETS: readonly ItemFulfilmentStage[] = ["Packed", "Shipped"];
+
+/** The next stage the SELLER may move this item to, or null when it isn't theirs to move. */
+export function sellerNextItemStage(from: string): ItemFulfilmentStage | null {
+  const next = nextItemStage(from);
+  return next && SELLER_ITEM_TARGETS.includes(next) ? next : null;
+}
+
 function stageIndex(status: unknown): number {
   const stages = ITEM_FULFILMENT_STAGES as readonly string[];
   return typeof status === "string" ? stages.indexOf(status) : -1;

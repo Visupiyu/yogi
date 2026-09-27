@@ -7,8 +7,10 @@
 // three seller surfaces (orders list, order detail, /seller/fulfilment) from
 // growing three slightly different versions of the same call.
 //
-// Deliberately sends no status: the caller does not choose the next stage and
-// cannot choose the parent's. The server derives both.
+// Deliberately sends no TARGET status: the caller does not choose the next
+// stage and cannot choose the parent's. The server derives both. It does send
+// the stage the seller is looking at (fromStatus), so a double click or a
+// stale screen is refused instead of advancing the item twice.
 
 export type AdvanceItemResult = {
   ok: boolean;
@@ -24,6 +26,8 @@ export async function requestItemAdvance(params: {
   idToken: string;
   recordId: string;
   itemKey: string;
+  /** The item's stage as the caller currently sees it. */
+  fromStatus?: string;
 }): Promise<AdvanceItemResult> {
   try {
     const response = await fetch("/api/seller/advance-item", {
@@ -35,6 +39,7 @@ export async function requestItemAdvance(params: {
       body: JSON.stringify({
         recordId: params.recordId,
         itemKey: params.itemKey,
+        ...(params.fromStatus ? { fromStatus: params.fromStatus } : {}),
       }),
     });
 

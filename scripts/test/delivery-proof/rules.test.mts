@@ -135,8 +135,10 @@ await check("8  buyer: cannot change proofImage — DENIED", () =>
   assertFails(updateDoc(order("buyer1", "o_delivered"), { proofImage: "https://example.invalid/x.jpg" })));
 await check("8b seller: cannot change proofImage — DENIED", () =>
   assertFails(updateDoc(order("seller1", "o_delivered"), { proofImage: "https://example.invalid/x.jpg", updatedAt: serverTimestamp() })));
-await check("8c seller: tracking update on a Delivered order — still ALLOWED", () =>
-  assertSucceeds(updateDoc(order("seller1", "o_delivered"), { trackingNumber: "TRK123", updatedAt: serverTimestamp() })));
+// Seller Order & Fulfillment hardening: a Delivered order is closed to seller
+// edits (and a multi-seller order never takes a seller's order-level write).
+await check("8c seller: tracking update on a Delivered order — now DENIED (order closed)", () =>
+  assertFails(updateDoc(order("seller1", "o_delivered"), { trackingNumber: "TRK123", updatedAt: serverTimestamp() })));
 await check("8d buyer: cancel own Pending order — still ALLOWED", () =>
   assertSucceeds(updateDoc(order("buyer1", "o_pending"), { status: "Cancelled", updatedAt: serverTimestamp() })));
 

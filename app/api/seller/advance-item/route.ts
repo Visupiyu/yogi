@@ -2,6 +2,7 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
 import {
+  SELLER_ITEM_TARGETS,
   buildItemAdvancePayload,
   deriveStageAcross,
   isLegalItemTransition,
@@ -12,6 +13,16 @@ import {
 // ---------------------------------------------------------------------------
 // Advance ONE line item, and roll the parent order's status up, in a single
 // transaction.
+//
+// SELLER SCOPE. A seller moves their own items only through the seller-side
+// stages — Confirmed -> Packed -> Shipped (handover) — and "Shipped" only when
+// no Delivery Engine job covers the shipment (there, handover is the delivery
+// company's pickup scan). "Out For Delivery" and "Delivered" are delivery
+// milestones owned by the Delivery Engine or an admin: a seller can never make
+// their own order Delivered (and so settlement-eligible). Every request must
+// carry the stage the seller saw (fromStatus), so a duplicate or stale request
+// is refused rather than advancing twice; a cancelled order never advances;
+// and every advance is audit-logged in the same transaction.
 //
 // sellerOrders.itemFulfilment stays the source of truth. orders.status becomes
 // a DERIVED summary of it: the least advanced item across every seller on the
@@ -80,7 +91,7 @@ export async function POST(request: Request) {
       );
     }
 
-    let body: { recordId?: unknown; itemKey?: unknown } = {};
+    let body: { recordId?: unknown; itemKey?: unknown; fromStatus?: unknown } = {};
     try {
       body = await request.json();
     } catch {
@@ -91,6 +102,8 @@ export async function POST(request: Request) {
       typeof body.recordId === "string" ? body.recordId.trim() : "";
     const itemKey =
       typeof body.itemKey === "string" ? body.itemKey.trim() : "";
+    const fromStatus =
+      typeof body.fromStatus === "string" ? body.fromStatus.trim() : "";
 
     if (!recordId || !itemKey) {
       return Response.json(
@@ -182,6 +195,34 @@ export async function POST(request: Request) {
         return { kind: "error", status: 409, error: "Illegal transition." };
       }
 
+      // Duplicate / stale request: the caller must be advancing the stage they
+      // actually saw. Required from sellers; honoured from admins when sent.
+      if ((!requester.isAdmin || fromStatus) && fromStatus !== current) {
+        return {
+          kind: "error",
+          status: 409,
+          error: "This product was already updated. Refresh to see its current status.",
+        };
+      }
+
+      // Seller scope: packing and handover only.
+      if (!requester.isAdmin && !SELLER_ITEM_TARGETS.includes(next)) {
+        return {
+          kind: "error",
+          status: 403,
+          error:
+            "Out for delivery and delivered are recorded by the delivery partner or YOMICO, not by the seller.",
+        };
+      }
+      if (!requester.isAdmin && next === "Shipped" && hasDeliveryJob) {
+        return {
+          kind: "error",
+          status: 409,
+          error:
+            "This shipment is handed over when the delivery company scans the pickup. Mark it packed and wait for collection.",
+        };
+      }
+
       // 2B-5 server guard: the seller cannot manually mark a Delivery-Engine-
       // covered record Delivered — that transition is owned by the DELIVER scan
       // + commerce reconciliation. Earlier stages are unaffected.
@@ -203,6 +244,11 @@ export async function POST(request: Request) {
 
       const orderRef = db.collection("orders").doc(orderId);
       const orderSnap = await tx.get(orderRef);
+
+      // A cancelled order is closed: none of its items advance any more.
+      if (orderSnap.exists && (orderSnap.data() as { status?: unknown }).status === "Cancelled") {
+        return { kind: "error", status: 409, error: "This order was cancelled." };
+      }
 
       // ---- compute ----
       const stampedAt = Timestamp.now();
@@ -233,6 +279,20 @@ export async function POST(request: Request) {
 
       // ---- writes ----
       tx.update(recordRef, payload);
+      tx.set(db.collection("audit_logs").doc(), {
+        actorUid: requester.uid,
+        actorEmail: requester.email || "",
+        action: "order_item_advanced",
+        targetId: recordId,
+        details: {
+          orderId,
+          itemKey,
+          from: current,
+          to: next,
+          by: requester.isAdmin ? "admin" : "seller",
+        },
+        createdAt: stampedAt,
+      });
 
       const orderStatus = orderSnap.exists
         ? (orderSnap.data() as { status?: unknown }).status

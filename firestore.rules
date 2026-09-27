@@ -535,58 +535,30 @@ service cloud.firestore {
           // known order id despite not being able to read it, producing a
           // Confirmed order with no confirmedAt and therefore no deadline.
           && resource.data.status != 'Pending'
-          // Sellers update status together with shipping/tracking
-          // details in one save — all of these must be allowed together,
-          // not just status, or every save touching tracking info fails.
-          // 'status' and 'deliveredAt' are deliberately absent.
+          // A seller may write ONLY their shipping details, and only on an
+          // order that is entirely theirs (vendorIds holds just them) and is
+          // still open. On a multi-seller order these order-level fields are
+          // shared — one seller must never overwrite what another seller's
+          // shipment shows — so each seller's shipping details live on their
+          // own sellerOrders record instead. Delivered and Cancelled orders
+          // are closed to seller edits.
+          && resource.data.vendorIds.size() == 1
+          && !(resource.data.status in ['Delivered', 'Cancelled'])
+          // 'status' and 'deliveredAt' are absent: orders.status is DERIVED
+          // from item fulfilment (app/api/seller/advance-item and the Delivery
+          // Engine's reconciliation) and is never written by a seller.
           //
-          // orders.status is now DERIVED from item fulfilment: the least
-          // advanced item across every seller on the order. A seller sets it
-          // by advancing their own product through
-          // app/api/seller/advance-item, never by writing it. Leaving it
-          // writable here would be the bypass — one seller could type
-          // "Delivered" onto an order whose other products have not shipped.
-          //
-          // deliveredAt goes with it: the route stamps it when the LAST item
-          // is delivered, which is what the 72h delivery clock measures.
-          //
-          // Cancellation is unaffected — it runs through /api/cancel-order
-          // with the Admin SDK.
+          // 'paymentStatus' is absent too: a seller can no longer mark any
+          // order Paid. The legacy cash-COD self-certification path is
+          // retired — together with a seller-controlled "Delivered" it let a
+          // seller alone make their own order settlement-eligible. Payment is
+          // confirmed by the server (ONLINE), by admin verification of the
+          // delivery partner's reference (Pay on Delivery, below), or by an
+          // admin.
           && affectedKeysOnly([
             'updatedAt', 'trackingNumber', 'courierPartner',
-            'dispatchDate', 'expectedDelivery', 'sellerNotes', 'paymentStatus'
+            'dispatchDate', 'expectedDelivery', 'sellerNotes'
           ])
-          // A seller may only ever move paymentStatus to 'Paid', and only
-          // in the same write that marks the order Delivered — this
-          // self-mark-paid path is reserved for the legacy cash-COD flow.
-          //
-          // Now an ALLOW-LIST. It previously read
-          // `paymentMethod != 'PAY_ON_DELIVERY_UPI'`, which excluded exactly
-          // one value and admitted every other — including 'ONLINE', the
-          // bare 'UPI' value some orders carry, and the display string
-          // 'Pay on Delivery (UPI Only)'. Production holds four distinct
-          // paymentMethod values, so the deny-list left most of them
-          // self-certifiable by the vendor, and with earnings now gated on
-          // Delivered + Paid that also unlocked their own payout.
-          //
-          // 'COD' is the only method settled in cash at the door with no
-          // second party able to verify it. Pay on Delivery (UPI Only)
-          // reaches Paid solely through the delivery partner's
-          // transaction-reference write plus admin verification
-          // (isValidDeliveryPaymentSubmission below); ONLINE is already
-          // Paid at creation. Anything unrecognised is refused by default.
-          && (
-            unchanged('paymentStatus')
-            || (
-              request.resource.data.paymentStatus == 'Paid'
-              // Reads the order's CURRENT status rather than the incoming
-              // one, because a seller can no longer send a status at all.
-              // Same guarantee: cash-COD is only self-certifiable once the
-              // order has actually been delivered.
-              && resource.data.status == 'Delivered'
-              && resource.data.paymentMethod == 'COD'
-            )
-          )
         )
         || (
           // The delivery partner physically handling this order updates

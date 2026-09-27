@@ -195,6 +195,20 @@ export async function POST(request: Request) {
         return { kind: "error", status: 403, error: "Not authorized." };
       }
 
+      // Only an admin-Approved seller may progress a return or replacement —
+      // read from the vendor record by the verified uid, never the request.
+      if (!isAdmin) {
+        const vendorSnap = await tx.get(
+          db.collection("vendors").where("uid", "==", requester.uid).limit(1)
+        );
+        if (
+          vendorSnap.empty ||
+          (vendorSnap.docs[0].data() as { status?: unknown })?.status !== "Approved"
+        ) {
+          return { kind: "error", status: 403, error: "Your seller account is not approved for this action." };
+        }
+      }
+
       // ---- WHAT (state machine) ----
       // Admin may RE-PROPOSE a pickup slot after the customer counters: a
       // same-state move (PICKUP_PROPOSED -> PICKUP_PROPOSED) that the

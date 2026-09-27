@@ -10,7 +10,7 @@ import {
   deriveFulfilmentStage,
   fulfilmentActionLabel,
   fulfilmentStageLabel,
-  nextItemStage,
+  sellerNextItemStage,
   type ItemFulfilmentMap,
 } from "@/lib/itemFulfilment";
 import { requestItemAdvance } from "@/lib/sellerFulfilmentClient";
@@ -102,7 +102,7 @@ export default function SellerFulfilmentPage() {
   ) => {
     const current = record.itemFulfilment?.[itemKey]?.status;
 
-    if (!nextItemStage(String(current))) return;
+    if (!sellerNextItemStage(String(current))) return;
 
     const user = auth.currentUser;
     if (!user) return;
@@ -114,6 +114,7 @@ export default function SellerFulfilmentPage() {
         idToken: await user.getIdToken(),
         recordId: record.id,
         itemKey,
+        fromStatus: String(current),
       });
 
       if (!result.ok) {
@@ -232,7 +233,7 @@ export default function SellerFulfilmentPage() {
                     const key = item.itemKey || `i${index}`;
                     const status =
                       record.itemFulfilment?.[key]?.status ?? "Confirmed";
-                    const next = nextItemStage(String(status));
+                    const next = sellerNextItemStage(String(status));
                     const busy = busyKey === `${record.id}:${key}`;
 
                     return (
@@ -272,7 +273,7 @@ export default function SellerFulfilmentPage() {
                             </button>
                           ) : (
                             <span className="text-xs text-gray-400">
-                              Complete
+                              {status === "Delivered" ? "Complete" : "With delivery partner"}
                             </span>
                           )}
                         </div>

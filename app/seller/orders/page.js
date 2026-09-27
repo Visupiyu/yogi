@@ -11,7 +11,7 @@ import {
   fulfilmentActionLabel,
   fulfilmentStageLabel,
   isStageComplete,
-  nextItemStage,
+  sellerNextItemStage,
 } from "@/lib/itemFulfilment";
 import { requestItemAdvance } from "@/lib/sellerFulfilmentClient";
 import { deliveryTiming, formatIst, relativeToNow } from "@/lib/orderTiming";
@@ -125,7 +125,8 @@ export default function SellerOrdersPage() {
   // recalculated in the same transaction. A direct write is refused by the
   // rules — itemFulfilment is server-only.
   const advanceItem = async (record, itemKey) => {
-    if (!nextItemStage(String(record.itemFulfilment?.[itemKey]?.status))) return;
+    const current = String(record.itemFulfilment?.[itemKey]?.status);
+    if (!sellerNextItemStage(current)) return;
 
     const user = auth.currentUser;
     if (!user) return;
@@ -137,6 +138,7 @@ export default function SellerOrdersPage() {
         idToken: await user.getIdToken(),
         recordId: record.id,
         itemKey,
+        fromStatus: current,
       });
 
       if (!result.ok) {
@@ -297,7 +299,7 @@ export default function SellerOrdersPage() {
                     const key = item.itemKey || `i${index}`;
                     const status =
                       record.itemFulfilment?.[key]?.status ?? "Confirmed";
-                    const next = nextItemStage(String(status));
+                    const next = sellerNextItemStage(String(status));
                     const busy = busyKey === `${record.id}:${key}`;
 
                     return (
@@ -343,7 +345,7 @@ export default function SellerOrdersPage() {
                             </button>
                           ) : (
                             <span className="text-xs text-gray-400">
-                              Complete
+                              {status === "Delivered" ? "Complete" : "With delivery partner"}
                             </span>
                           )}
                         </div>
