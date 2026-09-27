@@ -223,17 +223,11 @@ export async function POST(request: Request) {
     // client-side. userId is verified server-side by construction (the
     // query is scoped to requester.uid, not read from the request), unlike
     // the Firestore SDK path where firestore.rules do that verification.
-    const cartSnap = await db
+    // Read INSIDE the transaction below, never before it — see there.
+    const cartQuery = db
       .collection("cart")
       .where("userId", "==", requester.uid)
-      .where("savedForLater", "==", false)
-      .get();
-
-    if (cartSnap.empty) {
-      return Response.json({ error: "Your cart is empty." }, { status: 400 });
-    }
-
-    const cartDocs = cartSnap.docs;
+      .where("savedForLater", "==", false);
 
     // Coupon lookups that cannot run inside a transaction (queries). The
     // one-use guarantee itself is the deterministic
@@ -258,6 +252,22 @@ export async function POST(request: Request) {
       if (orderSnap.exists) {
         const data = orderSnap.data() as { total?: unknown };
         return { kind: "created", orderId, total: Number(data?.total || 0) };
+      }
+
+      // The cart is read HERE, under the transaction, so one cart can only
+      // ever become one order. The idempotency key above only collapses
+      // retries that reuse the SAME key; a re-entered Checkout, a relaunched
+      // app or a second device sends a NEW key for the same cart. Read before
+      // the transaction, two such requests could both see the cart, and each
+      // committed its own order and stock decrement from that stale copy.
+      // Read here, the loser is retried after the winner's commit deletes the
+      // cart lines, finds none, and is refused with the ordinary empty-cart
+      // 400 (never a 409: the app shows 409 as "Stock Unavailable"). It also
+      // means the order is built from the quantities as they are now.
+      const cartDocs = (await tx.get(cartQuery)).docs;
+
+      if (cartDocs.length === 0) {
+        return { kind: "error", status: 400, error: "Your cart is empty." };
       }
 
       // Aggregate quantity per product — a customer can have multiple cart
