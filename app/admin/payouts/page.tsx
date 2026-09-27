@@ -1,22 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   collection,
   getDocs,
-  addDoc,
   query,
   where,
-  serverTimestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { computeVendorEarningsBreakdown } from "@/lib/vendorPayable";
-import { logAdminAction } from "@/lib/auditLog";
+
+/** A fresh idempotency key for one payout attempt. */
+function newPayoutKey(): string {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+}
 
 export default function AdminPayoutsPage() {
   const [vendors, setVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
+  // Per seller: the key of a payout attempt that has not had a definite answer
+  // yet, so a retry after a network failure is the SAME request server-side.
+  const payoutKeys = useRef<Record<string, string>>({});
 
   useEffect(() => {
     loadPayouts();
@@ -144,13 +151,16 @@ export default function AdminPayoutsPage() {
   };
 
   const markPaid = async (vendor: any) => {
-    if (vendor.pendingPayout <= 0) {
+    // Payouts are whole rupees. This figure is only what the admin is asking
+    // to pay — the server re-derives the payable and refuses anything larger.
+    const amount = Math.floor(Number(vendor.pendingPayout) || 0);
+    if (amount <= 0) {
       alert("Nothing pending for this vendor.");
       return;
     }
     if (
       !confirm(
-        `Mark ₹${vendor.pendingPayout.toLocaleString(
+        `Mark ₹${amount.toLocaleString(
           "en-IN"
         )} as paid to ${vendor.shopName}?`
       )
@@ -160,17 +170,33 @@ export default function AdminPayoutsPage() {
 
     setSaving(vendor.id);
     try {
-      await addDoc(collection(db, "vendor_payouts"), {
-        vendorId: vendor.uid,
-        vendorName: vendor.shopName,
-        amount: vendor.pendingPayout,
-        status: "Paid",
-        createdAt: serverTimestamp(),
+      // SERVER-AUTHORITATIVE: /api/admin/record-payout verifies the admin,
+      // recomputes this seller's payable with the shared engine, and records
+      // the payout and its audit entry in one idempotent transaction. The
+      // browser never writes vendor_payouts (firestore.rules deny it).
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Please sign in again.");
+        return;
+      }
+      const key = payoutKeys.current[vendor.uid] || newPayoutKey();
+      payoutKeys.current[vendor.uid] = key;
+      const token = await user.getIdToken();
+      const res = await fetch("/api/admin/record-payout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ vendorUid: vendor.uid, amount, idempotencyKey: key }),
       });
-      await logAdminAction("vendor_payout", vendor.uid, {
-        vendorName: vendor.shopName,
-        amount: vendor.pendingPayout,
-      });
+      const data = await res.json().catch(() => ({}));
+      // A definite answer (success or refusal) retires the key; a server
+      // error keeps it so a retry cannot record the payout twice.
+      if (res.status < 500) delete payoutKeys.current[vendor.uid];
+      if (!res.ok) {
+        alert(data?.error || "Failed to record payout.");
+      }
       await loadPayouts(); // refresh from the ledger
     } catch (error) {
       console.error(error);

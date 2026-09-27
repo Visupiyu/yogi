@@ -1494,7 +1494,14 @@ service cloud.firestore {
       // account so their wallet balance reflects money already paid this
       // way, not just money paid via their own withdrawal requests.
       allow read: if isAdmin() || isOwnerUid(resource.data.vendorId);
-      allow write: if isAdmin();
+      // SERVER-ONLY. A payout is money that has left YOMICO: it is recorded
+      // only by app/api/admin/record-payout (Admin SDK, which bypasses these
+      // rules), which recomputes the seller's payable with lib/vendorPayable
+      // and writes the payout in one idempotent transaction. No client —
+      // admins included — may create one (the browser used to decide the
+      // amount), edit one or delete one: changing or removing a payout drops
+      // it out of the committed total and makes the same money payable twice.
+      allow create, update, delete: if false;
     }
 
     match /settings/{docId} {
