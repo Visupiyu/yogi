@@ -45,6 +45,16 @@ service firebase.storage {
         && request.resource.size < maxMb * 1024 * 1024;
     }
 
+    // The vendor's admin-controlled status, read from vendors_public/{uid}
+    // (the only vendor record keyed by uid — vendors/ uses random ids).
+    // firestore.rules freezes `status` for the owner (create must be
+    // 'Pending', owner updates require it unchanged), so only the admin
+    // approval flows (app/admin/vendors, app/admin/kyc) can make it
+    // 'Approved'. A missing doc makes firestore.get() fail, which denies.
+    function isApprovedVendor(uid) {
+      return firestore.get(/databases/(default)/documents/vendors_public/$(uid)).data.status == 'Approved';
+    }
+
     function isAdmin() {
       return request.auth != null
         && request.auth.token.email == 'adminyogimart@gmail.com'
@@ -182,20 +192,28 @@ service firebase.storage {
     // ship together. Deploying the freeze while old client code is still
     // live would reject every upload.
     //
-    // Ownership is proven here; approved-vendor status is NOT. A customer
-    // can still write products/{theirOwnUid}/... — Storage rules cannot
-    // resolve the vendors collection (it is keyed by random document id,
-    // not uid). That remains a separate workstream.
+    // products/ and vendor-store/ additionally require an APPROVED vendor
+    // (isApprovedVendor above) and are CREATE-ONLY: the seller dashboard —
+    // the only upload site — is itself Approved-only (app/seller/layout.js,
+    // app/vendor-login), every upload writes a fresh unique name
+    // (lib/storagePaths.ts), and nothing overwrites, re-tags or deletes an
+    // image. `resource == null` refuses a replacement (an upload over an
+    // existing object is evaluated as `create`); with no update/delete rule,
+    // metadata changes and deletes are denied too.
     match /products/{uid}/{fileName} {
       allow read: if true;
-      allow write: if isSignedIn() && request.auth.uid == uid
-        && isImageUnderLimit(5);
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && resource == null
+        && isImageUnderLimit(5)
+        && isApprovedVendor(uid);
     }
 
     match /vendor-store/{uid}/{fileName} {
       allow read: if true;
-      allow write: if isSignedIn() && request.auth.uid == uid
-        && isImageUnderLimit(5);
+      allow create: if isSignedIn() && request.auth.uid == uid
+        && resource == null
+        && isImageUnderLimit(5)
+        && isApprovedVendor(uid);
     }
 
     // chat/ and delivery-proof/ are PRIVATE: only the uploader (the uid in

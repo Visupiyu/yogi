@@ -8,12 +8,15 @@
  * unchanged. Also proves chat attachments and proof photos are immutable once
  * uploaded: no overwrite, metadata change or delete by anyone, and that
  * review photos are likewise create-only (owner creates, nobody overwrites,
- * changes metadata or deletes; public read unchanged). Loads the
- * repository's storage.rules into the emulator and uses tiny synthetic files
- * only.
+ * changes metadata or deletes; public read unchanged), and that product and
+ * store images can be created only by an APPROVED vendor (vendors_public/{uid}
+ * .status, read by the Storage rules through a cross-service firestore.get)
+ * in their own folder, and are create-only too. Loads the repository's
+ * storage.rules into the emulator and uses tiny synthetic files and synthetic
+ * vendors_public docs only.
  *
- * Run:
- *   npx firebase emulators:exec --only storage --project demo-yomico-storage \
+ * Run (the Firestore emulator serves the rules' vendors_public lookup):
+ *   npx firebase emulators:exec --only firestore,storage --project demo-yomico-storage \
  *     "npx tsx scripts/test/storage/rules.test.mts"
  */
 import fs from "node:fs";
@@ -27,11 +30,18 @@ if (!hostPort || !/^(127\.0\.0\.1|localhost):\d+$/.test(hostPort)) {
   process.exit(2);
 }
 const [host, port] = hostPort.split(":");
+const fsHostPort = process.env.FIRESTORE_EMULATOR_HOST;
+if (!fsHostPort || !/^(127\.0\.0\.1|localhost):\d+$/.test(fsHostPort)) {
+  console.error("REFUSING TO RUN: FIRESTORE_EMULATOR_HOST is not a local emulator. Run under `firebase emulators:exec --only firestore,storage`.");
+  process.exit(2);
+}
+const [fsHost, fsPort] = fsHostPort.split(":");
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const env = await initializeTestEnvironment({
   projectId: "demo-yomico-storage",
   storage: { rules: fs.readFileSync(path.join(REPO, "storage.rules"), "utf8"), host, port: Number(port) },
+  firestore: { rules: fs.readFileSync(path.join(REPO, "firestore.rules"), "utf8"), host: fsHost, port: Number(fsPort) },
 });
 
 let pass = 0;
@@ -174,6 +184,67 @@ await check("R9  reviews: non-image upload refused", () => assertFails(put(alice
 await check("R10 reviews: upload over 5MB refused", () => assertFails(put(alice(), "reviews/alice/1900000000000-big.jpg", OVER_5MB_STRICT)));
 await check("R11 reviews: signed-out user can still read an existing photo", () => assertSucceeds(read(anon(), REVIEW)));
 await check("R11b reviews: the new photo is still publicly readable", () => assertSucceeds(read(anon(), "reviews/alice/1900000000000-0.jpg")));
+
+// ============ PRODUCT & STORE IMAGES (approved vendors only, create-only) ============
+// The rules read vendors_public/{uid}.status — admin-controlled, keyed by uid.
+const VENDOR_STATUS: Record<string, string | null | undefined> = {
+  vPending: "Pending", vRejected: "Rejected", vBlocked: "Blocked", vApproved: "Approved", vApproved2: "Approved",
+  vNoStatus: undefined, vLower: "approved", vFlip: "Approved",
+};
+const setVendorPublic = (uid: string, status: string | null | undefined) =>
+  env.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc(`vendors_public/${uid}`).set(status === undefined ? { uid } : { uid, status });
+  });
+for (const [uid, status] of Object.entries(VENDOR_STATUS)) await setVendorPublic(uid, status);
+// A vendors/ doc (random id) says Approved but there is NO vendors_public doc: must still deny.
+await env.withSecurityRulesDisabled(async (ctx) => {
+  await ctx.firestore().doc("vendors/randomVendorDoc").set({ uid: "vOnlyPrivate", status: "Approved", kycStatus: "Approved" });
+  const s = ctx.storage();
+  await s.ref("products/vApproved/1700000000000-seed-p.jpg").put(tiny, IMG);
+  await s.ref("vendor-store/vApproved/1700000000000-seed-logo.jpg").put(tiny, IMG);
+});
+const vApproved = () => user("vApproved");
+const vApproved2 = () => user("vApproved2");
+const HTML = { contentType: "text/html" };
+const OVER_5MB_BY_ONE = new Uint8Array(5 * 1024 * 1024 + 1);
+for (const [P, L, SEED] of [
+  ["products", "P", "products/vApproved/1700000000000-seed-p.jpg"],
+  ["vendor-store", "S", "vendor-store/vApproved/1700000000000-seed-logo.jpg"],
+] as const) {
+  const fresh = (owner: string, tag: string) => `${P}/${owner}/1900000000000-${tag}-img.jpg`;
+  await check(`${L}1  ${P}: customer (no vendors_public) CANNOT create in own folder (was allowed)`, () => assertFails(put(bob(), fresh("bob", "c"))));
+  await check(`${L}2  ${P}: Pending vendor CANNOT create (was allowed)`, () => assertFails(put(user("vPending"), fresh("vPending", "p"))));
+  await check(`${L}3  ${P}: Rejected vendor CANNOT create (was allowed)`, () => assertFails(put(user("vRejected"), fresh("vRejected", "r"))));
+  await check(`${L}4  ${P}: Blocked vendor CANNOT create (was allowed)`, () => assertFails(put(user("vBlocked"), fresh("vBlocked", "b"))));
+  await check(`${L}5  ${P}: Approved vendor creates in own folder`, () => assertSucceeds(put(vApproved(), fresh("vApproved", "a"))));
+  await check(`${L}6  ${P}: Approved vendor creates a 1MB image`, () => assertSucceeds(put(vApproved(), fresh("vApproved", "a1mb"), ONE_MB)));
+  await check(`${L}7  ${P}: owner CANNOT overwrite an existing image (was allowed)`, () => assertFails(put(vApproved(), SEED)));
+  await check(`${L}8  ${P}: owner CANNOT change an image's metadata (was allowed)`, () =>
+    assertFails(vApproved().ref(SEED).updateMetadata({ customMetadata: { edited: "yes" } })));
+  await check(`${L}9  ${P}: owner CANNOT delete an image`, () => assertFails(vApproved().ref(SEED).delete()));
+  await check(`${L}10 ${P}: another Approved vendor CANNOT overwrite`, () => assertFails(put(vApproved2(), SEED)));
+  await check(`${L}11 ${P}: another Approved vendor CANNOT create in the folder`, () => assertFails(put(vApproved2(), fresh("vApproved", "x"))));
+  await check(`${L}12 ${P}: admin CANNOT create in a vendor folder`, () => assertFails(put(admin(), fresh("vApproved", "adm"))));
+  await check(`${L}13 ${P}: admin CANNOT overwrite`, () => assertFails(put(admin(), SEED)));
+  await check(`${L}14 ${P}: non-image refused (pdf, html)`, async () => {
+    await assertFails(put(vApproved(), `${P}/vApproved/1900000000000-x.pdf`, tiny, PDF));
+    await assertFails(put(vApproved(), `${P}/vApproved/1900000000000-x.html`, tiny, HTML));
+  });
+  await check(`${L}15 ${P}: upload over 5MB refused`, () => assertFails(put(vApproved(), fresh("vApproved", "big"), OVER_5MB_BY_ONE)));
+  await check(`${L}16 ${P}: signed-out CANNOT create`, () => assertFails(put(anon(), fresh("vApproved", "anon"))));
+  await check(`${L}17 ${P}: public read unchanged`, () => assertSucceeds(read(anon(), SEED)));
+}
+await check("L1  lookup: vendors_public without status -> denied", () => assertFails(put(user("vNoStatus"), "products/vNoStatus/1900000000000-n.jpg")));
+await check("L2  lookup: status 'approved' (wrong case) -> denied", () => assertFails(put(user("vLower"), "products/vLower/1900000000000-n.jpg")));
+await check("L3  lookup: Approved vendors/ doc but NO vendors_public doc -> denied", () =>
+  assertFails(put(user("vOnlyPrivate"), "vendor-store/vOnlyPrivate/1900000000000-n.jpg")));
+await check("L4  lookup is live: Approved -> Blocked -> Approved", async () => {
+  await assertSucceeds(put(user("vFlip"), "products/vFlip/1900000000000-a.jpg"));
+  await setVendorPublic("vFlip", "Blocked");
+  await assertFails(put(user("vFlip"), "products/vFlip/1900000000000-b.jpg"));
+  await setVendorPublic("vFlip", "Approved");
+  await assertSucceeds(put(user("vFlip"), "vendor-store/vFlip/1900000000000-c.jpg"));
+});
 
 await env.cleanup();
 console.log(`\n${pass}/${pass + fail} storage rules checks passed`);
