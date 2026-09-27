@@ -33,10 +33,10 @@
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 /** What an admin or seller sees as the product's moderation state. */
-export type ModerationStatus = "pending" | "rejected" | "blocked" | "live";
+export type ModerationStatus = "pending" | "rejected" | "blocked" | "live" | "archived";
 
 type ModeratableProduct =
-  | { active?: unknown; approvalStatus?: unknown }
+  | { active?: unknown; approvalStatus?: unknown; archived?: unknown }
   | null
   | undefined;
 
@@ -46,10 +46,14 @@ export function isApprovedForSale(product: ModeratableProduct): boolean {
   return status === undefined || status === null || status === "approved";
 }
 
-/** The canonical rule: approved for sale AND not blocked. */
+/**
+ * The canonical rule: approved for sale AND not blocked AND not archived by
+ * its seller. An archived product always also carries active:false (set by
+ * app/api/seller/product-status), so the archived test is defence in depth.
+ */
 export function isProductVisible(product: ModeratableProduct): boolean {
   if (!product) return false;
-  return product.active !== false && isApprovedForSale(product);
+  return product.active !== false && product.archived !== true && isApprovedForSale(product);
 }
 
 /** Alias for call sites that read better as a question about the customer. */
@@ -59,12 +63,15 @@ export function shouldShowToCustomer(product: ModeratableProduct): boolean {
 
 /**
  * Moderation state for admin/seller screens.
+ *   archived — the seller took it off sale (checked first: it is hidden
+ *              whatever its approval state, and is not an admin block)
  *   pending  — awaiting admin review (or an unknown status: fail closed)
  *   rejected — admin rejected it (a rejectionReason is stored)
  *   blocked  — approved (or pre-gate) but taken down with active:false
  *   live     — customer-visible
  */
 export function productModerationStatus(product: ModeratableProduct): ModerationStatus {
+  if (product?.archived === true) return "archived";
   const status = product?.approvalStatus;
   if (status === "rejected") return "rejected";
   if (status !== undefined && status !== null && status !== "approved") return "pending";

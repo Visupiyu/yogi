@@ -18,6 +18,7 @@ import { findDuplicateVariantGroups } from "@/lib/products/variantSelection";
 import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
 import { auth, storage } from "@/lib/firebase";
 import { productImagePath } from "@/lib/storagePaths";
+import { pickSellerProductFields } from "@/lib/products/sellerProductFields";
 import { serverTimestamp } from "firebase/firestore";
 import {ref,uploadBytes,getDownloadURL,} from "firebase/storage";
 import { useRouter } from "next/navigation";
@@ -622,17 +623,13 @@ const handleSubmit = async (
       // firestore.rules now refuses any direct seller write to them.
       // updatedAt is stamped by the server (a serverTimestamp() sentinel
       // cannot be sent as JSON).
-      const {
-        id,
-        createdAt,
-        active,
-        approved,
-        featured,
-        updatedAt,
-        ...updatePayload
-      } = finalProduct as typeof finalProduct & {
-        id?: string;
-      };
+      //
+      // Only the seller product fields are sent (lib/products/
+      // sellerProductFields.ts); the server refuses anything else, including
+      // vendorName, which it takes from the seller's own record.
+      const updatePayload = pickSellerProductFields(
+        finalProduct as unknown as Record<string, unknown>
+      );
       const editUser = auth.currentUser;
       if (!editUser) {
         setError("Please sign in again.");
@@ -651,16 +648,21 @@ const handleSubmit = async (
           product: updatePayload,
         }),
       });
+      const editData = await editResponse.json().catch(() => ({}));
       if (!editResponse.ok) {
-        const data = await editResponse.json().catch(() => ({}));
-        setError(data?.error || "Failed to update product.");
+        setError(editData?.error || "Failed to update product.");
         setLoading(false);
         return;
       }
 
       setSuccess(
-        "Product Updated Successfully."
+        editData?.reReview
+          ? "Product updated. Your changes were sent for review — the product is hidden until YOMICO approves them."
+          : "Product Updated Successfully."
       );
+      if (editData?.reReview) {
+        alert("Your changes were sent for review. The product is hidden until YOMICO approves them.");
+      }
     } else {
       // `id` is just local form state (always "" for a new product) —
       // Firestore assigns the real document ID; never write this
@@ -684,7 +686,11 @@ const handleSubmit = async (
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ product: newProductPayload }),
+        // Only the seller product fields: vendorId/vendorName, counters and
+        // moderation flags are server-owned and would be refused.
+        body: JSON.stringify({
+          product: pickSellerProductFields(newProductPayload as unknown as Record<string, unknown>),
+        }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));

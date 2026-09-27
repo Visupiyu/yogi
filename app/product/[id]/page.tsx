@@ -633,15 +633,18 @@ questionSnap.forEach((d) => {
       });
 
       // Keep the product's aggregate rating in sync so category/search
-      // rating filters (which read this field directly) actually work.
+      // rating filters (which read this field directly) actually work. The
+      // SERVER recomputes it from the stored reviews
+      // (app/api/reviews/sync-rating); the browser no longer writes it.
       try {
-        const oldRating = product.rating ?? 0;
-        const oldCount = product.reviewCount ?? 0;
-        const newCount = oldCount + 1;
-
-        await updateDoc(doc(db, "products", product.id), {
-          rating: (oldRating * oldCount + rating) / newCount,
-          reviewCount: newCount,
+        const token = await currentUser.getIdToken();
+        await fetch("/api/reviews/sync-rating", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ productId: product.id }),
         });
       } catch (aggregateError) {
         console.error("Failed to update product rating:", aggregateError);

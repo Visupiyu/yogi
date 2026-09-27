@@ -4,6 +4,11 @@ import { isWithinRateLimit } from "@/lib/rateLimit";
 import { Timestamp } from "firebase-admin/firestore";
 import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
 import {
+  reReviewFieldsChanged,
+  unknownSellerProductFields,
+} from "@/lib/products/sellerProductFields";
+import { isApprovedForSale } from "@/lib/products/visibility";
+import {
   PRODUCT_CATEGORY_FIELDS,
   changedLockedCategoryFields,
   isCategoryLocked,
@@ -22,9 +27,15 @@ import {
 // validated here with the same rule create-product applies.
 //
 // Behaviour otherwise matches the old direct write: a partial update of the
-// fields the form sent (nothing is deleted), by the product's owner only.
-// Moderation flags, identity, the product number, server-owned counters and
-// timestamps are never taken from the request.
+// fields the form sent (nothing is deleted), by the product's owner only, and
+// only while the seller account is Approved. The body may carry ONLY the
+// seller product fields (lib/products/sellerProductFields.ts) — moderation
+// flags, identity (vendorId, vendorName), the product number, server-owned
+// counters and timestamps are refused, not trimmed.
+//
+// Editing what an admin approved (content, media, variant definitions — see
+// REREVIEW_FIELDS) on an approved or legacy-live product sends it back to the
+// existing "pending" review, hidden until an admin approves it again.
 // ---------------------------------------------------------------------------
 
 const RATE_LIMIT_MAX = 60;
@@ -55,7 +66,7 @@ const SERVER_OWNED_FIELDS = new Set([
 ]);
 
 type Outcome =
-  | { kind: "ok" }
+  | { kind: "ok"; reReview: string[] }
   | { kind: "error"; status: number; error: string; errors?: string[] };
 
 export async function POST(request: Request) {
@@ -96,7 +107,36 @@ export async function POST(request: Request) {
     }
 
     const incoming = body.product as Record<string, unknown>;
+    const unknownFields = unknownSellerProductFields(incoming);
+    if (unknownFields.length > 0) {
+      return Response.json(
+        {
+          error: `These product fields can't be changed: ${unknownFields.join(", ")}`,
+          fields: unknownFields,
+        },
+        { status: 400 }
+      );
+    }
+
     const db = getAdminDb();
+
+    // Only an admin-Approved seller may change their products — a Blocked,
+    // Rejected or Pending account cannot, whatever its token. Read by the
+    // verified uid, never from the request.
+    const vendorSnap = await db
+      .collection("vendors")
+      .where("uid", "==", requester.uid)
+      .limit(1)
+      .get();
+    if (vendorSnap.empty) {
+      return Response.json({ error: "No seller account found for this login." }, { status: 403 });
+    }
+    if (vendorSnap.docs[0].data()?.status !== "Approved") {
+      return Response.json(
+        { error: "Your seller account is not approved to change products." },
+        { status: 403 }
+      );
+    }
     const ref = db.collection("products").doc(productId);
 
     const outcome = await db.runTransaction<Outcome>(async (tx) => {
@@ -154,8 +194,40 @@ export async function POST(request: Request) {
         };
       }
 
-      tx.update(ref, { ...changes, updatedAt: Timestamp.now() });
-      return { kind: "ok" };
+      // RE-REVIEW through the existing moderation model: changing content an
+      // admin approved on an approved (or pre-approval legacy) product returns
+      // it to "pending" — hidden until approved again. Price/stock/tax edits
+      // do not. A pending or rejected product keeps its state (a rejected one
+      // is resubmitted explicitly: app/api/seller/product-status).
+      const now = Timestamp.now();
+      const reReview = isApprovedForSale(existing)
+        ? reReviewFieldsChanged(existing, { ...existing, ...changes })
+        : [];
+      tx.update(ref, {
+        ...changes,
+        ...(reReview.length > 0
+          ? {
+              approvalStatus: "pending",
+              approved: false,
+              active: false,
+              reReviewRequestedAt: now,
+              reReviewFields: reReview,
+            }
+          : {}),
+        updatedAt: now,
+      });
+      if (reReview.length > 0) {
+        const title = typeof existing.title === "string" ? existing.title : "A product";
+        tx.set(db.collection("notifications").doc(), {
+          title: "Product edit needs review",
+          message: `"${title}" was edited (${reReview.join(", ")}) and is waiting for review.`,
+          role: "admin",
+          type: "vendor",
+          read: false,
+          createdAt: now,
+        });
+      }
+      return { kind: "ok", reReview };
     });
 
     if (outcome.kind === "error") {
@@ -165,7 +237,12 @@ export async function POST(request: Request) {
       );
     }
 
-    return Response.json({ success: true, productId });
+    return Response.json({
+      success: true,
+      productId,
+      reReview: outcome.reReview.length > 0,
+      reReviewFields: outcome.reReview,
+    });
   } catch (error) {
     console.error("update-product failed:", error);
     return Response.json(

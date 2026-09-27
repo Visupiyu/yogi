@@ -251,58 +251,15 @@ service cloud.firestore {
         && d.stock is number && d.stock >= 0;
     }
 
-    // Shared precondition for BOTH directional stock rules below.
-    //
-    // Individually each of those is bounded — one only allows stock to fall,
-    // the other only allows it to rise. But `allow update` is an || chain, so
-    // a client may satisfy whichever it prefers, and the union of the two was
-    // unbounded in both directions: any signed-in user could set ANY
-    // product's stock (and, via the unvalidated `sales` in the checkout rule,
-    // its sales count) to any value at all. Neither rule checks ownership,
-    // because checkout is legitimately performed by a customer who does not
-    // own the product.
-    //
-    // What every legitimate movement DOES have in common is that units only
-    // ever move between the two fields: checkout is -qty/+qty, cancellation
-    // is +qty/-qty. So stock + sales is conserved, and requiring that here
-    // removes the ability to invent or destroy inventory while leaving both
-    // real flows untouched.
-    //
-    // This is a stopgap, not a complete fix: a caller can still shift a
-    // competitor's stock into sales (stock->0), which reads as "Out of
-    // Stock". Rules cannot tell whether a decrement corresponds to a real
-    // order — only server-authored stock movement can. It does make any
-    // tampering visible in `sales` rather than silent.
-    function isStockTransfer() {
-      return isSignedIn()
-        && affectedKeysOnly(['stock', 'sales'])
-        && request.resource.data.stock is number
-        && request.resource.data.sales is number
-        && request.resource.data.stock >= 0
-        && request.resource.data.sales >= 0
-        && request.resource.data.stock + request.resource.data.sales
-           == resource.data.stock + resource.data.sales;
-    }
-
-    function isCheckoutStockUpdate() {
-      // Any signed-in customer completing checkout may decrement stock /
-      // increment sales on a product line item — nothing else may change.
-      return isStockTransfer()
-        && request.resource.data.stock <= resource.data.stock;
-    }
-
-    function isReviewRatingUpdate() {
-      // Any signed-in customer submitting a review may update the
-      // product's aggregate rating/reviewCount — nothing else may change,
-      // reviewCount can only advance by exactly one review at a time, and
-      // rating must stay within a valid 0-5 range.
-      return isSignedIn()
-        && affectedKeysOnly(['rating', 'reviewCount'])
-        && request.resource.data.rating is number
-        && request.resource.data.rating >= 0 && request.resource.data.rating <= 5
-        && request.resource.data.reviewCount is number
-        && request.resource.data.reviewCount == resource.data.reviewCount + 1;
-    }
+    // Stock and sales move ONLY on the server now (app/api/place-order,
+    // lib/onlineOrder, app/api/cancel-order — Admin SDK increments), and a
+    // product's rating/reviewCount is recomputed ONLY by
+    // app/api/reviews/sync-rating from its stored reviews. The client paths
+    // that used to allow those writes (isCheckoutStockUpdate /
+    // isStockRestoreUpdate / isReviewRatingUpdate) are gone: no web or
+    // Customer App flow used them any more, and they let ANY signed-in user
+    // shift a competitor's whole stock into sales (reading "Out of Stock")
+    // or set its rating without a review.
 
     function isViewIncrement() {
       // Any signed-in visitor loading a product page bumps its view
@@ -313,16 +270,6 @@ service cloud.firestore {
         && affectedKeysOnly(['views'])
         && request.resource.data.views is number
         && request.resource.data.views == resource.data.views + 1;
-    }
-
-    function isStockRestoreUpdate() {
-      // Cancelling an order (by the customer or the seller/admin) restores
-      // the stock and reverses the sale count that checkout previously
-      // recorded — the exact inverse of isCheckoutStockUpdate, sharing the
-      // same conservation precondition so the pair can no longer be combined
-      // to reach an arbitrary stock value.
-      return isStockTransfer()
-        && request.resource.data.stock >= resource.data.stock;
     }
 
     match /products/{productId} {
@@ -377,14 +324,47 @@ service cloud.firestore {
               && unchanged('leafCategoryId')
             )
           )
+          // Server-owned identity and counters are never the seller's to
+          // write: the storefront seller name, the product number, creation
+          // time and the sales/rating/reviewCount/views/wishlistCount counters.
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'sales', 'rating', 'reviewCount', 'views', 'wishlistCount',
+            'productNumber', 'createdAt', 'vendorName'
+          ])
+          // Beyond that, a direct write may touch ONLY the seller-editable
+          // listing fields (lib/products/sellerProductFields.ts, less the
+          // price/stock/tax fields frozen above, which go through
+          // app/api/seller/update-product). Lifecycle and moderation fields
+          // (archived*, lastRejectionReason, resubmit/re-review stamps, …)
+          // are outside this list, so they stay server-only.
+          && affectedKeysOnly([
+            'sku', 'slug', 'categoryId', 'subCategoryId', 'leafCategoryId',
+            'title', 'shortTitle', 'description', 'brand', 'model',
+            'mrp', 'costPrice', 'discount', 'currency', 'hsn',
+            'minStock', 'maxStock', 'thumbnail', 'images', 'video',
+            'specifications', 'weight', 'length', 'width', 'height',
+            'warranty', 'returnDays', 'metaTitle', 'metaDescription',
+            'keywords', 'updatedAt'
+          ])
+          // What an admin approved is frozen on an approved (or legacy live)
+          // product: changing its content or media goes through
+          // app/api/seller/update-product, which sends it back to review.
+          // Mirrors REREVIEW_FIELDS in lib/products/sellerProductFields.ts.
+          && (
+            resource.data.get('approvalStatus', null) in ['pending', 'rejected']
+            || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'title', 'shortTitle', 'description', 'brand', 'model',
+              'thumbnail', 'images', 'video', 'specifications'
+            ])
+          )
           && isValidProduct()
         )
-        || isCheckoutStockUpdate()
-        || isReviewRatingUpdate()
-        || isStockRestoreUpdate()
         || isViewIncrement();
 
-      allow delete: if isAdmin() || isOwnerUid(resource.data.vendorId);
+      // Admin only. A seller takes a product off sale by ARCHIVING it
+      // (app/api/seller/product-status) — never by deleting a document that
+      // orders and statements may reference.
+      allow delete: if isAdmin();
     }
 
     // ---------------------------------------------------------
@@ -1376,7 +1356,7 @@ service cloud.firestore {
 
     function isCancelledCouponReversal() {
       // Cancelling an order should free up the coupon it used, the same way
-      // isStockRestoreUpdate() frees up stock — the redemption may only be
+      // cancellation restores stock — the redemption may only be
       // deleted by its own owner, and only once the order it's tied to has
       // already legitimately transitioned to Cancelled (itself gated by the
       // orders update rule's own Pending -> Cancelled restriction).

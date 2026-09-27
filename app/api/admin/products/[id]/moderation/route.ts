@@ -2,7 +2,7 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
-import { planModeration } from "@/lib/products/moderation";
+import { planModeration, type ModerationAction } from "@/lib/products/moderation";
 import { productModerationStatus } from "@/lib/products/visibility";
 
 // ---------------------------------------------------------------------------
@@ -17,8 +17,14 @@ import { productModerationStatus } from "@/lib/products/visibility";
 // was never approved.
 //
 // Writes only: approvalStatus, approved, active, rejectionReason,
-// moderatedAt, moderatedBy. Inside a transaction, so the transition is
-// validated against the product's current state.
+// moderatedAt, moderatedBy (and archived:false when an admin rejects or
+// blocks a product the seller had archived). Inside a transaction, so the
+// transition is validated against the product's current state. The same
+// transaction appends an audit_logs entry and notifies the seller.
+//
+// A product the seller resubmitted after rejection (app/api/seller/
+// product-status) is simply "pending" again, so approve/reject apply to it
+// exactly as to a new product.
 // ---------------------------------------------------------------------------
 
 const RATE_LIMIT_MAX = 120;
@@ -27,6 +33,22 @@ const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 type Outcome =
   | { kind: "ok"; from: string; to: string }
   | { kind: "error"; status: number; error: string };
+
+function sellerNotice(action: ModerationAction, title: string, reason: string | null) {
+  switch (action) {
+    case "approve":
+      return { title: "Product approved", message: `"${title}" was approved and is now live.` };
+    case "reject":
+      return {
+        title: "Product rejected",
+        message: `"${title}" was not approved.${reason ? ` Reason: ${reason}` : ""} You can edit it and resubmit it for review.`,
+      };
+    case "block":
+      return { title: "Product blocked", message: `"${title}" has been taken off sale by YOMICO.` };
+    case "unblock":
+      return { title: "Product unblocked", message: `"${title}" is back on sale.` };
+  }
+}
 
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
@@ -74,17 +96,58 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         return { kind: "error", status: 404, error: "Product not found." };
       }
 
-      const product = snap.data() as { active?: unknown; approvalStatus?: unknown };
+      const product = snap.data() as {
+        active?: unknown;
+        approvalStatus?: unknown;
+        archived?: unknown;
+        vendorId?: unknown;
+        title?: unknown;
+        name?: unknown;
+      };
       const plan = planModeration(product, body?.action, body?.reason);
       if (!plan.ok) {
         return { kind: "error", status: plan.status, error: plan.error };
       }
+      const action = body.action as ModerationAction;
+      const now = Timestamp.now();
 
       tx.update(ref, {
         ...plan.changes,
-        moderatedAt: Timestamp.now(),
+        moderatedAt: now,
         moderatedBy: requester.uid,
       });
+
+      const title =
+        typeof product.title === "string" && product.title
+          ? product.title
+          : typeof product.name === "string" && product.name
+          ? product.name
+          : "Your product";
+      tx.set(db.collection("audit_logs").doc(), {
+        actorUid: requester.uid,
+        actorEmail: requester.email || "",
+        action: `product_${action}`,
+        targetId: productId,
+        details: {
+          from: plan.from,
+          to: productModerationStatus(plan.changes),
+          vendorId: typeof product.vendorId === "string" ? product.vendorId : "",
+          ...(plan.changes.rejectionReason ? { reason: plan.changes.rejectionReason } : {}),
+        },
+        createdAt: now,
+      });
+      // The seller's own notification feed (userId + role "seller" is what
+      // app/seller/notifications and NotificationsPanel query).
+      if (typeof product.vendorId === "string" && product.vendorId) {
+        tx.set(db.collection("notifications").doc(), {
+          ...sellerNotice(action, title, plan.changes.rejectionReason),
+          userId: product.vendorId,
+          role: "seller",
+          type: "vendor",
+          read: false,
+          createdAt: now,
+        });
+      }
 
       return {
         kind: "ok",

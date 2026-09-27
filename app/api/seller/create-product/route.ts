@@ -6,6 +6,7 @@ import { mintSequential } from "@/lib/humanIds";
 import { canSellerList, sellerListingBlockReason } from "@/lib/sellerTax";
 import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
 import { NEW_PRODUCT_MODERATION } from "@/lib/products/visibility";
+import { unknownSellerProductFields } from "@/lib/products/sellerProductFields";
 
 // ---------------------------------------------------------------------------
 // Server-authoritative product creation.
@@ -16,8 +17,10 @@ import { NEW_PRODUCT_MODERATION } from "@/lib/products/visibility";
 // transaction that writes the product. firestore.rules now denies client
 // `create` on products, so this route is the only creation path.
 //
-// Identity is taken from the verified token — vendorId is overwritten, never
-// trusted from the body — and any client-supplied number/id is dropped. The
+// Identity is taken from the verified token — vendorId is set here, and the
+// storefront vendorName comes from the seller's own vendor record — and the
+// body may carry ONLY the seller product fields (lib/products/
+// sellerProductFields.ts): anything else is refused, not trimmed. The
 // product's descriptive fields are persisted as the form built them (the same
 // values the client wrote before this route existed); this change adds the
 // server-minted number and server-owned identity, it does not re-open product
@@ -55,54 +58,27 @@ export async function POST(request: Request) {
       return Response.json({ error: "Invalid request body." }, { status: 400 });
     }
 
-    if (!body.product || typeof body.product !== "object") {
+    if (!body.product || typeof body.product !== "object" || Array.isArray(body.product)) {
       return Response.json({ error: "Missing product data." }, { status: 400 });
     }
 
-    // Never trust a client-supplied number, id, vendorId, or moderation flags.
-    // The analytics/social-proof counters (sales, rating, reviewCount, views,
-    // wishlistCount) are SERVER-OWNED too: they accrue only through the
-    // rules-guarded increment paths (checkout sales, review aggregation, view
-    // bumps), so a crafted create request must not be able to seed a product
-    // with fake ratings or best-seller numbers. Stripped here and re-seeded to
-    // 0 below, matching the product model's defaults.
-    const {
-      productNumber: _n,
-      id: _id,
-      vendorId: _v,
-      approved: _a,
-      featured: _f,
-      // Moderation is admin-only: a seller can never create a live, approved
-      // or featured product, whatever the request says.
-      active: _active,
-      approvalStatus: _approvalStatus,
-      rejectionReason: _rejectionReason,
-      moderatedAt: _moderatedAt,
-      moderatedBy: _moderatedBy,
-      createdAt: _c,
-      sales: _sales,
-      rating: _rating,
-      reviewCount: _reviewCount,
-      views: _views,
-      wishlistCount: _wishlistCount,
-      ...productFields
-    } = body.product as Record<string, unknown>;
-    void _n;
-    void _id;
-    void _v;
-    void _a;
-    void _f;
-    void _c;
-    void _sales;
-    void _rating;
-    void _reviewCount;
-    void _views;
-    void _wishlistCount;
-    void _active;
-    void _approvalStatus;
-    void _rejectionReason;
-    void _moderatedAt;
-    void _moderatedBy;
+    // STRICT allow-list. Identity (vendorId, vendorName), the product number,
+    // moderation and lifecycle flags, and the server-owned counters (sales,
+    // rating, reviewCount, views, wishlistCount) and timestamps are never
+    // accepted from the browser: a request carrying any key outside
+    // lib/products/sellerProductFields.ts is refused, so a forged field can
+    // never be stored.
+    const productFields = body.product as Record<string, unknown>;
+    const unknownFields = unknownSellerProductFields(productFields);
+    if (unknownFields.length > 0) {
+      return Response.json(
+        {
+          error: `These product fields can't be set: ${unknownFields.join(", ")}`,
+          fields: unknownFields,
+        },
+        { status: 400 }
+      );
+    }
 
     // Price / stock / GST fields are validated here, server-side — this route
     // writes with the Admin SDK, so firestore.rules' product checks never run
@@ -137,6 +113,8 @@ export async function POST(request: Request) {
 
     const vendor = vendorSnap.docs[0].data() as {
       status?: string;
+      businessName?: string;
+      fullName?: string;
       taxProfile?: { gstStatus?: string; gstin?: string };
       taxVerificationStatus?: string;
     };
@@ -185,6 +163,15 @@ export async function POST(request: Request) {
         // live again.
         ...NEW_PRODUCT_MODERATION,
         vendorId: requester.uid, // server-authoritative identity
+        // Shown on the storefront and copied onto order lines: always the
+        // seller's own business name from their vendor record, never the body.
+        vendorName: vendor.businessName || vendor.fullName || "",
+        // Server-owned counters start at zero.
+        sales: 0,
+        rating: 0,
+        reviewCount: 0,
+        views: 0,
+        wishlistCount: 0,
         productNumber: number,
         createdAt: Timestamp.now(),
       });

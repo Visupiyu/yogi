@@ -9,8 +9,11 @@
 // moderatedAt/moderatedBy. Dependency-free so it can be unit-tested.
 //
 //   approve  pending | rejected         -> approved, visible
-//   reject   pending | live | blocked   -> rejected, hidden, reason stored
-//   block    live                       -> approved, hidden (active:false)
+//   reject   pending | live | blocked | archived -> rejected, hidden, reason stored
+//   block    live | archived            -> approved, hidden (active:false)
+//
+// Rejecting or blocking a product its seller had archived also clears
+// `archived`, so the seller cannot "restore" their way past the decision.
 //   unblock  blocked                    -> approved, visible
 //
 // Anything else is refused, so e.g. "block" can never be used to approve a
@@ -29,6 +32,8 @@ export type ModerationChanges = {
   approved: boolean;
   active: boolean;
   rejectionReason: string | null;
+  /** Present only when the product was seller-archived: the admin decision replaces it. */
+  archived?: false;
 };
 
 export type ModerationPlan =
@@ -37,8 +42,8 @@ export type ModerationPlan =
 
 const ALLOWED_FROM: Record<ModerationAction, ModerationStatus[]> = {
   approve: ["pending", "rejected"],
-  reject: ["pending", "live", "blocked"],
-  block: ["live"],
+  reject: ["pending", "live", "blocked", "archived"],
+  block: ["live", "archived"],
   unblock: ["blocked"],
 };
 
@@ -47,7 +52,7 @@ export function isModerationAction(value: unknown): value is ModerationAction {
 }
 
 export function planModeration(
-  product: { active?: unknown; approvalStatus?: unknown },
+  product: { active?: unknown; approvalStatus?: unknown; archived?: unknown },
   action: unknown,
   reason?: unknown
 ): ModerationPlan {
@@ -87,14 +92,26 @@ export function planModeration(
       return {
         ok: true,
         from,
-        changes: { approvalStatus: "rejected", approved: false, active: false, rejectionReason: text },
+        changes: {
+          approvalStatus: "rejected",
+          approved: false,
+          active: false,
+          rejectionReason: text,
+          ...(from === "archived" ? { archived: false as const } : {}),
+        },
       };
     }
     case "block":
       return {
         ok: true,
         from,
-        changes: { approvalStatus: "approved", approved: true, active: false, rejectionReason: null },
+        changes: {
+          approvalStatus: "approved",
+          approved: true,
+          active: false,
+          rejectionReason: null,
+          ...(from === "archived" ? { archived: false as const } : {}),
+        },
       };
     case "unblock":
       return {

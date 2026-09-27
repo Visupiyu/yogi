@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, deleteDoc, doc, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { useVendor } from "@/hooks/useVendor";
 import { useRouter } from "next/navigation";
 
@@ -17,6 +17,7 @@ const MODERATION_BADGE: Record<ModerationStatus, { text: string; className: stri
   pending: { text: "Pending review", className: "bg-yellow-100 text-yellow-700" },
   rejected: { text: "Rejected", className: "bg-red-100 text-red-700" },
   blocked: { text: "Blocked", className: "bg-gray-200 text-gray-700" },
+  archived: { text: "Archived", className: "bg-slate-100 text-slate-600" },
 };
 
 export default function SellerProductsPage() {
@@ -140,6 +141,10 @@ export default function SellerProductsPage() {
         matchesStatus = moderation === "blocked";
       }
 
+      if (status === "Archived") {
+        matchesStatus = moderation === "archived";
+      }
+
       if (status === "Out of Stock") {
         matchesStatus = product.stock <= 0;
       }
@@ -148,24 +153,44 @@ export default function SellerProductsPage() {
     });
   }, [products, search, category, status]);
 
-  const deleteProduct = async (productId: string) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this product?"
-    );
-
-    if (!confirmed) return;
+  // Archive / restore / resubmit go through /api/seller/product-status (the
+  // server checks ownership and decides every field). Products are never
+  // deleted from here: orders and statements may reference them.
+  const changeStatus = async (
+    productId: string,
+    action: "archive" | "unarchive" | "resubmit"
+  ) => {
+    const prompts = {
+      archive: "Archive this product? It will be taken off sale and hidden from customers. You can restore it later.",
+      unarchive: "Restore this product?",
+      resubmit: "Resubmit this product for review?",
+    } as const;
+    if (!window.confirm(prompts[action])) return;
 
     try {
-      await deleteDoc(doc(db, "products", productId));
-
-      setProducts((current) =>
-        current.filter((product) => product.id !== productId)
-      );
-
-      alert("Product deleted successfully.");
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Please sign in again.");
+        return;
+      }
+      const token = await user.getIdToken();
+      const res = await fetch("/api/seller/product-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ productId, action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data?.error || "Could not update the product.");
+        return;
+      }
+      await loadProducts();
     } catch (error) {
-      console.error("Delete product error:", error);
-      alert("Failed to delete product.");
+      console.error("Product status change error:", error);
+      alert("Could not update the product.");
     }
   };
 
@@ -343,6 +368,7 @@ export default function SellerProductsPage() {
               <option value="Pending">Pending review</option>
               <option value="Rejected">Rejected</option>
               <option value="Blocked">Blocked</option>
+              <option value="Archived">Archived</option>
               <option value="Out of Stock">Out of Stock</option>
             </select>
           </div>
@@ -494,13 +520,33 @@ export default function SellerProductsPage() {
                           Edit
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => deleteProduct(product.id)}
-                          className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
-                        >
-                          Delete
-                        </button>
+                        {productModerationStatus(product) === "rejected" && (
+                          <button
+                            type="button"
+                            onClick={() => changeStatus(product.id, "resubmit")}
+                            className="rounded-lg bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+                          >
+                            Resubmit
+                          </button>
+                        )}
+
+                        {productModerationStatus(product) === "archived" ? (
+                          <button
+                            type="button"
+                            onClick={() => changeStatus(product.id, "unarchive")}
+                            className="rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700 hover:bg-green-100"
+                          >
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => changeStatus(product.id, "archive")}
+                            className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-100"
+                          >
+                            Archive
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

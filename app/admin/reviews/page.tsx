@@ -6,9 +6,8 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  updateDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<any[]>([]);
@@ -51,22 +50,20 @@ export default function AdminReviewsPage() {
     try {
       await deleteDoc(doc(db, "productReviews", review.id));
 
+      // The product's rating/reviewCount is recomputed on the server from the
+      // reviews that remain (app/api/reviews/sync-rating).
       try {
-        const productRef = doc(db, "products", review.productId);
-        const remainingReviews = reviews.filter(
-          (r) => r.productId === review.productId && r.id !== review.id
-        );
-        const newCount = remainingReviews.length;
-        const newRating =
-          newCount === 0
-            ? 0
-            : remainingReviews.reduce((sum, r) => sum + (r.rating || 0), 0) /
-              newCount;
-
-        await updateDoc(productRef, {
-          rating: newRating,
-          reviewCount: newCount,
-        });
+        const token = await auth.currentUser?.getIdToken();
+        if (token && review.productId) {
+          await fetch("/api/reviews/sync-rating", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ productId: review.productId }),
+          });
+        }
       } catch (aggregateError) {
         console.error("Failed to update product rating:", aggregateError);
       }

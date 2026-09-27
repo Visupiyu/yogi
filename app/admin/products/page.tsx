@@ -6,9 +6,6 @@ import {
   getDocs,
   query,
   orderBy,
-  updateDoc,
-  deleteDoc,
-  doc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { productModerationStatus, type ModerationStatus } from "@/lib/products/visibility";
@@ -39,6 +36,7 @@ const STATUS_LABEL: Record<ModerationStatus, string> = {
   pending: "Pending",
   rejected: "Rejected",
   blocked: "Blocked",
+  archived: "Archived",
 };
 
 const STATUS_BADGE_CLASS: Record<ModerationStatus, string> = {
@@ -46,6 +44,7 @@ const STATUS_BADGE_CLASS: Record<ModerationStatus, string> = {
   pending: "bg-yellow-100 text-yellow-700",
   rejected: "bg-red-100 text-red-700",
   blocked: "bg-gray-200 text-gray-700",
+  archived: "bg-slate-100 text-slate-600",
 };
 
 const MODERATION_TOAST: Record<ModerationAction, string> = {
@@ -155,17 +154,40 @@ export default function AdminProductsPage() {
     }
   };
 
-  // The homepage's "Featured Products" section filters on this field, but
-  // nothing anywhere ever set it to true — it always defaulted false at
-  // creation (app/seller/components/ProductForm.tsx) with no toggle
-  // anywhere in the app.
-  const toggleFeatured = async (product: Product) => {
+  // Featured and delete go through /api/admin/products/[id]/manage (admin
+  // verified on the server, audit-logged). The homepage's "Featured
+  // Products" section filters on `featured`. Delete is refused by the server
+  // for a product with sales history — block it instead.
+  const manage = async (product: Product, action: "feature" | "unfeature" | "delete") => {
     try {
-      await updateDoc(doc(db, "products", product.id), {
-        featured: !product.featured,
-      });
+      const user = auth.currentUser;
+      if (!user) {
+        toast.error("Please sign in again.");
+        return;
+      }
+      const token = await user.getIdToken();
+      const response = await fetch(
+        `/api/admin/products/${encodeURIComponent(product.id)}/manage`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action }),
+        }
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data?.error || "Failed to update product.");
+        return;
+      }
       toast.success(
-        product.featured ? "Removed from Featured." : "Marked as Featured."
+        action === "delete"
+          ? "Product deleted."
+          : action === "feature"
+          ? "Marked as Featured."
+          : "Removed from Featured."
       );
       loadProducts();
     } catch (error) {
@@ -174,16 +196,12 @@ export default function AdminProductsPage() {
     }
   };
 
-  const deleteProduct = async (id: string) => {
-    if (!confirm("Delete this product?")) return;
-    try {
-      await deleteDoc(doc(db, "products", id));
-      toast.success("Product deleted.");
-      loadProducts();
-    } catch (error) {
-      console.error(error);
-      toast.error("Delete failed.");
-    }
+  const toggleFeatured = (product: Product) =>
+    manage(product, product.featured ? "unfeature" : "feature");
+
+  const deleteProduct = (product: Product) => {
+    if (!confirm("Delete this product permanently?")) return;
+    void manage(product, "delete");
   };
 
   const filtered = products.filter((item) => {
@@ -320,6 +338,7 @@ export default function AdminProductsPage() {
             <option value="Active">Active</option>
             <option value="Blocked">Blocked</option>
             <option value="Rejected">Rejected</option>
+            <option value="Archived">Archived</option>
           </select>
         </div>
 
@@ -403,7 +422,7 @@ export default function AdminProductsPage() {
                     </button>
                   )}
 
-                  {product.moderation === "live" && (
+                  {(product.moderation === "live" || product.moderation === "archived") && (
                     <button
                       onClick={() => moderate(product, "block")}
                       className="flex-1 py-1.5 text-sm rounded-lg text-white transition bg-yellow-600 hover:bg-yellow-700"
@@ -433,7 +452,7 @@ export default function AdminProductsPage() {
                   </button>
 
                   <button
-                    onClick={() => deleteProduct(product.id)}
+                    onClick={() => deleteProduct(product)}
                     className="flex-1 bg-red-600 hover:bg-red-700 transition text-white py-1.5 text-sm rounded-lg"
                   >
                     Delete
