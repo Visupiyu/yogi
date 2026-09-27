@@ -279,6 +279,88 @@ async function main() {
       `approvalStatus=${p?.approvalStatus} active=${p?.active}`);
   }
 
+  // ================= P: category lock via the server routes =================
+  {
+    const CATS = { categoryId: "HOME", subCategoryId: "HOME_DECOR", leafCategoryId: "HOME_DECOR_LAMPS" };
+    const created = await json(await createProduct(req("http://x/api/seller/create-product", { product: { ...VALID_PRODUCT, ...CATS, slug: "cat-lock-lamp" } }, SELLER)));
+    const pid = created.productId;
+    const p0 = await getP(pid);
+    record("P1 seller creates a product with categoryId/subCategoryId/leafCategoryId (stored as sent, starts pending)",
+      !!pid && p0?.categoryId === "HOME" && p0?.subCategoryId === "HOME_DECOR" && p0?.leafCategoryId === "HOME_DECOR_LAMPS" && p0?.approvalStatus === "pending",
+      `id=${pid} cats=${p0?.categoryId}/${p0?.subCategoryId}/${p0?.leafCategoryId} status=${p0?.approvalStatus}`);
+
+    const beforeApproval = await updateProduct(req("http://x/api/seller/update-product", {
+      productId: pid, product: { categoryId: "FASHION", subCategoryId: "FASHION_MEN", leafCategoryId: "FASHION_MEN_SHIRTS" },
+    }, SELLER));
+    const p1 = await getP(pid);
+    record("P2 while pending the seller may change all three category fields",
+      beforeApproval.status === 200 && p1?.categoryId === "FASHION" && p1?.subCategoryId === "FASHION_MEN" && p1?.leafCategoryId === "FASHION_MEN_SHIRTS",
+      `status=${beforeApproval.status}`);
+
+    await asAdmin(pid, { action: "approve" });
+    const tries: [string, Record<string, string>][] = [
+      ["categoryId", { categoryId: "HOME" }],
+      ["subCategoryId", { subCategoryId: "HOME_DECOR" }],
+      ["leafCategoryId", { leafCategoryId: "HOME_DECOR_LAMPS" }],
+    ];
+    for (const [field, change] of tries) {
+      const r = await updateProduct(req("http://x/api/seller/update-product", { productId: pid, product: { ...change, title: "Should Not Apply" } }, SELLER));
+      const body = await json(r);
+      const p = await getP(pid);
+      record(`P3 after approval the seller cannot change ${field} (403, nothing written — not even the title in the same request)`,
+        r.status === 403 && /category/i.test(body.error || "") && p?.[field] === (p1 as any)?.[field] && p?.title !== "Should Not Apply",
+        `status=${r.status} ${field}=${p?.[field]} title=${p?.title}`);
+    }
+
+    const ok = await updateProduct(req("http://x/api/seller/update-product", {
+      productId: pid, product: { ...VALID_PRODUCT, categoryId: "FASHION", subCategoryId: "FASHION_MEN", leafCategoryId: "FASHION_MEN_SHIRTS", title: "Cat Lock Lamp v2", description: "updated" },
+    }, SELLER));
+    const p2 = await getP(pid);
+    record("P4 after approval the seller can still edit non-category fields (whole-form save with unchanged categories)",
+      ok.status === 200 && p2?.title === "Cat Lock Lamp v2" && p2?.description === "updated" && p2?.categoryId === "FASHION" && p2?.approvalStatus === "approved",
+      `status=${ok.status} title=${p2?.title}`);
+
+    await asAdmin(pid, { action: "block" });
+    const blocked = await updateProduct(req("http://x/api/seller/update-product", { productId: pid, product: { leafCategoryId: "X" } }, SELLER));
+    await asAdmin(pid, { action: "reject", reason: "Wrong category" });
+    const afterReject = await updateProduct(req("http://x/api/seller/update-product", { productId: pid, product: { leafCategoryId: "FASHION_MEN_TSHIRTS" } }, SELLER));
+    const p3 = await getP(pid);
+    record("P5 blocked product: category change refused (403); rejected product: category change allowed again (200)",
+      blocked.status === 403 && afterReject.status === 200 && p3?.leafCategoryId === "FASHION_MEN_TSHIRTS",
+      `blocked=${blocked.status} rejected=${afterReject.status} leaf=${p3?.leafCategoryId}`);
+
+    await db.collection("products").doc("legacy_cat").set({
+      ...VALID_PRODUCT, ...CATS, vendorId: SELLER, approved: false, active: true, sales: 0,
+    });
+    const legacy = await updateProduct(req("http://x/api/seller/update-product", { productId: "legacy_cat", product: { categoryId: "FASHION" } }, SELLER));
+    const legacyTitle = await updateProduct(req("http://x/api/seller/update-product", { productId: "legacy_cat", product: { title: "Legacy Title" } }, SELLER));
+    record("P6 legacy live product (no approvalStatus): category change refused (403), title edit still 200",
+      legacy.status === 403 && legacyTitle.status === 200 && (await getP("legacy_cat"))?.categoryId === "HOME",
+      `category=${legacy.status} title=${legacyTitle.status}`);
+
+    // The seller product form fills missing fields from its defaults, so an
+    // approved/legacy product stored WITHOUT sub/leaf category is re-sent with
+    // "" on every save. That must not count as a category change.
+    await db.collection("products").doc("legacy_nosub").set({
+      ...VALID_PRODUCT, categoryId: "HOME", vendorId: SELLER, approved: false, active: true, sales: 0,
+    });
+    const formSave = await updateProduct(req("http://x/api/seller/update-product", {
+      productId: "legacy_nosub", product: { ...VALID_PRODUCT, categoryId: "HOME", subCategoryId: "", leafCategoryId: "", title: "Form Save OK" },
+    }, SELLER));
+    const ln = await getP("legacy_nosub");
+    const realChange = await updateProduct(req("http://x/api/seller/update-product", {
+      productId: "legacy_nosub", product: { leafCategoryId: "HOME_DECOR_LAMPS" },
+    }, SELLER));
+    record("P6b locked product missing sub/leaf category: form save re-sending \"\" succeeds (title applied, no empty category fields written); a real new value is still 403",
+      formSave.status === 200 && ln?.title === "Form Save OK" && !("subCategoryId" in ln) && !("leafCategoryId" in ln) && realChange.status === 403,
+      `formSave=${formSave.status} hasSub=${"subCategoryId" in (ln || {})} realChange=${realChange.status}`);
+
+    const adminMove = await asAdmin(pid, { action: "approve" });
+    await db.collection("products").doc(pid).update({ categoryId: "HOME" }); // admin (Admin SDK) recategorisation is unaffected
+    record("P7 admin paths unaffected: moderation still works and an admin recategorisation applies",
+      adminMove.status === 200 && (await getP(pid))?.categoryId === "HOME", `approve=${adminMove.status}`);
+  }
+
   await clearAll();
   const failed = results.filter((r) => !r.pass);
   console.log("\n=================== SUMMARY ===================");

@@ -3,6 +3,11 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { Timestamp } from "firebase-admin/firestore";
 import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
+import {
+  PRODUCT_CATEGORY_FIELDS,
+  changedLockedCategoryFields,
+  isCategoryLocked,
+} from "@/lib/products/categoryLock";
 
 // ---------------------------------------------------------------------------
 // Server-authoritative product EDIT for sellers.
@@ -117,6 +122,25 @@ export async function POST(request: Request) {
         if (existing[key] instanceof Timestamp) continue;
         if (JSON.stringify(existing[key]) === JSON.stringify(value)) continue;
         changes[key] = value;
+      }
+
+      // Category is fixed once the product is approved (see
+      // lib/products/categoryLock.ts; firestore.rules enforces the same rule on
+      // direct SDK writes). Refused outright rather than silently dropped, so
+      // the seller is told why their change did not apply.
+      const lockedCategoryChanges = changedLockedCategoryFields(existing, changes);
+      if (lockedCategoryChanges.length > 0) {
+        return {
+          kind: "error",
+          status: 403,
+          error:
+            "The category of an approved product can't be changed. Please contact YOMICO support to move it to another category.",
+        };
+      }
+      // Anything left under a category key on a locked product is a no-op
+      // (e.g. "" re-sent for a field the product never had) — never write it.
+      if (isCategoryLocked(existing)) {
+        for (const field of PRODUCT_CATEGORY_FIELDS) delete changes[field];
       }
 
       // Validate the document as it will be AFTER this write.

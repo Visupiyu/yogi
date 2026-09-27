@@ -31,6 +31,10 @@ export default function AdminWithdrawalsPage() {
   };
 
   const updateStatus = async (id: string, status: string) => {
+    // A Paid withdrawal is final (firestore.rules refuses any status change);
+    // never offer or attempt one from here.
+    if (withdrawals.find((item) => item.id === id)?.status === "Paid") return;
+
     try {
       // The money-moving transition is SERVER-AUTHORITATIVE: the API verifies
       // the caller is an admin, recomputes the refund-adjusted payable from
@@ -131,18 +135,20 @@ export default function AdminWithdrawalsPage() {
                         >
                           {item.status || "Pending"}
                         </span>
-                        <select
-                          value={item.status || "Pending"}
-                          onChange={(e) =>
-                            updateStatus(item.id, e.target.value)
-                          }
-                          className="border p-2 rounded-lg"
-                        >
-                          <option>Pending</option>
-                          <option>Approved</option>
-                          <option>Rejected</option>
-                          <option>Paid</option>
-                        </select>
+                        {item.status !== "Paid" && (
+                          <select
+                            value={item.status || "Pending"}
+                            onChange={(e) =>
+                              updateStatus(item.id, e.target.value)
+                            }
+                            className="border p-2 rounded-lg"
+                          >
+                            <option>Pending</option>
+                            <option>Approved</option>
+                            <option>Rejected</option>
+                            <option>Paid</option>
+                          </select>
+                        )}
                       </div>
                     </td>
                   </tr>

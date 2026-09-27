@@ -362,6 +362,21 @@ service cloud.firestore {
           && unchanged('stock')
           && unchanged('gstRate')
           && unchanged('gstPercent')
+          // Category is fixed once the product is approved (future category
+          // commission must not be escapable by recategorising a live product).
+          // Only an explicitly pending or rejected product may still change
+          // it; approved, blocked (approved + inactive), legacy (no
+          // approvalStatus — live under lib/products/visibility.ts) and any
+          // unknown status are all locked. Mirrors lib/products/categoryLock.ts,
+          // which app/api/seller/update-product enforces server-side.
+          && (
+            resource.data.get('approvalStatus', null) in ['pending', 'rejected']
+            || (
+              unchanged('categoryId')
+              && unchanged('subCategoryId')
+              && unchanged('leafCategoryId')
+            )
+          )
           && isValidProduct()
         )
         || isCheckoutStockUpdate()
@@ -1254,8 +1269,25 @@ service cloud.firestore {
       // that reaches this collection is server-decided. Reads, admin updates
       // and admin deletes below are unchanged.
       allow create: if false;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      // A Paid withdrawal is final. Its status can never move again (a Paid ->
+      // Rejected/Pending/Approved flip would drop it out of the committed
+      // total in lib/vendorPayable.ts and make the same money payable twice),
+      // and the fields that define WHAT was paid and TO WHOM are frozen too.
+      // Deleting a Paid withdrawal would reopen the same money, so it is
+      // refused as well. Pending/Approved/Rejected keep their existing admin
+      // transitions; Paid is reached only through app/api/settle-withdrawal
+      // (Admin SDK), which is unaffected by these rules.
+      allow update: if isAdmin()
+        && (
+          resource.data.get('status', 'Pending') != 'Paid'
+          || (
+            unchanged('status')
+            && unchanged('amount')
+            && unchanged('vendorId')
+            && unchanged('vendorEmail')
+          )
+        );
+      allow delete: if isAdmin() && resource.data.get('status', 'Pending') != 'Paid';
     }
 
     // ---------------------------------------------------------
