@@ -16,6 +16,7 @@ const navItems = [
   { href: "/seller#add-product", label: "Add Product", icon: "➕" },
   { href: "/seller#products", label: "Products", icon: "🏷️" },
   { href: "/seller/inventory", label: "Inventory", icon: "📋" },
+  { href: "/seller/store", label: "My Store", icon: "🛍️" },
   { href: "/seller/settings", label: "Store Settings", icon: "🏬" },
   { href: "/seller/business", label: "Seller Business", icon: "🏢" },
   { href: "/seller/tax", label: "Tax & GST", icon: "🧾" },
