@@ -735,11 +735,38 @@ service cloud.firestore {
     // vendors
     // ---------------------------------------------------------
 
+    function zeroIfPresent(d, field) {
+      return !(field in d) || d[field] == 0;
+    }
+
     function isValidVendorApplication() {
       let d = request.resource.data;
       return d.uid == request.auth.uid
         && d.status == 'Pending'
-        && d.kycStatus == 'Pending';
+        && d.kycStatus == 'Pending'
+        // Only the fields app/vendor-register writes. Everything a server
+        // route or an admin owns — the tax profile and its verification
+        // result, sellerNumber, the business-change stamps — was previously
+        // accepted here as sent, so an applicant could open their record with
+        // taxVerificationStatus 'VERIFIED' or a copied sellerNumber. Counters
+        // and the (always-0) commission may only start at 0.
+        && d.keys().hasOnly([
+          'uid', 'fullName', 'email', 'businessPhone', 'businessName', 'gstNumber',
+          'businessType', 'street', 'unit', 'zipCode', 'city', 'state',
+          'accountHolder', 'bankName', 'accountNumber', 'ifsc',
+          'panNumber', 'aadhaarNumber',
+          'gstDocUrl', 'aadhaarDocUrl', 'chequeDocUrl',
+          'kycStatus', 'agreed', 'storeLogo', 'storeBanner', 'status',
+          'rating', 'totalProducts', 'commissionRate', 'totalSales',
+          'totalOrders', 'totalRevenue', 'pendingPayout', 'createdAt'
+        ])
+        && zeroIfPresent(d, 'rating')
+        && zeroIfPresent(d, 'totalProducts')
+        && zeroIfPresent(d, 'commissionRate')
+        && zeroIfPresent(d, 'totalSales')
+        && zeroIfPresent(d, 'totalOrders')
+        && zeroIfPresent(d, 'totalRevenue')
+        && zeroIfPresent(d, 'pendingPayout');
     }
 
     match /vendors/{vendorDocId} {
@@ -767,17 +794,25 @@ service cloud.firestore {
           // kycStatus is itself frozen for the owner (above), and blocking a
           // vendor changes only `status`, so a blocked vendor stays frozen too.
           // Admin (the isAdmin() branch) is unaffected.
+          //
+          // The approved business identity, contact and address are frozen
+          // the same way: after approval they change only through a
+          // business-change request an admin approves
+          // (app/api/seller/business/change-request ->
+          // app/api/admin/business-change-requests, Admin SDK).
+          //
+          // One affectedKeys() test instead of a per-field unchanged() each:
+          // same meaning (a change, an addition and a removal all count), but
+          // it keeps this rule well inside the rules engine's per-request
+          // evaluation budget now that the frozen set is larger.
           && (
             resource.data.kycStatus != 'Approved'
-            || (
-              unchanged('gstNumber')
-              && unchanged('panNumber')
-              && unchanged('aadhaarNumber')
-              && unchanged('accountHolder')
-              && unchanged('bankName')
-              && unchanged('accountNumber')
-              && unchanged('ifsc')
-            )
+            || !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'gstNumber', 'panNumber', 'aadhaarNumber',
+              'accountHolder', 'bankName', 'accountNumber', 'ifsc',
+              'businessName', 'fullName', 'businessType', 'businessPhone', 'email',
+              'street', 'unit', 'zipCode', 'city', 'state'
+            ])
           )
           && unchanged('commissionRate')
           && unchanged('totalSales')
@@ -797,6 +832,10 @@ service cloud.firestore {
           && unchanged('taxVerifiedBy')
           && unchanged('taxRejectionReason')
           && unchanged('sellerNumber')
+          // Stamped only by the admin business-change approval route.
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'businessDetailsUpdatedAt', 'bankDetailsUpdatedAt', 'bankProofPath'
+          ])
         );
 
       allow delete: if isAdmin();
@@ -830,17 +869,41 @@ service cloud.firestore {
           && request.resource.data.uid == uid
           && request.resource.data.status == 'Pending'
           && isValidPublicVendorProfile()
+          // A new storefront profile starts with no reputation of its own.
+          && zeroIfPresent(request.resource.data, 'rating')
+          && zeroIfPresent(request.resource.data, 'totalOrders')
+          && zeroIfPresent(request.resource.data, 'totalSales')
+          && zeroIfPresent(request.resource.data, 'totalRevenue')
         );
 
+      // The owner may restyle their storefront (logo, banner) only. Rating and
+      // sales counters are not the seller's to set, and the business name,
+      // owner, contact and location shown here mirror the verified vendors
+      // record — they change only when an admin approves a business-change
+      // request (Admin SDK), never from the seller's browser.
       allow update: if isAdmin()
         || (
           isOwnerUid(uid)
           && unchanged('uid')
           && unchanged('status')
           && isValidPublicVendorProfile()
+          && affectedKeysOnly(['storeLogo', 'storeBanner', 'updatedAt'])
         );
 
       allow delete: if isAdmin();
+    }
+
+    // ---------------------------------------------------------
+    // vendorChangeRequests — a seller's request to change their business
+    // identity, contact, address or bank/payout details. Created by
+    // app/api/seller/business/change-request and decided by
+    // app/api/admin/business-change-requests, both on the Admin SDK — no
+    // client, admin included, writes one. The seller reads only their own.
+    // ---------------------------------------------------------
+    match /vendorChangeRequests/{requestId} {
+      allow read: if isAdmin()
+        || (isSignedIn() && resource.data.vendorUid == request.auth.uid);
+      allow create, update, delete: if false;
     }
 
     // ---------------------------------------------------------

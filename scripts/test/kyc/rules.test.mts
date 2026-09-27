@@ -218,7 +218,13 @@ await check("V14 approved vendor can still change an ordinary profile field (abo
   assertSucceeds(updateDoc(approved(), { aboutStore: "Updated about" })));
 await check("V15 approved vendor whole-document save with protected values unchanged still allowed", async () => {
   const current = (await getDoc(approved())).data() || {};
-  await assertSucceeds(updateDoc(approved(), { ...current, businessName: "Approved Traders Ltd" }));
+  await assertSucceeds(updateDoc(approved(), { ...current, aboutStore: "Whole-document save" }));
+});
+// Seller Business: the approved business identity is now frozen like the bank
+// and identity numbers — a rename goes through an admin-approved request.
+await check("V15b approved vendor whole-document save CANNOT rename the business (changed via Seller Business request)", async () => {
+  const current = (await getDoc(approved())).data() || {};
+  await assertFails(updateDoc(approved(), { ...current, businessName: "Approved Traders Ltd" }));
 });
 await check("V16 approved vendor CANNOT change kycStatus (unchanged)", () => assertFails(updateDoc(approved(), { kycStatus: "Pending" })));
 await check("V17 approved vendor CANNOT change gstDocUrl (unchanged)", () =>

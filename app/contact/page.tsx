@@ -74,7 +74,7 @@ export default function ContactPage() {
                 <MapPin className="text-red-600" />
 
                 <span>
-                  Ahmedabad, Gujarat, India
+                  VADODARA, Gujarat, India
                 </span>
 
               </div>

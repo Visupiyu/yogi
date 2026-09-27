@@ -12,6 +12,8 @@ import {
   where,
 } from "firebase/firestore";
 
+import Link from "next/link";
+
 import {
   auth,
   db,
@@ -113,29 +115,25 @@ const saveSettings = async () => {
       return;
     }
 
+    // Store presentation only. Business name, owner, contact and address are
+    // verified details — they change through a request on /seller/business
+    // (firestore.rules freeze them once KYC is approved), so this page no
+    // longer writes them, nor the whole vendor document back.
     await updateDoc(
-
       doc(db, "vendors", vendorDocId),
-
-      form
-
+      {
+        aboutStore: form.aboutStore || "",
+        storeLogo: form.storeLogo || "",
+        storeBanner: form.storeBanner || "",
+      }
     );
-
-    // Keep the public storefront mirror in sync with the display-safe fields
+    // Keep the public storefront's logo and banner in sync.
     await setDoc(
       doc(db, "vendors_public", vendorId),
       {
         uid: vendorId,
-        status: vendorStatus,
-        businessName: form.businessName,
-        fullName: form.fullName,
-        email: form.email,
-        businessPhone: form.businessPhone,
-        businessType: form.businessType,
-        city: form.city,
-        state: form.state,
-        storeLogo: form.storeLogo,
-        storeBanner: form.storeBanner,
+        storeLogo: form.storeLogo || "",
+        storeBanner: form.storeBanner || "",
       },
       { merge: true }
     );
@@ -286,168 +284,26 @@ Store Banner
 
 </div>
 
-{/* Business Name */}
+{/* Business details — read-only here; changed via a reviewed request */}
 
-<div>
+<div className="bg-gray-50 rounded-2xl p-5">
 
-<label className="font-semibold">
-Business Name
-</label>
-
-<input
-className="w-full mt-2 border rounded-xl p-3"
-value={form.businessName}
-onChange={(e)=>
-setForm({
-...form,
-businessName:e.target.value,
-})
-}
-/>
-
+<div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+<h2 className="font-semibold">Business details</h2>
+<Link
+href="/seller/business"
+className="text-sm bg-white border hover:bg-gray-100 px-4 py-2 rounded-xl font-semibold"
+>
+Manage in Seller Business
+</Link>
 </div>
 
-{/* Owner */}
-
-<div>
-
-<label className="font-semibold">
-Owner Name
-</label>
-
-<input
-className="w-full mt-2 border rounded-xl p-3"
-value={form.fullName}
-onChange={(e)=>
-setForm({
-...form,
-fullName:e.target.value,
-})
-}
-/>
-
-</div>
-
-{/* Email */}
-
-<div>
-
-<label className="font-semibold">
-Email
-</label>
-
-<input
-className="w-full mt-2 border rounded-xl p-3"
-value={form.email}
-onChange={(e)=>
-setForm({
-...form,
-email:e.target.value,
-})
-}
-/>
-
-</div>
-
-{/* Phone */}
-
-<div>
-
-<label className="font-semibold">
-Phone
-</label>
-
-<input
-className="w-full mt-2 border rounded-xl p-3"
-value={form.businessPhone}
-onChange={(e)=>
-setForm({
-...form,
-businessPhone:e.target.value,
-})
-}
-/>
-
-</div>
-
-{/* Address */}
-
-<div>
-
-<label className="font-semibold">
-Street / Area
-</label>
-
-<input
-className="w-full mt-2 border rounded-xl p-3"
-value={form.street}
-onChange={(e)=>
-setForm({
-...form,
-street:e.target.value,
-})
-}
-/>
-
-</div>
-
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-<div>
-
-<label className="font-semibold">
-City
-</label>
-
-<input
-className="w-full mt-2 border rounded-xl p-3"
-value={form.city}
-onChange={(e)=>
-setForm({
-...form,
-city:e.target.value,
-})
-}
-/>
-
-</div>
-
-<div>
-
-<label className="font-semibold">
-State
-</label>
-
-<input
-className="w-full mt-2 border rounded-xl p-3"
-value={form.state}
-onChange={(e)=>
-setForm({
-...form,
-state:e.target.value,
-})
-}
-/>
-
-</div>
-
-<div>
-
-<label className="font-semibold">
-PIN Code
-</label>
-
-<input
-className="w-full mt-2 border rounded-xl p-3"
-value={form.zipCode}
-onChange={(e)=>
-setForm({
-...form,
-zipCode:e.target.value,
-})
-}
-/>
-
+<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+<p><span className="text-gray-500">Business name:</span> {form.businessName || "-"}</p>
+<p><span className="text-gray-500">Owner:</span> {form.fullName || "-"}</p>
+<p className="break-all"><span className="text-gray-500">Email:</span> {form.email || "-"}</p>
+<p><span className="text-gray-500">Phone:</span> {form.businessPhone || "-"}</p>
+<p className="md:col-span-2"><span className="text-gray-500">Address:</span> {[form.street, form.city, form.state, form.zipCode].filter(Boolean).join(", ") || "-"}</p>
 </div>
 
 </div>

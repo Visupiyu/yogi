@@ -16,6 +16,7 @@ const navItems = [
   { href: "/admin/customers", label: "Customers", icon: "🧑" },
   { href: "/admin/vendors", label: "Vendors", icon: "🏬" },
   { href: "/admin/kyc", label: "Vendor KYC", icon: "🪪" },
+  { href: "/admin/business-requests", label: "Business Changes", icon: "📝" },
   { href: "/admin/seller-inquiries", label: "Seller Inquiries", icon: "📨" },
   { href: "/admin/coupons", label: "Coupons", icon: "🎟" },
   { href: "/admin/delivery", label: "Delivery", icon: "🚚" },
