@@ -13,6 +13,7 @@ import {
 
 import { db } from "@/lib/firebase";
 import type { Vendor } from "@/hooks/useVendor";
+import { fetchSellerOrders } from "@/lib/sellerOrders/sellerOrdersClient";
 
 interface OnboardingChecklistProps {
   vendor: Vendor;
@@ -45,22 +46,10 @@ export default function OnboardingChecklist({
 
         setHasProduct(!productSnap.empty);
 
-        const orderSnap = await getDocs(
-          query(
-            collection(db, "orders"),
-            where("vendorIds", "array-contains", vendorId),
-            // Sellers must never see a Pending order: it belongs to them only once
-            // an admin confirms it. firestore.rules enforces this on the orders
-            // read rule, and the rules engine REJECTS this entire query unless it
-            // carries a filter proving the constraint - an unfiltered
-            // array-contains query returns permission-denied. Load-bearing, not
-            // cosmetic. Needs the orders vendorIds+status composite index.
-            where("status", "!=", "Pending"),
-            limit(1)
-          )
-        );
-
-        setHasOrder(!orderSnap.empty);
+        // Seller-scoped (app/api/seller/orders): sellers no longer read the
+        // shared orders/{id} documents.
+        const firstOrder = await fetchSellerOrders(1);
+        setHasOrder(!!firstOrder && firstOrder.length > 0);
 
       } catch (error) {
 

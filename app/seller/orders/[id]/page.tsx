@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
-import {doc,getDoc,updateDoc,addDoc,collection,serverTimestamp,getDocs,query,where} from "firebase/firestore";
+import {doc,getDoc,updateDoc,collection,serverTimestamp,getDocs,query,where} from "firebase/firestore";
+import type { SellerOrderDetail } from "@/lib/sellerOrders/sellerOrderView";
+import { timestampLike } from "@/lib/sellerOrders/sellerOrdersClient";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -17,7 +19,6 @@ import {
 import ShippingLabel from "@/components/ShippingLabel";
 import Invoice from "@/components/invoice/Invoice";
 import SellerOrderStatement from "@/components/settlement/SellerOrderStatement";
-import { computeVendorShare } from "@/lib/vendorEarnings";
 import {
   ITEM_FULFILMENT_STAGES,
   deriveFulfilmentStage,
@@ -40,7 +41,6 @@ import { useRef } from "react";
 // Order-level statuses a seller may still cancel from. Forward fulfilment is
 // per item now and lives in sellerOrders, so this is all that remains of the
 // parent-status control.
-const CANCELLABLE_BY_SELLER = ["Confirmed", "Packed"];
 
 type FulfilmentLine = {
   itemKey?: string;
@@ -75,6 +75,40 @@ type SellerVisibleRequest = {
   status: string;
   createdAt?: unknown;
 };
+
+// The seller-scoped order view (app/api/seller/orders/[orderId]) mapped onto
+// the field names this page and the shared ShippingLabel / Invoice components
+// already read. It holds ONLY the view's allow-listed fields — this seller's
+// own lines and figures, and the customer's name, phone and delivery address —
+// never the shared order document.
+function toPageOrder(view: SellerOrderDetail, vendorUid: string) {
+  return {
+    id: view.orderId,
+    orderNumber: view.orderNumber,
+    invoiceNumber: view.invoiceNumber,
+    createdAt: timestampLike(view.createdAt),
+    status: view.orderStatus,
+    isSoleSeller: view.isSoleSeller,
+    cancellable: view.cancellable,
+    customerName: view.customer.name,
+    phone: view.customer.phone,
+    address: view.customer.address,
+    paymentMethod: view.payment.method,
+    paymentStatus: view.payment.status,
+    shipmentNumber: view.shipmentNumber,
+    deliveryCompanyName: view.delivery.companyName,
+    deliveryPartnerName: view.delivery.partnerName,
+    trackingNumber: view.shipping.trackingNumber,
+    courierPartner: view.shipping.courierPartner,
+    dispatchDate: view.shipping.dispatchDate,
+    expectedDelivery: view.shipping.expectedDelivery,
+    sellerNotes: view.shipping.sellerNotes,
+    sellerShare: view.sellerShare,
+    // This seller's own lines, tagged with their own uid so the existing
+    // per-seller filters on this page keep working.
+    items: view.items.map((item) => ({ ...item, id: item.productId, vendorId: vendorUid })),
+  };
+}
 
 export default function SellerOrderDetailsPage(){
 
@@ -142,35 +176,25 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
   const loadOrder = async(vendorUid: string)=>{
     try{
-      const snap = await getDoc(
-        doc(
-          db,
-          "orders",
-          id
-        )
+      // The seller-scoped view — never the shared orders/{id} document, which
+      // firestore.rules no longer let a seller read. An unknown order, one
+      // with none of this seller's items, and a Pending order are all 404.
+      const currentUser = auth.currentUser;
+      const res = currentUser
+        ? await fetch(`/api/seller/orders/${encodeURIComponent(id)}`, {
+            headers: { Authorization: `Bearer ${await currentUser.getIdToken()}` },
+          })
+        : null;
+      const payload = res ? await res.json().catch(() => ({})) : {};
+      if (!res || !res.ok || !payload?.order) {
+        toast.error(payload?.error || "Order not found.");
+        router.push("/seller/orders");
+        return;
+      }
 
-      );
+      {
 
-      if(snap.exists()){
-
-        const data:any={
-
-          ...snap.data(),
-
-          id:snap.id,
-
-        };
-
-        if (
-          data.vendorIds &&
-          !data.vendorIds.includes(vendorUid)
-        ) {
-
-          toast.error("This order does not belong to your account.");
-          router.push("/seller/orders");
-          return;
-
-        }
+        const data: any = toPageOrder(payload.order as SellerOrderDetail, vendorUid);
 
         setOrder(data);
 
@@ -326,54 +350,31 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
   const saveOrder = async()=>{
     if (
+      status === order.status &&
+      trackingNumber === order.trackingNumber &&
+      courierPartner === order.courierPartner &&
+      dispatchDate === order.dispatchDate &&
+      expectedDelivery === order.expectedDelivery &&
+      sellerNotes === order.sellerNotes
+    ){
+      toast.info("No changes found.");
+      return;
+    }
 
-  status === order.status &&
-
-  trackingNumber === order.trackingNumber &&
-
-  courierPartner === order.courierPartner &&
-
-  dispatchDate === order.dispatchDate &&
-
-  expectedDelivery === order.expectedDelivery &&
-
-  sellerNotes === order.sellerNotes
-
-){
-
-  toast.info("No changes found.");
-
-  return;
-
-}
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      toast.error("Please login first.");
+      router.push("/vendor-login");
+      return;
+    }
 
     try{ setSaving(true);
+      const idToken = await currentUser.getIdToken();
 
-      // Cancellation is server-authoritative — /api/cancel-order is the single
-      // implementation, the same one app/orders (customer) and
-      // app/seller/orders already call.
-      //
-      // This path used to set status and restore stock from the browser and
-      // nothing else, so a seller-cancelled order left the customer's reward
-      // points credited for an order that never happened AND their coupon
-      // still consumed. The route re-reads the order, authorizes the caller
-      // against it (vendorIds branch), and does status + stock/sales + reward
-      // reversal + coupon release in one Admin SDK transaction.
-      //
-      // Cancelling is terminal, so the tracking/courier fields edited on this
-      // form are not sent — the route accepts an orderId and nothing else.
-      // Every other status transition below is unchanged.
+      // Cancellation is server-authoritative — /api/cancel-order does status,
+      // stock, reward reversal, coupon release and delivery-job halting in one
+      // transaction, and notifies the customer itself.
       if (status === "Cancelled" && order.status !== "Cancelled") {
-        const currentUser = auth.currentUser;
-
-        if (!currentUser) {
-          toast.error("Please login first.");
-          router.push("/vendor-login");
-          return;
-        }
-
-        const idToken = await currentUser.getIdToken();
-
         const response = await fetch("/api/cancel-order", {
           method: "POST",
           headers: {
@@ -382,111 +383,41 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
           },
           body: JSON.stringify({ orderId: id }),
         });
-
-        const data = await response.json();
-
+        const data = await response.json().catch(() => ({}));
         if (!response.ok) {
           toast.error(data?.error || "Couldn't cancel this order.");
           return;
         }
-
-        // The route does not write notifications, so this stays here —
-        // same wording, shape and type as the general path below.
-        await addDoc(collection(db, "notifications"), {
-          title: "Order Status Updated",
-          message: `Your order ${order?.orderNumber || id.slice(0, 8)} is now ${fulfilmentStageLabel(
-            status
-          )}`,
-          userId: order.userId,
-          userEmail: order.userEmail,
-          role: "customer",
-          type: "shipping",
-          read: false,
-          createdAt: serverTimestamp(),
-        });
-
         toast.success("Order updated successfully.");
-        setOrder({ ...order, status });
+        setOrder({ ...order, status, cancellable: false });
         return;
       }
 
-      // Shipping details are this seller's own, so they are always saved on
-      // the seller's record (sellerOrders — firestore.rules let the owning
-      // seller write exactly these fields). The order-level copy, which a
-      // single-seller order's customer sees, is written only when this seller
-      // is the order's ONLY seller and the order is still open: on a shared
-      // order one seller must never overwrite another's tracking. No status,
-      // payment or delivery field is ever written from here.
-      const shipping = {
-        trackingNumber,
-        courierPartner,
-        dispatchDate,
-        expectedDelivery,
-        sellerNotes,
-        updatedAt: serverTimestamp(),
-      };
-      if (sellerRecord) {
-        await updateDoc(doc(db, "sellerOrders", sellerRecord.id), shipping);
+      // Shipping details are saved by the server: on this seller's own
+      // record, and — on an order that is entirely theirs and still open —
+      // on the order the customer sees. The server also notifies the
+      // customer. Sellers never write orders/{id} themselves.
+      const response = await fetch(`/api/seller/orders/${encodeURIComponent(id)}/shipping`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ trackingNumber, courierPartner, dispatchDate, expectedDelivery, sellerNotes }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data?.error || "Failed to update order.");
+        return;
       }
-      const soleSeller = Array.isArray(order.vendorIds) && order.vendorIds.length === 1;
-      if (soleSeller && !["Delivered", "Cancelled"].includes(order.status)) {
-        await updateDoc(doc(db, "orders", id), shipping);
-      }
-
-      // The client-side stock/sales restore that stood here is gone —
-      // cancellation returns above, and /api/cancel-order performs the
-      // restoration inside the same transaction as the status change.
-
-      await addDoc(
-
-        collection(
-          db,
-          "notifications"
-        ),
-
-       {
-
-  title:
-    "Order Status Updated",
-
-  message:
-    `Your order ${order?.orderNumber || id.slice(0,8)} is now ${fulfilmentStageLabel(status)}`,
-
-  userId:
-    order.userId,
-
-  userEmail:
-    order.userEmail,
-
-  role:
-    "customer",
-
-  type:
-    "shipping",
-
-  read:false,
-
-  createdAt:
-    serverTimestamp(),
-
-}
-      );
-
-    toast.success(
-  "Order updated successfully."
-); 
-}
-
- catch(error){
-
-  console.error(error);
-
-  toast.error(
-    "Failed to update order."
-  );
-
-}
-finally{ setSaving(false);} };
+      setOrder({ ...order, trackingNumber, courierPartner, dispatchDate, expectedDelivery, sellerNotes });
+      toast.success(data?.unchanged ? "No changes found." : "Order updated successfully.");
+    }
+    catch(error){
+      console.error(error);
+      toast.error("Failed to update order.");
+    }
+    finally{ setSaving(false);} };
 
   // The seller's record-level stage (least-advanced item). Packed parcel weight
   // is editable up to dispatch and frozen once the shipment has left (Shipped /
@@ -586,7 +517,15 @@ finally{ setSaving(false);} };
   const vendorOrderItems = (order.items || []).filter(
     (item: any) => item.vendorId === vendorUid
   );
-  const vendorShare = computeVendorShare(order, vendorUid);
+  // This seller's own item value, computed by the server — the view never
+  // carries whole-order figures or other sellers' lines.
+  const vendorShare = order.sellerShare
+    ? {
+        vendorRawSubtotal: order.sellerShare.rawSubtotal,
+        vendorCommission: order.sellerShare.commission,
+        vendorEarning: order.sellerShare.earning,
+      }
+    : null;
   const vendorOrderSubtotal = vendorShare?.vendorRawSubtotal || 0;
   const vendorOrderCommission = vendorShare?.vendorCommission || 0;
   const vendorOrderEarning = vendorShare?.vendorEarning || 0;
@@ -705,15 +644,6 @@ finally{ setSaving(false);} };
 
                 </p>
 
-                <p>
-
-                  <strong>Email :</strong>
-
-                  {" "}
-
-                  {order.userEmail}
-
-                </p>
 
                 <p>
 
@@ -1186,7 +1116,7 @@ finally{ setSaving(false);} };
 
                   <span>
 
-                    ₹{order.total || 0}
+                    ₹{vendorOrderSubtotal}
 
                   </span>
 
@@ -1205,7 +1135,7 @@ finally{ setSaving(false);} };
 
                   <span>
 
-                    ₹{order.shippingCharge || 0}
+                    —
 
                   </span>
 
@@ -1298,7 +1228,7 @@ Your earnings for this order: see the Settlement Statement below.
 
                 }
 
-                disabled={!(CANCELLABLE_BY_SELLER.includes(order.status) && Array.isArray(order.vendorIds) && order.vendorIds.length === 1)}
+                disabled={!order.cancellable === true}
 
                 className="
                   w-full
@@ -1317,7 +1247,7 @@ Your earnings for this order: see the Settlement Statement below.
 
                 </option>
 
-                {(CANCELLABLE_BY_SELLER.includes(order.status) && Array.isArray(order.vendorIds) && order.vendorIds.length === 1) && (
+                {order.cancellable === true && (
 
                   <option value="Cancelled">Cancelled</option>
 
@@ -1946,24 +1876,6 @@ Your earnings for this order: see the Settlement Statement below.
 
             </a>
 
-            <a
-
-              href={`mailto:${order.userEmail}`}
-
-              className="
-                bg-red-600
-                text-white
-                py-3
-                rounded-xl
-                font-semibold
-                text-center
-              "
-
-            >
-
-              ✉ Email Customer
-
-            </a>
 
             <Link
 

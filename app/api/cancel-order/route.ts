@@ -529,6 +529,26 @@ export async function POST(request: Request) {
           order.paymentMethod === "ONLINE" && order.paymentStatus === "Paid";
 
         // ---- WRITES ----
+        // A seller-initiated cancellation tells the customer (sellers no
+        // longer hold the customer's uid to do it from the browser).
+        if (authz.role === "vendor" && typeof order.userId === "string" && order.userId) {
+          const orderNumber =
+            typeof (order as { orderNumber?: unknown }).orderNumber === "string"
+              ? String((order as { orderNumber?: unknown }).orderNumber)
+              : orderId.slice(0, 8);
+          tx.set(db.collection("notifications").doc(), {
+            title: "Order Status Updated",
+            message: `Your order ${orderNumber} is now Cancelled`,
+            userId: order.userId,
+            ...(typeof (order as { userEmail?: unknown }).userEmail === "string"
+              ? { userEmail: (order as { userEmail?: unknown }).userEmail }
+              : {}),
+            role: "customer",
+            type: "shipping",
+            read: false,
+            createdAt: Timestamp.now(),
+          });
+        }
         tx.update(orderRef, {
           status: "Cancelled",
           updatedAt: Timestamp.now(),

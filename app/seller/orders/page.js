@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
@@ -16,6 +16,7 @@ import {
 import { requestItemAdvance } from "@/lib/sellerFulfilmentClient";
 import { deliveryTiming, formatIst, relativeToNow } from "@/lib/orderTiming";
 import { shortOrderLabel } from "@/lib/orderSla";
+import { fetchSellerOrders } from "@/lib/sellerOrders/sellerOrdersClient";
 
 // Seller Orders — backed by the seller's own `sellerOrders` records.
 //
@@ -34,16 +35,15 @@ import { shortOrderLabel } from "@/lib/orderSla";
 //     composite index; this one needs none, and firestore.rules independently
 //     restricts every record to its own vendor.
 //
-// Customer contact details (phone, email, address) live on the parent order
-// and are shown on the order detail page, which still reads it.
+// The customer's delivery details (name, phone, address) are shown on the order
+// detail page, from the seller-scoped order view (app/api/seller/orders/[id]).
 
 export default function SellerOrdersPage() {
   const router = useRouter();
   const [records, setRecords] = useState([]);
-  // Delivery assignment per record, keyed by sellerOrder record id. The
-  // assignment (Delivery Company/Person + shipmentNumber) lives ONLY on the
-  // parent order, never on sellerOrders, so it is fetched from there — see the
-  // load effect. Only the delivery fields are kept; customer PII is discarded.
+  // Delivery assignment per record, keyed by sellerOrder record id, from the
+  // seller-scoped order view (app/api/seller/orders) — see the load effect.
+  // Only delivery names and this seller's own tracking number are kept.
   const [deliveryByRecord, setDeliveryByRecord] = useState({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -77,39 +77,25 @@ export default function SellerOrdersPage() {
 
         setRecords(list);
 
-        // The real delivery assignment (Delivery Company, Delivery Person,
-        // YOMICO tracking number) is written by Admin -> Delivery onto the
-        // PARENT order, never onto sellerOrders. Read it from there for each
-        // record — the seller is already authorized to read every confirmed
-        // parent order (uid in vendorIds && status != 'Pending'), which every
-        // listed record satisfies. Only the delivery fields are copied into
-        // state; the order's customer details are never stored or shown here.
-        // Per-order try/catch so one failed read can't blank the whole list,
-        // and only fields that exist are kept, so legacy orders are unaffected.
+        // Delivery assignment (company / person / tracking number) comes from
+        // the seller-scoped order view (app/api/seller/orders) — sellers no
+        // longer read the shared orders/{id} document. Delivery names are only
+        // given on an order that is entirely this seller's; the tracking
+        // number is this seller's own shipment's.
         const deliveryMap = {};
-        await Promise.all(
-          list.map(async (record) => {
-            if (!record.orderId) return;
-            try {
-              const orderSnap = await getDoc(doc(db, "orders", record.orderId));
-              if (!orderSnap.exists()) return;
-              const o = orderSnap.data();
-              if (
-                o.deliveryCompanyName ||
-                o.deliveryPartnerName ||
-                o.shipmentNumber
-              ) {
-                deliveryMap[record.id] = {
-                  deliveryCompanyName: o.deliveryCompanyName || "",
-                  deliveryPartnerName: o.deliveryPartnerName || "",
-                  shipmentNumber: o.shipmentNumber || "",
-                };
-              }
-            } catch {
-              // Non-fatal — the row still renders without delivery info.
-            }
-          })
-        );
+        const views = (await fetchSellerOrders()) || [];
+        const viewByOrder = new Map(views.map((v) => [v.orderId, v]));
+        for (const record of list) {
+          const v = viewByOrder.get(record.orderId);
+          if (!v) continue;
+          if (v.delivery.companyName || v.delivery.partnerName || v.shipmentNumber) {
+            deliveryMap[record.id] = {
+              deliveryCompanyName: v.delivery.companyName || "",
+              deliveryPartnerName: v.delivery.partnerName || "",
+              shipmentNumber: v.shipmentNumber || "",
+            };
+          }
+        }
         setDeliveryByRecord(deliveryMap);
       } catch (error) {
         console.error("Failed to load seller orders:", error);

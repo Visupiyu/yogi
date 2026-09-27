@@ -76,8 +76,10 @@ async function reseed() {
 await reseed();
 
 // ---------- sole-seller, open order: shipping details only ----------
-await check("O1 sole seller, open order: tracking / courier / dates / notes ALLOWED", () =>
-  assertSucceeds(updateDoc(order(A, "o_sole"), {
+// Seller Shared-Order Privacy: sellers no longer write orders/{id} at all —
+// their shipping details go through app/api/seller/orders/[orderId]/shipping.
+await check("O1 sole seller, open order: direct tracking / courier / dates / notes write now DENIED (server route only)", () =>
+  assertFails(updateDoc(order(A, "o_sole"), {
     trackingNumber: "TRK1", courierPartner: "Courier", dispatchDate: "2026-09-28", expectedDelivery: "2026-10-01",
     sellerNotes: "Fragile", updatedAt: serverTimestamp(),
   })));
@@ -137,8 +139,8 @@ await check("U1 customer may still cancel their own Pending order", () =>
   assertSucceeds(updateDoc(order(BUYER, "o_sole_pending", "buyer1@example.com"), { status: "Cancelled", updatedAt: serverTimestamp() })));
 await check("U2 admin may still update an order (admin access unchanged)", () =>
   assertSucceeds(updateDoc(order("adminUid", "o_sole_delivered", ADMIN_EMAIL), { paymentStatus: "Paid" })));
-await check("U3 seller may still READ an order that carries their items (unchanged; server projection is future work)", () =>
-  assertSucceeds(getDoc(order(A, "o_multi"))));
+await check("U3 seller can no longer READ the shared order document (served by app/api/seller/orders instead)", () =>
+  assertFails(getDoc(order(A, "o_multi"))));
 
 // Leave the shared emulator clean for whichever suite runs next.
 await env.clearFirestore();

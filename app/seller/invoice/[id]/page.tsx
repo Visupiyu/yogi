@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import Invoice from "@/components/invoice/Invoice";
-import { computeVendorShare } from "@/lib/vendorEarnings";
+import type { SellerOrderDetail } from "@/lib/sellerOrders/sellerOrderView";
+import { timestampLike } from "@/lib/sellerOrders/sellerOrdersClient";
 
 export default function SellerInvoicePage() {
 
@@ -34,64 +34,36 @@ export default function SellerInvoicePage() {
 
         try {
 
-          const snap = await getDoc(
-            doc(
-              db,
-              "orders",
-              params.id as string
-            )
+          // The seller-scoped order view (app/api/seller/orders/[orderId]):
+          // only this seller's own items and item value — never the shared
+          // order document, which sellers can no longer read. The GST tax
+          // invoice components are unchanged; they receive this seller's
+          // lines and this seller's item value, exactly as before.
+          const res = await fetch(
+            `/api/seller/orders/${encodeURIComponent(String(params.id))}`,
+            { headers: { Authorization: `Bearer ${await user.getIdToken()}` } }
           );
-
-          if (!snap.exists()) {
-
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload?.order) {
             alert("Invoice not found");
-
             window.location.href = "/seller/orders";
-
             return;
-
           }
-
-          const data: any = {
-
-            ...snap.data(),
-
-            id: snap.id,
-
-          };
-
-          // Optional security check
-          if (
-            data.vendorIds &&
-            !data.vendorIds.includes(user.uid)
-          ) {
-
-            alert("Unauthorized access");
-
-            window.location.href = "/seller/orders";
-
-            return;
-
-          }
-
-          // The order document holds every vendor's items and one
-          // whole-order total — a seller's invoice must only show their
-          // own items and their own share of the money, not the full
-          // multi-vendor order (same bug class already fixed in
-          // payouts/wallet/dashboard elsewhere this session).
-          const vendorItems = (data.items || []).filter(
-            (item: any) => item.vendorId === user.uid
-          );
-
-          // This seller's own item value from the shared helper. The seller's
-          // SETTLEMENT is deliberately not put on this GST tax invoice — it is
-          // on the Seller Order Settlement Statement (app/seller/orders/[id]).
-          const share = computeVendorShare(data, user.uid);
-          const vendorSubtotal = share?.vendorRawSubtotal ?? 0;
-
+          const view = payload.order as SellerOrderDetail;
+          const vendorSubtotal = view.sellerShare.rawSubtotal;
           setOrder({
-            ...data,
-            items: vendorItems,
+            id: view.orderId,
+            orderNumber: view.orderNumber,
+            invoiceNumber: view.invoiceNumber,
+            status: view.orderStatus,
+            createdAt: timestampLike(view.createdAt),
+            paymentMethod: view.payment.method,
+            paymentStatus: view.payment.status,
+            customerName: view.customer.name,
+            phone: view.customer.phone,
+            address: view.customer.address,
+            items: view.items.map((item) => ({ ...item, id: item.productId })),
+            total: vendorSubtotal,
             finalTotal: vendorSubtotal,
             // Shipping/coupon discount aren't split per vendor anywhere
             // in this app — showing the whole order's figures here would

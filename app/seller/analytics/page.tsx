@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { computeVendorShare } from "@/lib/vendorEarnings";
+import { fetchSellerOrders, toSellerOrderRow } from "@/lib/sellerOrders/sellerOrdersClient";
 import { fetchSellerPayableBreakdown } from "@/lib/sellerPayableClient";
 import type { VendorPayableBreakdown } from "@/lib/vendorPayable";
 import {
@@ -72,47 +72,25 @@ export default function SellerAnalyticsPage() {
       // (permission-denied) for every seller, silently swallowed by the
       // catch below — this page showed confident-looking zeros for
       // everyone, always.
-      const orderSnap = await getDocs(
-        query(
-          collection(db, "orders"),
-          where("vendorIds", "array-contains", vendorUid),
-          // Sellers must never see a Pending order: it belongs to them only once
-          // an admin confirms it. firestore.rules enforces this on the orders
-          // read rule, and the rules engine REJECTS this entire query unless it
-          // carries a filter proving the constraint - an unfiltered
-          // array-contains query returns permission-denied. Load-bearing, not
-          // cosmetic. Needs the orders vendorIds+status composite index.
-          where("status", "!=", "Pending")
-        )
-      );
+      // Seller-scoped order summaries (app/api/seller/orders) — this seller's
+      // own lines and item value, computed on the server with the same
+      // computeVendorShare as before. Cancelled orders are excluded, as
+      // Wallet and Admin Analytics do.
       const orderList: any[] = [];
-      orderSnap.forEach((doc) => {
-        const data: any = doc.data();
-
-        // Cancelled orders were counted into Revenue/Commission/Net
-        // Earnings here (Wallet and Admin Analytics both exclude them).
-        if (data.status === "Cancelled") return;
-
-        const myItems =
-          data.items?.filter((item: any) => item.vendorId === vendorUid) ||
-          [];
-        if (myItems.length === 0) return;
-
-        // order.commission/sellerEarning are whole-order, whole-cart
-        // figures — crediting them straight to one vendor in a
-        // multi-vendor order overstates their share, and a flat 10% of
-        // raw price*qty (the previous approach here) ignores this
-        // vendor's proportional cut of any coupon/reward discount.
-        // computeVendorShare is the same helper Wallet already uses.
-        const share = computeVendorShare(data, vendorUid) || {
-          vendorRawSubtotal: 0,
-          vendorNetSubtotal: 0,
-          vendorCommission: 0,
-          vendorEarning: 0,
-        };
-
-        orderList.push({ ...data, myItems, share });
-      });
+      for (const o of (await fetchSellerOrders()) || []) {
+        if (o.orderStatus === "Cancelled") continue;
+        const row = toSellerOrderRow(o, vendorUid);
+        orderList.push({
+          ...row,
+          myItems: row.items,
+          share: {
+            vendorRawSubtotal: o.sellerShare.rawSubtotal,
+            vendorNetSubtotal: o.sellerShare.netSubtotal,
+            vendorCommission: o.sellerShare.commission,
+            vendorEarning: o.sellerShare.earning,
+          },
+        });
+      }
       setOrders(orderList);
 
       // Commission / Net Earnings KPIs come from the server's single

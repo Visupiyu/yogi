@@ -3,16 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  collection,
-  getDocs,
-  query,
-  where
-} from "firebase/firestore";
 
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
-import { computeVendorShare } from "@/lib/vendorEarnings";
+import { fetchSellerOrders } from "@/lib/sellerOrders/sellerOrdersClient";
 import { onAuthStateChanged } from "firebase/auth";
 
 import * as XLSX from "xlsx";
@@ -55,82 +49,20 @@ export default function SellerReportsPage(){
 
       // Orders are Firestore-rules-scoped to vendorIds containing the
       // signed-in seller's auth uid — a full collection scan is denied.
-      const snapshot =
-        await getDocs(
-
-          query(
-            collection(db, "orders"),
-            where("vendorIds", "array-contains", vendorUid),
-            // Sellers must never see a Pending order: it belongs to them only once
-            // an admin confirms it. firestore.rules enforces this on the orders
-            // read rule, and the rules engine REJECTS this entire query unless it
-            // carries a filter proving the constraint - an unfiltered
-            // array-contains query returns permission-denied. Load-bearing, not
-            // cosmetic. Needs the orders vendorIds+status composite index.
-            where("status", "!=", "Pending")
-          )
-
-        );
-
-      const data:any[]=[];
-
-      snapshot.forEach(doc=>{
-
-        const order:any =
-          doc.data();
-
-        const items =
-
-          order.items?.filter(
-
-            (item:any)=>
-
-              item.vendorId ===
-              vendorUid
-
-          ) || [];
-
-        if(items.length){
-
-          data.push({
-
-            id:doc.id,
-
-            customer:
-              order.customerName,
-
-            amount:
-              // Canonical seller gross revenue for this order — the SAME source
-              // the dashboard uses — and NaN-safe: computeVendorShare treats a
-              // missing/non-numeric price or qty as 0 instead of poisoning the
-              // sum. Falls back to 0 when this vendor has no line on the order.
-              computeVendorShare(order, vendorUid)?.vendorRawSubtotal ?? 0,
-
-            status:
-              order.status,
-
-            items:
-              items.length,
-
-            date:
-
-              order.createdAt?.seconds
-
-                ? new Date(
-
-                    order.createdAt.seconds *
-
-                    1000
-
-                  ).toLocaleDateString()
-
-                : "-"
-
-          });
-
-        }
-
-      });
+      // Seller-scoped order summaries (app/api/seller/orders): this seller's
+      // own lines and item value — sellers no longer read the shared
+      // orders/{id} documents.
+      const data: any[] = [];
+      for (const o of (await fetchSellerOrders()) || []) {
+        data.push({
+          id: o.orderId,
+          customer: o.customerName,
+          amount: o.sellerShare.rawSubtotal,
+          status: o.orderStatus,
+          items: o.items.length,
+          date: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : "-",
+        });
+      }
 data.sort(
   (a, b) =>
     new Date(b.date).getTime() -

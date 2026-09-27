@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useVendor } from "@/hooks/useVendor";
-import { computeVendorShare } from "@/lib/vendorEarnings";
+import { fetchSellerOrders, toSellerOrderRow } from "@/lib/sellerOrders/sellerOrdersClient";
 import { fetchSellerPayableBreakdown } from "@/lib/sellerPayableClient";
 
 import SellerDashboard from "@/components/seller/SellerDashboard";
@@ -72,23 +72,12 @@ export default function SellerPage() {
       });
 
       // ---- Orders (scoped by vendorIds array-contains) ----
-      const ordersSnap = await getDocs(
-        query(
-          collection(db, "orders"),
-          where("vendorIds", "array-contains", vendorId),
-          // Sellers must never see a Pending order: it belongs to them only once
-          // an admin confirms it. firestore.rules enforces this on the orders
-          // read rule, and the rules engine REJECTS this entire query unless it
-          // carries a filter proving the constraint - an unfiltered
-          // array-contains query returns permission-denied. Load-bearing, not
-          // cosmetic. Needs the orders vendorIds+status composite index.
-          where("status", "!=", "Pending")
-        )
+      // Seller-scoped order summaries (app/api/seller/orders): this seller's
+      // own lines and item value only — sellers no longer read the shared
+      // orders/{id} documents.
+      const orderList: any[] = ((await fetchSellerOrders()) || []).map((o) =>
+        toSellerOrderRow(o, vendorId)
       );
-      const orderList = ordersSnap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as any),
-      }));
 
       let ordersCount = 0;
       let pendingCount = 0;
@@ -112,7 +101,14 @@ export default function SellerPage() {
           // genuinely awaits the seller.
           if (order.status === "Confirmed") pendingCount++;
 
-          const share = computeVendorShare(order, vendorId);
+          // This seller's own item value, computed on the server.
+          const share = order.sellerShare
+            ? {
+                vendorRawSubtotal: order.sellerShare.rawSubtotal,
+                vendorCommission: order.sellerShare.commission,
+                vendorEarning: order.sellerShare.earning,
+              }
+            : null;
 
           if (share) {
             totalEarnings += share.vendorRawSubtotal;
