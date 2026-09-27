@@ -14,9 +14,13 @@ rules_version = '2';
 //   all, so every upload fell through to the default-deny fallback below;
 //   since the upload loop runs before the review document write, this
 //   silently failed the ENTIRE review (not just the photo) whenever the
-//   customer attached one. Same owner-scoped shape as products/{uid} below
-//   — public read (shown on the product page), write restricted to the
-//   uploading customer, 5MB image cap.
+//   customer attached one. Create-only, restricted to the uploading
+//   customer (uid in the path), 5MB image cap. NOT publicly listable or
+//   readable through the rules: only the uploader (right after upload) and
+//   the admin can read, and nobody can list. The public views each photo
+//   through the stored share link (tokenized download URL) that the app
+//   saves in reviews/{id}.photos — the Customer App's product page renders
+//   those links directly, and token links do not go through these rules.
 //
 // products/{timestamp}-{filename}
 // chat/{timestamp}-{filename}
@@ -248,14 +252,22 @@ service firebase.storage {
     }
 
     // Mobile app's product-review photos — see the path-model note above.
-    // Public read (shown on the product page next to the review), create
-    // restricted to the customer whose uid the path carries. Create-only:
-    // each photo is uploaded once to a fresh {timestamp}-{index} name and the
-    // review document that links it is immutable, so no overwrite, metadata
-    // change or delete (`resource == null` — an upload over an existing
-    // object is evaluated as a create).
+    // Create restricted to the customer whose uid the path carries.
+    // Create-only: each photo is uploaded once to a fresh {timestamp}-{index}
+    // name and the review document that links it is immutable, so no
+    // overwrite, metadata change or delete (`resource == null` — an upload
+    // over an existing object is evaluated as a create).
+    //
+    // Reads: the photos are PUBLICLY VIEWED through the tokenized download
+    // URL that the app stores in reviews/{id}.photos at upload time; token
+    // URLs bypass these rules, so public viewing needs no rule here. A
+    // rules-level read is only the uploader's own getDownloadURL() right
+    // after upload (plus admin). There is deliberately NO list: reviewer uids
+    // are public in reviews/, so a public list/get let anyone enumerate a
+    // customer's folder and fetch photos never attached to a published
+    // review (e.g. when the review write failed after the upload).
     match /reviews/{uid}/{fileName} {
-      allow read: if true;
+      allow get: if isAdmin() || (isSignedIn() && request.auth.uid == uid);
       allow create: if isSignedIn() && request.auth.uid == uid
         && resource == null
         && isImageUnderLimit(5);

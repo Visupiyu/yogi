@@ -8,7 +8,10 @@
  * unchanged. Also proves chat attachments and proof photos are immutable once
  * uploaded: no overwrite, metadata change or delete by anyone, and that
  * review photos are likewise create-only (owner creates, nobody overwrites,
- * changes metadata or deletes; public read unchanged), and that product and
+ * changes metadata or deletes), are not listable by anyone and are readable
+ * through the rules only by their uploader and the admin — while the stored
+ * tokenized download link the app displays keeps working for everyone — and
+ * that product and
  * store images can be created only by an APPROVED vendor (vendors_public/{uid}
  * .status, read by the Storage rules through a cross-service firestore.get)
  * in their own folder, and are create-only too. Loads the repository's
@@ -84,6 +87,17 @@ const admin = () => user("adminUid", "adminyogimart@gmail.com");
 const anon = () => env.unauthenticatedContext().storage();
 
 const read = (s: ReturnType<typeof anon>, p: string) => s.ref(p).getDownloadURL();
+// The tokenized download URL an upload yields (what the app stores and shows),
+// minted with rules disabled so it reflects the object, not the caller.
+async function storedLink(p: string): Promise<string> {
+  let url = "";
+  await env.withSecurityRulesDisabled(async (ctx) => { url = await ctx.storage().ref(p).getDownloadURL(); });
+  return url;
+}
+async function fetchOk(url: string) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+}
 const list = (s: ReturnType<typeof anon>, p: string) => s.ref(p).listAll();
 const put = (s: ReturnType<typeof anon>, p: string, bytes: Uint8Array = tiny, meta = IMG) => s.ref(p).put(bytes, meta);
 const OVER_5MB = new Uint8Array(5 * 1024 * 1024);
@@ -135,7 +149,8 @@ await check("22 public: signed-out can read products/{uid}/ image", () => assert
 await check("22b public: signed-out can read legacy products/ image", () => assertSucceeds(read(anon(), "products/1600-legacy.jpg")));
 await check("23 public: signed-out can read vendor-store/{uid}/ image", () => assertSucceeds(read(anon(), "vendor-store/sellerS/1700-logo.jpg")));
 await check("23b public: signed-out can read legacy vendor-store/ image", () => assertSucceeds(read(anon(), "vendor-store/1600-legacy.jpg")));
-await check("24 public: signed-out can read reviews/{uid}/ image", () => assertSucceeds(read(anon(), "reviews/alice/1700-0.jpg")));
+await check("24 public: signed-out can still open a review photo's stored download link", async () =>
+  fetchOk(await storedLink("reviews/alice/1700-0.jpg")));
 await check("25 unmatched path: read denied", () => assertFails(read(bob(), "misc/unmatched.txt")));
 await check("25b unmatched path: write denied", () => assertFails(put(bob(), "misc/new.txt", tiny, { contentType: "text/plain" })));
 await check("26 KYC unchanged: unrelated user cannot read, admin can", async () => {
@@ -182,8 +197,29 @@ await check("R7  reviews: admin CANNOT overwrite a photo", () => assertFails(put
 await check("R8  reviews: signed-out user CANNOT create a photo", () => assertFails(put(anon(), "reviews/alice/1900000000000-anon.jpg")));
 await check("R9  reviews: non-image upload refused", () => assertFails(put(alice(), "reviews/alice/1900000000000-x.pdf", tiny, PDF)));
 await check("R10 reviews: upload over 5MB refused", () => assertFails(put(alice(), "reviews/alice/1900000000000-big.jpg", OVER_5MB_STRICT)));
-await check("R11 reviews: signed-out user can still read an existing photo", () => assertSucceeds(read(anon(), REVIEW)));
-await check("R11b reviews: the new photo is still publicly readable", () => assertSucceeds(read(anon(), "reviews/alice/1900000000000-0.jpg")));
+await check("R11 reviews: signed-out user can still open an existing photo's stored link", async () => fetchOk(await storedLink(REVIEW)));
+await check("R11b reviews: the new photo's stored link is publicly viewable", async () =>
+  fetchOk(await storedLink("reviews/alice/1900000000000-0.jpg")));
+await check("R12 reviews: owner can getDownloadURL right after upload (app flow)", () =>
+  assertSucceeds(read(alice(), "reviews/alice/1900000000000-0.jpg")));
+await check("R13 reviews: admin can read a photo", () => assertSucceeds(read(admin(), REVIEW)));
+await check("R14 reviews: signed-out CANNOT get a photo through the rules (was allowed)", () => assertFails(read(anon(), REVIEW)));
+await check("R15 reviews: another customer CANNOT get or read metadata (was allowed)", async () => {
+  await assertFails(read(bob(), REVIEW));
+  await assertFails(bob().ref(REVIEW).getMetadata());
+});
+await check("R16 reviews: signed-out CANNOT list reviews/alice/ (was allowed)", () => assertFails(list(anon(), "reviews/alice")));
+await check("R17 reviews: another customer CANNOT list reviews/alice/ (was allowed)", () => assertFails(list(bob(), "reviews/alice")));
+await check("R18 reviews: nobody lists — owner and admin too (nothing in the apps lists)", async () => {
+  await assertFails(list(alice(), "reviews/alice"));
+  await assertFails(list(admin(), "reviews/alice"));
+});
+await check("R19 reviews: signed-out CANNOT list reviews/ to enumerate uids", () => assertFails(list(anon(), "reviews")));
+await check("R20 reviews: token-less public media URL refused (was allowed)", async () => {
+  const bare = (await storedLink(REVIEW)).replace(/&token=[^&]+/, "");
+  const r = await fetch(bare);
+  if (r.ok) throw new Error(`expected refusal, got HTTP ${r.status}`);
+});
 
 // ============ PRODUCT & STORE IMAGES (approved vendors only, create-only) ============
 // The rules read vendors_public/{uid}.status — admin-controlled, keyed by uid.
