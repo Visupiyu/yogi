@@ -20,7 +20,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { db, auth } from "@/lib/firebase";
-import { computeVendorShare, normalizeOrderForEarnings } from "@/lib/vendorEarnings";
+import { normalizeOrderForEarnings } from "@/lib/vendorEarnings";
+import { computeEarningsBreakdownByVendor } from "@/lib/vendorPayable";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -113,7 +114,6 @@ export default function AdminPage() {
 
     let revenue = 0;
     const orderItems: Order[] = [];
-    const payouts: any = {};
     const customerMap: any = {};
 
     ordersSnapshot.forEach((docItem) => {
@@ -154,45 +154,6 @@ export default function AdminPage() {
           ? legacyTotal
           : lineSum;
 
-        // Vendor sales/commission/earnings come from the one shared
-        // formula (lib/vendorEarnings.ts), the same one the seller wallet
-        // and admin payouts page use. The previous inline `amount * 0.1`
-        // was a fourth, hardcoded commission rate that ignored each
-        // order's own stamped commissionRate — currently 0 on every
-        // order — as well as discounts and cancellations.
-        const vendorIds = [
-          ...new Set(
-            normalizedOrder.items
-              .map((item: any) => item.vendorId)
-              .filter(Boolean)
-          ),
-        ] as string[];
-
-        vendorIds.forEach((vid) => {
-          const share = computeVendorShare(normalizedOrder, vid);
-          if (!share) return;
-
-          if (!payouts[vid]) {
-            const named = normalizedOrder.items.find(
-              (item: any) => item.vendorId === vid && item.vendorName
-            );
-            payouts[vid] = {
-              vendorId: vid,
-              vendorName: named?.vendorName || "Unknown",
-              orders: 0,
-              sales: 0,
-              commission: 0,
-              payout: 0,
-            };
-          }
-
-          // One per ORDER, not per line item — this used to increment
-          // inside the item loop, so a two-line order counted as two.
-          payouts[vid].orders += 1;
-          payouts[vid].sales += share.vendorRawSubtotal;
-          payouts[vid].commission += share.vendorCommission;
-          payouts[vid].payout += share.vendorEarning;
-        });
       }
 
       const email = order.userEmail || "unknown";
@@ -212,7 +173,40 @@ export default function AdminPage() {
 
     setTotalRevenue(revenue);
     setOrders(orderItems);
-    setVendorPayouts(Object.values(payouts));
+    // Vendor sales/commission/delivery/earnings from lib/vendorPayable's ONE
+    // shared breakdown — the same calculation (and inputs, incl. the stored
+    // sellerDeliveryCharge snapshots) as the seller wallet, payout report and
+    // admin payouts. Settled figures: Delivered + Paid orders only.
+    const [sellerOrdersSnapshot, itemRequestsSnapshot, refundedReturnsSnapshot] =
+      await Promise.all([
+        getDocs(collection(db, "sellerOrders")),
+        getDocs(collection(db, "itemRequests")),
+        getDocs(query(collection(db, "returns"), where("status", "==", "Refunded"))),
+      ]);
+    const byVendor = computeEarningsBreakdownByVendor({
+      orders: orderItems as any[],
+      sellerOrders: sellerOrdersSnapshot.docs.map((d) => d.data()),
+      itemRequests: itemRequestsSnapshot.docs.map((d) => d.data()),
+      legacyReturns: refundedReturnsSnapshot.docs.map((d) => d.data()),
+    });
+    const vendorNameOf = (vid: string) => {
+      for (const o of orderItems as any[]) {
+        const named = (o.items || []).find((i: any) => i?.vendorId === vid && i?.vendorName);
+        if (named) return named.vendorName as string;
+      }
+      return "Unknown";
+    };
+    setVendorPayouts(
+      Object.entries(byVendor).map(([vid, b]) => ({
+        vendorId: vid,
+        vendorName: vendorNameOf(vid),
+        orders: b.eligibleOrders,
+        sales: b.grossSales,
+        commission: b.commission,
+        deliveryCharges: b.sellerDeliveryCharges + b.returnLogisticsCharges,
+        payout: b.adjustedEarnings,
+      }))
+    );
     setCustomers(Object.values(customerMap));
 
     // Notifications

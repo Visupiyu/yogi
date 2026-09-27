@@ -6,6 +6,8 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { computeVendorShare } from "@/lib/vendorEarnings";
+import { fetchSellerPayableBreakdown } from "@/lib/sellerPayableClient";
+import type { VendorPayableBreakdown } from "@/lib/vendorPayable";
 import {
   PieChart,
   Pie,
@@ -29,6 +31,7 @@ export default function SellerAnalyticsPage() {
 
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<any[]>([]);
+  const [payable, setPayable] = useState<VendorPayableBreakdown | null>(null);
   const [products, setProducts] = useState<any[]>([]);
   const [reviews, setReviews] = useState<any[]>([]);
 
@@ -112,6 +115,10 @@ export default function SellerAnalyticsPage() {
       });
       setOrders(orderList);
 
+      // Commission / Net Earnings KPIs come from the server's single
+      // seller-payable calculation (same as wallet and payout report).
+      setPayable(await fetchSellerPayableBreakdown());
+
       // REVIEWS — scoped to this seller's own products only, so Average
       // Rating / Total Reviews reflect this seller, not the marketplace.
       const reviewSnap = await getDocs(collection(db, "productReviews"));
@@ -176,14 +183,9 @@ export default function SellerAnalyticsPage() {
     (product: any) => Number(product.stock || 0) <= 5
   ).length;
 
-  const totalCommission = orders.reduce(
-    (sum, order) => sum + order.share.vendorCommission,
-    0
-  );
-  const netEarnings = orders.reduce(
-    (sum, order) => sum + order.share.vendorEarning,
-    0
-  );
+  const totalCommission = payable?.commission ?? 0;
+
+  const netEarnings = payable?.adjustedEarnings ?? 0;
 
   const orderStatusData = [
     { name: "Pending", value: orders.filter((o: any) => o.status === "Pending").length },

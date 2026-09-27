@@ -94,3 +94,53 @@ export function sellerForwardDeliveryForOrder(
     orderProductValue
   );
 }
+
+
+/**
+ * Splits ONE order-level delivery cost across the order's sellers in
+ * proportion to each seller's item value, so the shares add up to the cost
+ * EXACTLY — never a full cost per seller, never a ₹1 drift.
+ *
+ * Same whole-rupee granularity as allocateSellerDeliveryCost when the cost is
+ * a whole number of rupees (whole paise otherwise), with the remainder left by
+ * rounding down handed out one unit at a time by largest fractional share
+ * (ties: larger item value, then vendorId) — so the result is deterministic.
+ *
+ *   A ₹300 + B ₹250, cost ₹49 -> exact 26.727 / 22.272 -> A ₹27, B ₹22 (= ₹49)
+ *
+ * Sellers with no positive item value get 0; a zero/absent cost or base gives
+ * every seller 0.
+ */
+export function splitOrderDeliveryCost(
+  deliveryCost: unknown,
+  sellers: { vendorId: string; value: unknown }[]
+): Record<string, number> {
+  const shares: Record<string, number> = {};
+  for (const s of sellers) shares[s.vendorId] = 0;
+
+  const cost = toFiniteNumber(deliveryCost);
+  const scale = Number.isInteger(cost) ? 1 : 100;
+  const units = Math.round(cost * scale);
+  const positive = sellers
+    .map((s) => ({ vendorId: s.vendorId, value: toFiniteNumber(s.value) }))
+    .filter((s) => s.value > 0);
+  const base = positive.reduce((sum, s) => sum + s.value, 0);
+  if (units <= 0 || base <= 0) return shares;
+
+  const parts = positive.map((s) => {
+    const exact = (units * s.value) / base;
+    const whole = Math.floor(exact);
+    return { ...s, whole, frac: exact - whole };
+  });
+  let leftover = units - parts.reduce((sum, p) => sum + p.whole, 0);
+  const byRemainder = [...parts].sort(
+    (a, b) => b.frac - a.frac || b.value - a.value || a.vendorId.localeCompare(b.vendorId)
+  );
+  for (const p of byRemainder) {
+    if (leftover <= 0) break;
+    p.whole += 1;
+    leftover -= 1;
+  }
+  for (const p of parts) shares[p.vendorId] = p.whole / scale;
+  return shares;
+}

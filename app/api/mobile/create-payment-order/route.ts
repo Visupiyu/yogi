@@ -336,8 +336,8 @@ export async function POST(request: Request) {
 
     const shipping = subtotal >= freeShippingThreshold ? 0 : standardShippingCharge;
 
-    // Captured with the priced intent so the finalizer stamps the rate that
-    // was in effect when the customer was charged (see mobile place-order).
+    // Always 0 — YOMICO charges no commission (lib/commissionPolicy.ts). The
+    // finalizer stamps the constant, not this intent field.
     const commissionRate = resolveCommissionRate(settingsData);
 
     const deliveryCost =

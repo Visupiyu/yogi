@@ -187,19 +187,92 @@ function returnDeductionForOrder(params: {
   return 0;
 }
 
+/** A seller's per-order record (sellerOrders/{orderId}_{vendorId}), as far as payouts need it. */
+export type PayableSellerOrder = {
+  orderId?: unknown;
+  vendorId?: unknown;
+  // Written by the server at confirmation (lib/sellerOrderRecord.ts): this
+  // seller's share of the ONE order-level delivery cost. Absent on records
+  // confirmed before the snapshot existed -> recalculated from the order,
+  // exactly as before (legacy fallback).
+  sellerDeliveryCharge?: unknown;
+};
+
 /**
- * The vendor's refund-adjusted earnings — the earnings half of `payable`,
- * before commitments. Exported so display screens can show a consistent
- * "earned" figure without re-deriving the deduction logic.
+ * Every figure behind a seller's payable, from the ONE calculation below — the
+ * seller API (wallet, payout report, dashboard, analytics), the withdrawal
+ * request, admin settlement and the admin payouts screen all read these.
  */
-export function computeVendorAdjustedEarnings(params: {
+export type VendorEarningsBreakdown = {
+  /** Delivered + Paid + !needsReview orders carrying this seller's items. */
+  eligibleOrders: number;
+  /** Σ this seller's line price × qty on eligible orders. */
+  grossSales: number;
+  /** This seller's proportional share of coupon/reward discounts (existing rule). */
+  discountShare: number;
+  /** Always 0 — YOMICO charges no commission (lib/commissionPolicy.ts). */
+  commission: number;
+  /** Forward delivery: this seller's share of each free-delivery order's ONE delivery cost. */
+  sellerDeliveryCharges: number;
+  /** Merchandise earning removed for returned items (existing rule). */
+  returnDeductions: number;
+  /** Return/replacement logistics recorded on item requests (existing rule; 0 today). */
+  returnLogisticsCharges: number;
+  /** grossSales − discountShare − commission − returnDeductions − delivery − logistics. May be negative. */
+  adjustedEarnings: number;
+};
+
+export type VendorPayableBreakdown = VendorEarningsBreakdown & {
+  /** Admin direct settlements + Paid withdrawals. */
+  paidOut: number;
+  /** Pending + Approved withdrawals (reserved, not yet paid). */
+  reserved: number;
+  committed: number;
+  /** adjustedEarnings − committed. May be NEGATIVE (recoverable adjustment). */
+  payable: number;
+  /** max(0, payable) — what may be withdrawn now. */
+  available: number;
+};
+
+/** This seller's stored delivery-charge snapshots, keyed by orderId. */
+function deliverySnapshots(
+  vendorUid: string,
+  sellerOrders: PayableSellerOrder[]
+): Map<string, number> {
+  const byOrder = new Map<string, number>();
+  for (const so of sellerOrders || []) {
+    if (so?.vendorId !== vendorUid) continue;
+    const oid = String(so?.orderId || "");
+    const charge = so?.sellerDeliveryCharge;
+    if (!oid || typeof charge !== "number" || !Number.isFinite(charge) || charge < 0) continue;
+    byOrder.set(oid, charge);
+  }
+  return byOrder;
+}
+
+/**
+ * The vendor's refund-adjusted earnings, itemised — the earnings half of
+ * `payable`, before commitments.
+ */
+export function computeVendorEarningsBreakdown(params: {
   vendorUid: string;
   orders: PayableOrder[];
   itemRequests?: PayableItemRequest[];
   legacyReturns?: PayableLegacyReturn[];
-}): number {
-  const { vendorUid, orders, itemRequests = [], legacyReturns = [] } = params;
-  if (!vendorUid) return 0;
+  sellerOrders?: PayableSellerOrder[];
+}): VendorEarningsBreakdown {
+  const { vendorUid, orders, itemRequests = [], legacyReturns = [], sellerOrders = [] } = params;
+  const empty: VendorEarningsBreakdown = {
+    eligibleOrders: 0,
+    grossSales: 0,
+    discountShare: 0,
+    commission: 0,
+    sellerDeliveryCharges: 0,
+    returnDeductions: 0,
+    returnLogisticsCharges: 0,
+    adjustedEarnings: 0,
+  };
+  if (!vendorUid) return empty;
 
   // Index active RETURN item-requests for this vendor by orderId.
   const irByOrder = new Map<string, PayableItemRequest[]>();
@@ -222,10 +295,10 @@ export function computeVendorAdjustedEarnings(params: {
     if (oid) legacyByOrder.set(oid, lr);
   }
 
-  let adjustedEarnings = 0;
-  // Seller-borne delivery cost, subtracted from earnings once at the end so it
-  // stays a clearly separate line from merchandise/returns (concepts B/C).
-  let deliveryDeduction = 0;
+  const snapshots = deliverySnapshots(vendorUid, sellerOrders);
+  const b = { ...empty };
+  let merchandise = 0;
+
   for (const order of orders || []) {
     if (
       order?.status !== "Delivered" ||
@@ -234,26 +307,38 @@ export function computeVendorAdjustedEarnings(params: {
     ) {
       continue;
     }
+
     const share = computeVendorShare(order as never, vendorUid);
     if (!share) continue;
 
-    // FORWARD delivery — the seller bears it on free-delivery orders, allocated
-    // by this seller's product value in the order. Charged whenever the seller
-    // is on an eligible order (the goods shipped), independent of the per-order
-    // merchandise earning below. No-op on pre-feature orders (no snapshot).
-    deliveryDeduction += sellerForwardDeliveryForOrder(
-      order,
-      share.vendorRawSubtotal,
-      // The order's merchandise subtotal — `total` on web and historical
-      // orders (unchanged), the explicit itemsSubtotal on new mobile orders
-      // whose `total` is the grand total.
-      orderItemsSubtotalBasis(order)
-    );
+    b.eligibleOrders += 1;
+    b.grossSales += share.vendorRawSubtotal;
+    b.discountShare += share.vendorRawSubtotal - share.vendorNetSubtotal;
+    b.commission += share.vendorCommission;
+
+    const oid = String(order?.id || "");
+
+    // FORWARD delivery — the stored server snapshot (this seller's share of the
+    // ONE order-level cost) when the record has one; otherwise the previous
+    // recalculation from the order's own delivery snapshot (legacy records).
+    // Charged whenever the seller is on an eligible order (the goods shipped),
+    // independent of the per-order merchandise earning below.
+    const snapshot = oid ? snapshots.get(oid) : undefined;
+    b.sellerDeliveryCharges +=
+      snapshot !== undefined
+        ? snapshot
+        : sellerForwardDeliveryForOrder(
+            order,
+            share.vendorRawSubtotal,
+            // The order's merchandise subtotal — `total` on web and historical
+            // orders (unchanged), the explicit itemsSubtotal on new mobile orders
+            // whose `total` is the grand total.
+            orderItemsSubtotalBasis(order)
+          );
 
     const vendorEarning = share.vendorEarning;
     if (vendorEarning <= 0) continue;
 
-    const oid = String(order?.id || "");
     const deduction = returnDeductionForOrder({
       order,
       vendorUid,
@@ -262,7 +347,10 @@ export function computeVendorAdjustedEarnings(params: {
       itemReqs: irByOrder.get(oid) || [],
       legacyReturn: legacyByOrder.get(oid) || null,
     });
-    adjustedEarnings += Math.max(0, vendorEarning - deduction);
+
+    const kept = Math.max(0, vendorEarning - deduction);
+    merchandise += kept;
+    b.returnDeductions += vendorEarning - kept;
   }
 
   // RETURN / REPLACEMENT logistics recorded on item requests (both types). An
@@ -272,21 +360,80 @@ export function computeVendorAdjustedEarnings(params: {
   for (const ir of itemRequests) {
     if (ir?.vendorId !== vendorUid) continue;
     if (INACTIVE_RETURN_STATUSES.has(String(ir?.status))) continue;
-    deliveryDeduction += toNum(ir?.deliveryCost);
+    b.returnLogisticsCharges += toNum(ir?.deliveryCost);
   }
 
   // May go slightly negative when delivery costs outrun net merchandise
   // earnings; computeVendorPayable already documents and handles a negative
   // (recoverable-adjustment) result, and display callers clamp with max(0, …).
-  return adjustedEarnings - deliveryDeduction;
+  b.adjustedEarnings = merchandise - b.sellerDeliveryCharges - b.returnLogisticsCharges;
+  return b;
 }
 
 /**
- * earnings - commitments, for one vendor. May be NEGATIVE — the negative part
- * is the recoverable post-payout adjustment (see file header).
+ * The vendor's refund-adjusted earnings — the earnings half of `payable`,
+ * before commitments. Exported so display screens can show a consistent
+ * "earned" figure without re-deriving the deduction logic.
+ */
+export function computeVendorAdjustedEarnings(params: {
+  vendorUid: string;
+  orders: PayableOrder[];
+  itemRequests?: PayableItemRequest[];
+  legacyReturns?: PayableLegacyReturn[];
+  sellerOrders?: PayableSellerOrder[];
+}): number {
+  return computeVendorEarningsBreakdown(params).adjustedEarnings;
+}
+
+/**
+ * earnings − commitments for one vendor, itemised. `payable` may be NEGATIVE
+ * — the negative part is the recoverable post-payout adjustment (see file
+ * header).
  *
  * `excludeWithdrawalId` omits the request being settled or re-priced, so it is
  * not subtracted from the balance it is being checked against.
+ */
+export function computeVendorPayableBreakdown(params: {
+  vendorUid: string;
+  orders: PayableOrder[];
+  payouts: PayablePayout[];
+  withdrawals: PayableWithdrawal[];
+  itemRequests?: PayableItemRequest[];
+  legacyReturns?: PayableLegacyReturn[];
+  sellerOrders?: PayableSellerOrder[];
+  excludeWithdrawalId?: string | null;
+}): VendorPayableBreakdown {
+  const { vendorUid, payouts, withdrawals, excludeWithdrawalId } = params;
+  const earnings = computeVendorEarningsBreakdown(params);
+  let paidOut = 0;
+  let reserved = 0;
+
+  if (vendorUid) {
+    // Direct admin settlements.
+    for (const payout of payouts || []) {
+      if (payout?.vendorId === vendorUid) {
+        paidOut += toNum(payout?.amount);
+      }
+    }
+
+    // Every other withdrawal already settled or reserved.
+    for (const withdrawal of withdrawals || []) {
+      if (excludeWithdrawalId && withdrawal?.id === excludeWithdrawalId) continue;
+      if (!COMMITTED_STATUSES.includes(String(withdrawal?.status))) continue;
+      if (withdrawal?.vendorId !== vendorUid) continue;
+      if (String(withdrawal?.status) === "Paid") paidOut += toNum(withdrawal?.amount);
+      else reserved += toNum(withdrawal?.amount);
+    }
+  }
+
+  const committed = paidOut + reserved;
+  const payable = earnings.adjustedEarnings - committed;
+  return { ...earnings, paidOut, reserved, committed, payable, available: Math.max(0, payable) };
+}
+
+/**
+ * earnings − commitments, for one vendor. May be NEGATIVE — the negative part
+ * is the recoverable post-payout adjustment (see file header).
  */
 export function computeVendorPayable(params: {
   vendorUid: string;
@@ -295,45 +442,10 @@ export function computeVendorPayable(params: {
   withdrawals: PayableWithdrawal[];
   itemRequests?: PayableItemRequest[];
   legacyReturns?: PayableLegacyReturn[];
+  sellerOrders?: PayableSellerOrder[];
   excludeWithdrawalId?: string | null;
 }): number {
-  const {
-    vendorUid,
-    orders,
-    payouts,
-    withdrawals,
-    itemRequests = [],
-    legacyReturns = [],
-    excludeWithdrawalId,
-  } = params;
-
-  if (!vendorUid) return 0;
-
-  const adjustedEarnings = computeVendorAdjustedEarnings({
-    vendorUid,
-    orders,
-    itemRequests,
-    legacyReturns,
-  });
-
-  let committed = 0;
-
-  // Direct admin settlements.
-  for (const payout of payouts || []) {
-    if (payout?.vendorId === vendorUid) {
-      committed += toNum(payout?.amount);
-    }
-  }
-
-  // Every other withdrawal already settled or reserved.
-  for (const withdrawal of withdrawals || []) {
-    if (excludeWithdrawalId && withdrawal?.id === excludeWithdrawalId) continue;
-    if (!COMMITTED_STATUSES.includes(String(withdrawal?.status))) continue;
-    if (withdrawal?.vendorId !== vendorUid) continue;
-    committed += toNum(withdrawal?.amount);
-  }
-
-  return adjustedEarnings - committed;
+  return computeVendorPayableBreakdown(params).payable;
 }
 
 /** Whether a requested amount fits in what is left, with the reason if not. */
@@ -368,4 +480,31 @@ export function evaluateWithdrawalRequest(params: {
   }
 
   return { ok: true, amount };
+}
+
+
+/**
+ * computeVendorEarningsBreakdown for every seller that appears on `orders`
+ * (by vendorIds or line items) — a convenience loop over the ONE shared
+ * calculation above, not a second formula. For marketplace-wide admin views.
+ */
+export function computeEarningsBreakdownByVendor(params: {
+  orders: PayableOrder[];
+  itemRequests?: PayableItemRequest[];
+  legacyReturns?: PayableLegacyReturn[];
+  sellerOrders?: PayableSellerOrder[];
+}): Record<string, VendorEarningsBreakdown> {
+  const vendorIds = new Set<string>();
+  for (const order of params.orders || []) {
+    const declared = Array.isArray(order?.vendorIds) ? (order.vendorIds as unknown[]) : [];
+    const items = Array.isArray(order?.items) ? (order.items as { vendorId?: unknown }[]) : [];
+    for (const v of [...declared, ...items.map((i) => i?.vendorId)]) {
+      if (typeof v === "string" && v) vendorIds.add(v);
+    }
+  }
+  const out: Record<string, VendorEarningsBreakdown> = {};
+  for (const vendorUid of [...vendorIds].sort()) {
+    out[vendorUid] = computeVendorEarningsBreakdown({ ...params, vendorUid });
+  }
+  return out;
 }

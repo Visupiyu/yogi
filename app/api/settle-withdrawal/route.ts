@@ -116,13 +116,14 @@ export async function POST(request: Request) {
       }
       if (!vendorUid) return { kind: "no-vendor" };
 
-      const [orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap] =
+      const [orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap, sellerOrderSnap] =
         await Promise.all([
           tx.get(db.collection("orders").where("vendorIds", "array-contains", vendorUid)),
           tx.get(db.collection("vendor_payouts").where("vendorId", "==", vendorUid)),
           tx.get(db.collection("withdrawals").where("vendorId", "==", vendorUid)),
           tx.get(db.collection("itemRequests").where("vendorId", "==", vendorUid)),
           tx.get(db.collection("returns").where("status", "==", "Refunded")),
+          tx.get(db.collection("sellerOrders").where("vendorId", "==", vendorUid)),
         ]);
 
       const orders = orderSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -140,6 +141,7 @@ export async function POST(request: Request) {
         withdrawals: withdrawalSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
         itemRequests: itemReqSnap.docs.map((d) => d.data()),
         legacyReturns,
+        sellerOrders: sellerOrderSnap.docs.map((d) => d.data()),
         excludeWithdrawalId: withdrawalId,
       });
 

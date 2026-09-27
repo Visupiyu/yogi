@@ -1,5 +1,10 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
-import { computeVendorShare } from "@/lib/vendorEarnings";
+import {
+  computeEarningsBreakdownByVendor,
+  type VendorEarningsBreakdown,
+} from "@/lib/vendorPayable";
+import { loadVendorPayableBreakdown } from "@/lib/vendorPayableServer";
+import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 import type { ToolDefinition } from "@/lib/ai/tools/types";
 
 // These tools are only ever registered for a request whose verified
@@ -45,7 +50,8 @@ const getAdminSalesSummary: ToolDefinition = {
 
       totalOrders += 1;
       totalRevenue += data.total || 0;
-      totalCommission += data.commission || 0;
+      // Always ₹0 (lib/commissionPolicy.ts) — never summed from legacy order fields.
+      totalCommission += YOMICO_COMMISSION_AMOUNT;
 
       const status = data.status || "Unknown";
       statusCounts[status] = (statusCounts[status] || 0) + 1;
@@ -63,7 +69,7 @@ const getAdminSalesSummary: ToolDefinition = {
 const getVendorPerformance: ToolDefinition = {
   name: "getVendorPerformance",
   description:
-    "Get sales performance for a specific vendor by their ID, or the top-performing vendors marketplace-wide if no vendor ID is given.",
+    "Get settled sales performance (delivered + paid orders) for a specific vendor by their ID, or the top vendors marketplace-wide if no vendor ID is given: gross sales, discount share, commission (always ₹0), seller delivery charges, return deductions and net earnings.",
   parameters: {
     type: "object",
     properties: {
@@ -77,66 +83,44 @@ const getVendorPerformance: ToolDefinition = {
     const db = getAdminDb();
     const vendorId = args.vendorId ? String(args.vendorId) : undefined;
 
-    const ordersSnap = vendorId
-      ? await db.collection("orders").where("vendorIds", "array-contains", vendorId).limit(500).get()
-      : await db.collection("orders").limit(500).get();
-
-    // Keyed by orderId — at most one return per order (see
-    // app/api/request-return's deterministic doc id), so a plain map is
-    // safe here.
-    const refundedReturnsSnap = await db
-      .collection("returns")
-      .where("status", "==", "Refunded")
-      .get();
-    const refundByOrderId: Record<string, { status: string; refundAmount: number }> = {};
-    refundedReturnsSnap.docs.forEach((docSnap) => {
-      const r = docSnap.data();
-      if (r.orderId) {
-        refundByOrderId[r.orderId] = { status: r.status, refundAmount: r.refundAmount };
-      }
+    // Same shape for every vendor: lib/vendorPayable's shared breakdown
+    // (commission ₹0, stored sellerDeliveryCharge, returns). Settled figures —
+    // Delivered + Paid orders only.
+    const summarize = (b: VendorEarningsBreakdown) => ({
+      settledOrders: b.eligibleOrders,
+      grossSales: b.grossSales,
+      sellerDiscountShare: b.discountShare,
+      commission: b.commission,
+      sellerDeliveryCharges: b.sellerDeliveryCharges,
+      returnDeductions: b.returnDeductions,
+      returnLogisticsCharges: b.returnLogisticsCharges,
+      netEarnings: b.adjustedEarnings,
     });
 
-    const perVendor = new Map<string, { orders: number; revenue: number; commission: number; earning: number }>();
-
-    for (const doc of ordersSnap.docs) {
-      const data = doc.data();
-      const vendorIds: string[] = Array.isArray(data.vendorIds) ? data.vendorIds : [];
-
-      for (const vId of vendorIds) {
-        const share = computeVendorShare(data, vId, refundByOrderId[doc.id]);
-        if (!share) continue;
-
-        const existing = perVendor.get(vId) || { orders: 0, revenue: 0, commission: 0, earning: 0 };
-        existing.orders += 1;
-        existing.revenue += share.vendorNetSubtotal;
-        existing.commission += share.vendorCommission;
-        existing.earning += share.vendorEarning;
-        perVendor.set(vId, existing);
-      }
-    }
-
     if (vendorId) {
-      const stats = perVendor.get(vendorId);
-      if (!stats) return { vendorId, orders: 0, revenue: 0, commission: 0, earning: 0 };
-      return {
-        vendorId,
-        orders: stats.orders,
-        revenue: Math.round(stats.revenue),
-        commission: Math.round(stats.commission),
-        earning: Math.round(stats.earning),
-      };
+      // Exactly the seller's own payable (same read set and calculation as
+      // /api/seller/payable).
+      const b = await loadVendorPayableBreakdown(db, vendorId);
+      return { vendorId, ...summarize(b), payable: b.payable, withdrawableNow: b.available };
     }
+
+    const [ordersSnap, sellerOrdersSnap, itemRequestsSnap, refundedReturnsSnap] = await Promise.all([
+      db.collection("orders").limit(500).get(),
+      db.collection("sellerOrders").get(),
+      db.collection("itemRequests").get(),
+      db.collection("returns").where("status", "==", "Refunded").get(),
+    ]);
+    const byVendor = computeEarningsBreakdownByVendor({
+      orders: ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+      sellerOrders: sellerOrdersSnap.docs.map((d) => d.data()),
+      itemRequests: itemRequestsSnap.docs.map((d) => d.data()),
+      legacyReturns: refundedReturnsSnap.docs.map((d) => d.data()),
+    });
 
     const limit = typeof args.limit === "number" ? Math.min(args.limit, 20) : 5;
-    const ranked = Array.from(perVendor.entries())
-      .map(([id, stats]) => ({
-        vendorId: id,
-        orders: stats.orders,
-        revenue: Math.round(stats.revenue),
-        commission: Math.round(stats.commission),
-        earning: Math.round(stats.earning),
-      }))
-      .sort((a, b) => b.revenue - a.revenue)
+    const ranked = Object.entries(byVendor)
+      .map(([id, b]) => ({ vendorId: id, ...summarize(b) }))
+      .sort((a, b) => b.grossSales - a.grossSales)
       .slice(0, limit);
 
     return { topVendors: ranked };
@@ -145,7 +129,7 @@ const getVendorPerformance: ToolDefinition = {
 
 const getCommissionSummary: ToolDefinition = {
   name: "getCommissionSummary",
-  description: "Get total commission collected by the marketplace across all orders, optionally over a recent time window.",
+  description: "Get total commission collected by the marketplace. YOMICO charges sellers 0% commission, so this is always ₹0; also returns how many orders the window covers.",
   parameters: {
     type: "object",
     properties: {
@@ -172,11 +156,12 @@ const getCommissionSummary: ToolDefinition = {
         if (!createdAtMs || createdAtMs < cutoff) continue;
       }
 
-      totalCommission += data.commission || 0;
+      // Always ₹0 (lib/commissionPolicy.ts) — never summed from legacy order fields.
+      totalCommission += YOMICO_COMMISSION_AMOUNT;
       orderCount += 1;
     }
 
-    return { totalCommission: Math.round(totalCommission), orderCount };
+    return { totalCommission: Math.round(totalCommission), commissionRate: YOMICO_COMMISSION_RATE, orderCount };
   },
 };
 

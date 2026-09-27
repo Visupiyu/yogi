@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
-import { computeVendorShare } from "@/lib/vendorEarnings";
+import { computeVendorEarningsBreakdown, computeVendorPayableBreakdown } from "@/lib/vendorPayable";
+import { loadVendorPayableInputs } from "@/lib/vendorPayableServer";
 import type { ToolDefinition } from "@/lib/ai/tools/types";
 import type { DocumentData } from "firebase-admin/firestore";
 
@@ -46,7 +47,7 @@ const getSellerProducts: ToolDefinition = {
 const getSellerSales: ToolDefinition = {
   name: "getSellerSales",
   description:
-    "Get a sales/earnings summary for the signed-in seller across their own orders — total orders, revenue, commission, and net earnings. Use for 'how are my sales', 'how much did I earn' type questions.",
+    "Get a sales/earnings summary for the signed-in seller: booked orders, and settled (delivered + paid) gross sales, discount share, commission (always ₹0 — YOMICO charges no commission), delivery charges, return deductions and net earnings, plus the withdrawable balance when no day window is given. Use for 'how are my sales', 'how much did I earn' type questions.",
   parameters: {
     type: "object",
     properties: {
@@ -55,42 +56,53 @@ const getSellerSales: ToolDefinition = {
   },
   execute: async (args, context) => {
     const db = getAdminDb();
-    const snap = await db
-      .collection("orders")
-      .where("vendorIds", "array-contains", context.uid)
-      .limit(500)
-      .get();
+    const inputs = await loadVendorPayableInputs(db, context.uid);
 
     const days = typeof args.days === "number" ? args.days : undefined;
     const cutoff = days ? Date.now() - days * 24 * 60 * 60 * 1000 : undefined;
+    const inWindow = (order: Record<string, unknown>) => {
+      if (cutoff === undefined) return true;
+      const createdAtMs = (order.createdAt as { toDate?: () => Date } | undefined)?.toDate?.()?.getTime?.();
+      return !!createdAtMs && createdAtMs >= cutoff;
+    };
+    const windowOrders = inputs.orders.filter((o) => inWindow(o as Record<string, unknown>));
+    const windowOrderIds = new Set(windowOrders.map((o) => String(o.id || "")));
 
-    let totalOrders = 0;
-    let totalRevenue = 0;
-    let totalCommission = 0;
-    let totalEarning = 0;
+    // Booked activity: non-cancelled orders in the window carrying this seller's items.
+    const totalOrders = windowOrders.filter(
+      (o) =>
+        o.status !== "Cancelled" &&
+        Array.isArray(o.items) &&
+        (o.items as { vendorId?: unknown }[]).some((i) => i?.vendorId === context.uid)
+    ).length;
 
-    for (const doc of snap.docs) {
-      const data = doc.data();
-
-      if (cutoff !== undefined) {
-        const createdAtMs = data.createdAt?.toDate?.()?.getTime?.();
-        if (!createdAtMs || createdAtMs < cutoff) continue;
-      }
-
-      const share = computeVendorShare(data, context.uid);
-      if (!share) continue;
-
-      totalOrders += 1;
-      totalRevenue += share.vendorNetSubtotal;
-      totalCommission += share.vendorCommission;
-      totalEarning += share.vendorEarning;
-    }
+    // Money: lib/vendorPayable's shared breakdown — the same calculation as
+    // the seller wallet / payout report (commission ₹0, the stored
+    // sellerDeliveryCharge, returns) — over the window's orders.
+    const earnings = computeVendorEarningsBreakdown({
+      vendorUid: context.uid,
+      orders: windowOrders,
+      itemRequests: inputs.itemRequests.filter((ir) => windowOrderIds.has(String(ir?.orderId || ""))),
+      legacyReturns: inputs.legacyReturns,
+      sellerOrders: inputs.sellerOrders,
+    });
+    // Withdrawable balance is all-time by nature, so only reported without a window.
+    const payable =
+      cutoff === undefined ? computeVendorPayableBreakdown({ vendorUid: context.uid, ...inputs }) : null;
 
     return {
       totalOrders,
-      totalRevenue: Math.round(totalRevenue),
-      totalCommission: Math.round(totalCommission),
-      totalEarning: Math.round(totalEarning),
+      settledOrders: earnings.eligibleOrders,
+      grossSales: earnings.grossSales,
+      sellerDiscountShare: earnings.discountShare,
+      commission: earnings.commission,
+      sellerDeliveryCharges: earnings.sellerDeliveryCharges,
+      returnDeductions: earnings.returnDeductions,
+      returnLogisticsCharges: earnings.returnLogisticsCharges,
+      netEarnings: earnings.adjustedEarnings,
+      ...(payable
+        ? { withdrawableNow: payable.available, paidOut: payable.paidOut, reserved: payable.reserved }
+        : {}),
     };
   },
 };

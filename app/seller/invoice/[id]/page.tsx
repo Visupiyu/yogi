@@ -6,7 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import Invoice from "@/components/invoice/Invoice";
-import { LEGACY_ORDER_COMMISSION_RATE } from "@/lib/commission";
+import { computeVendorShare } from "@/lib/vendorEarnings";
 
 export default function SellerInvoicePage() {
 
@@ -83,32 +83,18 @@ export default function SellerInvoicePage() {
             (item: any) => item.vendorId === user.uid
           );
 
-          const vendorSubtotal = vendorItems.reduce(
-            (sum: number, item: any) =>
-              sum + (item.price || 0) * (item.qty || 0),
-            0
-          );
-
-          // Same fallback as computeVendorShare() in lib/vendorEarnings.ts —
-          // use the rate this specific order was actually placed under,
-          // not whatever the current admin setting happens to be. Orders
-          // predating this field fall back to the 10% they were actually
-          // charged, not YOMICO's current zero-commission launch default.
-          const commissionRate =
-            typeof data.commissionRate === "number" &&
-            data.commissionRate >= 0 &&
-            data.commissionRate <= 1
-              ? data.commissionRate
-              : LEGACY_ORDER_COMMISSION_RATE;
-
-          const vendorCommission = Math.round(vendorSubtotal * commissionRate);
+          // This seller's own figures from the shared payout helper — the
+          // same numbers app/seller/orders/[id]'s invoice embed shows. Its
+          // commission is always ₹0 (lib/commissionPolicy.ts).
+          const share = computeVendorShare(data, user.uid);
+          const vendorSubtotal = share?.vendorRawSubtotal ?? 0;
 
           setOrder({
             ...data,
             items: vendorItems,
             finalTotal: vendorSubtotal,
-            commission: vendorCommission,
-            sellerEarning: vendorSubtotal - vendorCommission,
+            commission: share?.vendorCommission ?? 0,
+            sellerEarning: share?.vendorEarning ?? 0,
             // Shipping/coupon discount aren't split per vendor anywhere
             // in this app — showing the whole order's figures here would
             // overstate this seller's own invoice.

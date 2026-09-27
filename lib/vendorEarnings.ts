@@ -1,4 +1,4 @@
-import { LEGACY_ORDER_COMMISSION_RATE } from "@/lib/commission";
+import { YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 
 type OrderItem = {
   vendorId?: string;
@@ -109,20 +109,11 @@ export function computeVendorShare(
     vendorRawSubtotal - vendorDiscountShare
   );
 
-  // Each order stamps the commission rate that was actually in effect when
-  // it was placed (see checkout's buildOrderData) — so a later admin rate
-  // change never retroactively recalculates an order already sold, paid,
-  // or invoiced. Orders from before this field existed fall back to the
-  // 10% they were implicitly always charged at — NOT to YOMICO's current
-  // zero-commission launch default, which only applies to new orders.
-  const rate =
-    typeof order.commissionRate === "number" &&
-    order.commissionRate >= 0 &&
-    order.commissionRate <= 1
-      ? order.commissionRate
-      : LEGACY_ORDER_COMMISSION_RATE;
-
-  const vendorCommission = Math.round(vendorNetSubtotal * rate);
+  // YOMICO charges sellers NO commission (lib/commissionPolicy.ts). Whatever
+  // an order's stored commissionRate says — missing, legacy, invalid, or a
+  // rate an admin setting once stamped — the seller's commission is ₹0. The
+  // old 10% fallback for orders without a commissionRate is gone.
+  const vendorCommission = Math.round(vendorNetSubtotal * YOMICO_COMMISSION_RATE);
   let vendorEarning = vendorNetSubtotal - vendorCommission;
 
   // A FULL refund (refundAmount == the order's actual grand total) means

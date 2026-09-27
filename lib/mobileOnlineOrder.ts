@@ -8,7 +8,7 @@ import {
   readIntentFinalization,
   type FinalizeResult,
 } from "@/lib/onlineOrder";
-import { getAdminCommissionRate } from "@/lib/orderPricing";
+import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 import { couponRedemptionId } from "@/lib/coupons/couponRules";
 import {
   planVariantDecrements,
@@ -143,15 +143,8 @@ export async function finalizeMobileOnlineOrder(params: {
     };
   }
 
-  // The rate captured with the priced intent; an intent from before that
-  // field existed falls back to the current configured rate (same rule),
-  // never to the legacy 10% the payout engine applies when it is absent.
-  const commissionRate =
-    typeof intent.commissionRate === "number" &&
-    intent.commissionRate >= 0 &&
-    intent.commissionRate <= 1
-      ? intent.commissionRate
-      : await getAdminCommissionRate();
+  // Permanently 0% (lib/commissionPolicy.ts) — whatever the intent carries.
+  const commissionRate = YOMICO_COMMISSION_RATE;
 
   // Same one-use record the web flow claims at finalisation.
   const couponRef = intent.couponCode
@@ -388,6 +381,7 @@ export async function finalizeMobileOnlineOrder(params: {
         itemsSubtotal: intent.subtotal,
         discount: intent.discountAmount,
         commissionRate,
+        commissionAmount: YOMICO_COMMISSION_AMOUNT,
 
         ...(shortfalls.length > 0 ? { stockShortfall: shortfalls } : {}),
         ...(Object.keys(stockDeductedQty).length > 0 ? { stockDeductedQty } : {}),

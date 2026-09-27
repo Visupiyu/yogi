@@ -446,7 +446,8 @@ export default function VendorRegisterPage() {
 
           status: "Pending",
 
-          commissionRate: 10,
+          // YOMICO charges sellers 0% commission (lib/commissionPolicy.ts).
+          commissionRate: 0,
 
           totalSales: 0,
           totalOrders: 0,

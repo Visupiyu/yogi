@@ -25,14 +25,8 @@ export default function AdminSettingsPage() {
   // forward delivery of a FREE-delivery order (and, later, returns), snapshotted
   // onto each new order so changing it never rewrites historical payouts.
   const [deliveryCost, setDeliveryCost] = useState(DEFAULT_DELIVERY_COST);
-  // YOMICO's launch policy is zero commission until explicitly turned on —
-  // both default to the "off" state until a settings doc says otherwise.
-  const [commissionEnabled, setCommissionEnabled] = useState(false);
-  // Displayed to the admin as a percentage; stored in Firestore as the
-  // 0-1 fraction every commission calculation (lib/vendorEarnings.ts,
-  // checkout, seller invoice) already expects. Only takes effect once
-  // commissionEnabled is turned on.
-  const [commissionRatePercent, setCommissionRatePercent] = useState(0);
+  // Commission is not configurable: YOMICO charges sellers 0% permanently
+  // (lib/commissionPolicy.ts), so there is no commission state on this page.
   // No real VPA is ever hardcoded — starts disabled/empty until an admin
   // sets a real one here. Not a secret (a UPI VPA is meant to be given to
   // payers), so this stays in the same publicly-readable settings doc.
@@ -54,14 +48,6 @@ export default function AdminSettingsPage() {
           }
           if (typeof data.deliveryCost === "number") {
             setDeliveryCost(data.deliveryCost);
-          }
-          setCommissionEnabled(data.commissionEnabled === true);
-          if (
-            typeof data.commissionRate === "number" &&
-            data.commissionRate >= 0 &&
-            data.commissionRate <= 1
-          ) {
-            setCommissionRatePercent(data.commissionRate * 100);
           }
           setUpiEnabled(data.upiEnabled === true);
           if (typeof data.upiVpa === "string") setUpiVpa(data.upiVpa);
@@ -88,16 +74,11 @@ export default function AdminSettingsPage() {
       toast.error("Values can't be negative.");
       return;
     }
-    if (commissionRatePercent < 0 || commissionRatePercent > 100) {
-      toast.error("Commission rate must be between 0% and 100%.");
-      return;
-    }
     if (upiEnabled && !upiVpa.trim()) {
       toast.error("Enter a UPI VPA before enabling Pay on Delivery collection.");
       return;
     }
 
-    const commissionRate = commissionRatePercent / 100;
 
     setSaving(true);
     try {
@@ -107,8 +88,6 @@ export default function AdminSettingsPage() {
           freeShippingThreshold,
           standardShippingCharge,
           deliveryCost,
-          commissionEnabled,
-          commissionRate,
           upiEnabled,
           upiVpa: upiVpa.trim(),
           upiPayeeName: upiPayeeName.trim() || "YOMICO",
@@ -121,8 +100,6 @@ export default function AdminSettingsPage() {
         freeShippingThreshold,
         standardShippingCharge,
         deliveryCost,
-        commissionEnabled,
-        commissionRate,
         upiEnabled,
         upiPayeeName,
         // The VPA itself isn't included — not a secret, but no reason to
@@ -216,47 +193,13 @@ export default function AdminSettingsPage() {
 
             <div className="pt-4 border-t">
               <h2 className="text-lg font-semibold mb-1">Commission</h2>
-              <p className="text-sm text-gray-500 mb-4">
-                Applies to new orders only — orders already placed keep the
-                rate that was in effect when they were sold, so changing
-                this never touches past earnings, payouts, or invoices.
-                Currently a <strong>zero-commission launch period</strong> —
-                new orders are charged 0% until you turn this on below.
+              <p className="text-sm text-gray-500">
+                YOMICO charges sellers <strong>0% commission</strong>. This is a
+                fixed business rule, not a setting: every order is stamped
+                0% / ₹0 and no commission is ever deducted from seller payouts.
+                The only seller-side charge is the delivery cost above, on
+                free-delivery orders.
               </p>
-
-              <label className="flex items-center gap-2 mb-4">
-                <input
-                  type="checkbox"
-                  checked={commissionEnabled}
-                  onChange={(e) => setCommissionEnabled(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <span className="text-sm font-medium">
-                  Enable commission on new orders
-                </span>
-              </label>
-
-              <div className="max-w-xs">
-                <label className="block text-sm font-medium mb-1">
-                  Commission rate (%)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  value={commissionRatePercent}
-                  disabled={!commissionEnabled}
-                  onChange={(e) =>
-                    setCommissionRatePercent(Number(e.target.value))
-                  }
-                  className="w-full border rounded-lg px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Platform's cut of each seller's net sale, e.g. 10 means 10%.
-                  Only applies once commission is enabled above.
-                </p>
-              </div>
             </div>
 
             <div className="pt-4 border-t">

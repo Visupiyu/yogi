@@ -502,10 +502,8 @@ export async function POST(request: Request) {
 
       const shipping = subtotal >= freeShippingThreshold ? 0 : standardShippingCharge;
 
-      // The commission rate in effect now, by the exact rule the web pricing
-      // pass uses — stamped on the order so a later settings change never
-      // re-prices it, and so the payout engine does not fall back to the
-      // legacy 10% it applies to orders with no commissionRate.
+      // Always 0 — YOMICO charges no commission (lib/commissionPolicy.ts);
+      // resolveCommissionRate ignores any settings/global commission fields.
       const commissionRate = resolveCommissionRate(settingsData);
 
       // Delivery-cost snapshot (concepts B/C), matching the web paths so a
@@ -665,6 +663,7 @@ export async function POST(request: Request) {
         itemsSubtotal: subtotal,
         discount: discountAmount,
         commissionRate,
+        commissionAmount: 0,
       });
 
       for (const cartDoc of cartDocs) {

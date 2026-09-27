@@ -1,4 +1,5 @@
 import { computeVendorShare } from "@/lib/vendorEarnings";
+import { sellerBearsForwardDelivery, splitOrderDeliveryCost } from "@/lib/deliveryRules";
 import {
   deriveFulfilmentStage,
   itemKeyFor,
@@ -79,6 +80,13 @@ export type SellerOrderRecordSeed = {
   vendorSubtotal: number;
   vendorCommission: number;
   vendorEarning: number;
+  /**
+   * This seller's share of the order's ONE delivery cost, fixed when the
+   * record is created (server-only, never recalculated). Non-zero only when
+   * the order shipped free to the customer; the shares of all sellers on the
+   * order add up to order.deliveryCost exactly. Set by buildSellerOrderSeeds.
+   */
+  sellerDeliveryCharge: number;
   customerName: string;
   deliveryDate: string | null;
 };
@@ -94,6 +102,8 @@ type ParentOrder = {
   discount?: number;
   rewardValue?: number;
   commissionRate?: number;
+  deliveryCost?: unknown;
+  freeDeliveryApplied?: unknown;
 };
 
 /** Every vendor that actually has a line on this order. */
@@ -165,6 +175,9 @@ export function buildSellerOrderSeed(
     vendorSubtotal: share?.vendorRawSubtotal ?? 0,
     vendorCommission: share?.vendorCommission ?? 0,
     vendorEarning: share?.vendorEarning ?? 0,
+    // Needs every seller on the order to split one cost — filled in by
+    // buildSellerOrderSeeds, the only caller.
+    sellerDeliveryCharge: 0,
 
     // Deliberately minimal customer reference. The seller can already read
     // the parent order for address and phone; duplicating that PII into a
@@ -181,10 +194,26 @@ export function buildSellerOrderSeeds(
   orderId: string,
   order: ParentOrder | null | undefined
 ): SellerOrderRecordSeed[] {
-  return vendorsOnOrder(order)
+  const seeds = vendorsOnOrder(order)
     .map((vendorId) => buildSellerOrderSeed(orderId, order, vendorId))
     .filter((seed): seed is SellerOrderRecordSeed => seed !== null)
     .sort((a, b) => a.vendorId.localeCompare(b.vendorId));
+
+  // ONE order-level delivery cost on a free-delivery order, shared by the
+  // sellers in proportion to their item value (never a full cost per seller).
+  // Read from the order's own creation-time snapshot (deliveryCost +
+  // freeDeliveryApplied), never from current settings.
+  const shares = sellerBearsForwardDelivery(order ?? {})
+    ? splitOrderDeliveryCost(
+        order?.deliveryCost,
+        seeds.map((seed) => ({ vendorId: seed.vendorId, value: seed.vendorSubtotal }))
+      )
+    : {};
+
+  return seeds.map((seed) => ({
+    ...seed,
+    sellerDeliveryCharge: shares[seed.vendorId] ?? 0,
+  }));
 }
 
 /**

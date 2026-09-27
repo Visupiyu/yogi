@@ -672,7 +672,18 @@ service cloud.firestore {
       // admin browser writing it would advance an item without running the
       // roll-up in app/api/seller/advance-item, leaving orders.status behind
       // the items it summarises. Admins keep every other field.
-      allow update: if (isAdmin() && unchanged('itemFulfilment'))
+      // The settlement figures on a seller record (lib/sellerOrderRecord.ts —
+      // incl. sellerDeliveryCharge, this seller's share of the order's ONE
+      // delivery cost) are a server-written snapshot: not even an admin may
+      // rewrite them from the client.
+      allow update: if (
+          isAdmin()
+          && unchanged('itemFulfilment')
+          && unchanged('vendorSubtotal')
+          && unchanged('vendorCommission')
+          && unchanged('vendorEarning')
+          && unchanged('sellerDeliveryCharge')
+        )
         || (
           isSignedIn()
           && resource.data.vendorId == request.auth.uid
@@ -685,6 +696,7 @@ service cloud.firestore {
           && unchanged('vendorSubtotal')
           && unchanged('vendorCommission')
           && unchanged('vendorEarning')
+          && unchanged('sellerDeliveryCharge')
           && unchanged('confirmedAt')
           && unchanged('deliveryDeadlineAt')
           && unchanged('createdAt')

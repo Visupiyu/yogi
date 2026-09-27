@@ -1,7 +1,7 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
-import { computeVendorPayable } from "@/lib/vendorPayable";
+import { loadVendorPayableBreakdown } from "@/lib/vendorPayableServer";
 
 // ---------------------------------------------------------------------------
 // Read-only "how much may this seller withdraw right now" for the signed-in
@@ -48,50 +48,20 @@ export async function GET(request: Request) {
 
     const db = getAdminDb();
 
-    // Identical read set to app/api/request-withdrawal — the returns query is
-    // by status only (rules cannot scope it to a vendor), then filtered to this
-    // seller's own orders so an unrelated order's return never counts.
-    const [orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap] =
-      await Promise.all([
-        db
-          .collection("orders")
-          .where("vendorIds", "array-contains", requester.uid)
-          .get(),
-        db
-          .collection("vendor_payouts")
-          .where("vendorId", "==", requester.uid)
-          .get(),
-        db
-          .collection("withdrawals")
-          .where("vendorId", "==", requester.uid)
-          .get(),
-        db
-          .collection("itemRequests")
-          .where("vendorId", "==", requester.uid)
-          .get(),
-        db.collection("returns").where("status", "==", "Refunded").get(),
-      ]);
-
-    const orders = orderSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-    const orderIds = new Set(orders.map((o) => o.id));
-    const legacyReturns = legacyReturnSnap.docs
-      .map((d) => d.data())
-      .filter((r) =>
-        orderIds.has(String((r as { orderId?: unknown })?.orderId || ""))
-      );
-
-    const payable = computeVendorPayable({
-      vendorUid: requester.uid,
-      orders,
-      payouts: payoutSnap.docs.map((d) => d.data()),
-      withdrawals: withdrawalSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
-      itemRequests: itemReqSnap.docs.map((d) => d.data()),
-      legacyReturns,
-    });
+    // The same read set as app/api/request-withdrawal (lib/vendorPayableServer,
+    // shared with the seller/admin AI tools) fed to lib/vendorPayable's one
+    // breakdown.
+    const breakdown = await loadVendorPayableBreakdown(db, requester.uid);
 
     // `payable` may be negative (a post-payout return recovery); the wallet
     // shows max(0, payable) as the withdrawable figure, same as every caller.
-    return Response.json({ payable, available: Math.max(0, payable) });
+    // `breakdown` itemises it (gross, discount share, commission ₹0, delivery,
+    // returns, paid/reserved) for the payout report, dashboard and analytics.
+    return Response.json({
+      payable: breakdown.payable,
+      available: breakdown.available,
+      breakdown,
+    });
   } catch (error) {
     console.error("seller-payable failed:", error);
     return Response.json(

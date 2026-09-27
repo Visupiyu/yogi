@@ -2,6 +2,7 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { computeOrderPricing, type PricedItemInput } from "@/lib/orderPricing";
+import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { isProductVisible } from "@/lib/products/visibility";
 import { mintNumbers } from "@/lib/humanIds";
@@ -460,7 +461,9 @@ export async function POST(request: Request) {
         deliveryDate: deliveryDateString(),
         commission: pricing.commission,
         sellerEarning: pricing.sellerEarning,
-        commissionRate: pricing.commissionRate,
+        // Permanently 0% / ₹0 (lib/commissionPolicy.ts), server-stamped.
+        commissionRate: YOMICO_COMMISSION_RATE,
+        commissionAmount: YOMICO_COMMISSION_AMOUNT,
         couponCode: normalizedCode || "",
         discount: pricing.couponDiscount,
         rewardValue: pricing.rewardValue,

@@ -136,7 +136,7 @@ export async function POST(request: Request) {
       const businessName =
         typeof vendor?.businessName === "string" ? vendor.businessName : "";
 
-      const [orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap] =
+      const [orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap, sellerOrderSnap] =
         await Promise.all([
           tx.get(
             db.collection("orders").where("vendorIds", "array-contains", requester.uid)
@@ -145,6 +145,7 @@ export async function POST(request: Request) {
           tx.get(db.collection("withdrawals").where("vendorId", "==", requester.uid)),
           tx.get(db.collection("itemRequests").where("vendorId", "==", requester.uid)),
           tx.get(db.collection("returns").where("status", "==", "Refunded")),
+          tx.get(db.collection("sellerOrders").where("vendorId", "==", requester.uid)),
         ]);
 
       const orders = orderSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -160,6 +161,7 @@ export async function POST(request: Request) {
         withdrawals: withdrawalSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
         itemRequests: itemReqSnap.docs.map((d) => d.data()),
         legacyReturns,
+        sellerOrders: sellerOrderSnap.docs.map((d) => d.data()),
       });
 
       const verdict = evaluateWithdrawalRequest({ amount: body.amount, payable });

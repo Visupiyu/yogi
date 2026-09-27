@@ -120,7 +120,7 @@ localStorage.setItem(
     email: userCredential.user.email,
     vendorId: snapshot.docs[0].id,
     businessName: vendorData.businessName,
-    commissionRate: vendorData.commissionRate || 10,
+    commissionRate: 0, // YOMICO charges sellers 0% commission
     pendingPayout: vendorData.pendingPayout || 0,
     totalSales: vendorData.totalSales || 0,
     totalOrders: vendorData.totalOrders || 0,

@@ -71,9 +71,13 @@ export default function SellerAgreementPage() {
 
       <Section title="6. Pricing, Commission and Payouts">
         <p>
-          YOMICO charges a commission on completed sales, as shown in your
-          seller dashboard and Payout Report. Your net earnings, after
-          commission and any applicable deductions, are made available for
+          YOMICO charges sellers 0% commission. On an order that ships free
+          to the customer, you are responsible for your allocated share of that
+          order&apos;s delivery charge (one delivery charge per order, shared
+          between the order&apos;s sellers in proportion to the value of their
+          items), as shown in your seller dashboard and Payout Report. Your net
+          earnings, after that delivery charge and any applicable deductions
+          (such as returns), are made available for
           withdrawal to your registered bank account through the Wallet
           section of your seller dashboard, subject to YOMICO&apos;s settlement
           schedule and verification checks.

@@ -10,8 +10,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { computeVendorShare } from "@/lib/vendorEarnings";
-import { computeVendorAdjustedEarnings } from "@/lib/vendorPayable";
+import { computeVendorEarningsBreakdown } from "@/lib/vendorPayable";
 import { logAdminAction } from "@/lib/auditLog";
 
 export default function AdminPayoutsPage() {
@@ -32,6 +31,7 @@ export default function AdminPayoutsPage() {
         withdrawalSnapshot,
         refundedReturnsSnapshot,
         itemRequestSnapshot,
+        sellerOrderSnapshot,
       ] = await Promise.all([
         getDocs(collection(db, "vendors")),
         getDocs(collection(db, "orders")),
@@ -39,6 +39,7 @@ export default function AdminPayoutsPage() {
         getDocs(collection(db, "withdrawals")),
         getDocs(query(collection(db, "returns"), where("status", "==", "Refunded"))),
         getDocs(collection(db, "itemRequests")),
+        getDocs(collection(db, "sellerOrders")),
       ]);
 
       // Refund-adjusted earnings use lib/vendorPayable — the SAME authoritative
@@ -50,6 +51,7 @@ export default function AdminPayoutsPage() {
       const ordersWithId = orderSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
       const legacyReturns = refundedReturnsSnapshot.docs.map((d) => d.data());
       const itemRequests = itemRequestSnapshot.docs.map((d) => d.data());
+      const sellerOrders = sellerOrderSnapshot.docs.map((d) => d.data());
 
       // Sum already-paid amounts per vendor from the payouts ledger.
       // Keyed by the seller's auth uid — the same id order items use —
@@ -99,46 +101,22 @@ export default function AdminPayoutsPage() {
       vendorSnapshot.forEach((vendorDoc) => {
         const vendor: any = vendorDoc.data();
 
-        let sales = 0;
-        let commission = 0;
-        let earnings = 0;
-
-        orderSnapshot.forEach((orderDoc) => {
-          const order: any = orderDoc.data();
-          // Same fulfilled-and-paid gate the seller wallet applies, so
-          // the amount an admin can settle here never exceeds what the
-          // seller could legitimately request. Subsumes the previous
-          // Cancelled-only exclusion.
-          // An order flagged needsReview was PAID but could not be fulfilled
-          // as priced (short stock, coupon already spent, reward balance
-          // moved — see lib/onlineOrder.ts). Its items[] still carry the full
-          // requested quantities, so computeVendorShare() would credit the
-          // vendor for units that were never in stock. Excluded until an
-          // admin resolves the flag.
-          if (
-            order.status !== "Delivered" ||
-            order.paymentStatus !== "Paid" ||
-            order.needsReview === true
-          )
-            return;
-
-          // Sales and commission are the gross reporting figures (unaffected by
-          // refunds); earnings is computed refund-aware just below.
-          const share = computeVendorShare(order, vendor.uid);
-
-          if (share) {
-            sales += share.vendorRawSubtotal;
-            commission += share.vendorCommission;
-          }
-        });
-
-        // Refund-adjusted earnings — the withdrawable half, net of returns.
-        earnings = computeVendorAdjustedEarnings({
+        // Every figure from lib/vendorPayable's single breakdown — the same
+        // calculation (and the same inputs, incl. the sellerOrders delivery
+        // snapshots) the seller API, withdrawal request and settlement use.
+        // Gated to Delivered + Paid + !needsReview orders inside it.
+        const breakdown = computeVendorEarningsBreakdown({
           vendorUid: vendor.uid,
           orders: ordersWithId,
           itemRequests,
           legacyReturns,
+          sellerOrders,
         });
+        const sales = breakdown.grossSales;
+        const commission = breakdown.commission; // always ₹0
+        const deliveryCharges =
+          breakdown.sellerDeliveryCharges + breakdown.returnLogisticsCharges;
+        const earnings = breakdown.adjustedEarnings;
 
         const paidPayout = paidByVendor[vendor.uid] || 0;
         const pendingPayout = Math.max(0, earnings - paidPayout);
@@ -150,6 +128,7 @@ export default function AdminPayoutsPage() {
             vendor.storeName || vendor.businessName || vendor.shopName || "Vendor",
           sales,
           commission,
+          deliveryCharges,
           earnings,
           paidPayout,
           pendingPayout,
@@ -223,6 +202,7 @@ export default function AdminPayoutsPage() {
                   <th className="text-left py-4 px-3">Seller</th>
                   <th className="text-left">Sales</th>
                   <th className="text-left">Commission</th>
+                  <th className="text-left">Delivery</th>
                   <th className="text-left">Earnings</th>
                   <th className="text-left">Pending</th>
                   <th className="text-left">Paid</th>
@@ -238,6 +218,7 @@ export default function AdminPayoutsPage() {
                     <td className="py-4 px-3">{vendor.shopName}</td>
                     <td>₹{vendor.sales.toLocaleString("en-IN")}</td>
                     <td>₹{vendor.commission.toLocaleString("en-IN")}</td>
+                    <td>₹{vendor.deliveryCharges.toLocaleString("en-IN")}</td>
                     <td>₹{vendor.earnings.toLocaleString("en-IN")}</td>
                     <td className="text-orange-600 font-bold">
                       ₹{vendor.pendingPayout.toLocaleString("en-IN")}

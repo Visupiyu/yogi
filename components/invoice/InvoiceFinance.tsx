@@ -1,5 +1,7 @@
 "use client";
 
+import { YOMICO_COMMISSION_AMOUNT } from "@/lib/commissionPolicy";
+
 interface InvoiceFinanceProps {
   order: any;
   type: "customer" | "seller" | "admin";
@@ -10,8 +12,10 @@ export default function InvoiceFinance({
   type,
 }: InvoiceFinanceProps) {
 
-  const commission =
-    Number(order.commission || 0);
+  // YOMICO charges sellers no commission (lib/commissionPolicy.ts): always
+  // ₹0, whatever a legacy order document may still carry.
+  const commission = YOMICO_COMMISSION_AMOUNT;
+  void order.commission;
 
   const sellerEarning =
     Number(order.sellerEarning || 0);

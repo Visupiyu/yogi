@@ -30,6 +30,7 @@ import {
 // sharing pattern as shippingRules — kept SEPARATE from the customer charge
 // (standardShippingCharge, concept A) on purpose.
 import { DEFAULT_DELIVERY_COST } from "@/lib/deliveryRules";
+import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 import {
   findVariantById,
   variantAttributes,
@@ -130,22 +131,17 @@ type GlobalSettings = {
 };
 
 /**
- * The commission rate a NEW order is stamped with, from settings/global's
- * {commissionEnabled, commissionRate}. 0 unless commission is explicitly
- * enabled with a well-formed 0–1 rate — the zero-commission launch default.
- * Exported so the mobile order writers stamp the exact same rate the web
- * pricing pass does (seller payouts read order.commissionRate).
+ * The commission rate a NEW order is stamped with: always 0. YOMICO charges
+ * sellers no commission (lib/commissionPolicy.ts) — settings/global's legacy
+ * commissionEnabled/commissionRate fields are deliberately IGNORED, so no
+ * admin setting can create a seller commission. The parameter is kept only so
+ * existing callers (the mobile order writers) compile unchanged.
  */
 export function resolveCommissionRate(
-  data: Record<string, unknown> | null | undefined
+  _data?: Record<string, unknown> | null
 ): number {
-  const rawRate = data?.commissionRate;
-  return data?.commissionEnabled === true &&
-    typeof rawRate === "number" &&
-    rawRate >= 0 &&
-    rawRate <= 1
-    ? rawRate
-    : 0;
+  void _data;
+  return YOMICO_COMMISSION_RATE;
 }
 
 // settings/global carries both the shipping thresholds and the commission
@@ -499,7 +495,9 @@ export async function computeOrderPricing(
 
   // buildOrderData()'s formulas, unchanged: commission rounds against the
   // final charged amount and the seller keeps the remainder.
-  const commission = Math.round(finalTotal * settings.commissionRate);
+  // Commission is permanently ₹0 (lib/commissionPolicy.ts). sellerEarning is
+  // the legacy whole-order display field and is therefore finalTotal.
+  const commission = YOMICO_COMMISSION_AMOUNT;
   const sellerEarning = finalTotal - commission;
 
   // applyPostOrderEffects()'s formula, unchanged.

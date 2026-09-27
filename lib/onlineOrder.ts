@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
@@ -504,9 +505,13 @@ export async function finalizeOnlineOrder(params: {
       freeDeliveryApplied: pricing.freeDeliveryApplied,
       finalTotal: capturedRupees,
       deliveryDate: intent.deliveryDate,
-      commission: pricing.commission,
-      sellerEarning: pricing.sellerEarning,
-      commissionRate: pricing.commissionRate,
+      // Commission is permanently 0% / ₹0 (lib/commissionPolicy.ts) — stamped
+      // from the constant, never from the intent, so an intent priced under an
+      // old setting cannot carry a commission onto the order.
+      commission: YOMICO_COMMISSION_AMOUNT,
+      sellerEarning: capturedRupees,
+      commissionRate: YOMICO_COMMISSION_RATE,
+      commissionAmount: YOMICO_COMMISSION_AMOUNT,
       couponCode: intent.couponCode || "",
       discount: pricing.couponDiscount,
       // The rupee discount applied to this order's PRICE, not the points

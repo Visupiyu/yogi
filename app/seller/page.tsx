@@ -5,6 +5,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useVendor } from "@/hooks/useVendor";
 import { computeVendorShare } from "@/lib/vendorEarnings";
+import { fetchSellerPayableBreakdown } from "@/lib/sellerPayableClient";
 
 import SellerDashboard from "@/components/seller/SellerDashboard";
 import OnboardingChecklist from "./components/OnboardingChecklist";
@@ -121,13 +122,20 @@ export default function SellerPage() {
         }
       });
 
+      // Commission and earnings come from the server's single seller-payable
+      // calculation (the same figures as the wallet and payout report), not
+      // from a local formula. "Revenue" stays the booked gross of active orders.
+      void totalCommission;
+      void totalNetEarnings;
+      const payable = await fetchSellerPayableBreakdown();
+
       setStats({
         totalProducts: productList.length,
         totalOrders: ordersCount,
         pendingOrders: pendingCount,
         earnings: totalEarnings,
-        commissionPaid: totalCommission,
-        netEarnings: totalNetEarnings,
+        commissionPaid: payable?.commission ?? 0,
+        netEarnings: payable?.adjustedEarnings ?? 0,
         totalViews: views,
         totalSales: sales,
         bestSeller: topProduct || "None",

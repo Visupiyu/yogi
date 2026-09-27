@@ -118,7 +118,8 @@ function req(url: string, body: unknown, uid = BUYER, method = "POST") {
 async function json(res: Response): Promise<any> { return res.json().catch(() => ({})); }
 
 async function seedSettings() {
-  // Emulator-only settings: a NON-zero commission so payout math is non-trivial.
+  // Emulator-only settings: commission switched ON at 10% in settings — which
+  // YOMICO's fixed 0% policy (lib/commissionPolicy.ts) must ignore everywhere.
   await db.collection("settings").doc("global").set({
     commissionEnabled: true, commissionRate: 0.1,
     freeShippingThreshold: 499, standardShippingCharge: 49, deliveryCost: 60,
@@ -406,7 +407,7 @@ async function main() {
     });
     onlineOrder = (await db.collection("orders").doc("pay_money_1").get()).data();
 
-    // Intent created before this change (no commissionRate) -> current configured rate, never legacy 10%-by-absence
+    // Intent created before this change (no commissionRate) -> still stamped 0% (never a configured or legacy rate)
     const legacyIntent = { ...intent, commissionRate: undefined, razorpayOrderId: "order_legacy_1" };
     delete legacyIntent.commissionRate;
     await seedMobileProduct(10);
@@ -414,12 +415,12 @@ async function main() {
     const legacyOrder = (await db.collection("orders").doc("pay_money_legacy").get()).data() as any;
 
     const codFields = cod?.items?.[0]?.qty === 2 && cod?.items?.[0]?.quantity === 2 && cod?.items?.[0]?.price === 1000 &&
-      cod?.itemsSubtotal === 2000 && cod?.discount === 200 && cod?.commissionRate === 0.1 && cod?.vendorIds?.[0] === SELLER;
+      cod?.itemsSubtotal === 2000 && cod?.discount === 200 && cod?.commissionRate === 0 && cod?.commissionAmount === 0 && cod?.vendorIds?.[0] === SELLER;
     const onlineFields = fin.kind === "created" && onlineOrder?.items?.[0]?.qty === 2 && onlineOrder?.items?.[0]?.quantity === 2 &&
-      onlineOrder?.itemsSubtotal === 2000 && onlineOrder?.discount === 200 && onlineOrder?.commissionRate === 0.1 &&
+      onlineOrder?.itemsSubtotal === 2000 && onlineOrder?.discount === 200 && onlineOrder?.commissionRate === 0 && onlineOrder?.commissionAmount === 0 &&
       onlineOrder?.finalTotal === 1800 && onlineOrder?.paymentStatus === "Paid" && !("paymentAmount" in onlineOrder);
-    record("T10 new mobile orders carry payout fields: items[].qty (+quantity), itemsSubtotal, discount, commissionRate; ONLINE has no paymentAmount",
-      codFields && onlineFields && intent?.commissionRate === 0.1 && legacyOrder?.commissionRate === 0.1,
+    record("T10 new mobile orders carry payout fields: items[].qty (+quantity), itemsSubtotal, discount, commissionRate 0 + commissionAmount 0 (settings say 10% — ignored); ONLINE has no paymentAmount",
+      codFields && onlineFields && intent?.commissionRate === 0 && legacyOrder?.commissionRate === 0 && legacyOrder?.commissionAmount === 0,
       `COD qty=${cod?.items?.[0]?.qty} itemsSubtotal=${cod?.itemsSubtotal} discount=${cod?.discount} rate=${cod?.commissionRate} | ONLINE qty=${onlineOrder?.items?.[0]?.qty} rate=${onlineOrder?.commissionRate} paymentAmount=${onlineOrder?.paymentAmount} | legacy-intent rate=${legacyOrder?.commissionRate}`);
   }
 
@@ -430,9 +431,9 @@ async function main() {
     await db.collection("orders").doc("pay_money_legacy").delete();
     await codRef.update({ status: "Delivered", paymentStatus: "Paid" });
     // Hand calc: raw 2000; coupon share 200 x 2000/2000 = 200 -> net 1800;
-    // commission round(1800 x 0.1) = 180 -> earning 1620; seller bears the
-    // forward delivery cost on a free-delivery order: round(60 x 2000/2000) = 60.
-    const EXPECTED_PAYABLE = 1800 - 180 - 60; // 1560
+    // commission is ₹0 (YOMICO's fixed 0% policy) -> earning 1800; seller bears
+    // the forward delivery cost on a free-delivery order: round(60 x 2000/2000) = 60.
+    const EXPECTED_PAYABLE = 1800 - 0 - 60; // 1740
     const res = await sellerPayable(req("http://x/api/seller/payable", null, SELLER, "GET"));
     const pj = await json(res);
     const share = computeVendorShare({ ...(await codRef.get()).data() } as any, SELLER);
@@ -441,8 +442,8 @@ async function main() {
     old.items = old.items.map(({ qty, ...rest }: any) => rest);
     delete old.itemsSubtotal; delete old.discount; delete old.commissionRate;
     const oldShare = computeVendorShare(old, SELLER);
-    record("T11 seller payable for new mobile order is non-zero and exact (1560 = 1800 - 180 commission - 60 delivery); pre-fix shape still 0",
-      res.status === 200 && pj.payable === EXPECTED_PAYABLE && share?.vendorEarning === 1620 && oldShare?.vendorEarning === 0,
+    record("T11 seller payable for new mobile order is non-zero and exact (1740 = 1800 - ₹0 commission - 60 delivery); pre-fix shape still 0",
+      res.status === 200 && pj.payable === EXPECTED_PAYABLE && share?.vendorEarning === 1800 && share?.vendorCommission === 0 && oldShare?.vendorEarning === 0,
       `route payable=${pj.payable} vendorEarning=${share?.vendorEarning} preFixShapeEarning=${oldShare?.vendorEarning}`);
   }
 
@@ -456,7 +457,7 @@ async function main() {
     let sameShare = true;
     try { assert.deepEqual(adminDashboardShare, sellerShare); } catch { sameShare = false; }
     record("T12 admin dashboard share == seller share; admin payouts earned == seller payable (no commitments)",
-      sameShare && adminPayoutsEarned === sellerPayableCalc && sellerPayableCalc === 1560,
+      sameShare && adminPayoutsEarned === sellerPayableCalc && sellerPayableCalc === 1740,
       `sellerShare=${JSON.stringify(sellerShare)} adminShare=${JSON.stringify(adminDashboardShare)} adminEarned=${adminPayoutsEarned} sellerPayable=${sellerPayableCalc}`);
   }
 
