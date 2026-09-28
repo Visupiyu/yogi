@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -18,6 +18,17 @@ export default function SignupPage() {
   const [referralCode, setReferralCode] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // A friend's share link (/signup?ref=CODE, from /profile/referrals) pre-fills
+  // their code. It is only a pre-fill: the code is recorded as referredBy, and
+  // whether it is real — and every bonus — is decided on the server
+  // (app/api/signup-rewards). Read from window.location rather than
+  // useSearchParams so this page needs no Suspense boundary.
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    const code = (ref || "").trim().toUpperCase();
+    if (/^[A-Z0-9]{4,32}$/.test(code)) setReferralCode(code);
+  }, []);
 
   const signup = async () => {
     if (!name || !email || !phone || !password) {

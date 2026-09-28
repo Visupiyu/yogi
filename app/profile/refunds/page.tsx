@@ -1,391 +1,301 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
-import { auth, db } from "@/lib/firebase";
+import { useCallback, useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import {
-  REFUND_DESTINATION_LABEL,
-  isTerminal,
-  stagesFor,
-  statusLabel,
-  statusTone,
-  type ItemRequestType,
-} from "@/lib/itemRequests";
+  fetchAccountReturns,
+  formatDate,
+  respondToPickup,
+  type AccountReturns,
+} from "@/lib/account/accountClient";
 
-// Customer refund/request history.
-//
-// Primary: the new per-item itemRequests (return + replace), read by the owner
-// (firestore.rules: userId == uid). Secondary: the legacy order-level `returns`
-// records, so older requests still show. Both are read-only here.
+// Returns & Refunds. Everything comes from app/api/account/returns — the
+// customer's own requests, legacy returns and ONE refund timeline across all
+// three refund sources (item returns, cancelled online orders, legacy
+// returns), as fixed fields. YOMICO proposes each pickup slot; the customer can
+// confirm it or ask for another time (app/api/item-request/respond). The
+// customer never picks the first slot.
 
-const TONE_BADGE: Record<string, string> = {
-  ok: "bg-green-100 text-green-700 border-green-300",
-  bad: "bg-red-100 text-red-700 border-red-300",
-  running: "bg-blue-100 text-blue-700 border-blue-300",
-  idle: "bg-amber-100 text-amber-700 border-amber-300",
+type Tab = "requests" | "refunds";
+
+const TONE: Record<string, string> = {
+  ok: "bg-green-100 text-green-700",
+  bad: "bg-red-100 text-red-700",
+  running: "bg-blue-100 text-blue-700",
+  idle: "bg-gray-100 text-gray-700",
 };
-
-type ItemRequest = {
-  id: string;
-  requestNumber?: string;
-  type?: ItemRequestType;
-  status?: string;
-  orderId?: string;
-  reason?: string;
-  item?: { name?: string; image?: string; qty?: number };
-  refund?: { amount?: number };
-  pickup?: {
-    proposedAt?: unknown;
-    counterAt?: unknown;
-    scheduledAt?: unknown;
-    customerResponse?: unknown;
-    partner?: unknown;
-  };
-  createdAt?: { seconds?: number };
+const REFUND_TONE: Record<string, string> = {
+  completed: "bg-green-100 text-green-700",
+  "not-refunded": "bg-red-100 text-red-700",
+  processing: "bg-blue-100 text-blue-700",
+  due: "bg-amber-100 text-amber-800",
 };
-
-/** Firestore Timestamp | ISO | epoch | {seconds} -> Date | null. */
-function toDate(v: unknown): Date | null {
-  if (!v) return null;
-  if (typeof v === "string" || typeof v === "number") {
-    const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  const c = v as { toDate?: () => Date; seconds?: number };
-  if (typeof c.toDate === "function") {
-    try {
-      const d = c.toDate();
-      return Number.isNaN(d.getTime()) ? null : d;
-    } catch {
-      return null;
-    }
-  }
-  if (typeof c.seconds === "number") return new Date(c.seconds * 1000);
-  return null;
-}
-
-function fmtDateTime(v: unknown): string {
-  const d = toDate(v);
-  return d
-    ? d.toLocaleString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      })
-    : "";
-}
 
 export default function RefundsPage() {
-  const [requests, setRequests] = useState<ItemRequest[]>([]);
-  const [legacy, setLegacy] = useState<{ id: string; [k: string]: unknown }[]>([]);
+  const [data, setData] = useState<AccountReturns | null>(null);
   const [loading, setLoading] = useState(true);
-  // Pickup-slot negotiation (customer accept / counter). Keyed per request.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("requests");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [counterInputs, setCounterInputs] = useState<Record<string, string>>({});
-  const [error, setError] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
+  const [actionError, setActionError] = useState<Record<string, string>>({});
+
+  const load = useCallback(async () => {
+    const result = await fetchAccountReturns();
+    setData(result.data);
+    setLoadError(result.error);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
         setLoading(false);
         return;
       }
-      try {
-        const reqSnap = await getDocs(
-          query(collection(db, "itemRequests"), where("userId", "==", user.uid))
-        );
-        const items: ItemRequest[] = [];
-        reqSnap.forEach((d) => items.push({ id: d.id, ...(d.data() as object) }));
-        items.sort(
-          (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-        );
-        setRequests(items);
-
-        // Legacy order-level returns, matched by email as before.
-        if (user.email) {
-          const legacySnap = await getDocs(
-            query(collection(db, "returns"), where("userEmail", "==", user.email))
-          );
-          const legacyItems: { id: string; [k: string]: unknown }[] = [];
-          legacySnap.forEach((d) => legacyItems.push({ id: d.id, ...d.data() }));
-          setLegacy(legacyItems);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
+      load();
     });
     return () => unsub();
-  }, [reloadKey]);
+  }, [load]);
 
-  // Respond to a proposed pickup slot: accept it, or counter with a different
-  // time. The customer never writes the request directly — this calls the
-  // existing server respond route, which verifies ownership and the state.
-  const respond = async (
-    requestId: string,
-    action: "accept" | "counter",
-    when?: string
-  ) => {
-    setError("");
-    const user = auth.currentUser;
-    if (!user) return;
-    if (action === "counter") {
-      if (!when) {
-        setError("Please choose a pickup date and time.");
-        return;
-      }
-      const chosen = new Date(when);
-      // Date.now() is read inside this async click handler (not during render),
-      // so this is a legitimate use; the purity lint only fires because respond
-      // is referenced from inside a .map() callback.
-      // eslint-disable-next-line react-hooks/purity
-      if (Number.isNaN(chosen.getTime()) || chosen.getTime() <= Date.now()) {
-        setError("Please choose a valid future date and time.");
-        return;
-      }
+  const respond = async (id: string, action: "accept" | "counter") => {
+    setBusyId(id);
+    setActionError((p) => ({ ...p, [id]: "" }));
+    const counter = counterInputs[id];
+    const result = await respondToPickup(
+      id,
+      action,
+      action === "counter" && counter ? new Date(counter).toISOString() : undefined
+    );
+    setBusyId(null);
+    if (result.error) {
+      setActionError((p) => ({ ...p, [id]: result.error || "" }));
+      return;
     }
-    try {
-      setBusyId(requestId);
-      const token = await user.getIdToken();
-      const res = await fetch("/api/item-request/respond", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          requestId,
-          action,
-          ...(action === "counter" && when
-            ? { counterAt: new Date(when).toISOString() }
-            : {}),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data?.error || "Couldn't submit your response.");
-        return;
-      }
-      setCounterInputs((p) => ({ ...p, [requestId]: "" }));
-      setReloadKey((k) => k + 1);
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setBusyId(null);
-    }
+    setCounterInputs((p) => ({ ...p, [id]: "" }));
+    load();
   };
+
+  const requests = data?.requests || [];
+  const legacy = data?.legacyReturns || [];
+  const refunds = data?.refunds || [];
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
       <div className="max-w-4xl mx-auto">
-        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
-        <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white p-6 sm:p-8 rounded-3xl mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold">My Returns & Refunds</h1>
-          <p className="opacity-90">Track your return and replacement requests</p>
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">
+          ← Back to Profile
+        </Link>
+        <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white p-6 sm:p-8 rounded-3xl mb-6">
+          <h1 className="text-3xl sm:text-4xl font-bold">Returns & Refunds</h1>
+          <p className="opacity-90">Track your returns, pickups and every refund in one place</p>
+        </div>
+
+        <div className="mb-6 flex gap-2">
+          {(["requests", "refunds"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`rounded-2xl px-5 py-2 font-semibold ${tab === t ? "bg-gray-900 text-white" : "bg-white text-gray-700 shadow"}`}
+            >
+              {t === "requests" ? `Returns & replacements (${requests.length + legacy.length})` : `Refunds (${refunds.length})`}
+            </button>
+          ))}
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-3xl shadow p-10 text-center">
-            Loading...
-          </div>
-        ) : requests.length === 0 && legacy.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow p-10 text-center text-gray-500">
-            <p className="mb-4">You have no return or replacement requests yet.</p>
-            <Link
-              href="/orders"
-              className="inline-flex px-6 py-3 rounded-xl bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold"
-            >
-              View My Orders
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {requests.map((r) => {
-              const type: ItemRequestType =
-                r.type === "replace" ? "replace" : "return";
-              const status = r.status || "REQUESTED";
-              const tone = statusTone(status);
-              const stages = stagesFor(type);
-              const idx = stages.indexOf(status);
-              // Pickup negotiation: the customer acts only while a slot is
-              // awaiting them (PICKUP_PROPOSED).
-              const isProposed = status === "PICKUP_PROPOSED";
-              const proposedOn = fmtDateTime(r.pickup?.proposedAt);
-              const counterOn = fmtDateTime(r.pickup?.counterAt);
-              const confirmedOn = fmtDateTime(r.pickup?.scheduledAt);
-              const partner =
-                typeof r.pickup?.partner === "string" ? r.pickup.partner : "";
-              const respondingThis = busyId === r.id;
-              return (
-                <div key={r.id} className="bg-white rounded-3xl shadow p-5">
-                  <div className="flex items-center gap-4">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={r.item?.image || "/no-image.png"}
-                      alt={r.item?.name || "Product"}
-                      className="w-14 h-14 rounded-xl object-cover bg-gray-100 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold truncate">
-                        {r.item?.name || "Product"}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        <span className="capitalize">{type}</span>
-                        {r.requestNumber ? ` #${r.requestNumber}` : ""} · Order{" "}
-                        {r.orderId?.slice(0, 8) || "-"} · Qty {r.item?.qty ?? 1}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border ${TONE_BADGE[tone]} shrink-0`}
-                    >
-                      {statusLabel(type, status)}
-                    </span>
-                  </div>
-
-                  {!isTerminal(status) && idx >= 0 && (
-                    <p className="mt-3 text-xs text-gray-500">
-                      Step {idx + 1} of {stages.length}
-                      {type === "return" &&
-                      typeof r.refund?.amount === "number" &&
-                      r.refund.amount > 0
-                        ? ` · Refund ₹${r.refund.amount.toLocaleString(
-                            "en-IN"
-                          )} as ${REFUND_DESTINATION_LABEL}`
-                        : type === "replace"
-                        ? " · Replacement in progress"
-                        : ""}
-                    </p>
-                  )}
-
-                  {r.reason && (
-                    <p className="mt-2 text-sm text-gray-600">
-                      Reason: {r.reason}
-                    </p>
-                  )}
-
-                  {/* Pickup negotiation — the customer accepts the proposed slot
-                      or proposes a different time. Gated on the STATUS
-                      (PICKUP_PROPOSED), driven entirely through the existing
-                      /api/item-request/respond route (no client Firestore
-                      writes). Returns only. */}
-                  {type === "return" && isProposed && (
-                    <div className="mt-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                      <p className="text-sm text-gray-800">
-                        {proposedOn ? (
-                          <>
-                            Proposed pickup:{" "}
-                            <span className="font-semibold">{proposedOn}</span>
-                          </>
-                        ) : (
-                          "YOMICO has proposed a pickup time."
-                        )}
-                      </p>
-                      {r.pickup?.customerResponse === "countered" &&
-                        counterOn && (
-                          <p className="text-xs text-amber-700 mt-1">
-                            You asked for {counterOn} — awaiting a new proposal.
-                          </p>
-                        )}
-
-                      <div className="mt-3">
-                        <button
-                          disabled={respondingThis}
-                          onClick={() => respond(r.id, "accept")}
-                          className="px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold"
-                        >
-                          {respondingThis ? "Saving…" : "Accept pickup time"}
-                        </button>
-                      </div>
-
-                      <div className="mt-3">
-                        <p className="text-gray-600 text-xs mb-1">
-                          Propose a different time
+          <div className="bg-white rounded-3xl shadow p-10 text-center">Loading...</div>
+        ) : loadError && !data ? (
+          <div className="bg-red-50 rounded-3xl p-6 text-red-700">{loadError}</div>
+        ) : tab === "requests" ? (
+          requests.length === 0 && legacy.length === 0 ? (
+            <div className="bg-white rounded-3xl shadow p-10 text-center text-gray-500">
+              <p className="mb-4">You have no return or replacement requests yet.</p>
+              <Link href="/orders" className="inline-block bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-xl font-semibold">
+                View My Orders
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {requests.map((r) => {
+                const busy = busyId === r.id;
+                return (
+                  <div key={r.id} className="bg-white rounded-3xl shadow p-5">
+                    <div className="flex items-center gap-4">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={r.item.image || "/no-image.png"}
+                        alt={r.item.name}
+                        className="w-16 h-16 rounded-xl object-cover border shrink-0"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold truncate">{r.item.name}</p>
+                        <p className="text-xs text-gray-500">
+                          <span className="capitalize">{r.type}</span>
+                          {r.requestNumber ? ` #${r.requestNumber}` : ""}
+                          {r.orderNumber ? ` · Order ${r.orderNumber}` : ""} · Qty {r.item.qty}
                         </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            type="datetime-local"
-                            value={counterInputs[r.id] || ""}
-                            onChange={(e) =>
-                              setCounterInputs((p) => ({
-                                ...p,
-                                [r.id]: e.target.value,
-                              }))
-                            }
-                            className="border rounded-lg px-2 py-1 text-sm"
-                          />
-                          <button
-                            disabled={respondingThis || !counterInputs[r.id]}
-                            onClick={() =>
-                              respond(r.id, "counter", counterInputs[r.id])
-                            }
-                            className="px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-60 text-sm font-semibold"
-                          >
-                            {respondingThis ? "Saving…" : "Submit new time"}
-                          </button>
-                        </div>
+                        <p className="text-xs text-gray-400">Requested {formatDate(r.createdAt)}</p>
                       </div>
-
-                      {error && (
-                        <p className="text-xs text-red-600 mt-2">{error}</p>
-                      )}
+                      <span className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${TONE[r.tone]}`}>{r.statusLabel}</span>
                     </div>
-                  )}
 
-                  {/* Confirmed appointment once the customer (or admin) has
-                      confirmed the slot. */}
-                  {type === "return" &&
-                    !isProposed &&
-                    !isTerminal(status) &&
-                    confirmedOn && (
-                      <p className="mt-3 text-sm text-green-700 font-semibold">
-                        ✓ Confirmed pickup: {confirmedOn}
-                        {partner ? ` · ${partner}` : ""}
+                    {r.step && (
+                      <p className="mt-3 text-xs text-gray-500">
+                        Step {r.step.index + 1} of {r.step.total}
+                        {r.refund && r.refund.amount > 0
+                          ? ` · Refund ₹${r.refund.amount.toLocaleString("en-IN")} as ${r.refund.destinationLabel}`
+                          : r.type === "replace"
+                          ? " · Replacement in progress"
+                          : ""}
                       </p>
                     )}
-                </div>
-              );
-            })}
+                    {r.refund?.status === "credited" && (
+                      <p className="mt-2 text-sm text-green-700">
+                        ₹{r.refund.amount.toLocaleString("en-IN")} credited as {r.refund.destinationLabel}
+                        {r.refund.creditedAt ? ` on ${formatDate(r.refund.creditedAt)}` : ""}
+                        {r.refund.refundNumber ? ` · Ref ${r.refund.refundNumber}` : ""}
+                      </p>
+                    )}
+                    {r.reason && <p className="mt-2 text-sm text-gray-600">Reason: {r.reason}</p>}
 
-            {legacy.length > 0 && (
-              <div className="pt-4">
-                <h2 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">
-                  Earlier requests
-                </h2>
-                <div className="space-y-3">
-                  {legacy.map((item) => (
-                    <div key={item.id} className="bg-white rounded-2xl shadow p-4">
-                      <p className="font-semibold text-sm">
-                        Order: {String(item.orderId || "-").slice(0, 8)}
+                    {r.pickup && r.pickup.canRespond && (
+                      <div className="mt-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                        <p className="text-sm text-gray-800">
+                          {r.pickup.proposedAt ? (
+                            <>
+                              YOMICO proposed a pickup on{" "}
+                              <span className="font-semibold">{formatDate(r.pickup.proposedAt, true)}</span>
+                            </>
+                          ) : (
+                            "YOMICO has proposed a pickup time."
+                          )}
+                        </p>
+                        {r.pickup.customerResponse === "countered" && r.pickup.counterAt && (
+                          <p className="text-xs text-amber-700 mt-1">
+                            You asked for {formatDate(r.pickup.counterAt, true)} — waiting for YOMICO to confirm a time.
+                          </p>
+                        )}
+                        <div className="mt-3">
+                          <button
+                            disabled={busy}
+                            onClick={() => respond(r.id, "accept")}
+                            className="bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-4 py-2 rounded-xl text-sm font-semibold"
+                          >
+                            {busy ? "Saving…" : "Confirm this pickup time"}
+                          </button>
+                        </div>
+                        {r.pickup.countersLeft > 0 ? (
+                          <div className="mt-3">
+                            <p className="text-gray-600 text-xs mb-1">
+                              Ask for another time ({r.pickup.countersLeft} request{r.pickup.countersLeft === 1 ? "" : "s"} left)
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                type="datetime-local"
+                                value={counterInputs[r.id] || ""}
+                                onChange={(e) => setCounterInputs((p) => ({ ...p, [r.id]: e.target.value }))}
+                                className="border rounded-xl px-3 py-2 text-sm"
+                              />
+                              <button
+                                disabled={busy || !counterInputs[r.id]}
+                                onClick={() => respond(r.id, "counter")}
+                                className="bg-white border border-blue-300 text-blue-700 disabled:opacity-60 px-4 py-2 rounded-xl text-sm font-semibold"
+                              >
+                                {busy ? "Saving…" : "Request this time"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-xs text-gray-600">
+                            You&apos;ve used all your requests for another time. Please confirm the proposed time or contact support.
+                          </p>
+                        )}
+                        {actionError[r.id] && <p className="text-xs text-red-600 mt-2">{actionError[r.id]}</p>}
+                      </div>
+                    )}
+
+                    {r.pickup && !r.pickup.canRespond && r.pickup.scheduledAt && !r.pickup.pickedUpAt && (
+                      <p className="mt-3 text-sm text-gray-700">
+                        Pickup confirmed for <span className="font-semibold">{formatDate(r.pickup.scheduledAt, true)}</span>
+                        {r.pickup.partner ? ` · ${r.pickup.partner}` : ""}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        Reason: {String(item.reason || "-")}
-                      </p>
-                      <p className="text-sm mt-1">
-                        Status:{" "}
-                        <span
-                          className={
-                            item.status === "Refunded"
-                              ? "text-green-600 font-semibold"
-                              : item.status === "Rejected"
-                              ? "text-red-600 font-semibold"
-                              : "text-blue-600 font-semibold"
-                          }
-                        >
-                          {String(item.status || "Pending")}
-                        </span>
-                      </p>
-                    </div>
-                  ))}
+                    )}
+                    {r.pickup?.pickedUpAt && (
+                      <p className="mt-3 text-sm text-gray-700">Picked up on {formatDate(r.pickup.pickedUpAt, true)}</p>
+                    )}
+
+                    {r.timeline.length > 0 && (
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-xs font-semibold text-gray-500">Timeline</summary>
+                        <ol className="mt-2 space-y-1 border-l-2 border-gray-200 pl-3">
+                          {r.timeline.map((t, i) => (
+                            <li key={i} className="text-xs text-gray-600">
+                              <span className="font-semibold">{t.label}</span>
+                              {t.at ? ` · ${formatDate(t.at, true)}` : ""} · by {t.by}
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
+                    )}
+                  </div>
+                );
+              })}
+
+              {legacy.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wide">Earlier whole-order returns</h2>
+                  <div className="space-y-3">
+                    {legacy.map((item) => (
+                      <div key={item.id} className="bg-white rounded-2xl shadow p-4 flex justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold">{item.orderNumber ? `Order ${item.orderNumber}` : "Order return"}</p>
+                          {item.reason && <p className="text-sm text-gray-600">Reason: {item.reason}</p>}
+                          <p className="text-xs text-gray-400">{formatDate(item.createdAt)}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold">{item.status}</p>
+                          {item.refundAmount > 0 && (
+                            <p className="text-xs text-gray-500">₹{item.refundAmount.toLocaleString("en-IN")} · {item.refundMethod}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        ) : refunds.length === 0 ? (
+          <div className="bg-white rounded-3xl shadow p-10 text-center text-gray-500">No refunds yet.</div>
+        ) : (
+          <div className="space-y-3">
+            {refunds.map((f, i) => (
+              <div key={`${f.source}-${f.reference}-${i}`} className="bg-white rounded-2xl shadow p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold">
+                      ₹{f.amount.toLocaleString("en-IN")}{" "}
+                      <span className="text-sm font-normal text-gray-500">
+                        · {f.source === "order-cancellation" ? "Cancelled order" : "Return"}
+                        {f.orderNumber ? ` · Order ${f.orderNumber}` : ""}
+                      </span>
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      To {f.destinationLabel} · Ref {f.reference}
+                      {f.providerReference ? ` · Payment ref …${f.providerReference}` : ""}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {f.requestedAt ? `Requested ${formatDate(f.requestedAt)}` : ""}
+                      {f.completedAt ? ` · Completed ${formatDate(f.completedAt)}` : ""}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${REFUND_TONE[f.status]}`}>{f.statusLabel}</span>
                 </div>
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
