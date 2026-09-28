@@ -218,6 +218,17 @@ export async function POST(request: Request) {
       });
     }
 
+    // A blocked customer cannot place new orders (same rule and message as
+    // app/api/place-order and app/api/create-order). Identity is the verified
+    // token uid; a missing users/{uid} profile is treated as active.
+    const userSnap = await db.collection("users").doc(requester.uid).get();
+    if (userSnap.exists && userSnap.data()?.status === "Blocked") {
+      return Response.json(
+        { error: "Your account has been blocked. Please contact support." },
+        { status: 403 }
+      );
+    }
+
     // Caller's own active cart — same filter services/cartService.ts's
     // getCartItems() + CheckoutScreen.tsx's `!savedForLater` filter apply
     // client-side. userId is verified server-side by construction (the

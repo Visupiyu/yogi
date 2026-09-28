@@ -128,6 +128,17 @@ export async function POST(request: Request) {
 
     const db = getAdminDb();
 
+    // A blocked customer cannot place new orders (same rule and message as
+    // app/api/place-order and app/api/create-order). Identity is the verified
+    // token uid; a missing users/{uid} profile is treated as active.
+    const userSnap = await db.collection("users").doc(requester.uid).get();
+    if (userSnap.exists && userSnap.data()?.status === "Blocked") {
+      return Response.json(
+        { error: "Your account has been blocked. Please contact support." },
+        { status: 403 }
+      );
+    }
+
     // Caller's own active cart — same filter as app/api/mobile/place-order.
     const cartSnap = await db
       .collection("cart")
