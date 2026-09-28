@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { fetchSellerOrders, toSellerOrderRow } from "@/lib/sellerOrders/sellerOrdersClient";
-import { fetchSellerPayableBreakdown } from "@/lib/sellerPayableClient";
-import type { VendorPayableBreakdown } from "@/lib/vendorPayable";
+import { fetchSellerAnalytics } from "@/lib/sellerAnalytics/sellerAnalyticsClient";
+import type { SellerAnalytics } from "@/lib/sellerAnalytics/sellerAnalytics";
 import {
   PieChart,
   Pie,
@@ -24,16 +22,14 @@ import {
   Legend,
 } from "recharts";
 
-const COLORS = ["#16a34a", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6"];
+const COLORS = ["#16a34a", "#2563eb", "#f59e0b", "#ef4444", "#8b5cf6", "#0891b2"];
 
 export default function SellerAnalyticsPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [payable, setPayable] = useState<VendorPayableBreakdown | null>(null);
-  const [products, setProducts] = useState<any[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [data, setData] = useState<SellerAnalytics | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -43,184 +39,79 @@ export default function SellerAnalyticsPage() {
         return;
       }
 
-      loadAnalytics(user.uid);
+      loadAnalytics();
 
     });
 
     return () => unsubscribe();
   }, [router]);
 
-  const loadAnalytics = async (vendorUid: string) => {
-    try {
-
-      // PRODUCTS (scoped to this vendor)
-      const productSnap = await getDocs(collection(db, "products"));
-      const productList: any[] = [];
-      const myProductIds = new Set<string>();
-      productSnap.forEach((doc) => {
-        const data: any = { ...doc.data(), id: doc.id };
-        if (data.vendorId === vendorUid) {
-          productList.push(data);
-          myProductIds.add(doc.id);
-        }
-      });
-      setProducts(productList);
-
-      // ORDERS — was an unscoped, whole-collection read. firestore.rules
-      // only allows a non-admin to read an order if they're the owner or
-      // named in vendorIds, so an unfiltered scan was rejected outright
-      // (permission-denied) for every seller, silently swallowed by the
-      // catch below — this page showed confident-looking zeros for
-      // everyone, always.
-      // Seller-scoped order summaries (app/api/seller/orders) — this seller's
-      // own lines and item value, computed on the server with the same
-      // computeVendorShare as before. Cancelled orders are excluded, as
-      // Wallet and Admin Analytics do.
-      const orderList: any[] = [];
-      for (const o of (await fetchSellerOrders()) || []) {
-        if (o.orderStatus === "Cancelled") continue;
-        const row = toSellerOrderRow(o, vendorUid);
-        orderList.push({
-          ...row,
-          myItems: row.items,
-          share: {
-            vendorRawSubtotal: o.sellerShare.rawSubtotal,
-            vendorNetSubtotal: o.sellerShare.netSubtotal,
-            vendorCommission: o.sellerShare.commission,
-            vendorEarning: o.sellerShare.earning,
-          },
-        });
-      }
-      setOrders(orderList);
-
-      // Commission / Net Earnings KPIs come from the server's single
-      // seller-payable calculation (same as wallet and payout report).
-      setPayable(await fetchSellerPayableBreakdown());
-
-      // REVIEWS — scoped to this seller's own products only, so Average
-      // Rating / Total Reviews reflect this seller, not the marketplace.
-      const reviewSnap = await getDocs(collection(db, "productReviews"));
-      const reviewList: any[] = [];
-      reviewSnap.forEach((doc) => {
-        const data: any = doc.data();
-        if (myProductIds.has(data.productId)) reviewList.push(data);
-      });
-      setReviews(reviewList);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+  // Every figure is aggregated on the server (app/api/seller/analytics) from
+  // this seller's own products and order summaries, with money from the one
+  // settlement calculation (lib/vendorPayable). This page used to download
+  // the WHOLE product and product-review collections — every seller's
+  // listings and every reviewer's email — and filter them in the browser.
+  const loadAnalytics = async () => {
+    const result = await fetchSellerAnalytics();
+    setData(result.data);
+    setError(result.error);
+    setLoading(false);
   };
-
-  const revenue = orders.reduce(
-    (sum, order) => sum + order.share.vendorRawSubtotal,
-    0
-  );
-
-  const totalProducts = products.length;
-  const totalOrders = orders.length;
-
-  const averageRating = reviews.length
-    ? (
-        reviews.reduce((sum: any, r: any) => sum + r.rating, 0) / reviews.length
-      ).toFixed(1)
-    : "0";
-
-  const chartData = [
-    { name: "Products", value: totalProducts },
-    { name: "Orders", value: totalOrders },
-    { name: "Reviews", value: reviews.length },
-  ];
-
-  const revenueChart = [{ name: "Revenue", amount: revenue }];
-
-  const productSales: any = {};
-  orders.forEach((order) => {
-    order.myItems.forEach((item: any) => {
-      if (!productSales[item.name]) productSales[item.name] = 0;
-      productSales[item.name] += item.qty;
-    });
-  });
-
-  const bestSellingProducts = Object.entries(productSales)
-    .map(([name, qty]) => ({ name: name as string, qty: Number(qty) }))
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 5);
-
-  const totalUnitsSold = Object.values(productSales).reduce(
-    (sum: number, qty: any) => sum + Number(qty),
-    0
-  );
-
-  const pendingOrders = orders.filter(
-    (order: any) => order.status === "Pending"
-  ).length;
-
-  const lowStockProducts = products.filter(
-    (product: any) => Number(product.stock || 0) <= 5
-  ).length;
-
-  const totalCommission = payable?.commission ?? 0;
-
-  const netEarnings = payable?.adjustedEarnings ?? 0;
-
-  const orderStatusData = [
-    { name: "Pending", value: orders.filter((o: any) => o.status === "Pending").length },
-    { name: "Packed", value: orders.filter((o: any) => o.status === "Packed").length },
-    { name: "Shipped", value: orders.filter((o: any) => o.status === "Shipped").length },
-    { name: "Delivered", value: orders.filter((o: any) => o.status === "Delivered").length },
-    { name: "Cancelled", value: orders.filter((o: any) => o.status === "Cancelled").length },
-  ];
-
-  const inventoryData = [
-    { name: "Healthy", value: products.filter((p: any) => Number(p.stock || 0) > 5).length },
-    { name: "Low Stock", value: products.filter((p: any) => Number(p.stock || 0) <= 5 && Number(p.stock || 0) > 0).length },
-    { name: "Out of Stock", value: products.filter((p: any) => Number(p.stock || 0) === 0).length },
-  ];
-
-  const MONTH_LABELS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jly", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ];
-
-  const monthlyRevenueTotals = new Array(12).fill(0);
-  const currentYear = new Date().getFullYear();
-
-  orders.forEach((order: any) => {
-    const seconds = order.createdAt?.seconds;
-    if (!seconds) return;
-
-    const orderDate = new Date(seconds * 1000);
-    // Bucketing by month alone (no year) silently merged e.g. Jan 2025
-    // and Jan 2026 revenue into the same bar once the store has more
-    // than a year of history. Scoping to the current year keeps this a
-    // real "this year's monthly trend" chart instead.
-    if (orderDate.getFullYear() !== currentYear) return;
-
-    monthlyRevenueTotals[orderDate.getMonth()] += order.share.vendorRawSubtotal;
-  });
-
-  const monthlyRevenue = MONTH_LABELS.map((month, index) => ({
-    month,
-    revenue: monthlyRevenueTotals[index],
-  }));
 
   if (loading) {
     return <div className="p-10 text-center">Loading Analytics...</div>;
   }
 
+  if (!data) {
+    return <div className="p-10 text-center text-red-600">{error || "Could not load your analytics."}</div>;
+  }
+
+  const { products, orders, settlement } = data;
+  const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+  // Booked sales = this seller's own item value on orders that are not
+  // cancelled. Commission and Net Earnings are the settlement figures
+  // (Delivered + Paid, returns and delivery charges netted).
+  const bookedSales = orders.bookedSales;
+  const averageRating = products.reviews.count ? products.reviews.averageRating.toFixed(1) : "0";
+  const bestSeller = orders.bestSelling[0]?.name || "N/A";
+  const lowStockProducts = products.inventory.low + products.inventory.out;
+  const awaitingAction = orders.toPack + orders.toShip;
+
+  const chartData = [
+    { name: "Products", value: products.total },
+    { name: "Orders", value: orders.total },
+    { name: "Reviews", value: products.reviews.count },
+  ];
+
+  const revenueChart = [
+    { name: "Booked Sales", amount: bookedSales },
+    { name: "Net Earnings", amount: settlement.adjustedEarnings },
+  ];
+
+  const bestSellingProducts = orders.bestSelling.map((p) => ({ name: p.name, qty: p.units }));
+
+  const orderStatusData = Object.entries(orders.byStage).map(([name, value]) => ({ name, value }));
+
+  const inventoryData = [
+    { name: "Healthy", value: products.inventory.healthy },
+    { name: "Low Stock", value: products.inventory.low },
+    { name: "Out of Stock", value: products.inventory.out },
+  ];
+
+  const monthlyRevenue = orders.monthly.map((m) => ({ month: m.month, revenue: m.bookedSales }));
+
   const kpis = [
-    { icon: "🏆", label: "Best Seller", value: bestSellingProducts[0]?.name || "N/A" },
-    { icon: "📦", label: "Pending Orders", value: pendingOrders },
-    { icon: "📉", label: "Low Stock", value: lowStockProducts },
-    { icon: "💸", label: "Commission", value: `₹${totalCommission.toLocaleString("en-IN")}` },
-    { icon: "💵", label: "Net Earnings", value: `₹${netEarnings.toLocaleString("en-IN")}` },
-    { icon: "🛒", label: "Units Sold", value: totalUnitsSold },
-    { icon: "⭐", label: "Total Reviews", value: reviews.length },
-    { icon: "💰", label: "Total Revenue", value: `₹${revenue.toLocaleString("en-IN")}` },
-    { icon: "📋", label: "Orders", value: totalOrders },
-    { icon: "📦", label: "Products", value: totalProducts },
+    { icon: "🏆", label: "Best Seller", value: bestSeller },
+    { icon: "📦", label: "Awaiting Pack / Ship", value: awaitingAction },
+    { icon: "📉", label: "Low / Out of Stock", value: lowStockProducts },
+    { icon: "💸", label: "Commission", value: inr(settlement.commission) },
+    { icon: "💵", label: "Net Earnings", value: inr(settlement.adjustedEarnings) },
+    { icon: "🛒", label: "Units Sold", value: orders.unitsSold },
+    { icon: "⭐", label: "Total Reviews", value: products.reviews.count },
+    { icon: "💰", label: "Booked Sales", value: inr(bookedSales) },
+    { icon: "📋", label: "Orders", value: orders.total },
+    { icon: "📦", label: "Products", value: products.total },
     { icon: "⭐", label: "Average Rating", value: averageRating },
   ];
 
@@ -231,6 +122,10 @@ export default function SellerAnalyticsPage() {
         <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-8">
           <h1 className="text-4xl font-bold">Seller Analytics</h1>
           <p className="mt-2">Business Performance Dashboard</p>
+          <p className="mt-2 text-sm opacity-90">
+            Booked Sales is your item value on orders that are not cancelled. Net Earnings is settled money
+            (delivered and paid), the same figure as your wallet.
+          </p>
         </div>
 
         {/* KPI CARDS */}
@@ -278,7 +173,7 @@ export default function SellerAnalyticsPage() {
           </div>
 
           <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[500px]">
-            <h2 className="text-2xl font-bold mb-6">💰 Revenue</h2>
+            <h2 className="text-2xl font-bold mb-6">💰 Sales &amp; Earnings</h2>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={revenueChart}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -310,32 +205,40 @@ export default function SellerAnalyticsPage() {
             <h2 className="text-2xl font-bold mb-8">📈 Business Insights</h2>
             <div className="space-y-6 text-lg">
               <div className="flex justify-between border-b pb-3">
-                <span>💰 Revenue</span>
-                <strong>₹{revenue.toLocaleString("en-IN")}</strong>
+                <span>💰 Booked Sales</span>
+                <strong>{inr(bookedSales)}</strong>
+              </div>
+              <div className="flex justify-between border-b pb-3">
+                <span>💵 Withdrawable Now</span>
+                <strong>{inr(settlement.available)}</strong>
               </div>
               <div className="flex justify-between border-b pb-3">
                 <span>🏆 Best Seller</span>
-                <strong>{bestSellingProducts[0]?.name || "N/A"}</strong>
+                <strong>{bestSeller}</strong>
               </div>
               <div className="flex justify-between border-b pb-3">
                 <span>⭐ Rating</span>
                 <strong>{averageRating}</strong>
               </div>
               <div className="flex justify-between border-b pb-3">
-                <span>📦 Low Stock</span>
+                <span>📦 Low / Out of Stock</span>
                 <strong>{lowStockProducts}</strong>
               </div>
+              <div className="flex justify-between border-b pb-3">
+                <span>📦 To Pack</span>
+                <strong>{orders.toPack}</strong>
+              </div>
               <div className="flex justify-between">
-                <span>🚚 Pending Orders</span>
-                <strong>{pendingOrders}</strong>
+                <span>🚚 To Ship</span>
+                <strong>{orders.toShip}</strong>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Monthly Revenue */}
+        {/* Monthly booked sales (this calendar year, IST) */}
         <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[550px]">
-          <h2 className="text-2xl font-bold mb-6">📈 Monthly Revenue</h2>
+          <h2 className="text-2xl font-bold mb-6">📈 Monthly Booked Sales — {orders.year}</h2>
           <ResponsiveContainer width="100%" height={450}>
             <LineChart data={monthlyRevenue}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -351,7 +254,7 @@ export default function SellerAnalyticsPage() {
         {/* Row 4 */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[500px]">
-            <h2 className="text-2xl font-bold mb-6">📦 Order Status</h2>
+            <h2 className="text-2xl font-bold mb-6">📦 Order Status (your items)</h2>
             <ResponsiveContainer width="100%" height={380}>
               <PieChart>
                 <Pie data={orderStatusData} dataKey="value" outerRadius={140} label>

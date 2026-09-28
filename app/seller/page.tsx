@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useVendor } from "@/hooks/useVendor";
-import { fetchSellerOrders, toSellerOrderRow } from "@/lib/sellerOrders/sellerOrdersClient";
-import { fetchSellerPayableBreakdown } from "@/lib/sellerPayableClient";
+import { fetchSellerAnalytics } from "@/lib/sellerAnalytics/sellerAnalyticsClient";
+import type { SellerAnalytics } from "@/lib/sellerAnalytics/sellerAnalytics";
 
 import SellerDashboard from "@/components/seller/SellerDashboard";
 import OnboardingChecklist from "./components/OnboardingChecklist";
@@ -19,26 +17,13 @@ import LowStockProducts from "./components/LowStockProducts";
 export default function SellerPage() {
   const { vendor, vendorId, loading: vendorLoading } = useVendor();
 
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    totalOrders: 0,
-    pendingOrders: 0,
-    earnings: 0,
-    commissionPaid: 0,
-    netEarnings: 0,
-    totalViews: 0,
-    totalSales: 0,
-    bestSeller: "None",
-  });
-
-  // Fetched ONCE here and shared with the child widgets (SalesChart,
-  // RecentOrders, LowStockProducts) as props, so the seller's products and
-  // orders are each read a single time per dashboard load instead of the
-  // widgets re-querying the same seller-scoped data. Query semantics are
-  // unchanged; the children only consume this already-loaded, seller-scoped
-  // data and keep their own computations.
-  const [products, setProducts] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
+  // One server call (app/api/seller/analytics) feeds the cards and every
+  // widget: this seller's own products and order summaries aggregated on the
+  // server, with Commission / Total Earnings from the one settlement
+  // calculation (lib/vendorPayable) — the same figures as the wallet. The
+  // dashboard no longer reads product documents or order lists itself, and
+  // its totals no longer stop at the 200 most recent orders.
+  const [analytics, setAnalytics] = useState<SellerAnalytics | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
@@ -47,106 +32,37 @@ export default function SellerPage() {
       return;
     }
 
-    const fetchDashboardData = async () => {
-      // ---- Products (scoped by vendorId = uid) ----
-      const productSnap = await getDocs(
-        query(collection(db, "products"), where("vendorId", "==", vendorId))
-      );
-      const productList = productSnap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as any),
-      }));
-
-      let views = 0;
-      let sales = 0;
-      let topProduct = "";
-      let topSales = 0;
-
-      productList.forEach((product: any) => {
-        views += product.views || 0;
-        sales += product.sales || 0;
-        if ((product.sales || 0) > topSales) {
-          topSales = product.sales || 0;
-          topProduct = product.title;
-        }
-      });
-
-      // ---- Orders (scoped by vendorIds array-contains) ----
-      // Seller-scoped order summaries (app/api/seller/orders): this seller's
-      // own lines and item value only — sellers no longer read the shared
-      // orders/{id} documents.
-      const orderList: any[] = ((await fetchSellerOrders()) || []).map((o) =>
-        toSellerOrderRow(o, vendorId)
-      );
-
-      let ordersCount = 0;
-      let pendingCount = 0;
-      let totalEarnings = 0;
-      let totalCommission = 0;
-      let totalNetEarnings = 0;
-
-      orderList.forEach((order: any) => {
-        if (order.status === "Cancelled") return;
-
-        const sellerItems = (order.items || []).filter(
-          (item: any) => item.vendorId === vendorId
-        );
-
-        if (sellerItems.length > 0) {
-          ordersCount++;
-          // Was a count of status "Pending". Sellers can no longer read
-          // Pending orders at all, so that counter could only ever be 0 -
-          // which would read as "nothing needs your attention" while
-          // confirmed orders sat unpacked. Confirmed is the state that
-          // genuinely awaits the seller.
-          if (order.status === "Confirmed") pendingCount++;
-
-          // This seller's own item value, computed on the server.
-          const share = order.sellerShare
-            ? {
-                vendorRawSubtotal: order.sellerShare.rawSubtotal,
-                vendorCommission: order.sellerShare.commission,
-                vendorEarning: order.sellerShare.earning,
-              }
-            : null;
-
-          if (share) {
-            totalEarnings += share.vendorRawSubtotal;
-            totalCommission += share.vendorCommission;
-            totalNetEarnings += share.vendorEarning;
-          }
-        }
-      });
-
-      // Commission and earnings come from the server's single seller-payable
-      // calculation (the same figures as the wallet and payout report), not
-      // from a local formula. "Revenue" stays the booked gross of active orders.
-      void totalCommission;
-      void totalNetEarnings;
-      const payable = await fetchSellerPayableBreakdown();
-
-      setStats({
-        totalProducts: productList.length,
-        totalOrders: ordersCount,
-        pendingOrders: pendingCount,
-        earnings: totalEarnings,
-        commissionPaid: payable?.commission ?? 0,
-        netEarnings: payable?.adjustedEarnings ?? 0,
-        totalViews: views,
-        totalSales: sales,
-        bestSeller: topProduct || "None",
-      });
-
-      // Share the already-loaded, seller-scoped data with the child widgets.
-      setProducts(productList);
-      setOrders(orderList);
-    };
-
+    let cancelled = false;
     setDataLoading(true);
-    fetchDashboardData()
-      .catch(console.error)
-      .finally(() => setDataLoading(false));
+    fetchSellerAnalytics()
+      .then((result) => {
+        if (cancelled) return;
+        if (result.error) console.error("Seller analytics:", result.error);
+        setAnalytics(result.data);
+      })
+      .finally(() => {
+        if (!cancelled) setDataLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [vendorId]);
+
+  const products = analytics?.products;
+  const orders = analytics?.orders;
+  const stats = {
+    totalProducts: products?.total ?? 0,
+    totalOrders: orders?.total ?? 0,
+    // The seller's OWN stage Confirmed (not the whole-order status, which on
+    // a multi-seller order can lag behind this seller's own progress).
+    pendingOrders: orders?.toPack ?? 0,
+    earnings: orders?.bookedSales ?? 0,
+    commissionPaid: analytics?.settlement.commission ?? 0,
+    netEarnings: analytics?.settlement.adjustedEarnings ?? 0,
+    totalViews: products?.totalViews ?? 0,
+    totalSales: orders?.unitsSold ?? 0,
+    bestSeller: orders?.bestSelling[0]?.name || "None",
+  };
 
   if (vendorLoading) {
   return (
@@ -207,22 +123,21 @@ return (
 
       <div className="mt-6">
         <SalesChart
-          orders={orders}
-          vendorId={vendorId || ""}
+          monthly={orders?.monthly || []}
+          year={orders?.year ?? null}
           loading={dataLoading}
         />
       </div>
 
       <div className="mt-6">
         <RecentOrders
-          orders={orders}
-          vendorId={vendorId || ""}
+          orders={orders?.recent || []}
           loading={dataLoading}
         />
       </div>
 
       <div className="mt-6">
-        <LowStockProducts products={products} loading={dataLoading} />
+        <LowStockProducts products={products?.restock || []} loading={dataLoading} />
       </div>
 
       {/* SECONDARY STATS */}

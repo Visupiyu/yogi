@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { generateProductContent } from "@/lib/ai/seller/contentGenerator";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { findSellerVendor } from "@/lib/sellerBusinessServer";
 
 // Same reasoning as app/api/ai/product-qa/route.ts: every call costs real
 // Gemini spend, and this route was previously reachable with no credentials
-// at all. Sign-in mirrors app/api/ai/seller/chat/route.ts, the closest
-// sibling — no extra role gate there either, since the seller dashboard
-// (app/seller/layout.js) already restricts this page to approved vendors and
-// the generated content is not scoped to any seller's private data.
+// at all. The generated content is not scoped to any seller's private data,
+// but the page is a seller-dashboard feature, so — like
+// app/api/ai/seller/chat/route.ts — the server now requires an APPROVED
+// seller account instead of trusting app/seller/layout.js's browser-side gate.
 //
 // Rate limiting copies app/api/create-order/route.ts's module-local helper
 // (not exported, so duplicated by convention) under its own key namespace.
@@ -64,11 +65,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
+    const vendor = await findSellerVendor(getAdminDb(), user.uid);
+    if (vendor.kind !== "ok" || vendor.data.status !== "Approved") {
+      return NextResponse.json(
+        { error: "The seller assistant is available to approved sellers only." },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json().catch(() => null);
     const productName = String(body?.productName || "").trim();
     const category = body?.category ? String(body.category).trim() : "";
 
-    if (!productName) {
+    if (!productName || productName.length > 200 || category.length > 200) {
       return NextResponse.json(
         { error: "Product name is required." },
         { status: 400 }

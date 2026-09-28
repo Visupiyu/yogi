@@ -31,16 +31,18 @@ export default function DashboardCards({
       icon: "📋",
     },
     {
-      // Counts Confirmed orders - see app/seller/page.tsx. "Pending" would
-      // now be a permanently-zero card, since sellers never see orders in
-      // that state.
+      // Orders where this seller's OWN items are still Confirmed (see
+      // app/api/seller/analytics). "Pending" would be a permanently-zero
+      // card, since sellers never see orders in that state.
       title: "To Pack",
       value: pendingOrders,
       color: "bg-yellow-500",
       icon: "⏳",
     },
     {
-      title: "Revenue",
+      // Booked item value on orders that are not cancelled — activity, not
+      // money owed. "Total Earnings" below is the settled figure.
+      title: "Booked Sales",
       value: `₹${earnings.toLocaleString()}`,
       color: "bg-purple-500",
       icon: "💰",

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-
 
 import { auth } from "@/lib/firebase";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
-import { fetchSellerOrders } from "@/lib/sellerOrders/sellerOrdersClient";
+import { fetchSellerReport } from "@/lib/sellerAnalytics/sellerAnalyticsClient";
+import type { SellerReport } from "@/lib/sellerAnalytics/sellerAnalytics";
 import { onAuthStateChanged } from "firebase/auth";
 
 import * as XLSX from "xlsx";
@@ -15,15 +15,61 @@ import jsPDF from "jspdf";
 
 import autoTable from "jspdf-autotable";
 
+// The report is built on the server (app/api/seller/reports): this seller's
+// own orders in the chosen IST date range, one allow-listed row each (order
+// number, customer name, own lines/units/item value, own stage, payment
+// method, date) and totals over EVERY order in range. Both exports are made
+// from exactly those rows, so a download can never carry more than the
+// screen shows, and the totals cannot drift from it.
+
+const formatDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) : "-";
+
+function exportRows(report: SellerReport) {
+  return report.rows.map((row) => ({
+    Order: row.orderRef,
+    Customer: row.customerName,
+    Lines: row.lines,
+    Units: row.units,
+    "Amount (₹)": row.amount,
+    Status: fulfilmentStageLabel(row.stage),
+    Payment: row.paymentMethod || "-",
+    Date: formatDate(row.createdAt),
+  }));
+}
+
+function fileSuffix(report: SellerReport) {
+  const { from, to } = report.range;
+  if (!from && !to) return "all";
+  return `${from || "start"}_to_${to || "today"}`;
+}
+
 export default function SellerReportsPage(){
 
   const router = useRouter();
 
-  const [orders,setOrders] =
-    useState<any[]>([]);
+  const [report,setReport] =
+    useState<SellerReport | null>(null);
 
   const [loading,setLoading] =
     useState(true);
+
+  const [error,setError] =
+    useState<string | null>(null);
+
+  const [from,setFrom] =
+    useState("");
+
+  const [to,setTo] =
+    useState("");
+
+  const loadReport = useCallback(async (range: { from?: string; to?: string }) => {
+    setLoading(true);
+    const result = await fetchSellerReport(range);
+    setReport(result.data);
+    setError(result.error);
+    setLoading(false);
+  }, []);
 
   useEffect(()=>{
 
@@ -34,60 +80,32 @@ export default function SellerReportsPage(){
         return;
       }
 
-      loadOrders(user.uid);
+      loadReport({});
 
     });
 
     return () => unsubscribe();
 
-  },[router]);
+  },[router, loadReport]);
 
-  const loadOrders =
-  async(vendorUid: string)=>{
+  const applyRange = () => {
+    loadReport({ from: from || undefined, to: to || undefined });
+  };
 
-    try{
-
-      // Orders are Firestore-rules-scoped to vendorIds containing the
-      // signed-in seller's auth uid — a full collection scan is denied.
-      // Seller-scoped order summaries (app/api/seller/orders): this seller's
-      // own lines and item value — sellers no longer read the shared
-      // orders/{id} documents.
-      const data: any[] = [];
-      for (const o of (await fetchSellerOrders()) || []) {
-        data.push({
-          id: o.orderId,
-          customer: o.customerName,
-          amount: o.sellerShare.rawSubtotal,
-          status: o.orderStatus,
-          items: o.items.length,
-          date: o.createdAt ? new Date(o.createdAt).toLocaleDateString() : "-",
-        });
-      }
-data.sort(
-  (a, b) =>
-    new Date(b.date).getTime() -
-    new Date(a.date).getTime()
-);
-      setOrders(data);
-
-    }catch(error){
-
-      console.log(error);
-
-    }finally{
-
-      setLoading(false);
-
-    }
-
+  const clearRange = () => {
+    setFrom("");
+    setTo("");
+    loadReport({});
   };
 
   const exportExcel = ()=>{
 
+    if (!report) return;
+
     const worksheet =
 
       XLSX.utils.json_to_sheet(
-        orders
+        exportRows(report)
       );
 
     const workbook =
@@ -108,13 +126,15 @@ data.sort(
 
       workbook,
 
-      "seller-orders.xlsx"
+      `seller-orders-${fileSuffix(report)}.xlsx`
 
     );
 
   };
 
   const exportPDF = ()=>{
+
+    if (!report) return;
 
     const pdf =
       new jsPDF();
@@ -145,7 +165,7 @@ data.sort(
 
             "Customer",
 
-            "Items",
+            "Units",
 
             "Amount",
 
@@ -159,21 +179,21 @@ data.sort(
 
         body:
 
-          orders.map(
+          report.rows.map(
 
-            (o:any)=>([
+            (row)=>([
 
-              o.id,
+              row.orderRef,
 
-              o.customer,
+              row.customerName,
 
-              o.items,
+              row.units,
 
-              "₹"+o.amount,
+              "Rs. "+row.amount.toLocaleString("en-IN"),
 
-              fulfilmentStageLabel(o.status),
+              fulfilmentStageLabel(row.stage),
 
-              o.date
+              formatDate(row.createdAt)
 
             ])
 
@@ -185,20 +205,13 @@ data.sort(
 
     pdf.save(
 
-      "seller-orders.pdf"
+      `seller-orders-${fileSuffix(report)}.pdf`
 
     );
 
   };
-// Cancelled orders stay visible in the report table (so a seller can
-// still see what was cancelled), but shouldn't count toward revenue —
-// matches the exclusion Wallet and Admin Analytics both already apply.
-const totalRevenue = orders.reduce(
-  (sum, order) =>
-    sum + (order.status === "Cancelled" ? 0 : Number(order.amount) || 0),
-  0
-);
-  if(loading){
+
+  if(loading && !report){
 
     return(
 
@@ -214,6 +227,8 @@ const totalRevenue = orders.reduce(
     );
 
   }
+
+  const rows = report?.rows || [];
 
   return(
 
@@ -242,7 +257,9 @@ const totalRevenue = orders.reduce(
             text-4xl
             font-bold
           ">
+
             Seller Reports
+
           </h1>
 
           <p className="mt-2">
@@ -252,17 +269,96 @@ const totalRevenue = orders.reduce(
           </p>
 
         </div>
-<div className="mb-8 rounded-3xl bg-white p-6 shadow">
 
-  <p className="text-gray-500">
-    Total Revenue
-  </p>
+        <div className="mb-8 flex flex-wrap items-end gap-4 rounded-3xl bg-white p-6 shadow">
 
-  <h2 className="mt-2 text-4xl font-bold text-green-600">
-    ₹{totalRevenue.toLocaleString("en-IN")}
-  </h2>
+          <label className="flex flex-col text-sm text-gray-600">
+            From
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="mt-1 rounded-lg border px-3 py-2 text-gray-900"
+            />
+          </label>
 
+          <label className="flex flex-col text-sm text-gray-600">
+            To
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="mt-1 rounded-lg border px-3 py-2 text-gray-900"
+            />
+          </label>
+
+          <button
+            onClick={applyRange}
+            disabled={loading}
+            className="rounded-xl bg-indigo-600 px-5 py-2 text-white disabled:opacity-50"
+          >
+            Apply
+          </button>
+
+          <button
+            onClick={clearRange}
+            disabled={loading}
+            className="rounded-xl border px-5 py-2 disabled:opacity-50"
+          >
+            All time
+          </button>
+
+        </div>
+
+        {error && (
+
+          <div className="mb-8 rounded-2xl bg-red-50 p-4 text-red-700">
+            {error}
+          </div>
+
+        )}
+
+<div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+  <div className="rounded-3xl bg-white p-6 shadow">
+    <p className="text-gray-500">
+      Booked Sales
+    </p>
+    <h2 className="mt-2 text-4xl font-bold text-green-600">
+      ₹{(report?.totals.bookedSales ?? 0).toLocaleString("en-IN")}
+    </h2>
+    <p className="mt-1 text-xs text-gray-500">
+      Your item value on orders that are not cancelled. Settled earnings are in your wallet.
+    </p>
+  </div>
+  <div className="rounded-3xl bg-white p-6 shadow">
+    <p className="text-gray-500">
+      Orders
+    </p>
+    <h2 className="mt-2 text-4xl font-bold">
+      {report?.totals.orders ?? 0}
+    </h2>
+    <p className="mt-1 text-xs text-gray-500">
+      {report?.totals.cancelled ?? 0} cancelled (listed, not counted)
+    </p>
+  </div>
+  <div className="rounded-3xl bg-white p-6 shadow">
+    <p className="text-gray-500">
+      Units
+    </p>
+    <h2 className="mt-2 text-4xl font-bold">
+      {report?.totals.units ?? 0}
+    </h2>
+  </div>
 </div>
+
+        {report?.truncated && (
+
+          <div className="mb-8 rounded-2xl bg-yellow-50 p-4 text-yellow-800">
+            Showing the newest {rows.length} orders. Totals cover every order in the range — narrow the dates to see the rest.
+          </div>
+
+        )}
+
         <div className="
           flex
           gap-4
@@ -275,13 +371,17 @@ const totalRevenue = orders.reduce(
               exportExcel
             }
 
+            disabled={!report || rows.length === 0}
+
             className="
               bg-green-600
               text-white
               px-6
               py-3
               rounded-xl
+              disabled:opacity-50
             "
+
           >
 
             Export Excel
@@ -294,13 +394,17 @@ const totalRevenue = orders.reduce(
               exportPDF
             }
 
+            disabled={!report || rows.length === 0}
+
             className="
               bg-red-600
               text-white
               px-6
               py-3
               rounded-xl
+              disabled:opacity-50
             "
+
           >
 
             Export PDF
@@ -330,37 +434,49 @@ const totalRevenue = orders.reduce(
                   p-4
                   text-left
                 ">
+
                   Order
+
                 </th>
 
                 <th className="
                   text-left
                 ">
+
                   Customer
+
                 </th>
 
                 <th className="
                   text-left
                 ">
-                  Items
+
+                  Units
+
                 </th>
 
                 <th className="
                   text-left
                 ">
+
                   Amount
+
                 </th>
 
                 <th className="
                   text-left
                 ">
+
                   Status
+
                 </th>
 
                 <th className="
                   text-left
                 ">
+
                   Date
+
                 </th>
 
               </tr>
@@ -369,12 +485,18 @@ const totalRevenue = orders.reduce(
 
             <tbody>
 
-              {orders.map((order:any)=>(
+              {rows.length === 0 ? (
+
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-gray-500">
+                    No orders in this period.
+                  </td>
+                </tr>
+
+              ) : rows.map((row, index)=>(
 
                 <tr
-
-                  key={order.id}
-
+                  key={`${row.orderRef}-${index}`}
                   className="
                     border-b
                   "
@@ -383,27 +505,39 @@ const totalRevenue = orders.reduce(
                   <td className="
                     p-4
                   ">
-                    {order.id.slice(0,8)}
+
+                    {row.orderRef}
+
                   </td>
 
                   <td>
-                    {order.customer}
+
+                    {row.customerName}
+
                   </td>
 
                   <td>
-                    {order.items}
+
+                    {row.units}
+
                   </td>
 
                   <td>
-                    ₹{order.amount}
+
+                    ₹{row.amount.toLocaleString("en-IN")}
+
                   </td>
 
                   <td>
-                    {fulfilmentStageLabel(order.status)}
+
+                    {fulfilmentStageLabel(row.stage)}
+
                   </td>
 
                   <td>
-                    {order.date}
+
+                    {formatDate(row.createdAt)}
+
                   </td>
 
                 </tr>

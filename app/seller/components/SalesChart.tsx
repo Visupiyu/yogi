@@ -1,7 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
-
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,58 +10,22 @@ import {
   Tooltip,
 } from "recharts";
 
-// Orders + vendorId are provided by the parent dashboard (app/seller/page.tsx),
-// which loads the seller's non-pending orders ONCE and shares them. This
-// component no longer queries Firestore itself; the monthly aggregation below
-// is unchanged from when it fetched its own copy.
+// The monthly figures are aggregated on the server (app/api/seller/analytics,
+// lib/sellerAnalytics) from this seller's own lines on orders that are not
+// cancelled, bucketed by IST month of the current year. This widget used to
+// bucket by month NAME alone, which merged e.g. Jan 2025 into Jan 2026, and
+// only ever saw the 200 most recent orders.
+
 type SalesChartProps = {
-  orders: any[];
-  vendorId: string;
+  monthly: { month: string; bookedSales: number }[];
+  year: number | null;
   loading: boolean;
 };
 
-export default function SalesChart({ orders, vendorId, loading }: SalesChartProps) {
+export default function SalesChart({ monthly, year, loading }: SalesChartProps) {
+  const chartData = (monthly || []).map((m) => ({ month: m.month, revenue: m.bookedSales }));
+  const hasSales = chartData.some((m) => m.revenue > 0);
 
-  const chartData = useMemo(() => {
-    const monthly: Record<string, number> = {};
-
-    (orders || []).forEach((order: any) => {
-
-      if (!order.createdAt) return;
-
-      if (order.status === "Cancelled") return;
-
-      // order.finalTotal is the WHOLE order's total — in a
-      // multi-vendor order that would count other sellers' items as
-      // this seller's revenue too. Sum only this seller's own items.
-      const vendorRevenue = (order.items || [])
-        .filter((item: any) => item.vendorId === vendorId)
-        .reduce(
-          (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-          0
-        );
-
-      if (vendorRevenue === 0) return;
-
-      const date = order.createdAt.toDate();
-
-      const month =
-        date.toLocaleString("default", {
-          month: "short",
-        });
-
-      monthly[month] =
-        (monthly[month] || 0) + vendorRevenue;
-
-    });
-
-    return Object.entries(monthly).map(
-      ([month, revenue]) => ({
-        month,
-        revenue,
-      })
-    );
-  }, [orders, vendorId]);
  return (
   <div className="rounded-2xl border bg-white p-6 shadow-sm">
 
@@ -74,7 +36,7 @@ export default function SalesChart({ orders, vendorId, loading }: SalesChartProp
       </h2>
 
       <span className="text-sm text-gray-500">
-        Monthly Revenue
+        Monthly Booked Sales{year ? ` — ${year}` : ""}
       </span>
 
     </div>
@@ -85,7 +47,7 @@ export default function SalesChart({ orders, vendorId, loading }: SalesChartProp
         Loading...
       </div>
 
-    ) : chartData.length === 0 ? (
+    ) : !hasSales ? (
 
       <div className="h-72 flex items-center justify-center text-gray-500">
         No sales data available.

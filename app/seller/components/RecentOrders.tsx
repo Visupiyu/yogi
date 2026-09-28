@@ -1,49 +1,20 @@
 "use client";
 
-"use client";
-
-import { useMemo } from "react";
 import Link from "next/link";
-
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import type { SellerRecentOrder } from "@/lib/sellerAnalytics/sellerAnalytics";
 
-// Orders + vendorId are provided by the parent dashboard (app/seller/page.tsx),
-// which loads the seller's non-pending orders ONCE and shares them. This
-// component no longer queries Firestore itself; the per-seller amount, newest-
-// first sort and top-5 slice below are unchanged from when it fetched its own.
+// The five most recent orders come from the server (app/api/seller/analytics):
+// this seller's own item value and their own stage, the customer's name only.
+// The row shows the human order number — the old "#<first 8 characters of the
+// order id>" was, for Pay on Delivery orders, the start of the customer's uid.
+
 type RecentOrdersProps = {
-  orders: any[];
-  vendorId: string;
+  orders: SellerRecentOrder[];
   loading: boolean;
 };
 
-export default function RecentOrders({ orders: allOrders, vendorId, loading }: RecentOrdersProps) {
-
-  const orders = useMemo(() => {
-    const sellerOrders = (allOrders || []).map((source: any) => {
-      const order: any = { ...source };
-
-      // order.finalTotal is the WHOLE order's total — in a
-      // multi-vendor order that would show other sellers' items as
-      // this seller's revenue. Show only this seller's own share.
-      order.vendorAmount = (order.items || [])
-        .filter((item: any) => item.vendorId === vendorId)
-        .reduce(
-          (sum: number, item: any) => sum + (item.price || 0) * (item.qty || 0),
-          0
-        );
-
-      return order;
-    });
-
-    sellerOrders.sort(
-      (a, b) =>
-        (b.createdAt?.seconds || 0) -
-        (a.createdAt?.seconds || 0)
-    );
-
-    return sellerOrders.slice(0, 5);
-  }, [allOrders, vendorId]);
+export default function RecentOrders({ orders, loading }: RecentOrdersProps) {
   return (
   <div className="rounded-2xl border bg-white p-6 shadow-sm">
 
@@ -101,12 +72,17 @@ export default function RecentOrders({ orders: allOrders, vendorId, loading }: R
             {orders.map((order) => (
 
               <tr
-                key={order.id}
+                key={order.orderId}
                 className="border-b hover:bg-gray-50"
               >
 
                 <td className="p-3 font-medium">
-                  #{order.id.slice(0, 8)}
+                  <Link
+                    href={`/seller/orders/${encodeURIComponent(order.orderId)}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {order.orderRef}
+                  </Link>
                 </td>
 
                 <td className="p-3">
@@ -114,7 +90,7 @@ export default function RecentOrders({ orders: allOrders, vendorId, loading }: R
                 </td>
 
                 <td className="p-3">
-                  ₹{Number(order.vendorAmount || 0).toLocaleString("en-IN")}
+                  ₹{Number(order.amount || 0).toLocaleString("en-IN")}
                 </td>
 
                 <td className="p-3">
@@ -122,14 +98,14 @@ export default function RecentOrders({ orders: allOrders, vendorId, loading }: R
                   <span
                     className={`px-3 py-1 rounded-full text-sm font-medium
                     ${
-                      order.status === "Delivered"
+                      order.stage === "Delivered"
                         ? "bg-green-100 text-green-700"
-                        : order.status === "Cancelled"
+                        : order.stage === "Cancelled"
                         ? "bg-red-100 text-red-700"
                         : "bg-yellow-100 text-yellow-700"
                     }`}
                   >
-                    {fulfilmentStageLabel(order.status)}
+                    {fulfilmentStageLabel(order.stage)}
                   </span>
 
                 </td>

@@ -9,6 +9,12 @@ import type { DocumentData } from "firebase-admin/firestore";
 // here scopes to context.uid directly rather than trusting any
 // vendorId the model or client might pass in.
 
+/** A model-supplied number, clamped to [min, max] (or the fallback when absent/invalid). */
+function boundedInt(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
 const getSellerProducts: ToolDefinition = {
   name: "getSellerProducts",
   description: "Get the signed-in seller's own product listings.",
@@ -19,7 +25,7 @@ const getSellerProducts: ToolDefinition = {
     },
   },
   execute: async (args, context) => {
-    const limit = typeof args.limit === "number" ? Math.min(args.limit, 50) : 20;
+    const limit = boundedInt(args.limit, 1, 50, 20);
 
     const db = getAdminDb();
     const snap = await db
@@ -58,7 +64,7 @@ const getSellerSales: ToolDefinition = {
     const db = getAdminDb();
     const inputs = await loadVendorPayableInputs(db, context.uid);
 
-    const days = typeof args.days === "number" ? args.days : undefined;
+    const days = args.days === undefined ? undefined : boundedInt(args.days, 1, 3660, 30);
     const cutoff = days ? Date.now() - days * 24 * 60 * 60 * 1000 : undefined;
     const inWindow = (order: Record<string, unknown>) => {
       if (cutoff === undefined) return true;
@@ -117,7 +123,7 @@ const getSellerInventory: ToolDefinition = {
     },
   },
   execute: async (args, context) => {
-    const threshold = typeof args.threshold === "number" ? args.threshold : 5;
+    const threshold = boundedInt(args.threshold, 0, 100000, 5);
 
     const db = getAdminDb();
     const snap = await db

@@ -1,30 +1,18 @@
 "use client";
 
-"use client";
-
-import { useMemo } from "react";
 import Link from "next/link";
+import type { SellerProductStat } from "@/lib/sellerAnalytics/sellerAnalytics";
 
-// Products are provided by the parent dashboard (app/seller/page.tsx), which
-// loads the seller's products ONCE and shares them. This component no longer
-// queries Firestore itself; the low-stock threshold (<= 10) filter and
-// ascending sort below are unchanged from when it fetched its own copy.
+// The restock list comes from the server (app/api/seller/analytics): this
+// seller's own products that are not archived, at or below the restock
+// threshold, lowest stock first — allow-listed product stats, not documents.
+
 type LowStockProductsProps = {
-  products: any[];
+  products: SellerProductStat[];
   loading: boolean;
 };
 
-export default function LowStockProducts({ products: allProducts, loading }: LowStockProductsProps) {
-
-  const products = useMemo(() => {
-    const items = (allProducts || []).filter(
-      (product: any) => (product.stock ?? 0) <= 10
-    );
-
-    return [...items].sort(
-      (a, b) => (a.stock || 0) - (b.stock || 0)
-    );
-  }, [allProducts]);
+export default function LowStockProducts({ products, loading }: LowStockProductsProps) {
  return (
   <div className="rounded-2xl border bg-white p-6 shadow-sm">
 
@@ -101,7 +89,7 @@ export default function LowStockProducts({ products: allProducts, loading }: Low
                 <td className="p-3">
 
                   <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-medium">
-                    Low Stock
+                    {product.stock <= 0 ? "Out of Stock" : "Low Stock"}
                   </span>
 
                 </td>
