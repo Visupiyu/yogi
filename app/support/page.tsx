@@ -4,13 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  collection,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 
 export default function SupportPage() {
 
@@ -58,79 +52,21 @@ async()=>{
 
     setLoading(true);
 
-    await addDoc(
-
-      collection(
-        db,
-        "tickets"
-      ),
-
-      {
-
-        customerName:
-          currentUser.displayName ||
-          "Customer",
-
-        userId:
-          currentUser.uid,
-
-        userEmail:
-          currentUser.email ||
-          "",
-
-        subject,
-
-        category,
-
-        message,
-
-        status:
-          "Open",
-
-        adminReply:
-          "",
-
-        createdAt:
-          serverTimestamp(),
-
-      }
-
-    );
-
-    // notifications requires `role` (and userId for non-admin roles) or
-    // the write is rejected by Firestore rules — this was missing both,
-    // so it threw here and silently skipped the success alert and
-    // clearing the form below, even though the ticket itself had already
-    // saved successfully.
-    await addDoc(
-
-      collection(
-        db,
-        "notifications"
-      ),
-
-      {
-
-        title:
-          "New Support Ticket",
-
-        message:
-          `${subject}`,
-
-        role:
-          "admin",
-
-        type:
-          "support",
-
-        read:false,
-
-        createdAt:
-          serverTimestamp(),
-
-      }
-
-    );
+    // The ticket and admin's notification are written by the server
+    // (app/api/support/tickets). The admin notification used to be written
+    // from here, which firestore.rules refuse — so the ticket saved but the
+    // customer never saw this confirmation and admin was never told.
+    const idToken = await currentUser.getIdToken();
+    const response = await fetch("/api/support/tickets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ subject, category, message }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(result?.error || "Couldn't create your ticket. Please try again.");
+      return;
+    }
 
     alert(
       "Ticket Created Successfully"

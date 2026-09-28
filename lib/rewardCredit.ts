@@ -91,15 +91,53 @@ function returnBlocks(
 }
 
 /**
+ * The order's ITEM-level return requests (itemRequests), summarised for the
+ * credit decision: how many are still open, and how much has been refunded.
+ * Replacements are not returns — no money goes back — so they are ignored.
+ */
+export type ItemReturnSummary = {
+  /** Return requests that are neither refunded nor rejected/cancelled. */
+  open: number;
+  /** Sum of the refunds already paid on this order's returned items. */
+  refundedAmount: number;
+};
+
+export const NO_ITEM_RETURNS: ItemReturnSummary = { open: 0, refundedAmount: 0 };
+
+export function summariseItemReturns(
+  requests: { type?: unknown; status?: unknown; refund?: { amount?: unknown } | null }[]
+): ItemReturnSummary {
+  let open = 0;
+  let refundedAmount = 0;
+  for (const r of requests || []) {
+    if (r?.type !== "return") continue;
+    const status = typeof r.status === "string" ? r.status : "";
+    if (status === "REJECTED" || status === "CANCELLED") continue;
+    if (status === "REFUNDED") {
+      const amount = Number(r.refund?.amount);
+      if (Number.isFinite(amount) && amount > 0) refundedAmount += amount;
+      continue;
+    }
+    open++;
+  }
+  return { open, refundedAmount };
+}
+
+/**
  * Whether this order's points may be credited right now, and how many.
  *
  * Every condition is evaluated against stored order data. The caller must have
  * read both documents server-side; nothing here is client-supplied.
+ *
+ * Item-level returns count too: while one is open the credit waits, and the
+ * value of items already refunded is taken out of the earning basis — the
+ * customer is not paid points on money that came back to them.
  */
 export function evaluateRewardCredit(
   order: RewardCreditOrder,
   returnRecord: RewardCreditReturn = null,
-  now: Date = new Date()
+  now: Date = new Date(),
+  itemReturns: ItemReturnSummary = NO_ITEM_RETURNS
 ): RewardEligibility {
 
   // Checked first so a retry, a double-click or a duplicate job costs one
@@ -150,7 +188,13 @@ export function evaluateRewardCredit(
     return { eligible: false, reason: "return-window-open" };
   }
 
-  const points = earnedPointsFor(order.finalTotal);
+  if (itemReturns.open > 0) {
+    return { eligible: false, reason: "return-unresolved" };
+  }
+
+  const total = Number(order.finalTotal || 0);
+  const basis = Number.isFinite(total) ? Math.max(0, total - itemReturns.refundedAmount) : 0;
+  const points = earnedPointsFor(basis);
   if (points <= 0) {
     return { eligible: false, reason: "no-points" };
   }

@@ -51,8 +51,11 @@ export default function SignupPage() {
         password
       );
 
-      const myReferralCode =
-        "YOGI" + Math.floor(100000 + Math.random() * 900000);
+      // The customer's own referral code is issued by the server
+      // (app/api/signup-rewards, unique, never changes) — firestore.rules no
+      // longer let the browser choose one. referredBy is recorded here, once,
+      // at profile creation, and is frozen after that.
+      const referredBy = referralCode.trim().toUpperCase().slice(0, 32);
 
       try {
         await setDoc(doc(db, "users", result.user.uid), {
@@ -62,8 +65,7 @@ export default function SignupPage() {
           phone,
           role: "customer",
           rewardPoints: 0,
-          referralCode: myReferralCode,
-          referredBy: referralCode || "",
+          referredBy,
           totalReferrals: 0,
           createdAt: new Date(),
         });
@@ -101,18 +103,20 @@ export default function SignupPage() {
       // referral code off the profile written above, and is idempotent — the
       // amounts (+100 / +50) and the ledger rows are unchanged.
       //
+      // Always called now: it also issues the customer's own referral code.
+      // The referral bonus itself waits until the email is verified — the
+      // login page asks again on the next sign-in.
+      //
       // Best-effort, exactly like the block it replaces: a failure here must
       // not fail an otherwise-complete signup.
-      if (referralCode) {
-        try {
-          const idToken = await result.user.getIdToken();
-          await fetch("/api/signup-rewards", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${idToken}` },
-          });
-        } catch (error) {
-          console.error("Failed to credit signup rewards:", error);
-        }
+      try {
+        const idToken = await result.user.getIdToken();
+        await fetch("/api/signup-rewards", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+      } catch (error) {
+        console.error("Failed to set up referral rewards:", error);
       }
 
       localStorage.setItem(

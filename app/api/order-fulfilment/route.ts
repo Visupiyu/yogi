@@ -1,6 +1,7 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
+import { isValidDocId } from "@/lib/customerAccount/customerGuards";
 
 // Read-only, but every call costs one order read plus a sellerOrders query, so
 // an unbounded loop is Firestore read amplification. Generous by design: this
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
     const orderId =
       typeof body.orderId === "string" ? body.orderId.trim() : "";
 
-    if (!orderId) {
+    if (!isValidDocId(orderId)) {
       return Response.json({ error: "Missing order id." }, { status: 400 });
     }
 
@@ -109,8 +110,10 @@ export async function POST(request: Request) {
     const order = orderSnap.data() as Record<string, unknown>;
 
     // Ownership, not just authentication. Admins may look too.
+    // The same answer as "no such order", so this cannot be used to probe
+    // which order ids exist.
     if (order.userId !== requester.uid && !requester.isAdmin) {
-      return Response.json({ error: "Not authorized." }, { status: 403 });
+      return Response.json({ error: "Order not found." }, { status: 404 });
     }
 
     const recordsSnap = await db

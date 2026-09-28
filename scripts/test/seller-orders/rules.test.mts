@@ -135,8 +135,9 @@ await check("D2 itemRequests: seller cannot write (refunds / stages server-only)
 });
 
 // ---------- unchanged neighbours ----------
-await check("U1 customer may still cancel their own Pending order", () =>
-  assertSucceeds(updateDoc(order(BUYER, "o_sole_pending", "buyer1@example.com"), { status: "Cancelled", updatedAt: serverTimestamp() })));
+// Customer Account hardening: cancelling goes through app/api/cancel-order only.
+await check("U1 customer can no longer cancel their Pending order by a direct write (app/api/cancel-order only)", () =>
+  assertFails(updateDoc(order(BUYER, "o_sole_pending", "buyer1@example.com"), { status: "Cancelled", updatedAt: serverTimestamp() })));
 await check("U2 admin may still update an order (admin access unchanged)", () =>
   assertSucceeds(updateDoc(order("adminUid", "o_sole_delivered", ADMIN_EMAIL), { paymentStatus: "Paid" })));
 await check("U3 seller can no longer READ the shared order document (served by app/api/seller/orders instead)", () =>

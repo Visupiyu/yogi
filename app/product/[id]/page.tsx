@@ -59,9 +59,10 @@ type ProductQuestion = {
 type ProductReview = {
   id: string;
   customerName: string;
-  userEmail?: string;
   review: string;
   rating: number;
+  createdAt?: string | null;
+  verifiedPurchase?: boolean;
 };
 type CartItem = {
   id: string;
@@ -233,48 +234,24 @@ relatedSnap.forEach((d) => {
 });
           setRelatedProducts(related.slice(0, 4));
 
-          const questionSnap = await getDocs(
-            query(
-              collection(db, "productQuestions"),
-              where("productId", "==", snap.id)
-            )
-          );
-          const questionData: ProductQuestion[] = [];
-
-questionSnap.forEach((d) => {
-  const data = d.data() as Omit<ProductQuestion, "id">;
-
-  questionData.push({
-    id: d.id,
-    ...data,
-  });
-});
-          setQuestions(questionData);
+          // Q&A and reviews come from the server's public, allow-listed views
+          // (app/api/products/[id]/questions and /reviews) — never the raw
+          // documents, which carry the author's email and uid.
+          try {
+            const qRes = await fetch(`/api/products/${encodeURIComponent(snap.id)}/questions`);
+            const qBody = await qRes.json().catch(() => ({}));
+            setQuestions(qRes.ok && Array.isArray(qBody?.questions) ? qBody.questions : []);
+          } catch (e) {
+            console.error("Product Questions Error:", e);
+          }
 
           try {
-  const reviewSnap = await getDocs(
-    query(
-      collection(db, "productReviews"),
-      where("productId", "==", snap.id)
-    )
-  );
-
-  const reviewData: ProductReview[] = [];
-
-  reviewSnap.forEach((d) => {
-    const data = d.data() as Omit<ProductReview, "id">;
-
-    reviewData.push({
-      id: d.id,
-      ...data,
-    });
-  });
-
-  setReviews(reviewData);
-
-} catch (e) {
-  console.error("Product Reviews Error:", e);
-}
+            const rRes = await fetch(`/api/products/${encodeURIComponent(snap.id)}/reviews`);
+            const rBody = await rRes.json().catch(() => ({}));
+            setReviews(rRes.ok && Array.isArray(rBody?.reviews) ? rBody.reviews : []);
+          } catch (e) {
+            console.error("Product Reviews Error:", e);
+          }
     
          }
       } catch (error) {
@@ -500,16 +477,19 @@ questionSnap.forEach((d) => {
       return;
     }
     try {
-      await addDoc(collection(db, "productQuestions"), {
-        productId: product.id,
-        productName: (product as any).title || product.name,
-        vendorId: product.vendorId || "",
-        customerName: currentUser.displayName || "Customer",
-        question,
-        answer: "",
-        status: "Pending",
-        createdAt: new Date(),
+      // The server records the question (asker = verified token, vendor = the
+      // product's own, no answer): app/api/products/[id]/questions.
+      const token = await currentUser.getIdToken();
+      const response = await fetch(`/api/products/${encodeURIComponent(product.id)}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ question }),
       });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        alert(result?.error || "Couldn't submit your question. Please try again.");
+        return;
+      }
       alert("Question submitted");
       setQuestion("");
       window.location.reload();
@@ -606,48 +586,21 @@ questionSnap.forEach((d) => {
       return;
     }
     try {
-      // Nothing previously stopped the same account from submitting
-      // unlimited reviews on one product, each one further skewing the
-      // aggregate rating written back onto the product doc below.
-      const existingReview = await getDocs(
-        query(
-          collection(db, "productReviews"),
-          where("productId", "==", product.id),
-          where("userEmail", "==", currentUser.email || "")
-        )
-      );
-
-      if (!existingReview.empty) {
-        alert("You've already reviewed this product.");
-        return;
-      }
-
-      await addDoc(collection(db, "productReviews"), {
-        productId: product.id,
-        productName: product.name,
-        customerName: currentUser.displayName || "Customer",
-        userEmail: currentUser.email || "",
-        rating,
-        review: reviewText,
-        createdAt: serverTimestamp(),
+      // app/api/reviews records the review on the server: only for a product
+      // delivered to this customer, one review per customer per product, the
+      // customer's own name, and the product's rating recomputed in the same
+      // step. The browser used to write it (any account, any product, any
+      // number of times).
+      const token = await currentUser.getIdToken();
+      const response = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ productId: product.id, rating, review: reviewText }),
       });
-
-      // Keep the product's aggregate rating in sync so category/search
-      // rating filters (which read this field directly) actually work. The
-      // SERVER recomputes it from the stored reviews
-      // (app/api/reviews/sync-rating); the browser no longer writes it.
-      try {
-        const token = await currentUser.getIdToken();
-        await fetch("/api/reviews/sync-rating", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ productId: product.id }),
-        });
-      } catch (aggregateError) {
-        console.error("Failed to update product rating:", aggregateError);
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        alert(result?.error || "Couldn't submit your review. Please try again.");
+        return;
       }
 
       alert("Review Submitted");
@@ -662,53 +615,53 @@ questionSnap.forEach((d) => {
 
   if (!product) return;
 
-  const user = JSON.parse(
-    localStorage.getItem("user") || "{}"
-  );
+  const currentUser = auth.currentUser;
 
-  if (!user.email) {
+  if (!currentUser) {
     alert("Please login first.");
     router.push("/login");
     return;
   }
 
-  const existing = await getDocs(
-    query(
-      collection(db, "stockNotifications"),
-      where("productId", "==", product.id),
-      where("userEmail", "==", user.email),
-      limit(1)
-    )
-  );
-
-  if (!existing.empty) {
-    alert("You are already subscribed.");
+  // app/api/stock-notifications records the request (customer = verified
+  // token, vendor = the product's own, one per customer per product). The
+  // seller sees only how many customers are waiting — never who.
+  try {
+    const token = await currentUser.getIdToken();
+    const response = await fetch("/api/stock-notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ productId: product.id }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      alert(result?.error || "Couldn't save your request. Please try again.");
+      return;
+    }
+    if (result?.alreadySubscribed) {
+      alert("You are already subscribed.");
+      return;
+    }
+  } catch (error) {
+    console.error(error);
+    alert("Couldn't save your request. Please try again.");
     return;
   }
-
-  await addDoc(
-    collection(db, "stockNotifications"),
-    {
-      productId: product.id,
-      productName: product.name,
-      userEmail: user.email,
-      userName: user.name || "Customer",
-      vendorId: product.vendorId,
-      createdAt: serverTimestamp(),
-    }
-  );
 
   setNotifySuccess(true);
 
 };
 
   const startChat = async () => { if (!product) return;
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.email) {
+    // The signed-in account, not a cached localStorage snapshot: the chat is
+    // owned by this uid and email (firestore.rules check both).
+    const currentUser = auth.currentUser;
+    if (!currentUser?.email) {
       alert("Please Login First");
       router.push("/login");
       return;
     }
+    const user = { email: currentUser.email, name: currentUser.displayName || "Customer" };
 
     const snapshot = await getDocs(
       query(
@@ -724,6 +677,7 @@ questionSnap.forEach((d) => {
     }
 
     const docRef = await addDoc(collection(db, "chats"), {
+      customerId: currentUser.uid,
       customerEmail: user.email,
       customerName: user.name,
       sellerId: product.vendorId ?? "",

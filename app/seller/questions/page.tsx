@@ -9,8 +9,6 @@ import { useRouter } from "next/navigation";
 import {
   collection,
   getDocs,
-  updateDoc,
-  doc,
   query,
   where
 } from "firebase/firestore";
@@ -107,24 +105,22 @@ export default function SellerQuestionsPage(){
 
     try{
 
-      await updateDoc(
-
-        doc(
-          db,
-          "productQuestions",
-          id
-        ),
-
+      // app/api/seller/questions/[id]/answer checks the PRODUCT is this
+      // seller's before saving (a question's own vendorId is not trusted).
+      const idToken = await auth.currentUser?.getIdToken();
+      const response = await fetch(
+        `/api/seller/questions/${encodeURIComponent(id)}/answer`,
         {
-
-          answer,
-
-          status:
-            "Answered"
-
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ answer }),
         }
-
       );
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        alert(result?.error || "Couldn't save your answer.");
+        return;
+      }
 
       alert(
         "Answer Saved"

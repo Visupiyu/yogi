@@ -139,8 +139,10 @@ await check("8b seller: cannot change proofImage — DENIED", () =>
 // edits (and a multi-seller order never takes a seller's order-level write).
 await check("8c seller: tracking update on a Delivered order — now DENIED (order closed)", () =>
   assertFails(updateDoc(order("seller1", "o_delivered"), { trackingNumber: "TRK123", updatedAt: serverTimestamp() })));
-await check("8d buyer: cancel own Pending order — still ALLOWED", () =>
-  assertSucceeds(updateDoc(order("buyer1", "o_pending"), { status: "Cancelled", updatedAt: serverTimestamp() })));
+// Customer Account hardening: cancelling goes through app/api/cancel-order
+// only (stock, rewards, coupons and the seller's notice are handled there).
+await check("8d buyer: direct cancel of own Pending order — now DENIED (app/api/cancel-order only)", () =>
+  assertFails(updateDoc(order("buyer1", "o_pending"), { status: "Cancelled", updatedAt: serverTimestamp() })));
 
 await env.cleanup();
 console.log(`\n${pass}/${pass + fail} delivery-proof rules checks passed`);

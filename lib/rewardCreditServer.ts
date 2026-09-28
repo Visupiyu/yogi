@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
 import {
   evaluateRewardCredit,
+  summariseItemReturns,
   type RewardCreditOrder,
   type RewardCreditReturn,
   type RewardIneligibleReason,
@@ -88,7 +89,18 @@ export async function creditOneOrder(
       ? (returnSnap.data() as { status?: unknown })
       : null;
 
-    const verdict = evaluateRewardCredit(order, returnRecord);
+    // Item-level returns on this order (lib/rewardCredit.summariseItemReturns):
+    // an open one holds the credit, refunded ones leave the earning basis.
+    const itemReturnSnap = await tx.get(
+      db.collection("itemRequests").where("orderId", "==", orderId)
+    );
+    const itemReturns = summariseItemReturns(
+      itemReturnSnap.docs
+        .map((d) => d.data())
+        .filter((r) => r.userId === ownerUid)
+    );
+
+    const verdict = evaluateRewardCredit(order, returnRecord, new Date(), itemReturns);
 
     if (!verdict.eligible) {
       return { orderId, credited: false, reason: verdict.reason };

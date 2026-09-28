@@ -58,6 +58,26 @@ function extractProductCards(toolCalls: ToolCallRecord[]): ProductCard[] {
   return [...cards.values()].slice(0, 8);
 }
 
+// The client resends the conversation each turn. It is only ever text the
+// model sees (never tool output), but it is bounded — in count and size — so
+// one request cannot carry an unbounded prompt, and any role other than
+// user/model is dropped. Same limits as app/api/ai/seller/chat.
+const MAX_HISTORY_TURNS = 20;
+const MAX_TURN_CHARS = 4000;
+const MAX_MESSAGE_CHARS = 2000;
+
+function sanitizeHistory(value: unknown): ChatTurn[] {
+  if (!Array.isArray(value)) return [];
+  const turns: ChatTurn[] = [];
+  for (const turn of value.slice(-MAX_HISTORY_TURNS)) {
+    const role = (turn as { role?: unknown })?.role;
+    const text = (turn as { text?: unknown })?.text;
+    if ((role !== "user" && role !== "model") || typeof text !== "string" || !text.trim()) continue;
+    turns.push({ role, text: text.slice(0, MAX_TURN_CHARS) });
+  }
+  return turns;
+}
+
 export async function POST(request: Request) {
   try {
     const user = await verifyRequestUser(request);
@@ -82,12 +102,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const message = String(body?.message || "").trim();
-    const history: ChatTurn[] = Array.isArray(body?.history) ? body.history : [];
+    const history = sanitizeHistory(body?.history);
 
     if (!message) {
       return NextResponse.json({ error: "Message is required." }, { status: 400 });
+    }
+    if (message.length > MAX_MESSAGE_CHARS) {
+      return NextResponse.json({ error: "That message is too long." }, { status: 400 });
     }
 
     const { declarations, executeTool } = buildToolRegistry(customerTools, {
@@ -109,8 +132,9 @@ export async function POST(request: Request) {
       products: extractProductCards(result.toolCalls),
     });
   } catch (error) {
+    // Log the real cause server-side only — provider and Firestore errors can
+    // carry internal details that shouldn't reach the browser.
     console.error("Customer AI chat error:", error);
-    const message = error instanceof Error ? error.message : "Failed to get a response.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Couldn't get a response right now. Please try again." }, { status: 500 });
   }
 }

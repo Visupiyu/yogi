@@ -122,8 +122,9 @@ export default function ProfilePage() {
       await setDoc(
         doc(db, "users", uid),
         {
+          // email is the Auth account's, frozen by firestore.rules — not
+          // written from here.
           uid,
-          email: user.email,
           name: fullName,
           phone,
           address,

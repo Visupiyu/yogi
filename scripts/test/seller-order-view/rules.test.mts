@@ -77,8 +77,9 @@ await check("R4 seller CANNOT write the order — not even shipping details on a
 await check("C1 customer reads their own order", () => assertSucceeds(getDoc(doc(as(BUYER, "buyer1@example.com"), "orders", "o_multi"))));
 await check("C2 customer lists their own orders", () =>
   assertSucceeds(getDocs(query(collection(as(BUYER, "buyer1@example.com"), "orders"), where("userId", "==", BUYER)))));
-await check("C3 customer may still cancel their own Pending order", () =>
-  assertSucceeds(updateDoc(doc(as(BUYER, "buyer1@example.com"), "orders", "o_pending"), { status: "Cancelled", updatedAt: serverTimestamp() })));
+// Customer Account hardening: cancelling goes through app/api/cancel-order only.
+await check("C3 customer can no longer cancel their Pending order by a direct write (app/api/cancel-order only)", () =>
+  assertFails(updateDoc(doc(as(BUYER, "buyer1@example.com"), "orders", "o_pending"), { status: "Cancelled", updatedAt: serverTimestamp() })));
 await check("C4 another customer cannot read the order", () => assertFails(getDoc(doc(as("buyer2"), "orders", "o_multi"))));
 await check("A1 admin reads and updates orders", async () => {
   await assertSucceeds(getDoc(doc(as("adminUid", ADMIN_EMAIL), "orders", "o_multi")));

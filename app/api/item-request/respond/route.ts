@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { Timestamp } from "firebase-admin/firestore";
 import { isAwaitingCustomerPickup } from "@/lib/itemRequests";
+import { isValidDocId } from "@/lib/customerAccount/customerGuards";
 
 // ---------------------------------------------------------------------------
 // Customer response to a PROPOSED pickup slot. SERVER-AUTHORITATIVE.
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       typeof body.requestId === "string" ? body.requestId.trim() : "";
     const action = typeof body.action === "string" ? body.action.trim() : "";
 
-    if (!requestId) {
+    if (!isValidDocId(requestId)) {
       return Response.json({ error: "Missing request id." }, { status: 400 });
     }
     if (action !== "accept" && action !== "counter") {

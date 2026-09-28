@@ -521,12 +521,11 @@ service cloud.firestore {
       allow create: if false;
 
       allow update: if isAdmin()
-        || (
-          isOwnerUid(resource.data.userId)
-          && resource.data.status == 'Pending'
-          && request.resource.data.status == 'Cancelled'
-          && affectedKeysOnly(['status', 'updatedAt'])
-        )
+        // No customer branch. Cancelling goes through app/api/cancel-order
+        // (web and Customer App), which restores stock/sales, reverses reward
+        // points and coupons and notifies the seller in one place. A direct
+        // Pending -> Cancelled write skipped all of that and could lock a
+        // seller's stock.
         // No seller branch: sellers never write this shared document. Their
         // shipping details are saved by app/api/seller/orders/[orderId]/
         // shipping (Admin SDK) — on their own sellerOrders record, and on the
@@ -844,7 +843,15 @@ service cloud.firestore {
       return d.uid == request.auth.uid
         && d.role == 'customer'
         && (!('rewardPoints' in d) || d.rewardPoints == 0)
-        && (!('totalReferrals' in d) || d.totalReferrals == 0);
+        && (!('totalReferrals' in d) || d.totalReferrals == 0)
+        // Referral state is SERVER-OWNED (app/api/signup-rewards). A profile
+        // may record who referred it (referredBy, only here at creation), but
+        // never its own referral code (server-issued, unique) or the "bonus
+        // already settled" stamp — a client-chosen stamp or a copied code is
+        // how the bonus was replayed and hijacked.
+        && !('signupRewardsGrantedAt' in d)
+        && !('referralCode' in d)
+        && (!('referredBy' in d) || (d.referredBy is string && d.referredBy.size() <= 32));
     }
 
     match /users/{userId} {
@@ -876,6 +883,16 @@ service cloud.firestore {
           && unchanged('uid')
           && unchanged('rewardPoints')
           && unchanged('totalReferrals')
+          // Referral state and the account email are server-owned. Deleting
+          // signupRewardsGrantedAt (or re-pointing referredBy) re-armed
+          // app/api/signup-rewards and minted reward points on every call;
+          // a rewritten referralCode could hijack another user's referrals.
+          // email is copied into ledger rows and shown to admin, so it is the
+          // Auth account's email, not a free-text field.
+          && unchanged('signupRewardsGrantedAt')
+          && unchanged('referredBy')
+          && unchanged('referralCode')
+          && unchanged('email')
         );
 
       allow delete: if isAdmin();
@@ -896,13 +913,41 @@ service cloud.firestore {
 
     function chatCreatorIsCustomer() {
       let d = request.resource.data;
-      // At least one of customerId/customerEmail must be present AND match
-      // the caller — a chat can't be created with neither identifier set.
+      // At least one of customerId/customerEmail must be present, and EVERY
+      // one that is present must be the caller's own — a chat can't be
+      // created with neither identifier set, or with someone else's.
+      // The seller is the product's real vendor: a customer cannot open a
+      // "chat" with an arbitrary account. (Order chats are created by
+      // app/api/contact-seller with the Admin SDK.)
       return d.sellerId is string
-        && (
-          ('customerId' in d && d.customerId == request.auth.uid)
-          || ('customerEmail' in d && d.customerEmail == request.auth.token.email)
-        );
+        && ('customerId' in d || 'customerEmail' in d)
+        && (!('customerId' in d) || d.customerId == request.auth.uid)
+        && (!('customerEmail' in d) || d.customerEmail == request.auth.token.email)
+        && d.productId is string
+        && d.productId.size() > 0
+        && get(/databases/$(database)/documents/products/$(d.productId)).data.vendorId == d.sellerId;
+    }
+
+    // A message's sender is the caller's own role in THIS chat. The web pages
+    // write sender ('customer'/'seller'); the Customer App writes senderRole
+    // and senderId. Either way the role cannot be chosen by the browser, so
+    // neither side can post words "from" the other.
+    function isValidChatMessage(chat) {
+      let d = request.resource.data;
+      let isSeller = chat.sellerId == request.auth.uid;
+      return d.keys().hasOnly([
+          'chatId', 'sender', 'senderRole', 'senderId', 'senderName',
+          'receiverId', 'text', 'image', 'createdAt', 'read'
+        ])
+        && ('sender' in d || 'senderRole' in d)
+        && (!('sender' in d) || (isSeller && d.sender == 'seller') || (!isSeller && d.sender == 'customer'))
+        && (!('senderRole' in d) || (isSeller && d.senderRole == 'seller') || (!isSeller && d.senderRole == 'customer'))
+        && (!('senderId' in d) || d.senderId == request.auth.uid)
+        && (!('senderName' in d) || (d.senderName is string && d.senderName.size() <= 100))
+        && (!('receiverId' in d) || (d.receiverId is string && d.receiverId.size() <= 128))
+        && (!('text' in d) || (d.text is string && d.text.size() <= 2000))
+        && (!('image' in d) || (d.image is string && d.image.size() <= 2048))
+        && (!('read' in d) || d.read == false);
     }
 
     match /chats/{chatId} {
@@ -933,6 +978,9 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.chatId is string
         && isChatParticipant(
+          get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data
+        )
+        && isValidChatMessage(
           get(/databases/$(database)/documents/chats/$(request.resource.data.chatId)).data
         );
 
@@ -1001,7 +1049,14 @@ service cloud.firestore {
         // update must reach the customer's. Those are bounded by the field,
         // type, length and read==false constraints above, and are only
         // readable by the uid they name.
-        && (request.resource.data.role != 'admin' || isAdmin());
+        && (request.resource.data.role != 'admin' || isAdmin())
+        // A browser may only write into its OWN feed (the Customer App's
+        // "Order Placed" confirmation). Anything that lands in someone
+        // else's feed — seller updates, delivery updates, refunds — is
+        // created by a server route with the Admin SDK. Previously any
+        // signed-in user could drop an "order"/"refund" notification with any
+        // text into any customer's or seller's feed.
+        && (isAdmin() || request.resource.data.userId == request.auth.uid);
 
       allow update: if (
           isAdmin()
@@ -1078,14 +1133,53 @@ service cloud.firestore {
           )
           && unchanged('userEmail')
           && unchanged('userId')
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(ADDRESS_FIELDS())
+          && addressValuesOk()
         );
 
+      // EVERY identifier on a new address must be the caller's own. The web
+      // branch used to check only userEmail (userId could name anyone) and the
+      // Customer App branch only userId (userEmail could name anyone), so one
+      // account could plant a default address in another's address book.
       allow create: if isSignedIn()
-        && (
-          ('userEmail' in request.resource.data
-            && request.resource.data.userEmail == request.auth.token.email)
-          || isValidMobileAddress()
-        );
+        && ('userEmail' in request.resource.data || 'userId' in request.resource.data)
+        && (!('userEmail' in request.resource.data)
+            || request.resource.data.userEmail == request.auth.token.email)
+        && (!('userId' in request.resource.data)
+            || request.resource.data.userId == request.auth.uid)
+        && request.resource.data.keys().hasOnly(ADDRESS_FIELDS())
+        && addressValuesOk();
+    }
+
+    // Every field the web address form (app/addresses/add, edit) and the
+    // Customer App (AddressScreen / EditAddressScreen) write.
+    function ADDRESS_FIELDS() {
+      return [
+        'userId', 'userEmail', 'type', 'fullName', 'phone', 'addressLine1',
+        'addressLine2', 'landmark', 'city', 'state', 'pincode', 'isDefault',
+        'name', 'mobile', 'address', 'createdAt', 'updatedAt'
+      ];
+    }
+
+    function optionalString(d, field, maxLen) {
+      return !(field in d) || (d[field] is string && d[field].size() <= maxLen);
+    }
+
+    function addressValuesOk() {
+      let d = request.resource.data;
+      return optionalString(d, 'type', 30)
+        && optionalString(d, 'fullName', 100)
+        && optionalString(d, 'name', 100)
+        && optionalString(d, 'phone', 15)
+        && optionalString(d, 'mobile', 15)
+        && optionalString(d, 'addressLine1', 300)
+        && optionalString(d, 'addressLine2', 300)
+        && optionalString(d, 'address', 500)
+        && optionalString(d, 'landmark', 200)
+        && optionalString(d, 'city', 100)
+        && optionalString(d, 'state', 100)
+        && optionalString(d, 'pincode', 10)
+        && (!('isDefault' in d) || d.isDefault is bool);
     }
 
     match /sellerInquiries/{inquiryId} {
@@ -1112,6 +1206,7 @@ service cloud.firestore {
         || ('userId' in resource.data && isOwnerUid(resource.data.userId));
       allow create: if isSignedIn()
         && request.resource.data.userEmail == request.auth.token.email
+        && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid)
         && isValidString('subject', 200)
         && isValidString('message', 2000);
 
@@ -1351,19 +1446,18 @@ service cloud.firestore {
 
     match /rewardTransactions/{transactionId} {
       allow read: if isAdmin()
-        || ('userEmail' in resource.data && isOwnerEmail(resource.data.userEmail));
+        || ('userEmail' in resource.data && isOwnerEmail(resource.data.userEmail))
+        || ('userId' in resource.data && isOwnerUid(resource.data.userId));
 
       // The signup referral-bonus carve-out that used to sit here let any
       // signed-in user write a 'Referral Bonus' ledger row against ANOTHER
       // user's uid. Signup rewards are now credited by app/api/signup-rewards
       // with the Admin SDK, which writes both ledger rows itself and bypasses
       // these rules, so no client needs to write another user's history.
-      allow create: if isAdmin()
-        || (
-          isSignedIn()
-          && 'userEmail' in request.resource.data
-          && request.resource.data.userEmail == request.auth.token.email
-        );
+      // Every ledger row is written by a server route (orders, cancellations,
+      // refunds, reward credit, signup rewards) or an admin. A customer could
+      // previously create rows for themselves with any points and type.
+      allow create: if isAdmin();
 
       allow update, delete: if isAdmin();
     }
@@ -1373,15 +1467,18 @@ service cloud.firestore {
     // ---------------------------------------------------------
 
     match /stockNotifications/{notificationId} {
+      // Created by app/api/stock-notifications (vendorId from the product) and
+      // served to sellers as COUNTS by app/api/seller/stock-notifications,
+      // which also sends the in-app "back in stock" notice and clears the
+      // requests. Sellers no longer read these documents: they carried the
+      // waiting customers' emails.
       allow read: if isAdmin()
-        || isOwnerUid(resource.data.vendorId)
-        || isOwnerEmail(resource.data.userEmail);
+        || ('userEmail' in resource.data && isOwnerEmail(resource.data.userEmail))
+        || ('userId' in resource.data && isOwnerUid(resource.data.userId));
 
-      allow create: if isSignedIn()
-        && request.resource.data.userEmail == request.auth.token.email
-        && request.resource.data.vendorId is string;
+      allow create: if false;
 
-      allow delete: if isAdmin() || isOwnerUid(resource.data.vendorId);
+      allow delete: if isAdmin();
       allow update: if isAdmin();
     }
 
@@ -1391,32 +1488,51 @@ service cloud.firestore {
 
     match /productQuestions/{questionId} {
       allow read: if true;
+      // The Customer App still writes questions directly (web goes through
+      // app/api/products/[id]/questions). A new question carries no answer —
+      // the product page shows any answer as the "Seller Reply" — and its
+      // vendorId must be the product's real vendor, so nobody can route a
+      // question to themselves and "answer" it on another seller's product.
       allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+             'productId', 'productName', 'vendorId', 'vendorName', 'userId',
+             'customerName', 'customerEmail', 'question', 'answer', 'status', 'createdAt'
+           ])
         && request.resource.data.productId is string
+        && request.resource.data.productId.size() > 0
+        && request.resource.data.vendorId
+             == get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.vendorId
         && isValidString('question', 1000)
-        && request.resource.data.status == 'Pending';
+        && request.resource.data.status == 'Pending'
+        && (!('answer' in request.resource.data) || request.resource.data.answer == '')
+        && (!('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid)
+        && (!('customerEmail' in request.resource.data)
+            || request.resource.data.customerEmail == request.auth.token.email)
+        && optionalString(request.resource.data, 'customerName', 100)
+        && optionalString(request.resource.data, 'productName', 300)
+        && optionalString(request.resource.data, 'vendorName', 200);
       // vendorId is now written at creation (denormalized from the
       // product), so the owning vendor can answer directly. Older docs
       // created before this fix have no vendorId and fall through to
       // admin-only, same as before.
-      allow update: if isAdmin()
-        || (
-          isSignedIn()
-          && 'vendorId' in resource.data
-          && resource.data.vendorId == request.auth.uid
-          && affectedKeysOnly(['answer', 'status'])
-          && request.resource.data.status == 'Answered'
-        );
+      // Seller answers go through app/api/seller/questions/[id]/answer, which
+      // checks the PRODUCT's owner (a question's own vendorId could have been
+      // chosen by whoever asked it before creation was locked down).
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     match /productReviews/{reviewId} {
-      allow read: if true;
-      allow create: if isSignedIn()
-        && request.resource.data.userEmail == request.auth.token.email
-        && request.resource.data.rating is number
-        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
-        && isValidString('review', 2000);
+      // Public reads now go through app/api/products/[id]/reviews (name,
+      // rating, text, date, verified-purchase flag only). The raw documents
+      // carry the reviewer's email and were readable by anyone. A reviewer can
+      // still read their own; admin moderation is unchanged.
+      allow read: if isAdmin()
+        || ('userEmail' in resource.data && isOwnerEmail(resource.data.userEmail))
+        || ('userId' in resource.data && isOwnerUid(resource.data.userId));
+      // Created only by app/api/reviews: a verified, delivered purchase, one
+      // review per customer per product, server timestamp.
+      allow create: if false;
       allow update: if false;
       allow delete: if isAdmin();
     }
@@ -1446,6 +1562,8 @@ service cloud.firestore {
         && d.productId is string && d.productId.size() > 0
         && d.orderId is string && d.orderId.size() > 0
         && ownsReviewOrder(d.orderId)
+        // Only once the order has actually been delivered.
+        && get(/databases/$(database)/documents/orders/$(d.orderId)).data.status == 'Delivered'
         && d.rating is number && d.rating >= 1 && d.rating <= 5
         && isValidString('review', 2000)
         && d.photos is list

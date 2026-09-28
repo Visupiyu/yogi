@@ -39,6 +39,17 @@ export default function LoginPage() {
         return;
       }
 
+      // A referral bonus waits for email verification (and the referrer's
+      // monthly cap), and older accounts may have no referral code yet:
+      // app/api/signup-rewards settles both, idempotently. Best-effort and
+      // not awaited — it must never hold up or fail a sign-in.
+      firebaseUser
+        .getIdToken()
+        .then((token) =>
+          fetch("/api/signup-rewards", { method: "POST", headers: { Authorization: `Bearer ${token}` } })
+        )
+        .catch((error) => console.error("signup-rewards check failed:", error));
+
       // Clear any previous seller/admin session
       localStorage.removeItem("vendor");
       localStorage.removeItem("admin");

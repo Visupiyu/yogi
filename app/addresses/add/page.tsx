@@ -53,6 +53,9 @@ export default function AddAddressPage() {
       collection(db, "addresses"),
       {
         userEmail: auth.currentUser.email,
+        // Owned by the account's uid as well (firestore.rules require every
+        // identifier on an address to be the caller's own).
+        userId: auth.currentUser.uid,
 
         fullName: form.fullName,
         phone: form.phone,

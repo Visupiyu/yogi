@@ -273,42 +273,24 @@ if (proofImage) {
         }
 
       );
-      await addDoc(
-
-  collection(
-    db,
-    "notifications"
-  ),
-
-  {
-
-    title:
-      "Delivery Update",
-
-    message:
-      `Your order ${id.slice(0,8)} is now ${fulfilmentStageLabel(status)}.`,
-
-    userId:
-      order.userId,
-
-    userEmail:
-      order.userEmail,
-
-    role:
-      "customer",
-
-    type:
-      "delivery",
-
-    read:
-      false,
-
-    createdAt:
-      serverTimestamp(),
-
-  }
-
-);
+      // The customer's "Delivery Update" is written by the server
+      // (app/api/delivery/partner-order-notification), which checks this
+      // partner is assigned to the order and words it from the order's stored
+      // status. firestore.rules no longer let a browser write into another
+      // user's notification feed. Best-effort: the status update above has
+      // already been saved.
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (token) {
+          await fetch("/api/delivery/partner-order-notification", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ orderId: id }),
+          });
+        }
+      } catch (notifyError) {
+        console.error("Customer delivery notification failed:", notifyError);
+      }
 
       toast.success(
 

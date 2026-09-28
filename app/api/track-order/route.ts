@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
+import { isValidDocId } from "@/lib/customerAccount/customerGuards";
 
 // ---------------------------------------------------------------------------
 // PUBLIC guest order tracking.
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (orderId.length > 200 || email.length > 320) {
+    if (!isValidDocId(orderId) || email.length > 320) {
       return Response.json({ error: "Invalid request." }, { status: 400 });
     }
 

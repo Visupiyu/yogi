@@ -15,6 +15,7 @@ import {
   refundableForOrderIndex,
   type ItemRequestType,
 } from "@/lib/itemRequests";
+import { isValidDocId } from "@/lib/customerAccount/customerGuards";
 
 // ---------------------------------------------------------------------------
 // Per-item Return / Replace request creation. SERVER-AUTHORITATIVE.
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
     const comments =
       typeof body.comments === "string" ? body.comments.trim() : "";
 
-    if (!orderId || orderId.length > 200) {
+    if (!isValidDocId(orderId)) {
       return Response.json(
         { error: "A valid order is required." },
         { status: 400 }

@@ -1,264 +1,146 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-  deleteDoc,
-  doc,
-} from "firebase/firestore";
-
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
-type StockNotification = {
-  id: string;
+// Back-in-stock requests for this seller's products, from the server
+// (app/api/seller/stock-notifications): a COUNT of waiting customers per
+// product. Customers' names and emails are no longer shown to sellers — this
+// page used to read the request documents, emails included, straight from
+// Firestore. "Notify waiting customers" sends each of them an in-app YOMICO
+// notification (once the product is back in stock) and clears the requests.
+
+type WaitingProduct = {
   productId: string;
   productName: string;
-  userName: string;
-  userEmail: string;
-  vendorId: string;
-  createdAt?: any;
+  waiting: number;
+  stock: number;
 };
+
+async function authedFetch(url: string, init: RequestInit = {}) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Please sign in again.");
+  const token = await user.getIdToken();
+  const res = await fetch(url, {
+    ...init,
+    headers: { ...(init.headers || {}), Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body?.error === "string" ? body.error : "Something went wrong.");
+  return body;
+}
 
 export default function SellerStockNotificationsPage() {
   const router = useRouter();
 
-  const [requests, setRequests] = useState<
-    StockNotification[]
-  >([]);
-
+  const [items, setItems] = useState<WaitingProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const body = await authedFetch("/api/seller/stock-notifications");
+      setItems(Array.isArray(body?.items) ? body.items : []);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-
-    let unsubscribeSnapshot: (() => void) | undefined;
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.push("/vendor-login");
         return;
       }
-
-      const q = query(
-        collection(db, "stockNotifications"),
-        where("vendorId", "==", user.uid)
-      );
-
-      unsubscribeSnapshot = onSnapshot(
-        q,
-        (snapshot) => {
-          const data: StockNotification[] = [];
-
-          snapshot.forEach((docSnap) => {
-            data.push({
-              ...(docSnap.data() as Omit<
-                StockNotification,
-                "id"
-              >),
-              id: docSnap.id,
-            });
-          });
-
-          setRequests(data);
-          setLoading(false);
-        }
-      );
-
+      load();
     });
+    return () => unsubscribe();
+  }, [router, load]);
 
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeSnapshot) unsubscribeSnapshot();
-    };
-  }, [router]);
-
-  const groupedProducts = useMemo(() => {
-    const groups: Record<
-      string,
-      {
-        productName: string;
-        customers: StockNotification[];
-      }
-    > = {};
-
-    requests.forEach((item) => {
-      if (!groups[item.productId]) {
-        groups[item.productId] = {
-          productName: item.productName,
-          customers: [],
-        };
-      }
-
-      groups[item.productId].customers.push(item);
-    });
-
-    return Object.entries(groups);
-  }, [requests]);
-
-  const markAsNotified = async (
-    customers: StockNotification[]
-  ) => {
-    for (const customer of customers) {
-      await deleteDoc(
-        doc(
-          db,
-          "stockNotifications",
-          customer.id
-        )
-      );
+  const notifyWaiting = async (item: WaitingProduct) => {
+    setBusy(item.productId);
+    try {
+      const body = await authedFetch("/api/seller/stock-notifications", {
+        method: "POST",
+        body: JSON.stringify({ productId: item.productId }),
+      });
+      alert(`Notified ${body.notified ?? 0} waiting customer(s).`);
+      await load();
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(null);
     }
-
-    alert(
-      "Notification requests cleared."
-    );
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <h2 className="text-2xl font-bold">
-          Loading...
-        </h2>
+        <h2 className="text-2xl font-bold">Loading...</h2>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-
       <div className="max-w-7xl mx-auto">
 
         <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-3xl p-8 mb-8">
-
-          <h1 className="text-4xl font-bold">
-            🔔 Stock Notifications
-          </h1>
-
-          <p className="mt-2">
-            Customers waiting for products to
-            return in stock
-          </p>
-
+          <h1 className="text-4xl font-bold">🔔 Stock Notifications</h1>
+          <p className="mt-2">Customers waiting for your products to return in stock</p>
         </div>
 
-        {groupedProducts.length === 0 ? (
-
-          <div className="bg-white rounded-3xl shadow p-10 text-center">
-
-            <h2 className="text-2xl font-bold">
-              🎉 No Waiting Customers
-            </h2>
-
-            <p className="text-gray-500 mt-2">
-              Nobody has requested stock alerts.
-            </p>
-
-          </div>
-
-        ) : (
-
-          <div className="space-y-6">
-
-            {groupedProducts.map(
-              ([productId, group]) => (
-
-                <div
-                  key={productId}
-                  className="bg-white rounded-3xl shadow p-6"
-                >
-
-                  <div className="flex justify-between items-start">
-
-                    <div>
-
-                      <h2 className="text-2xl font-bold">
-                        {group.productName}
-                      </h2>
-
-                      <p className="text-gray-500 mt-2">
-                        Waiting Customers :
-                        {" "}
-                        <span className="font-bold text-green-600">
-                          {
-                            group.customers.length
-                          }
-                        </span>
-                      </p>
-
-                    </div>
-
-                    <button
-                      onClick={() =>
-                        markAsNotified(
-                          group.customers
-                        )
-                      }
-                      className="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl"
-                    >
-                      ✔ Mark as Notified
-                    </button>
-
-                  </div>
-
-                  <div className="mt-6 space-y-4">
-
-                    {group.customers.map(
-                      (customer) => (
-
-                        <div
-                          key={customer.id}
-                          className="border rounded-2xl p-4 flex justify-between items-center"
-                        >
-
-                          <div>
-
-                            <h3 className="font-bold">
-                              👤{" "}
-                              {customer.userName}
-                            </h3>
-
-                            <p className="text-gray-600">
-                              📧{" "}
-                              {customer.userEmail}
-                            </p>
-
-                          </div>
-
-                          <div className="text-sm text-gray-400">
-
-                            {customer.createdAt?.seconds
-                              ? new Date(
-                                  customer.createdAt.seconds *
-                                    1000
-                                ).toLocaleDateString()
-                              : ""}
-
-                          </div>
-
-                        </div>
-
-                      )
-                    )}
-
-                  </div>
-
-                </div>
-
-              )
-            )}
-
-          </div>
-
+        {error && (
+          <div className="mb-6 rounded-2xl bg-red-50 p-4 text-red-700">{error}</div>
         )}
 
-      </div>
+        {items.length === 0 ? (
+          <div className="bg-white rounded-3xl shadow p-10 text-center">
+            <h2 className="text-2xl font-bold">🎉 No Waiting Customers</h2>
+            <p className="text-gray-500 mt-2">Nobody has requested stock alerts.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {items.map((item) => (
+              <div key={item.productId} className="bg-white rounded-3xl shadow p-6">
+                <div className="flex flex-wrap justify-between items-start gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold">{item.productName || "Product"}</h2>
+                    <p className="text-gray-500 mt-2">
+                      Waiting Customers :{" "}
+                      <span className="font-bold text-green-600">{item.waiting}</span>
+                    </p>
+                    <p className="text-gray-500 mt-1">
+                      Current stock : <span className="font-semibold">{item.stock}</span>
+                    </p>
+                  </div>
 
+                  <button
+                    onClick={() => notifyWaiting(item)}
+                    disabled={busy === item.productId || item.stock <= 0}
+                    title={item.stock <= 0 ? "Restock this product first" : undefined}
+                    className="bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-xl font-semibold disabled:opacity-50"
+                  >
+                    {busy === item.productId ? "Notifying..." : "🔔 Notify waiting customers"}
+                  </button>
+                </div>
+                {item.stock <= 0 && (
+                  <p className="mt-3 text-sm text-orange-700">
+                    Restock this product, then notify the waiting customers.
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
+import { isValidDocId } from "@/lib/customerAccount/customerGuards";
 
 // Sending is not idempotent — every call dispatches another email through
 // Resend — so looping this burns the shared transactional-email quota and can
@@ -83,6 +84,9 @@ export async function POST(
     // otherwise anyone could POST an arbitrary orderId/customerEmail pair
     // and use this route to spam any inbox with a plausible-looking
     // "order confirmation".
+    if (!isValidDocId(orderId)) {
+      return Response.json({ success: false, error: "Order not found" }, { status: 404 });
+    }
     const orderSnap = await getAdminDb().collection("orders").doc(orderId).get();
 
     if (!orderSnap.exists) {

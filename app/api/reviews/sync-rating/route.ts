@@ -1,6 +1,7 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { computeProductRating, reviewerKey } from "@/lib/reviews/productRating";
 
 // ---------------------------------------------------------------------------
 // POST /api/reviews/sync-rating  { productId }
@@ -61,20 +62,15 @@ export async function POST(request: Request) {
         if (!own) return { status: 403, error: "You have not reviewed this product." } as const;
       }
 
-      // One review per reviewer (newest wins), valid ratings only.
-      const latest = new Map<string, { rating: number; at: number }>();
-      for (const d of reviewSnap.docs) {
-        const r = d.data();
-        const rating = Number(r.rating);
-        if (!Number.isFinite(rating) || rating < 1 || rating > 5) continue;
-        const who = String(r.userEmail || d.id).toLowerCase();
-        const at = millis(r.createdAt);
-        const prev = latest.get(who);
-        if (!prev || at >= prev.at) latest.set(who, { rating, at });
-      }
-      const reviewCount = latest.size;
-      const rating =
-        reviewCount === 0 ? 0 : [...latest.values()].reduce((s, v) => s + v.rating, 0) / reviewCount;
+      // One review per reviewer (newest wins), valid ratings only — the same
+      // calculation app/api/reviews runs when a review is created.
+      const { rating, reviewCount } = computeProductRating(
+        reviewSnap.docs.map((d) => ({
+          reviewer: reviewerKey(d.data(), d.id),
+          rating: d.get("rating"),
+          atMs: millis(d.get("createdAt")),
+        }))
+      );
       tx.update(productRef, { rating, reviewCount });
       return { status: 200, rating, reviewCount } as const;
     });

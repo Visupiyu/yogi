@@ -2,6 +2,7 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { FieldValue } from "firebase-admin/firestore";
+import { isValidDocId } from "@/lib/customerAccount/customerGuards";
 
 // ---------------------------------------------------------------------------
 // Customer → Seller chat opener. SERVER-AUTHORITATIVE.
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     const orderId = typeof body.orderId === "string" ? body.orderId.trim() : "";
     const vendorIdIn =
       typeof body.vendorId === "string" ? body.vendorId.trim() : "";
-    if (!orderId) {
+    if (!isValidDocId(orderId)) {
       return Response.json({ error: "Missing order id." }, { status: 400 });
     }
 
