@@ -9,6 +9,8 @@ export type VerifiedUser = {
   // verification-email route skip re-sending to an already-verified address
   // without a second round trip. Additive — existing callers ignore it.
   emailVerified: boolean;
+  /** When the Firebase Auth account was created (epoch ms), if known. */
+  createdAtMs?: number | null;
 };
 
 // Verifies the Firebase ID token the client sent (Authorization: Bearer
@@ -74,6 +76,9 @@ export async function verifyRequestUser(
       // token the security rules reject on every read).
       isAdmin: user.email === ADMIN_EMAIL && user.emailVerified === true,
       emailVerified: user.emailVerified === true,
+      // When the Auth account was created — accounts:lookup reports it as
+      // epoch-ms text. Used by the referral new-customer rule.
+      createdAtMs: Number.isFinite(Number(user.createdAt)) && Number(user.createdAt) > 0 ? Number(user.createdAt) : null,
     };
   } catch (error) {
     console.error("verifyRequestUser: ID token verification failed:", error);

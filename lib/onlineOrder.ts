@@ -2,6 +2,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 import { emitOrderPlacedNotifications } from "@/lib/orderNotifications";
 import { mintNumbers } from "@/lib/humanIds";
+import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import type { OrderPricing } from "@/lib/orderPricing";
 import {
@@ -574,9 +575,27 @@ export async function finalizeOnlineOrder(params: {
     // nothing more. An ONLINE order is Paid at creation but not yet delivered
     // and nowhere near the end of its return window, so its points are not
     // earned — app/api/credit-reward-points grants them later.
-    const newBalance = Math.max(0, balance - actualRedeemed);
-    if (newBalance !== balance) {
-      tx.set(userRef, { rewardPoints: newBalance }, { merge: true });
+    //
+    // The deduction and its "Redeemed" ledger row (redeem_{orderId}) move
+    // together inside this transaction (lib/points). The balance result is
+    // unchanged — max(0, balance − actualRedeemed) — and any part of
+    // pricing.rewardValue the balance could not cover is recorded on the row
+    // as an explicit shortfall (the same figure as rewardShortfall above).
+    if (pricing.rewardValue > 0) {
+      applyPointsMovements(
+        tx,
+        db,
+        { ref: userRef, snap: userSnap, uid: intent.uid, email: intent.email, write: "merge" },
+        [
+          {
+            kind: "checkout_redeem",
+            id: pointsLedgerId.redeem(orderId),
+            requested: -pricing.rewardValue,
+            allowShortfall: true,
+            refs: { orderId },
+          },
+        ]
+      );
     }
 
     return {
@@ -606,26 +625,8 @@ export async function finalizeOnlineOrder(params: {
   // ---- Best-effort, outside the transaction. None of these may fail an order
   // that has already committed and been paid for.
 
-  // No "Earned" row at creation — see app/api/place-order for why.
-  const ledger: { type: string; points: number }[] = [];
-  const redeemed = pricing.rewardValue - (outcome.rewardShort || 0);
-  if (redeemed > 0) ledger.push({ type: "Redeemed", points: redeemed });
-
-  for (const entry of ledger) {
-    try {
-      await db.collection("rewardTransactions").add({
-        userId: intent.uid,
-        userEmail: intent.email,
-        type: entry.type,
-        points: entry.points,
-        ...(entry.type === "Earned" ? { orderTotal: outcome.finalTotal } : {}),
-        orderId,
-        createdAt: Timestamp.now(),
-      });
-    } catch (error) {
-      console.error("finalizeOnlineOrder: reward ledger write failed:", error);
-    }
-  }
+  // The reward ledger row is written inside the transaction above; no
+  // "Earned" row at creation — see app/api/place-order for why.
 
   // Confirmation email. Sent from here rather than from the browser so the
   // webhook path — the whole reason the webhook exists — also reaches the

@@ -3,12 +3,16 @@
 //
 //   - A new customer who signed up with a referral code gets WELCOME_BONUS and
 //     the code's owner gets REFERRER_BONUS — the amounts are unchanged.
-//   - Paid only once the new customer's email is verified.
-//   - A referrer is paid for at most REFERRAL_MONTHLY_CAP referrals per IST
-//     calendar month. A referral over the cap is DEFERRED, not forfeited: it
-//     stays eligible and is paid on a later check once the referrer is under
-//     the cap in a new month.
+//   - Direct referrals are UNLIMITED and ONE LEVEL only: only the holder of the
+//     code is paid, never whoever referred them.
+//   - Paid only once the new customer's email is verified, only while neither
+//     account is blocked, and only for a genuinely NEW customer: the profile
+//     must be created within NEW_CUSTOMER_WINDOW_MS of the Auth account.
 //   - Referral codes are issued by the server and never change.
+//
+// Fraud/abuse protection beyond these rules (referral velocity limits,
+// device/phone signals, review queues) is DEFERRED to the fraud-protection
+// stage; removing the old monthly cap did not replace it with a new limit.
 //
 // Each paid referral writes two ledger rows with fixed ids, so the grant is
 // idempotent on documents only the server can write:
@@ -17,9 +21,9 @@
 
 export const REFERRER_BONUS = 100;
 export const WELCOME_BONUS = 50;
-export const REFERRAL_MONTHLY_CAP = 10;
 
-const IST_OFFSET_MS = 330 * 60 * 1000;
+/** A profile created more than this long after its Auth account is not a new customer. */
+export const NEW_CUSTOMER_WINDOW_MS = 30 * 60 * 1000;
 
 export function welcomeLedgerId(newUid: string): string {
   return `referral_${newUid}`;
@@ -31,12 +35,6 @@ export function isReferrerLedgerId(id: string): boolean {
   return id.startsWith("referrer_");
 }
 
-/** Start of the IST calendar month containing `nowMs`, as epoch ms. */
-export function istMonthStartMs(nowMs: number): number {
-  const ist = new Date(nowMs + IST_OFFSET_MS);
-  return Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), 1) - IST_OFFSET_MS;
-}
-
 /** Same format the signup page used: "YOGI" + 6 digits. */
 export function generateReferralCode(random: () => number = Math.random): string {
   return "YOGI" + Math.floor(100000 + random() * 900000);
@@ -46,13 +44,11 @@ export function isWellFormedReferralCode(code: unknown): code is string {
   return typeof code === "string" && /^[A-Z0-9]{4,32}$/.test(code);
 }
 
-/** How many referrals this referrer has been paid for in the current IST month. */
-export function paidReferralsThisMonth(
-  referrerRows: { id: string; createdAtMs: number | null }[],
-  nowMs: number
-): number {
-  const start = istMonthStartMs(nowMs);
-  return referrerRows.filter(
-    (row) => isReferrerLedgerId(row.id) && row.createdAtMs !== null && row.createdAtMs >= start
-  ).length;
+/**
+ * Whether the users/{uid} profile belongs to a genuinely new customer: it was
+ * created (server-assigned document createTime) no more than
+ * NEW_CUSTOMER_WINDOW_MS after the Firebase Auth account.
+ */
+export function isNewCustomerProfile(profileCreatedMs: number, authCreatedMs: number): boolean {
+  return profileCreatedMs - authCreatedMs <= NEW_CUSTOMER_WINDOW_MS;
 }

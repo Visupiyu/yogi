@@ -3,6 +3,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { mintSequential } from "@/lib/humanIds";
+import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
 import {
   SELLER_REPLACE_TARGETS,
   SELLER_RETURN_TARGETS,
@@ -340,14 +341,41 @@ export async function POST(request: Request) {
         // Human-readable refund number, minted once on the first (and only)
         // arrival at REFUNDED. Minted before the credit write below so the
         // counter read precedes every write in this transaction.
+        // The customer's profile is read BEFORE mintSequential, which writes
+        // its counter — every read must precede the first write.
+        const refundUserRef =
+          !alreadyCredited && amount > 0 && req.userId
+            ? db.collection("users").doc(req.userId)
+            : null;
+        const refundUserSnap = refundUserRef ? await tx.get(refundUserRef) : null;
+
         const refundNumber = alreadyCredited
           ? null
           : await mintSequential(tx, db, "refund");
 
-        if (!alreadyCredited && amount > 0 && req.userId) {
-          tx.update(db.collection("users").doc(req.userId), {
-            rewardPoints: FieldValue.increment(amount),
-          });
+        if (refundUserRef && refundUserSnap && req.userId) {
+          // The credit and its refunditem_{requestId} ledger row move together
+          // (lib/points). "update", as before: a missing profile fails the
+          // transition rather than creating one.
+          applyPointsMovements(
+            tx,
+            db,
+            {
+              ref: refundUserRef,
+              snap: refundUserSnap,
+              uid: req.userId,
+              email: req.userEmail || "",
+              write: "update",
+            },
+            [
+              {
+                kind: "refund_item",
+                id: pointsLedgerId.refundItem(requestId),
+                requested: amount,
+                refs: { requestId },
+              },
+            ]
+          );
           creditedAmount = amount;
         }
         // Mark credited regardless, so a (state-machine-impossible) re-entry
@@ -460,23 +488,7 @@ export async function POST(request: Request) {
     }
 
     // ---- post-commit, best-effort ----
-    // Reward-points ledger entry, only when a credit actually happened. A
-    // transaction cannot addDoc a generated id, so it is written here, mirroring
-    // lib/returns.ts.
-    if (outcome.creditedAmount > 0) {
-      try {
-        await db.collection("rewardTransactions").add({
-          requestId,
-          userId: outcome.userId,
-          userEmail: outcome.userEmail ?? "",
-          type: "Refund",
-          points: outcome.creditedAmount,
-          createdAt: Timestamp.now(),
-        });
-      } catch (error) {
-        console.error("item-request transition: ledger write failed:", error);
-      }
-    }
+    // (The refund's reward ledger row is written inside the transaction above.)
 
     // Seller notification: a replacement just got approved, so the seller now
     // has a fulfilment task. Addressed by vendorId + role "seller", matching

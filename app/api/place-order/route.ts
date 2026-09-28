@@ -6,6 +6,7 @@ import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissi
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { isProductVisible } from "@/lib/products/visibility";
 import { mintNumbers } from "@/lib/humanIds";
+import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
 import {
   hasStockBearingVariants,
   planVariantDecrements,
@@ -493,12 +494,28 @@ export async function POST(request: Request) {
       // now. What the order EARNS is no longer added: an order that has only
       // just been placed has not been delivered, paid for, or survived its
       // return window, so its points are not earned yet.
-      const newBalance = Math.max(0, balance - pricing.rewardValue);
-      if (newBalance !== balance) {
-        tx.set(
-          db.collection("users").doc(requester.uid),
-          { rewardPoints: newBalance },
-          { merge: true }
+      // The balance and its "Redeemed" ledger row (redeem_{orderId}) move
+      // together (lib/points). No shortfall is possible: the balance was
+      // checked against pricing.rewardValue above.
+      if (pricing.rewardValue > 0) {
+        applyPointsMovements(
+          tx,
+          db,
+          {
+            ref: db.collection("users").doc(requester.uid),
+            snap: txUserSnap,
+            uid: requester.uid,
+            email: requester.email,
+            write: "merge",
+          },
+          [
+            {
+              kind: "checkout_redeem",
+              id: pointsLedgerId.redeem(orderId),
+              requested: -pricing.rewardValue,
+              refs: { orderId },
+            },
+          ]
         );
       }
 
@@ -519,33 +536,10 @@ export async function POST(request: Request) {
     }
 
     // ---- Best-effort, outside the transaction. None of these may fail an
-    // order that has already committed. The reward LEDGER lives here because
-    // addDoc-style generated ids cannot be created inside a transaction; the
-    // balance itself moved atomically above. The caller still owns the
-    // notifications and the confirmation email.
-    // No "Earned" row at creation any more — nothing has been earned yet, and
-    // writing one would show the customer points they cannot spend.
-    // app/api/credit-reward-points writes it when the credit actually happens.
-    const ledger: { type: string; points: number }[] = [];
-    if (pricing.rewardValue > 0) {
-      ledger.push({ type: "Redeemed", points: pricing.rewardValue });
-    }
-
-    for (const entry of ledger) {
-      try {
-        await db.collection("rewardTransactions").add({
-          userId: requester.uid,
-          userEmail: requester.email,
-          type: entry.type,
-          points: entry.points,
-          ...(entry.type === "Earned" ? { orderTotal: pricing.finalTotal } : {}),
-          orderId,
-          createdAt: Timestamp.now(),
-        });
-      } catch (error) {
-        console.error("place-order: reward ledger write failed:", error);
-      }
-    }
+    // order that has already committed. The reward ledger row is no longer
+    // written here: it moved into the transaction above, atomically with the
+    // balance (lib/points). No "Earned" row at creation — nothing has been
+    // earned yet; app/api/credit-reward-points writes it when it is.
 
     // Pay-on-delivery notifications, previously written by the browser in
     // app/checkout's applyPostOrderEffects. They moved here because writing

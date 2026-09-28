@@ -28,11 +28,9 @@ import {
 } from "@/lib/rewardCredit";
 import { returnWindowEndsAt } from "@/lib/returnEligibility";
 import {
-  REFERRAL_MONTHLY_CAP,
   REFERRER_BONUS,
   WELCOME_BONUS,
   isWellFormedReferralCode,
-  paidReferralsThisMonth,
   referrerLedgerId,
   welcomeLedgerId,
 } from "@/lib/referrals";
@@ -477,6 +475,21 @@ const LEDGER_TYPES: Record<string, { kind: LedgerKind; sign: 1 | -1; label: stri
   "Cancelled - Points Reversed": { kind: "cancellation-reversed", sign: -1, label: "Earned points reversed (order cancelled)" },
 };
 
+// v2 rows (lib/points: v === 2) carry a signed `delta` — what actually moved
+// the balance — and a `kind`, mapped onto the SAME view kinds and labels.
+const V2_KINDS: Record<string, { kind: LedgerKind; label: string }> = {
+  purchase_earned: { kind: "earned", label: LEDGER_TYPES.Earned.label },
+  checkout_redeem: { kind: "redeemed", label: LEDGER_TYPES.Redeemed.label },
+  refund_item: { kind: "refund", label: LEDGER_TYPES.Refund.label },
+  refund_return: { kind: "refund", label: LEDGER_TYPES.Refund.label },
+  referral_welcome: { kind: "referral", label: LEDGER_TYPES["Referral Bonus"].label },
+  referral_referrer: { kind: "referral", label: LEDGER_TYPES["Referral Bonus"].label },
+  cancel_restore: { kind: "cancellation-restored", label: LEDGER_TYPES["Cancelled - Points Restored"].label },
+  cancel_reverse: { kind: "cancellation-reversed", label: LEDGER_TYPES["Cancelled - Points Reversed"].label },
+  adjustment: { kind: "other", label: "Adjustment" },
+  opening_balance: { kind: "other", label: "Opening balance" },
+};
+
 export type LedgerEntry = {
   id: string;
   kind: LedgerKind;
@@ -491,10 +504,22 @@ export function buildLedger(rows: Row[], orderNumbers: OrderNumbers): LedgerEntr
   return [...rows]
     .sort((a, b) => ms(b.data.createdAt) - ms(a.data.createdAt))
     .map((r) => {
+      const orderId = str(r.data.orderId, 200);
+      const v2 = r.data.v === 2 && typeof r.data.kind === "string" ? V2_KINDS[r.data.kind] : undefined;
+      if (v2) {
+        return {
+          id: opaqueId(r.id),
+          kind: v2.kind,
+          label: v2.label,
+          points: Math.round(num(r.data.delta)),
+          orderNumber: orderId ? orderNumbers.get(orderId) ?? null : null,
+          createdAt: iso(r.data.createdAt),
+        };
+      }
+      // Legacy rows: sign from the type label, as before.
       const type = str(r.data.type, 60);
       const t = LEDGER_TYPES[type];
       const points = Math.abs(Math.round(num(r.data.points)));
-      const orderId = str(r.data.orderId, 200);
       return {
         // Ledger ids can embed another customer's uid (referrer_{friendUid}).
         id: opaqueId(r.id),
@@ -528,19 +553,19 @@ export const REFERRAL_HISTORY_KEYS = ["id", "friend", "status", "points", "date"
 
 export type AccountReferrals = {
   code: string | null;
-  bonuses: { referrer: number; welcome: number; monthlyCap: number };
-  thisMonth: { paid: number; remaining: number };
+  bonuses: { referrer: number; welcome: number };
   totals: { paidReferrals: number; pointsEarned: number };
   history: ReferralHistoryEntry[];
   yourSignup: { referred: boolean; status: "paid" | "pending" | "not-paid" | "none" };
 };
-export const ACCOUNT_REFERRALS_KEYS = ["code", "bonuses", "thisMonth", "totals", "history", "yourSignup"] as const;
+export const ACCOUNT_REFERRALS_KEYS = ["code", "bonuses", "totals", "history", "yourSignup"] as const;
 
 /**
  * The customer's referral page. Friends are ANONYMOUS — "A friend", their
  * join date and whether the bonus has been paid; never a name, email or uid
- * (the entry id is opaque). "pending" covers both a friend awaiting email
- * verification and a referral deferred by the monthly cap.
+ * (the entry id is opaque). "pending" covers every unpaid referral (awaiting
+ * email verification, blocked, or held for review). Direct referrals are
+ * unlimited — there is no monthly cap.
  */
 export function buildReferrals(params: {
   uid: string;
@@ -550,7 +575,6 @@ export function buildReferrals(params: {
   now?: number;
 }): AccountReferrals {
   const { uid, user, ownLedger, friends } = params;
-  const now = params.now ?? Date.now();
   const code = isWellFormedReferralCode(user.referralCode) ? (user.referralCode as string) : null;
   const ledgerIds = new Set(ownLedger.map((r) => r.id));
 
@@ -568,10 +592,6 @@ export function buildReferrals(params: {
     })
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
-  const paidThisMonth = paidReferralsThisMonth(
-    ownLedger.map((r) => ({ id: r.id, createdAtMs: ms(r.data.createdAt) || null })),
-    now
-  );
   const paidReferrals = Math.max(0, Math.floor(num(user.totalReferrals)));
 
   const referredBy = typeof user.referredBy === "string" ? user.referredBy.trim() : "";
@@ -590,8 +610,7 @@ export function buildReferrals(params: {
 
   return {
     code,
-    bonuses: { referrer: REFERRER_BONUS, welcome: WELCOME_BONUS, monthlyCap: REFERRAL_MONTHLY_CAP },
-    thisMonth: { paid: paidThisMonth, remaining: Math.max(0, REFERRAL_MONTHLY_CAP - paidThisMonth) },
+    bonuses: { referrer: REFERRER_BONUS, welcome: WELCOME_BONUS },
     totals: { paidReferrals, pointsEarned: paidReferrals * REFERRER_BONUS },
     history,
     yourSignup,

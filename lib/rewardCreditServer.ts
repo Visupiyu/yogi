@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
 import { Timestamp } from "firebase-admin/firestore";
 import {
   evaluateRewardCredit,
@@ -108,12 +109,29 @@ export async function creditOneOrder(
 
     const userRef = db.collection("users").doc(ownerUid);
     const userSnap = await tx.get(userRef);
-    const balance = Number(userSnap.data()?.rewardPoints || 0);
+    const orderEmail = (order as { userEmail?: unknown }).userEmail;
 
-    tx.set(
-      userRef,
-      { rewardPoints: balance + verdict.points },
-      { merge: true }
+    // The balance and its "Earned" ledger row (earned_{orderId}) move
+    // together, inside this transaction (lib/points).
+    applyPointsMovements(
+      tx,
+      db,
+      {
+        ref: userRef,
+        snap: userSnap,
+        uid: ownerUid,
+        email: typeof orderEmail === "string" ? orderEmail : null,
+        write: "merge",
+      },
+      [
+        {
+          kind: "purchase_earned",
+          id: pointsLedgerId.earned(orderId),
+          requested: verdict.points,
+          refs: { orderId },
+          extra: { orderTotal: Number(order.finalTotal || 0) },
+        },
+      ]
     );
 
     tx.update(orderRef, {
@@ -125,35 +143,7 @@ export async function creditOneOrder(
     return { orderId, credited: true, points: verdict.points };
   });
 
-  // ---- Best-effort, outside the transaction. The balance has already moved
-  // and must not be rolled back over a ledger write, exactly as the order
-  // creation paths treat their own ledger rows.
-  if (outcome.credited) {
-    try {
-      const orderSnap = await db.collection("orders").doc(orderId).get();
-      const order = orderSnap.data() || {};
-
-      // Deterministic id rather than add(), so a retry of this write cannot
-      // produce a second "Earned" row for the same order. Matches the
-      // deterministic-id idempotency the order and return paths already use.
-      await db
-        .collection("rewardTransactions")
-        .doc(`earned_${orderId}`)
-        .set({
-          userId:
-            typeof order.userId === "string" ? order.userId : caller.uid,
-          userEmail:
-            typeof order.userEmail === "string" ? order.userEmail : null,
-          type: "Earned",
-          points: outcome.points,
-          orderTotal: Number(order.finalTotal || 0),
-          orderId,
-          createdAt: Timestamp.now(),
-        });
-    } catch (error) {
-      console.error("creditOneOrder: ledger write failed:", error);
-    }
-  }
+  // The "Earned" ledger row is written inside the transaction above.
 
   return outcome;
 }

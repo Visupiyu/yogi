@@ -41,6 +41,9 @@ process.env.RAZORPAY_KEY_SECRET = "test_secret_local_harness";
 delete process.env.GEMINI_API_KEY;
 delete process.env.RESEND_API_KEY;
 
+// Every test Auth account "was created" when the harness started, so profiles
+// written during the run are new customers (lib/referrals 30-minute rule).
+const AUTH_CREATED_MS = Date.now();
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: any, init?: any) => {
   const url = typeof input === "string" ? input : input?.url ?? "";
@@ -49,7 +52,7 @@ globalThis.fetch = (async (input: any, init?: any) => {
     try { idToken = JSON.parse(init?.body ?? "{}").idToken ?? ""; } catch {}
     const parts = idToken.split(":");
     if (parts[0] !== "test" || !parts[1]) return new Response(JSON.stringify({ error: "invalid" }), { status: 400 });
-    return new Response(JSON.stringify({ users: [{ localId: parts[1], email: parts[2] || null, emailVerified: parts[3] === "true" }] }),
+    return new Response(JSON.stringify({ users: [{ localId: parts[1], email: parts[2] || null, emailVerified: parts[3] === "true", createdAt: String(AUTH_CREATED_MS) }] }),
       { status: 200, headers: { "content-type": "application/json" } });
   }
   if (url.includes("generativelanguage") || url.includes("api.resend.com")) throw new Error("TEST HARNESS: external call attempted");
@@ -203,19 +206,15 @@ try {
         (await user("dup1")).rewardPoints === 0 && (await user("dup2")).rewardPoints === 0,
       `${self.body.result}/${unknown.body.result}/${dup.body.result}`);
 
-    // Cap: R2 has already been paid for 10 referrals this month.
+    // No monthly cap: R2 has already been paid for 10 referrals this month.
     for (let i = 0; i < 10; i++) {
       await db.collection("rewardTransactions").doc(`referrer_old${i}`).set({ userId: R2, points: 100, type: "Referral Bonus", createdAt: Timestamp.now() });
     }
     await db.collection("users").doc("n6").set({ uid: "n6", role: "customer", email: email("n6"), rewardPoints: 0, referredBy: "YOGI500002" });
-    const capped = await call(signupRewards, { uid: "n6", body: {} });
-    const cappedState = { n6: (await user("n6")).rewardPoints, R2: (await user(R2)).rewardPoints, stamp: !!(await user("n6")).signupRewardsGrantedAt };
-    for (let i = 0; i < 10; i++) await db.collection("rewardTransactions").doc(`referrer_old${i}`).update({ createdAt: daysAgo(40) });
-    const later = await call(signupRewards, { uid: "n6", body: {} });
-    record("7  monthly cap (10): the 11th referral is DEFERRED (nothing paid, still eligible) and paid once the referrer is under the cap",
-      capped.body.result === "deferred" && cappedState.n6 === 0 && cappedState.R2 === 0 && !cappedState.stamp &&
-        later.body.result === "granted" && (await user("n6")).rewardPoints === 50 && (await user(R2)).rewardPoints === 100,
-      `${capped.body.result} -> ${later.body.result}`);
+    const eleventh = await call(signupRewards, { uid: "n6", body: {} });
+    record("7  unlimited direct referrals: an 11th referral in the same month is paid at once (+50 / +100)",
+      eleventh.body.result === "granted" && (await user("n6")).rewardPoints === 50 && (await user(R2)).rewardPoints === 100,
+      String(eleventh.body.result));
 
     await db.collection("users").doc("n7").set({ uid: "n7", role: "customer", email: email("n7") });
     await db.collection("rateLimits").doc("signup-rewards_n7").set({ windowStart: Date.now(), count: 10 });

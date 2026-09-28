@@ -54,10 +54,11 @@ rules_version = '2';
 //
 // Collection: users                 Doc ID: uid
 //   uid, name, email, role("customer"), rewardPoints(number), status.
-//   Owner CRUD on their own doc, role/status immutable by the owner. A signup
-//   referral bonus performs a narrow cross-user write of exactly
-//   {rewardPoints, totalReferrals} (increasing only) on the referrer's doc —
-//   allowed as a scoped carve-out, nothing else.
+//   Owner CRUD on their own doc, role/status immutable by the owner. The
+//   reward balance and referral state (rewardPoints, totalReferrals,
+//   referralCode, referredBy after creation, signupRewardsGrantedAt) are
+//   SERVER-ONLY for every client, admin included — they move only through
+//   lib/points inside server transactions.
 //
 // Collection: chats                 Doc ID: auto-id
 //   sellerId(string=uid, always present). customerId(uid) and/or
@@ -467,6 +468,21 @@ service cloud.firestore {
         );
     }
 
+    // Server-owned reward state on an order: what checkout priced in points
+    // (rewardValue), what could not be deducted (rewardShortfall) and the
+    // deferred-credit lifecycle (rewardPointsStatus / rewardPointsCredited /
+    // rewardPointsCreditedAt). Written only by the Admin SDK inside the
+    // transaction that moves the points (app/api/place-order, lib/onlineOrder,
+    // lib/rewardCreditServer); cancellation restores from them. No client —
+    // admin included — may change them.
+    function orderRewardStateUnchanged() {
+      return unchanged('rewardValue')
+        && unchanged('rewardShortfall')
+        && unchanged('rewardPointsStatus')
+        && unchanged('rewardPointsCredited')
+        && unchanged('rewardPointsCreditedAt');
+    }
+
     match /orders/{orderId} {
       // isAssignedDeliveryPartner() added here as a genuine bug fix, not
       // scope creep: app/delivery/[id]/page.tsx's loadOrder() has always
@@ -520,7 +536,7 @@ service cloud.firestore {
       // unchanged; only creation moves server-side.
       allow create: if false;
 
-      allow update: if isAdmin()
+      allow update: if (isAdmin() && orderRewardStateUnchanged())
         // No customer branch. Cancelling goes through app/api/cancel-order
         // (web and Customer App), which restores stock/sales, reverses reward
         // points and coupons and notifies the seller in one place. A direct
@@ -865,9 +881,12 @@ service cloud.firestore {
       // these rules entirely:
       //   spend at checkout  -> app/api/place-order, lib/onlineOrder
       //   earn after delivery-> lib/rewardCreditServer (credit-reward-points)
-      //   refund to points   -> app/api/item-request/transition
+      //   refund to points   -> app/api/item-request/transition,
+      //                         app/api/admin/returns/[id]/status
       //   cancellation       -> app/api/cancel-order
       //   signup/referral    -> app/api/signup-rewards
+      // each through lib/points, which writes the balance and its ledger row
+      // in the same transaction.
       //
       // The two client branches that used to live here (a referral bonus and
       // a "checkout" balance write) let a signed-in customer set their own
@@ -875,7 +894,17 @@ service cloud.firestore {
       // account — and lib/orderPricing.ts trusts the stored balance to grant
       // a checkout discount, so either one minted spendable money. Both are
       // removed; the owner branch below still requires unchanged('rewardPoints').
-      allow update: if isAdmin()
+      allow update: if (
+          // Admin: status (Block/Unblock) and profile fields stay editable,
+          // but the balance and referral state are server-owned for admins
+          // too — a browser write would move points with no ledger row.
+          isAdmin()
+          && unchanged('rewardPoints')
+          && unchanged('totalReferrals')
+          && unchanged('signupRewardsGrantedAt')
+          && unchanged('referredBy')
+          && unchanged('referralCode')
+        )
         || (
           isOwnerUid(userId)
           && unchanged('role')
@@ -1294,6 +1323,16 @@ service cloud.firestore {
       // still in that same write, otherwise the ceiling would be checked
       // against one order while a different one is stored.
       allow update: if isAdmin()
+        // A return's status and its one-time points-credit flag are
+        // server-owned: app/api/admin/returns/[id]/status credits points on
+        // "Refunded" and sets pointsCredited in one transaction. A direct
+        // status write could strip the "Refunded" evidence of a legacy credit
+        // and let it be paid again; clearing pointsCredited would re-arm it.
+        // Pickup details and the (bounded) refundAmount stay admin-editable.
+        && unchanged('status')
+        && unchanged('pointsCredited')
+        && unchanged('pointsCreditedAt')
+        && unchanged('pointsCreditedLegacy')
         && (
           unchanged('refundAmount')
           || (unchanged('orderId') && isValidRefundAmount(resource.data.orderId))
@@ -1455,11 +1494,12 @@ service cloud.firestore {
       // with the Admin SDK, which writes both ledger rows itself and bypasses
       // these rules, so no client needs to write another user's history.
       // Every ledger row is written by a server route (orders, cancellations,
-      // refunds, reward credit, signup rewards) or an admin. A customer could
-      // previously create rows for themselves with any points and type.
-      allow create: if isAdmin();
-
-      allow update, delete: if isAdmin();
+      // refunds, reward credit, signup rewards) through lib/points, in the same
+      // transaction as the balance it records. The ledger is IMMUTABLE and
+      // SERVER-ONLY: no client — admin included — may create, edit or delete a
+      // row (an admin row would record points that never moved). A customer
+      // could previously create rows for themselves with any points and type.
+      allow create, update, delete: if false;
     }
 
     // ---------------------------------------------------------

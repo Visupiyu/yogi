@@ -322,20 +322,20 @@ try {
   {
     const r = await get(referralsRoute, { uid: A });
     const b = r.body;
-    record("15 referrals: EXACT keys; anonymous history 'A friend' with join dates — F1 paid (+100), F2 pending (awaiting verification), F3 pending (deferred) — opaque ids",
+    record("15 referrals: EXACT keys; anonymous history 'A friend' with join dates — F1 paid (+100), F2 and F3 pending — opaque ids",
       r.status === 200 && keys(b) === expect(V.ACCOUNT_REFERRALS_KEYS) &&
         b.history.every((h: any) => keys(h) === expect(V.REFERRAL_HISTORY_KEYS) && h.friend === "A friend" && h.date) &&
         b.history.length === 3 && b.history.filter((h: any) => h.status === "paid").length === 1 &&
         b.history.find((h: any) => h.status === "paid").points === 100 && b.history.filter((h: any) => h.status === "pending").length === 2,
       JSON.stringify(b.history.map((h: any) => [h.friend, h.status, h.points])));
-    record("16 referral numbers: code, bonuses 100/50, cap 10; this month 1 paid / 9 left (a 60-day-old legacy row is not this month); totals 2 paid · 200 points; your own signup bonus paid",
-      b.code === "YOGI100001" && b.bonuses.referrer === 100 && b.bonuses.welcome === 50 && b.bonuses.monthlyCap === 10 &&
-        b.thisMonth.paid === 1 && b.thisMonth.remaining === 9 && b.totals.paidReferrals === 2 && b.totals.pointsEarned === 200 &&
+    record("16 referral numbers: code, bonuses 100/50 (no monthly cap); totals 2 paid · 200 points; your own signup bonus paid",
+      b.code === "YOGI100001" && b.bonuses.referrer === 100 && b.bonuses.welcome === 50 && !("monthlyCap" in b.bonuses) &&
+        !("thisMonth" in b) && b.totals.paidReferrals === 2 && b.totals.pointsEarned === 200 &&
         b.yourSignup.referred === true && b.yourSignup.status === "paid",
-      JSON.stringify({ month: b.thisMonth, totals: b.totals, you: b.yourSignup }));
-    const capped = await get(referralsRoute, { uid: R });
-    record("17 monthly cap: a referrer paid 10 times this month shows 10/10, 0 remaining",
-      capped.body.thisMonth.paid === 10 && capped.body.thisMonth.remaining === 0, JSON.stringify(capped.body.thisMonth));
+      JSON.stringify({ bonuses: b.bonuses, totals: b.totals, you: b.yourSignup }));
+    const many = await get(referralsRoute, { uid: R });
+    record("17 no monthly cap: a referrer paid 10 times this month sees no cap or 'this month' limit",
+      many.status === 200 && !("thisMonth" in many.body) && !("monthlyCap" in many.body.bonuses), JSON.stringify(many.body.bonuses));
 
     const before = await get(referralsRoute, { uid: N });
     const issue = await post(signupRewards, N, {});

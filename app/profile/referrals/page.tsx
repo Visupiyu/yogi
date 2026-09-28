@@ -125,7 +125,7 @@ export default function ReferralsPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white rounded-2xl shadow p-5 text-center">
                 <p className="text-sm text-gray-500">Paid referrals</p>
                 <p className="mt-1 text-3xl font-bold">{data.totals.paidReferrals}</p>
@@ -133,17 +133,6 @@ export default function ReferralsPage() {
               <div className="bg-white rounded-2xl shadow p-5 text-center">
                 <p className="text-sm text-gray-500">Points from referrals</p>
                 <p className="mt-1 text-3xl font-bold">{data.totals.pointsEarned}</p>
-              </div>
-              <div className="bg-white rounded-2xl shadow p-5 text-center">
-                <p className="text-sm text-gray-500">This month</p>
-                <p className="mt-1 text-3xl font-bold">
-                  {data.thisMonth.paid}/{data.bonuses.monthlyCap}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {data.thisMonth.remaining > 0
-                    ? `${data.thisMonth.remaining} more can be paid this month`
-                    : "Monthly limit reached — new referrals are paid next month"}
-                </p>
               </div>
             </div>
 
@@ -173,8 +162,8 @@ export default function ReferralsPage() {
                 </div>
               )}
               <p className="mt-4 text-xs text-gray-400">
-                A referral is paid once your friend verifies their email. Up to {data.bonuses.monthlyCap} referrals are paid each
-                month; any more are paid the following month.
+                A referral is paid once your friend, a new YOMICO customer, verifies their email. There is no limit on how
+                many friends you can refer.
               </p>
             </div>
 

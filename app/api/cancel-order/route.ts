@@ -2,6 +2,7 @@ import { verifyRequestUser, type VerifiedUser } from "@/lib/serverAuth";
 import { shouldReverseEarnedPoints } from "@/lib/rewardCredit";
 import { vendorsOnOrder } from "@/lib/sellerOrderRecord";
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
 import {
   FieldValue,
   Timestamp,
@@ -101,6 +102,7 @@ type OrderRecord = {
   status?: unknown;
   finalTotal?: unknown;
   rewardValue?: unknown;
+  rewardShortfall?: unknown;
   couponCode?: unknown;
   paymentMethod?: unknown;
   paymentStatus?: unknown;
@@ -412,6 +414,38 @@ export async function POST(request: Request) {
           : null;
         const userSnap = adjustsPoints && userRef ? await tx.get(userRef) : null;
 
+        // Restore only the points ACTUALLY deducted. An ONLINE order keeps the
+        // full priced rewardValue even when the balance could not cover it at
+        // payment; the gap is recorded as rewardShortfall, and the order's
+        // redeem_{orderId} ledger row (lib/points) holds the real deduction.
+        // Restoring rewardValue in full would mint the shortfall as points.
+        // Source of truth: that row when it is a v2 row for this customer;
+        // otherwise (orders placed before the ledger moved into the
+        // transaction) rewardValue − rewardShortfall.
+        const redeemRowSnap =
+          adjustsPoints && redeemedValue > 0
+            ? await tx.get(
+                db.collection("rewardTransactions").doc(pointsLedgerId.redeem(orderRef.id))
+              )
+            : null;
+        const redeemRow = redeemRowSnap?.exists
+          ? (redeemRowSnap.data() as { v?: unknown; userId?: unknown; delta?: unknown })
+          : null;
+        const redeemRowDelta = Number(redeemRow?.delta);
+        const recordedShortfall = Number(order.rewardShortfall);
+        const restoreValue =
+          redeemRow &&
+          redeemRow.v === 2 &&
+          redeemRow.userId === orderUserId &&
+          Number.isFinite(redeemRowDelta) &&
+          redeemRowDelta <= 0
+            ? Math.min(redeemedValue, -redeemRowDelta)
+            : Math.max(
+                0,
+                redeemedValue -
+                  (Number.isFinite(recordedShortfall) && recordedShortfall > 0 ? recordedShortfall : 0)
+              );
+
         // F010 gives redemptions a deterministic id, so the claim can be
         // read inside the transaction instead of queried (transactions
         // cannot run queries). Legacy random-id claims are swept up
@@ -613,15 +647,38 @@ export async function POST(request: Request) {
           }
         }
 
-        if (adjustsPoints && userRef) {
-          const currentPoints = userSnap?.exists
-            ? Number(userSnap.data()?.rewardPoints || 0)
-            : 0;
-          const newBalance = Math.max(
-            0,
-            currentPoints - earnedPoints + redeemedValue
+        if (adjustsPoints && userRef && userSnap && orderUserId) {
+          // Restore first, then reverse: net max(0, current − earned + restored),
+          // where restored is what was actually deducted (above). Each movement gets its own
+          // fixed-id ledger row in this transaction (lib/points), and any part
+          // of the reversal the balance cannot cover is recorded as an
+          // explicit shortfall instead of vanishing.
+          applyPointsMovements(
+            tx,
+            db,
+            {
+              ref: userRef,
+              snap: userSnap,
+              uid: orderUserId,
+              email: typeof order.userEmail === "string" ? order.userEmail : null,
+              write: "merge",
+            },
+            [
+              {
+                kind: "cancel_restore",
+                id: pointsLedgerId.cancelRestore(orderRef.id),
+                requested: restoreValue,
+                refs: { orderId: orderRef.id },
+              },
+              {
+                kind: "cancel_reverse",
+                id: pointsLedgerId.cancelReverse(orderRef.id),
+                requested: -earnedPoints,
+                allowShortfall: true,
+                refs: { orderId: orderRef.id },
+              },
+            ]
           );
-          tx.set(userRef, { rewardPoints: newBalance }, { merge: true });
         }
 
         // Only release a claim that belongs to THIS order.
@@ -660,36 +717,7 @@ export async function POST(request: Request) {
     // ---- Best-effort, outside the transaction ----
     // None of these may fail the cancellation, which has already committed.
 
-    // Reward ledger entries, mirroring the customer path's wording.
-    if (outcome.orderUserId) {
-      const ledger: { type: string; points: number }[] = [];
-      if (outcome.earnedPoints > 0) {
-        ledger.push({
-          type: "Cancelled - Points Reversed",
-          points: outcome.earnedPoints,
-        });
-      }
-      if (outcome.redeemedValue > 0) {
-        ledger.push({
-          type: "Cancelled - Points Restored",
-          points: outcome.redeemedValue,
-        });
-      }
-      for (const entry of ledger) {
-        try {
-          await db.collection("rewardTransactions").add({
-            userId: outcome.orderUserId,
-            userEmail: outcome.orderUserEmail,
-            type: entry.type,
-            points: entry.points,
-            orderId,
-            createdAt: Timestamp.now(),
-          });
-        } catch (error) {
-          console.error("cancel-order: reward ledger write failed:", error);
-        }
-      }
-    }
+    // (The reward ledger rows are written inside the transaction above.)
 
     // Customer notification — centralised here so every caller (the website's
     // own pages AND the Customer App, once migrated to this same route) gets
