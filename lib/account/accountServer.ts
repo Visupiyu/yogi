@@ -29,6 +29,7 @@ import {
   type ReturnRequestView,
   type Row,
 } from "@/lib/account/accountViews";
+import { isCustomerNotificationFor } from "@/lib/account/notificationViews";
 
 export const WALLET_PAGE_SIZE = 50;
 
@@ -101,7 +102,7 @@ export async function loadAccountSummary(db: Firestore, who: VerifiedUser, now =
       paidReferrals: Math.max(0, Math.floor(Number(user.totalReferrals) || 0)),
     },
     notifications: {
-      unread: notifications.filter((n) => n.data.read === false && (n.data.role === undefined || n.data.role === "customer")).length,
+      unread: notifications.filter((n) => isCustomerNotificationFor(who.uid, n.data) && n.data.read !== true).length,
     },
     addresses: { saved: addresses.length },
   };

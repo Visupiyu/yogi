@@ -5,8 +5,19 @@
 import { auth } from "@/lib/firebase";
 import type { AccountReferrals, AccountSummary } from "@/lib/account/accountViews";
 import type { AccountReturns, AccountWallet } from "@/lib/account/accountServer";
+import type { CustomerNotification } from "@/lib/account/notificationViews";
+import type { AccountNotificationsPage } from "@/lib/account/notificationServer";
+import type { DeletionRequestView } from "@/lib/account/deletionRequests";
 
-export type { AccountReferrals, AccountSummary, AccountReturns, AccountWallet };
+export type {
+  AccountReferrals,
+  AccountSummary,
+  AccountReturns,
+  AccountWallet,
+  CustomerNotification,
+  AccountNotificationsPage,
+  DeletionRequestView,
+};
 
 type Result<T> = { data: T | null; error: string | null };
 
@@ -49,6 +60,30 @@ export function respondToPickup(requestId: string, action: "accept" | "counter",
     body: JSON.stringify({ requestId, action, ...(action === "counter" ? { counterAt } : {}) }),
   });
 }
+
+// ---- Notification centre (app/api/account/notifications*) ----
+export const fetchNotifications = (cursor?: string | null) =>
+  authed<AccountNotificationsPage>(`/api/account/notifications${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`);
+export const fetchUnreadCount = () => authed<{ unreadCount: number }>("/api/account/notifications/unread-count");
+/** Mark the customer's own notifications read: some (opaque ids) or all. */
+export const markNotificationsRead = (target: { ids: string[] } | { all: true }) =>
+  authed<{ updated: number }>("/api/account/notifications/read", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(target),
+  });
+
+// ---- Account deletion request (app/api/account/deletion-request*) ----
+export const fetchDeletionRequest = () =>
+  authed<{ request: DeletionRequestView | null; canRequest: boolean }>("/api/account/deletion-request");
+export const requestAccountDeletion = (reason: string) =>
+  authed<{ request: DeletionRequestView }>("/api/account/deletion-request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm: true, ...(reason ? { reason } : {}) }),
+  });
+export const cancelAccountDeletion = () =>
+  authed<{ request: DeletionRequestView }>("/api/account/deletion-request/cancel", { method: "POST" });
 
 export const formatDate = (isoValue: string | null, withTime = false) => {
   if (!isoValue) return "";

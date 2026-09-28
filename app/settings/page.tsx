@@ -1,68 +1,143 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { onAuthStateChanged, sendPasswordResetEmail, signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
+import {
+  cancelAccountDeletion,
+  fetchAccountSummary,
+  fetchDeletionRequest,
+  formatDate,
+  requestAccountDeletion,
+  type AccountSummary,
+  type DeletionRequestView,
+} from "@/lib/account/accountClient";
+
+// Account & Security. Everything shown comes from the server
+// (app/api/account/summary, app/api/account/deletion-request) — this page no
+// longer reads orders, addresses or reviews from Firestore.
+//
+//   - Email verification status, with a resend (the branded verification
+//     email, app/api/auth/send-verification-email).
+//   - Change password: Firebase emails a reset link to the signed-in address;
+//     YOMICO never sees or handles the password.
+//   - Notifications: no preference toggles. The old ones were never read by
+//     any sender, so they changed nothing; order, delivery, return and refund
+//     updates are always sent in-app and YOMICO sends no promotions.
+//   - Account deletion is a REQUEST that an admin processes by hand. Nothing
+//     is deleted or blocked automatically.
+
+const DELETION_RETAINED = [
+  "Orders, invoices and GST records",
+  "Payments, refunds and settlement records",
+  "Reward points and referral records",
+];
 
 export default function SettingsPage() {
   const router = useRouter();
+  const [summary, setSummary] = useState<AccountSummary | null>(null);
+  const [wishlistCount, setWishlistCount] = useState(0);
+  const [deletion, setDeletion] = useState<{ request: DeletionRequestView | null; canRequest: boolean } | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [showDeletionForm, setShowDeletionForm] = useState(false);
+  const [reason, setReason] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
 
-  const [stats, setStats] = useState({
-    orders: 0,
-    wishlist: 0,
-    addresses: 0,
-    reviews: 0,
-  });
+  const load = useCallback(async () => {
+    const [s, d] = await Promise.all([fetchAccountSummary(), fetchDeletionRequest()]);
+    if (s.data) setSummary(s.data);
+    if (d.data) setDeletion(d.data);
+    try {
+      setWishlistCount(JSON.parse(localStorage.getItem("wishlist") || "[]").length || 0);
+    } catch {
+      setWishlistCount(0);
+    }
+  }, []);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.push("/login");
         return;
       }
-
-      const wishlist = JSON.parse(
-        localStorage.getItem("wishlist") || "[]"
-      );
-
-      try {
-        const [ordersSnap, addressesSnap, reviewsSnap] = await Promise.all([
-          // firestore.rules gates orders reads on resource.data.userId,
-          // not userEmail -- querying a different field than the rule
-          // checks makes Firestore reject the whole query.
-          getDocs(
-            query(collection(db, "orders"), where("userId", "==", user.uid))
-          ),
-          getDocs(
-            query(collection(db, "addresses"), where("userEmail", "==", user.email))
-          ),
-          getDocs(
-            query(collection(db, "productReviews"), where("userEmail", "==", user.email))
-          ),
-        ]);
-
-        setStats({
-          orders: ordersSnap.size,
-          wishlist: wishlist.length,
-          addresses: addressesSnap.size,
-          reviews: reviewsSnap.size,
-        });
-      } catch (error) {
-        console.error(error);
-      }
+      load();
     });
-
     return () => unsub();
-  }, [router]);
+  }, [router, load]);
+
+  const email = summary?.profile.email || auth.currentUser?.email || "";
+  const verified = summary?.profile.emailVerified ?? auth.currentUser?.emailVerified ?? false;
+
+  const resendVerification = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    setBusy("verify");
+    setNotice(null);
+    try {
+      await sendVerificationEmail(user);
+      setNotice({ kind: "ok", text: `Verification email sent to ${user.email}. Check your inbox.` });
+    } catch {
+      setNotice({ kind: "error", text: "Couldn't send the verification email right now. Please try again later." });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const sendPasswordReset = async () => {
+    const user = auth.currentUser;
+    if (!user?.email) return;
+    setBusy("password");
+    setNotice(null);
+    try {
+      // Firebase sends the reset link to the SIGNED-IN account's own address;
+      // the new password is set on Firebase's page, never through YOMICO.
+      await sendPasswordResetEmail(auth, user.email);
+      setNotice({ kind: "ok", text: `We've emailed a password reset link to ${user.email}.` });
+    } catch {
+      setNotice({ kind: "error", text: "Couldn't send the reset email right now. Please try again later." });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const submitDeletion = async () => {
+    if (!confirmed) return;
+    setBusy("delete");
+    setNotice(null);
+    const result = await requestAccountDeletion(reason.trim());
+    setBusy(null);
+    if (result.error) {
+      setNotice({ kind: "error", text: result.error });
+      return;
+    }
+    setShowDeletionForm(false);
+    setReason("");
+    setConfirmed(false);
+    setNotice({ kind: "ok", text: "Your account deletion request has been sent. YOMICO will review it." });
+    load();
+  };
+
+  const cancelDeletion = async () => {
+    if (!confirm("Withdraw your account deletion request?")) return;
+    setBusy("cancel");
+    setNotice(null);
+    const result = await cancelAccountDeletion();
+    setBusy(null);
+    if (result.error) {
+      setNotice({ kind: "error", text: result.error });
+      return;
+    }
+    setNotice({ kind: "ok", text: "Your account deletion request has been withdrawn." });
+    load();
+  };
 
   const logout = async () => {
     if (!confirm("Logout from your account?")) return;
-
     await signOut(auth);
-
     localStorage.removeItem("user");
     localStorage.removeItem("vendor");
     localStorage.removeItem("admin");
@@ -74,700 +149,242 @@ export default function SettingsPage() {
     localStorage.removeItem("wishlist");
     window.dispatchEvent(new Event("cartUpdated"));
     window.dispatchEvent(new Event("wishlistUpdated"));
-
     router.push("/login");
   };
 
+  const req = deletion?.request || null;
+
+  const row = (href: string, icon: string, title: string, desc: string) => (
+    <Link
+      key={href + title}
+      href={href}
+      className="flex items-center justify-between gap-3 rounded-2xl border p-4 hover:bg-gray-50 transition"
+    >
+      <span className="flex items-center gap-3 min-w-0">
+        <span className="text-2xl">{icon}</span>
+        <span className="min-w-0">
+          <span className="block font-semibold">{title}</span>
+          <span className="block text-sm text-gray-500">{desc}</span>
+        </span>
+      </span>
+      <span className="text-gray-400">›</span>
+    </Link>
+  );
+
   return (
-    <section className="min-h-screen bg-gray-100 py-10 px-4">
+    <div className="min-h-screen bg-gray-100 p-4 sm:p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900">
+          ← Back to Profile
+        </Link>
 
-      <div className="max-w-5xl mx-auto">
-
-        <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 mb-4">← Back to Profile</Link>
-
-        {/* ================= HEADER ================= */}
-
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">
-            Settings
-          </h1>
-
-          <p className="text-gray-500 mt-2">
-            Manage your account, shopping preferences, notifications and privacy.
-          </p>
+        <div className="bg-gradient-to-r from-gray-800 to-gray-600 text-white rounded-3xl p-8">
+          <h1 className="text-4xl font-bold">Account & Security</h1>
+          <p className="mt-2 opacity-90">Manage your sign-in, security and account.</p>
         </div>
 
-        {/* ================= PROFILE CARD ================= */}
+        {notice && (
+          <div className={`rounded-2xl p-4 ${notice.kind === "ok" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-700"}`}>
+            {notice.text}
+          </div>
+        )}
 
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl p-8 text-white shadow-lg">
-
-          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-
-            <div className="flex items-center gap-5">
-
-              <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center text-5xl">
-                👤
-              </div>
-
-              <div>
-
-                <h2 className="text-3xl font-bold">
-                  Welcome Back
-                </h2>
-
-                <p className="text-green-100 mt-2">
-                  Manage your YOMICO account with ease.
-                </p>
-
-                <div className="mt-4 inline-block bg-white/20 px-4 py-1 rounded-full text-sm">
-                  Customer Account
-                </div>
-
-              </div>
-
-            </div>
-
-            <Link
-              href="/profile"
-              className="bg-white text-green-700 font-semibold px-6 py-3 rounded-xl hover:bg-gray-100 transition"
-            >
-              View Profile
+        {/* ACCOUNT OVERVIEW */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Orders", value: summary?.orders.total ?? 0, href: "/orders" },
+            { label: "Wishlist", value: wishlistCount, href: "/wishlist" },
+            { label: "Addresses", value: summary?.addresses.saved ?? 0, href: "/addresses" },
+            { label: "Unread", value: summary?.notifications.unread ?? 0, href: "/notifications" },
+          ].map((s) => (
+            <Link key={s.label} href={s.href} className="bg-white rounded-2xl shadow p-5 text-center">
+              <p className="text-sm text-gray-500">{s.label}</p>
+              <p className="mt-1 text-3xl font-bold">{s.value}</p>
             </Link>
-
-          </div>
-
+          ))}
         </div>
 
-        {/* ================= ACCOUNT STATS ================= */}
+        {/* SIGN-IN & SECURITY */}
+        <div className="bg-white rounded-3xl shadow p-6 space-y-4">
+          <h2 className="text-xl font-bold">🔐 Sign-in & security</h2>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mt-8">
-
-          <div className="bg-white rounded-2xl shadow-md p-6 text-center">
-            <div className="text-4xl">📦</div>
-
-            <h3 className="text-3xl font-bold mt-3">
-              {stats.orders}
-            </h3>
-
-            <p className="text-gray-500 mt-1">
-              Orders
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-4">
+            <div className="min-w-0">
+              <p className="font-semibold">Email</p>
+              <p className="text-sm text-gray-600 break-all">{email || "—"}</p>
+              <span
+                className={`mt-1 inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${
+                  verified ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"
+                }`}
+              >
+                {verified ? "✓ Verified" : "Not verified"}
+              </span>
+            </div>
+            {!verified && (
+              <button
+                onClick={resendVerification}
+                disabled={busy === "verify"}
+                className="shrink-0 rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {busy === "verify" ? "Sending…" : "Resend verification email"}
+              </button>
+            )}
           </div>
 
-          <div className="bg-white rounded-2xl shadow-md p-6 text-center">
-            <div className="text-4xl">❤️</div>
-
-            <h3 className="text-3xl font-bold mt-3">
-              {stats.wishlist}
-            </h3>
-
-            <p className="text-gray-500 mt-1">
-              Wishlist
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-4">
+            <div>
+              <p className="font-semibold">Password</p>
+              <p className="text-sm text-gray-600">We&apos;ll email a secure link to change your password.</p>
+            </div>
+            <button
+              onClick={sendPasswordReset}
+              disabled={busy === "password"}
+              className="shrink-0 rounded-xl border px-4 py-2 text-sm font-semibold text-gray-800 disabled:opacity-60"
+            >
+              {busy === "password" ? "Sending…" : "Email me a reset link"}
+            </button>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-md p-6 text-center">
-            <div className="text-4xl">📍</div>
-
-            <h3 className="text-3xl font-bold mt-3">
-              {stats.addresses}
-            </h3>
-
-            <p className="text-gray-500 mt-1">
-              Addresses
-            </p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-4">
+            <div>
+              <p className="font-semibold">Sign out</p>
+              <p className="text-sm text-gray-600">Sign out of YOMICO on this device.</p>
+            </div>
+            <button onClick={logout} className="shrink-0 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white">
+              🚪 Logout
+            </button>
           </div>
-
-          <div className="bg-white rounded-2xl shadow-md p-6 text-center">
-            <div className="text-4xl">⭐</div>
-
-            <h3 className="text-3xl font-bold mt-3">
-              {stats.reviews}
-            </h3>
-
-            <p className="text-gray-500 mt-1">
-              Reviews
-            </p>
-          </div>
-
         </div>
 
-        {/* ================= ACCOUNT SETTINGS ================= */}
+        {/* NOTIFICATIONS — no toggles: none were ever honoured */}
+        <div className="bg-white rounded-3xl shadow p-6 space-y-3">
+          <h2 className="text-xl font-bold">🔔 Notifications</h2>
+          <p className="text-sm text-gray-600">
+            Order, delivery, return and refund updates are always sent in-app. YOMICO doesn&apos;t send promotional
+            notifications.
+          </p>
+          {row("/notifications", "🔔", "Notification centre", "See and manage your notifications")}
+        </div>
 
-        <div className="bg-white rounded-3xl shadow-md mt-10 p-8">
+        {/* SHOPPING */}
+        <div className="bg-white rounded-3xl shadow p-6 space-y-3">
+          <h2 className="text-xl font-bold">🛍 Shopping</h2>
+          {row("/profile", "👤", "My Profile", "Name, mobile number and account overview")}
+          {row("/orders", "📦", "My Orders", "Track all your purchases")}
+          {row("/profile/refunds", "↩️", "Returns & Refunds", "Track returns, pickups and refunds")}
+          {row("/addresses", "📍", "Saved Addresses", "Manage delivery addresses")}
+          {row("/profile/tickets", "🎫", "Support Tickets", "View your requests and replies")}
+        </div>
 
-          <h2 className="text-2xl font-bold mb-6">
-            Account Settings
-          </h2>
+        {/* PREFERENCES (informational) */}
+        <div className="bg-white rounded-3xl shadow p-6 space-y-2">
+          <h2 className="text-xl font-bold">⚙️ Preferences</h2>
+          <div className="flex justify-between border-b py-2 text-sm">
+            <span>Language</span>
+            <span className="text-gray-600">English</span>
+          </div>
+          <div className="flex justify-between border-b py-2 text-sm">
+            <span>Currency</span>
+            <span className="text-gray-600">₹ INR</span>
+          </div>
+          <div className="flex justify-between py-2 text-sm">
+            <span>Dark mode</span>
+            <span className="text-gray-600">Coming soon</span>
+          </div>
+        </div>
 
-  {/* My Profile */}
+        {/* PRIVACY & LEGAL */}
+        <div className="bg-white rounded-3xl shadow p-6 space-y-3">
+          <h2 className="text-xl font-bold">📄 Privacy & legal</h2>
+          {row("/privacy-policy", "🔐", "Privacy Policy", "Learn how your information is protected")}
+          {row("/terms", "📄", "Terms & Conditions", "Read our marketplace terms")}
+          {row("/contact", "📞", "Contact Support", "Get help from YOMICO")}
+          {row("/about", "ℹ️", "About YOMICO", "Learn about us")}
+        </div>
 
-<Link
-  href="/profile"
-  className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mb-4"
->
-  <div className="flex items-center gap-4">
+        {/* ACCOUNT DELETION */}
+        <div className="bg-white rounded-3xl shadow p-6 space-y-4">
+          <h2 className="text-xl font-bold">🗑 Delete account</h2>
 
-    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">
-      👤
+          {req && (
+            <div className="rounded-2xl border p-4 space-y-1">
+              <p className="font-semibold">
+                Your request: <span className="text-gray-800">{req.statusLabel}</span>
+              </p>
+              {req.requestedAt && <p className="text-sm text-gray-500">Requested {formatDate(req.requestedAt)}</p>}
+              {req.reason && <p className="text-sm text-gray-600">Reason: {req.reason}</p>}
+              {req.messageFromYomico && (
+                <p className="text-sm text-gray-800">Message from YOMICO: {req.messageFromYomico}</p>
+              )}
+              {req.canCancel && (
+                <button
+                  onClick={cancelDeletion}
+                  disabled={busy === "cancel"}
+                  className="mt-2 rounded-xl border px-4 py-2 text-sm font-semibold text-gray-800 disabled:opacity-60"
+                >
+                  {busy === "cancel" ? "Withdrawing…" : "Withdraw request"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {deletion?.canRequest && !showDeletionForm && (
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600">
+                You can ask YOMICO to delete your account. Your request is reviewed by our team — nothing is deleted
+                automatically.
+              </p>
+              <button
+                onClick={() => setShowDeletionForm(true)}
+                className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white"
+              >
+                Request account deletion
+              </button>
+            </div>
+          )}
+
+          {showDeletionForm && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 space-y-3">
+              <p className="text-sm text-gray-800">
+                After review, YOMICO will close your account. By law we keep some records even after an account is
+                deleted:
+              </p>
+              <ul className="list-disc pl-5 text-sm text-gray-700">
+                {DELETION_RETAINED.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+              <textarea
+                value={reason}
+                maxLength={500}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Why are you leaving? (optional)"
+                className="w-full rounded-xl border p-3 text-sm"
+                rows={3}
+              />
+              <label className="flex items-start gap-2 text-sm text-gray-800">
+                <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-1" />
+                I understand and want to request deletion of my YOMICO account.
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={submitDeletion}
+                  disabled={!confirmed || busy === "delete"}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {busy === "delete" ? "Sending…" : "Send deletion request"}
+                </button>
+                <button
+                  onClick={() => setShowDeletionForm(false)}
+                  className="rounded-xl border px-4 py-2 text-sm font-semibold text-gray-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
-
-    <div>
-      <h3 className="font-semibold text-lg">
-        My Profile
-      </h3>
-
-      <p className="text-sm text-gray-500">
-        View your personal information
-      </p>
-    </div>
-
-  </div>
-
-  <span className="text-2xl text-gray-400">›</span>
-</Link>
-
-{/* Edit Profile */}
-
-<Link
-  href="/profile"
-  className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mb-4"
->
-  <div className="flex items-center gap-4">
-
-    <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-2xl">
-      ✏️
-    </div>
-
-    <div>
-      <h3 className="font-semibold text-lg">
-        Edit Profile
-      </h3>
-
-      <p className="text-sm text-gray-500">
-        Update your personal details
-      </p>
-    </div>
-
-  </div>
-
-  <span className="text-2xl text-gray-400">›</span>
-</Link>
-
-{/* Change Password */}
-
-<Link
-  href="/forgot-password"
-  className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition"
->
-  <div className="flex items-center gap-4">
-
-    <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-2xl">
-      🔒
-    </div>
-
-    <div>
-      <h3 className="font-semibold text-lg">
-        Change Password
-      </h3>
-
-      <p className="text-sm text-gray-500">
-        Reset your account password
-      </p>
-    </div>
-
-  </div>
-
-  <span className="text-2xl text-gray-400">›</span>
-</Link>
-
-</div>
-
-{/* ================= SHOPPING ================= */}
-
-<div className="bg-white rounded-3xl shadow-md mt-8 p-8">
-
-  <h2 className="text-2xl font-bold mb-6">
-    Shopping
-  </h2>
-
-  {/* Orders */}
-
-  <Link
-    href="/orders"
-    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mb-4"
-  >
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center text-2xl">
-        📦
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-lg">
-          My Orders
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Track all your purchases
-        </p>
-      </div>
-
-    </div>
-
-    <span className="text-2xl text-gray-400">›</span>
-  </Link>
-
-  {/* Wishlist */}
-
-  <Link
-    href="/wishlist"
-    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mb-4"
-  >
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center text-2xl">
-        ❤️
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-lg">
-          Wishlist
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Your favourite products
-        </p>
-      </div>
-
-    </div>
-
-    <span className="text-2xl text-gray-400">›</span>
-  </Link>
-
-  {/* Addresses */}
-
-  <Link
-    href="/addresses"
-    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition"
-  >
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">
-        📍
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-lg">
-          Saved Addresses
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Manage delivery addresses
-        </p>
-      </div>
-
-    </div>
-
-    <span className="text-2xl text-gray-400">›</span>
-  </Link>
-
-  {/* Support Tickets */}
-
-  <Link
-    href="/profile/tickets"
-    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mt-4"
-  >
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-2xl">
-        🎫
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-lg">
-          Support Tickets
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          View your requests and replies
-        </p>
-      </div>
-
-    </div>
-
-    <span className="text-2xl text-gray-400">›</span>
-  </Link>
-
-</div>
-{/* ================= NOTIFICATIONS ================= */}
-
-<div className="bg-white rounded-3xl shadow-md mt-8 p-8">
-
-  <h2 className="text-2xl font-bold mb-6">
-    Notifications
-  </h2>
-
-  {/* Order Notifications */}
-
-  <div className="flex items-center justify-between p-5 border rounded-2xl mb-4 hover:bg-gray-50 transition">
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-2xl">
-        🔔
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Order Notifications
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Receive updates about your orders.
-        </p>
-
-      </div>
-
-    </div>
-
-    <input
-      type="checkbox"
-      defaultChecked
-      className="w-5 h-5 accent-green-600"
-    />
-
-  </div>
-
-  {/* Promotional Notifications */}
-
-  <div className="flex items-center justify-between p-5 border rounded-2xl mb-4 hover:bg-gray-50 transition">
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center text-2xl">
-        🎁
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Promotional Notifications
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Receive offers, discounts and coupons.
-        </p>
-
-      </div>
-
-    </div>
-
-    <input
-      type="checkbox"
-      defaultChecked
-      className="w-5 h-5 accent-green-600"
-    />
-
-  </div>
-
-  {/* Email Notifications */}
-
-  <div className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition">
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-2xl">
-        📧
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Email Notifications
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Receive important account emails.
-        </p>
-
-      </div>
-
-    </div>
-
-    <input
-      type="checkbox"
-      defaultChecked
-      className="w-5 h-5 accent-green-600"
-    />
-
-  </div>
-
-</div>
-
-{/* ================= PRIVACY & SECURITY ================= */}
-
-<div className="bg-white rounded-3xl shadow-md mt-8 p-8">
-
-  <h2 className="text-2xl font-bold mb-6">
-    Privacy & Security
-  </h2>
-
-  <Link
-    href="/privacy-policy"
-    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mb-4"
-  >
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">
-        🔐
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Privacy Policy
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Learn how your information is protected.
-        </p>
-
-      </div>
-
-    </div>
-
-    <span className="text-2xl text-gray-400">›</span>
-
-  </Link>
-
-  <Link
-    href="/terms"
-    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mb-4"
-  >
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-2xl">
-        📄
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Terms & Conditions
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Read our marketplace terms.
-        </p>
-
-      </div>
-
-    </div>
-
-    <span className="text-2xl text-gray-400">›</span>
-
-  </Link>
-
-  <Link
-    href="/contact"
-    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition"
-  >
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-2xl">
-        📞
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Contact Support
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Need help? Contact the YOMICO support team.
-        </p>
-
-      </div>
-
-    </div>
-
-    <span className="text-2xl text-gray-400">›</span>
-
-  </Link>
-
-</div>
-{/* ================= PREFERENCES ================= */}
-
-<div className="bg-white rounded-3xl shadow-md mt-8 p-8">
-
-  <h2 className="text-2xl font-bold mb-6">
-    Preferences
-  </h2>
-
-  {/* Dark Mode */}
-
-  <div className="flex items-center justify-between p-5 border rounded-2xl mb-4">
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-2xl">
-        🌙
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Dark Mode
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Coming soon
-        </p>
-
-      </div>
-
-    </div>
-
-    <input
-      type="checkbox"
-      disabled
-      className="w-5 h-5 accent-green-600"
-    />
-
-  </div>
-
-  {/* Language */}
-
-  <div className="flex items-center justify-between p-5 border rounded-2xl mb-4">
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-2xl">
-        🌐
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Language
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          English
-        </p>
-
-      </div>
-
-    </div>
-
-    <span className="font-semibold text-gray-500">
-      EN
-    </span>
-
-  </div>
-
-  {/* Currency */}
-
-  <div className="flex items-center justify-between p-5 border rounded-2xl">
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">
-        💰
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          Currency
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Indian Rupee (₹)
-        </p>
-
-      </div>
-
-    </div>
-
-    <span className="font-semibold text-gray-500">
-      INR
-    </span>
-
-  </div>
-
-</div>
-
-{/* ================= ABOUT ================= */}
-
-<div className="bg-white rounded-3xl shadow-md mt-8 p-8">
-
-  <h2 className="text-2xl font-bold mb-6">
-    About
-  </h2>
-
-  <Link
-    href="/about"
-    className="flex items-center justify-between p-5 border rounded-2xl hover:bg-gray-50 transition mb-4"
-  >
-
-    <div className="flex items-center gap-4">
-
-      <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-2xl">
-        ℹ️
-      </div>
-
-      <div>
-
-        <h3 className="font-semibold text-lg">
-          About YOMICO
-        </h3>
-
-        <p className="text-sm text-gray-500">
-          Marketplace Version 1.0.0
-        </p>
-
-      </div>
-
-    </div>
-
-    <span className="text-2xl text-gray-400">
-      ›
-    </span>
-
-  </Link>
-
-  {/* Logout */}
-
-  <button
-    onClick={logout}
-    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-4 rounded-2xl transition mb-4"
-  >
-    🚪 Logout
-  </button>
-
-  {/* Delete Account */}
-
-  <button
-    onClick={()=>{
-      alert("Delete Account feature coming soon.");
-    }}
-    className="w-full border-2 border-red-500 text-red-600 hover:bg-red-50 py-4 rounded-2xl font-bold transition"
-  >
-    🗑 Delete Account
-  </button>
-
-</div>
-
-</div>
-
-</section>
-
   );
 }

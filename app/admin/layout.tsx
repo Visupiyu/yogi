@@ -14,6 +14,7 @@ const navItems = [
   { href: "/admin/orders", label: "Orders", icon: "📦" },
   { href: "/admin/users", label: "Users", icon: "👥" },
   { href: "/admin/customers", label: "Customers", icon: "🧑" },
+  { href: "/admin/account-deletions", label: "Account Deletions", icon: "🗑" },
   { href: "/admin/vendors", label: "Vendors", icon: "🏬" },
   { href: "/admin/kyc", label: "Vendor KYC", icon: "🪪" },
   { href: "/admin/business-requests", label: "Business Changes", icon: "📝" },
