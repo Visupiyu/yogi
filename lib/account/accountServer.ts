@@ -30,6 +30,7 @@ import {
   type Row,
 } from "@/lib/account/accountViews";
 import { isCustomerNotificationFor } from "@/lib/account/notificationViews";
+import { isRewardsEligible } from "@/lib/rewards/eligibility";
 
 export const WALLET_PAGE_SIZE = 50;
 
@@ -96,7 +97,11 @@ export async function loadAccountSummary(db: Firestore, who: VerifiedUser, now =
     returns: {
       open: requests.filter((r) => !["REFUNDED", "DELIVERED", "REJECTED", "CANCELLED"].includes(String(r.data.status))).length,
     },
-    rewards: { balance: rewardBalanceOf(user), pendingPoints: pendingPoints(orders, requests, legacy, now).points },
+    rewards: {
+      balance: rewardBalanceOf(user),
+      pendingPoints: pendingPoints(orders, requests, legacy, now).points,
+      rewardsEligible: isRewardsEligible(user),
+    },
     referrals: {
       code: typeof user.referralCode === "string" && /^[A-Z0-9]{4,32}$/.test(user.referralCode) ? user.referralCode : null,
       paidReferrals: Math.max(0, Math.floor(Number(user.totalReferrals) || 0)),
@@ -140,8 +145,13 @@ export type AccountWallet = {
   ledger: LedgerEntry[];
   nextCursor: string | null;
   rules: typeof WALLET_RULES;
+  /** First qualifying purchase completed (users.rewardsEligibleAt, server-owned). */
+  rewardsEligible: boolean;
+  rewardsEligibleAt: string | null;
 };
-export const ACCOUNT_WALLET_KEYS = ["balance", "pending", "ledger", "nextCursor", "rules"] as const;
+export const ACCOUNT_WALLET_KEYS = [
+  "balance", "pending", "ledger", "nextCursor", "rules", "rewardsEligible", "rewardsEligibleAt",
+] as const;
 
 /** cursor = how many ledger entries the customer has already been shown. */
 export function parseWalletCursor(raw: string | null): number | null {
@@ -167,6 +177,9 @@ export async function loadAccountWallet(db: Firestore, who: VerifiedUser, offset
     ledger: page,
     nextCursor: offset + WALLET_PAGE_SIZE < ledger.length ? String(offset + WALLET_PAGE_SIZE) : null,
     rules: WALLET_RULES,
+    // Read from the trusted profile only — never from the request.
+    rewardsEligible: isRewardsEligible(user),
+    rewardsEligibleAt: isRewardsEligible(user) ? iso(user.rewardsEligibleAt) : null,
   };
 }
 

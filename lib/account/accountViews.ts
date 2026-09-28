@@ -633,7 +633,7 @@ export type AccountSummary = {
   actions: { pickupSlotsToConfirm: number; verifyEmail: boolean; refundsDue: number };
   orders: { total: number; active: number; delivered: number; cancelled: number; recent: AccountOrderCard[] };
   returns: { open: number };
-  rewards: { balance: number; pendingPoints: number };
+  rewards: { balance: number; pendingPoints: number; rewardsEligible: boolean };
   referrals: { code: string | null; paidReferrals: number };
   notifications: { unread: number };
   addresses: { saved: number };

@@ -867,6 +867,10 @@ service cloud.firestore {
         // how the bonus was replayed and hijacked.
         && !('signupRewardsGrantedAt' in d)
         && !('referralCode' in d)
+        // Rewards eligibility (first qualifying purchase) is stamped only by
+        // lib/rewardCreditServer on the Admin SDK — never self-declared.
+        && !('rewardsEligibleAt' in d)
+        && !('rewardsEligibleOrderId' in d)
         && (!('referredBy' in d) || (d.referredBy is string && d.referredBy.size() <= 32));
     }
 
@@ -904,6 +908,8 @@ service cloud.firestore {
           && unchanged('signupRewardsGrantedAt')
           && unchanged('referredBy')
           && unchanged('referralCode')
+          && unchanged('rewardsEligibleAt')
+          && unchanged('rewardsEligibleOrderId')
         )
         || (
           isOwnerUid(userId)
@@ -922,6 +928,9 @@ service cloud.firestore {
           && unchanged('referredBy')
           && unchanged('referralCode')
           && unchanged('email')
+          // Rewards eligibility is server-owned (lib/rewards/eligibility).
+          && unchanged('rewardsEligibleAt')
+          && unchanged('rewardsEligibleOrderId')
         );
 
       allow delete: if isAdmin();

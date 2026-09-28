@@ -1,5 +1,6 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
+import { eligibilityStampFor } from "@/lib/rewards/eligibility";
 import { Timestamp } from "firebase-admin/firestore";
 import {
   evaluateRewardCredit,
@@ -111,6 +112,16 @@ export async function creditOneOrder(
     const userSnap = await tx.get(userRef);
     const orderEmail = (order as { userEmail?: unknown }).userEmail;
 
+    // One instant for the credit and, when this is the customer's FIRST
+    // qualifying purchase, their Rewards eligibility (lib/rewards/eligibility).
+    // The stamp rides in the same users write as the balance, in this
+    // transaction: it commits or rolls back with the points and the ledger row.
+    // An already-eligible customer keeps their original stamp (null here); two
+    // qualifying credits racing both write this user document, so Firestore
+    // retries the later one, which then sees the stamp and leaves it.
+    const creditedAt = Timestamp.now();
+    const eligibilityStamp = eligibilityStampFor(userSnap.data(), orderId, creditedAt);
+
     // The balance and its "Earned" ledger row (earned_{orderId}) move
     // together, inside this transaction (lib/points).
     applyPointsMovements(
@@ -122,6 +133,7 @@ export async function creditOneOrder(
         uid: ownerUid,
         email: typeof orderEmail === "string" ? orderEmail : null,
         write: "merge",
+        ...(eligibilityStamp ? { userFields: eligibilityStamp } : {}),
       },
       [
         {
@@ -136,7 +148,7 @@ export async function creditOneOrder(
 
     tx.update(orderRef, {
       rewardPointsStatus: "credited",
-      rewardPointsCreditedAt: Timestamp.now(),
+      rewardPointsCreditedAt: creditedAt,
       rewardPointsCredited: verdict.points,
     });
 

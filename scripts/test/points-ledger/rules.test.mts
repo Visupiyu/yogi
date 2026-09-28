@@ -55,7 +55,7 @@ const admin = () => env.authenticatedContext("adminUid", { email: ADMIN_EMAIL, e
 await env.clearFirestore();
 await env.withSecurityRulesDisabled(async (ctx) => {
   const f = ctx.firestore();
-  await setDoc(doc(f, "users", M), { uid: M, role: "customer", email: emailOf(M), name: "Mal", rewardPoints: 50, totalReferrals: 1, referralCode: "YOGI111111", referredBy: "YOGI222222", signupRewardsGrantedAt: new Date() });
+  await setDoc(doc(f, "users", M), { uid: M, role: "customer", email: emailOf(M), name: "Mal", rewardPoints: 50, totalReferrals: 1, referralCode: "YOGI111111", referredBy: "YOGI222222", signupRewardsGrantedAt: new Date(), rewardsEligibleAt: new Date(), rewardsEligibleOrderId: "o_done" });
   await setDoc(doc(f, "users", A), { uid: A, role: "customer", email: emailOf(A), name: "Alice", rewardPoints: 10, totalReferrals: 0, referralCode: "YOGI222222", status: "Active" });
   await setDoc(doc(f, "rewardTransactions", `earned_o_mal`), { v: 2, kind: "purchase_earned", userId: M, userEmail: emailOf(M), type: "Earned", points: 5, delta: 5, balanceBefore: 45, balanceAfter: 50, orderId: "o_mal", createdAt: new Date() });
   await setDoc(doc(f, "rewardTransactions", `redeem_o_alice`), { v: 2, kind: "checkout_redeem", userId: A, userEmail: emailOf(A), type: "Redeemed", points: 5, delta: -5, balanceBefore: 15, balanceAfter: 10, orderId: "o_alice", createdAt: new Date() });
@@ -153,6 +153,37 @@ await check("A4 admin browser cannot change a return's status or its points-cred
   await assertFails(updateDoc(doc(ADb, "returns", "ret_mal"), { pointsCredited: deleteField() }));
   await assertFails(updateDoc(doc(ADb, "returns", "ret_legacy"), { status: "Approved" }));
   await assertFails(updateDoc(doc(ADb, "returns", "ret_legacy"), { pointsCredited: true }));
+});
+
+// ================= rewards eligibility (first qualifying purchase) =================
+await check("E1 customer cannot CREATE a profile carrying rewardsEligibleAt / rewardsEligibleOrderId", async () => {
+  const N = as("newbie4");
+  const base = { uid: "newbie4", role: "customer", email: emailOf("newbie4"), name: "N" };
+  await assertFails(setDoc(doc(N, "users", "newbie4"), { ...base, rewardsEligibleAt: new Date() }));
+  await assertFails(setDoc(doc(N, "users", "newbie4"), { ...base, rewardsEligibleOrderId: "o_x" }));
+  await assertFails(setDoc(doc(N, "users", "newbie4"), { ...base, rewardsEligibleAt: new Date(), rewardsEligibleOrderId: "o_x" }));
+});
+await check("E2 customer cannot add, modify or delete their eligibility stamp", async () => {
+  const Adb = as(A);
+  await assertFails(updateDoc(doc(Adb, "users", A), { rewardsEligibleAt: new Date() }));
+  await assertFails(updateDoc(doc(Adb, "users", A), { rewardsEligibleOrderId: "o_alice" }));
+  await assertFails(setDoc(doc(Adb, "users", A), { rewardsEligibleAt: new Date() }, { merge: true }));
+  await assertFails(updateDoc(doc(Mdb, "users", M), { rewardsEligibleAt: new Date(0) }));
+  await assertFails(updateDoc(doc(Mdb, "users", M), { rewardsEligibleOrderId: "o_other" }));
+  await assertFails(updateDoc(doc(Mdb, "users", M), { rewardsEligibleAt: deleteField() }));
+  await assertFails(updateDoc(doc(Mdb, "users", M), { rewardsEligibleOrderId: deleteField() }));
+});
+await check("E3 admin browser cannot add, modify or delete an eligibility stamp", async () => {
+  await assertFails(updateDoc(doc(ADb, "users", A), { rewardsEligibleAt: new Date() }));
+  await assertFails(updateDoc(doc(ADb, "users", A), { rewardsEligibleOrderId: "o_alice" }));
+  await assertFails(updateDoc(doc(ADb, "users", M), { rewardsEligibleAt: new Date(0) }));
+  await assertFails(updateDoc(doc(ADb, "users", M), { rewardsEligibleOrderId: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "users", M), { rewardsEligibleAt: deleteField() }));
+});
+await check("E4 a stamped customer can still edit ordinary profile fields; admin can still Block/Unblock them", async () => {
+  await assertSucceeds(updateDoc(doc(Mdb, "users", M), { name: "Mallory M", phone: "9000000000" }));
+  await assertSucceeds(updateDoc(doc(ADb, "users", M), { status: "Blocked" }));
+  await assertSucceeds(updateDoc(doc(ADb, "users", M), { status: "Active" }));
 });
 
 // ================= legitimate client writes still work =================
