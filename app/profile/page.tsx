@@ -234,7 +234,7 @@ export default function ProfilePage() {
               <div>
                 <p className="text-sm opacity-90">🏆 Reward Wallet</p>
                 <h2 className="text-4xl font-bold mt-1">🏆 {rewardPoints}</h2>
-                <p className="text-sm opacity-90 mt-1">points available · ≈ ₹{rewardPoints} redeemable</p>
+                <p className="text-sm opacity-90 mt-1">points available</p>
                 {pendingPoints > 0 && (
                   <p className="text-sm opacity-90">+ {pendingPoints} pending (credited after the return window)</p>
                 )}

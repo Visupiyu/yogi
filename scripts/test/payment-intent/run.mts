@@ -139,6 +139,26 @@ function isInertDuplicate(o: any, duplicateOf: string) {
 }
 
 // ---- web ----
+// Rewards B1: checkout refuses redeemPoints, so an intent that spends points can
+// only be one created BEFORE B1. This builds exactly that: a normal intent,
+// then its stored pricing rewritten the way create-order priced points pre-B1
+// (lib/orderPricing: rewardValue = min(balance, floor(subtotal − coupon)),
+// folded into discountAmount, finalTotal and the Razorpay amount).
+async function asPreB1PointsIntent(razorpayOrderId: string, uid: string) {
+  const ref = db.collection("paymentIntents").doc(razorpayOrderId);
+  const p = ((await ref.get()).data() as any).pricing;
+  const stored = Number(((await db.collection("users").doc(uid).get()).data() as any)?.rewardPoints);
+  const balance = Number.isFinite(stored) && stored > 0 ? stored : 0;
+  const rewardValue = Math.min(balance, Math.floor(Math.max(0, p.subtotal - p.couponDiscount)));
+  const discountAmount = Math.min(p.couponDiscount + rewardValue, p.subtotal + p.shipping);
+  const finalTotal = Math.max(1, Math.round(p.subtotal + p.shipping - discountAmount));
+  await ref.update({
+    "pricing.rewardValue": rewardValue, "pricing.discountAmount": discountAmount, "pricing.finalTotal": finalTotal,
+    "pricing.sellerEarning": finalTotal, "pricing.earnedPoints": Math.floor(finalTotal / 100),
+    expectedAmountPaise: finalTotal * 100, redeemPoints: true,
+  });
+  return (await ref.get()).data() as any;
+}
 async function webIntent(uid: string, opts: { coupon?: boolean; points?: boolean } = {}) {
   await db.collection("users").doc(uid).set({ rewardPoints: START_POINTS }, { merge: true });
   control.reset();
@@ -146,11 +166,12 @@ async function webIntent(uid: string, opts: { coupon?: boolean; points?: boolean
     customerName: "Test Buyer", phone: "9898989898", address: "1 Test Road",
     items: [{ id: PRODUCT, qty: 1 }],
     ...(opts.coupon ? { couponCode: "SAVE10" } : {}),
-    ...(opts.points ? { redeemPoints: true } : {}),
   }, uid));
   const j = await res.json();
-  const intent = (await db.collection("paymentIntents").doc(j.id).get()).data() as any;
+  let intent = (await db.collection("paymentIntents").doc(j.id).get()).data() as any;
   if (!intent) throw new Error(`web intent not created: ${JSON.stringify(j)}`);
+  // Points on an online intent now only exist on intents created before B1.
+  if (opts.points) intent = await asPreB1PointsIntent(j.id, uid);
   return { razorpayOrderId: j.id as string, intent };
 }
 const webFinalize = (i: { razorpayOrderId: string; intent: any }, paymentId: string, source = "browser") =>

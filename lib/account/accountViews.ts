@@ -535,7 +535,7 @@ export function buildLedger(rows: Row[], orderNumbers: OrderNumbers): LedgerEntr
 export const WALLET_RULES = {
   pointValueRupees: 1 as const,
   earn: "Earn 1 point for every ₹100 you pay. Points are credited once the order is delivered, paid and its 7-day return window has closed. Items you return and get refunded don't earn points.",
-  redeem: "1 point = ₹1. Use points at checkout for up to your order subtotal after coupons (not shipping).",
+  redeem: "Points can no longer be used as a discount at checkout. Your balance is kept safe in your wallet.",
 };
 
 // ---------------------------------------------------------------------------

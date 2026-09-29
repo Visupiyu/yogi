@@ -174,8 +174,6 @@ export async function POST(request: Request) {
     const rawCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";
     const couponCode = rawCode && rawCode.length <= 50 ? rawCode.toUpperCase() : null;
 
-    const redeemPoints = body.redeemPoints === true;
-
     const db = getAdminDb();
     const orderId = orderIdFor(requester.uid, idempotencyKey);
     const orderRef = db.collection("orders").doc(orderId);
@@ -203,12 +201,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // ---- The one trusted pricing pass (products, shipping, coupon, points).
+    // Rewards B1: YOMICO Points can no longer be spent at checkout. A points
+    // discount on an order reduced the SELLER's share
+    // (lib/vendorEarnings.computeVendorShare subtracts rewardValue), so a
+    // request asking for one is refused outright — never silently priced
+    // without it. Checked after the idempotent fast path above, so a retry of
+    // an order placed before this change still returns that order. The
+    // customer's points and ledger are untouched.
+    if (body.redeemPoints === true) {
+      return Response.json(
+        { error: "YOMICO Points can't be used at checkout. Your points balance is unchanged." },
+        { status: 400 }
+      );
+    }
+
+    // ---- The one trusted pricing pass (products, shipping, coupon). Points
+    // are never applied to a new order.
     const priced = await computeOrderPricing(
       items,
       requester.uid,
       couponCode,
-      redeemPoints
+      false
     );
 
     if (!priced.ok) {

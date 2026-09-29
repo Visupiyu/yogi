@@ -66,8 +66,6 @@ export default function CheckoutPage() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [discount, setDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState(false);
-  const [redeemPoints, setRedeemPoints] = useState(false);
-  const [availablePoints, setAvailablePoints] = useState(0);
   const [FREE_SHIPPING_THRESHOLD, setFreeShippingThreshold] = useState(
     DEFAULT_FREE_SHIPPING_THRESHOLD
   );
@@ -125,14 +123,6 @@ setAddress(userData.address || "");
         void loadAddresses();
       }
 
-      try {
-        const snap = await getDoc(doc(db, "users", user.uid));
-        setAvailablePoints(
-          snap.exists() ? Number(snap.data().rewardPoints || 0) : 0
-        );
-      } catch (error) {
-        console.error("Failed to load reward balance:", error);
-      }
     });
 
     return () => unsubscribe();
@@ -145,11 +135,10 @@ setAddress(userData.address || "");
 
   const finalAmount = total - discount;
 
-  const rewardValue = redeemPoints
-    ? Math.min(availablePoints, Math.floor(finalAmount))
-    : 0;
-
-  const grandTotal = Math.max(0, finalAmount + shipping - rewardValue);
+  // YOMICO Points are not spent at checkout (Rewards B1) — /api/place-order and
+  // /api/create-order refuse redeemPoints, so the total never includes a
+  // points discount.
+  const grandTotal = Math.max(0, finalAmount + shipping);
   const commission = Math.round(grandTotal * commissionRate);
 
   // Shipping + delivery date recompute whenever the amount changes, or once
@@ -372,10 +361,9 @@ setAddress(userData.address || "");
     // which contradicts the deferred rule the server implements.
     //
     // What replaces it, all with the Admin SDK:
-    //   REDEEM  app/api/place-order (Pay on Delivery) and lib/onlineOrder
-    //           (Razorpay) move the balance inside the SAME transaction as
-    //           the order, re-clamped against the real stored balance, and
-    //           write the "Redeemed" ledger row.
+    //   REDEEM  not at checkout (Rewards B1): /api/place-order and
+    //           /api/create-order refuse redeemPoints, so new orders never
+    //           carry a points discount.
     //   EARN    the order is stamped rewardPointsStatus: "pending"; points
     //           are credited only once it is delivered, paid and past its
     //           return window, by lib/rewardCreditServer via
@@ -415,34 +403,6 @@ setAddress(userData.address || "");
     return true;
   };
 
-  // Re-checks a points redemption against the REAL current balance right
-  // before the order total is locked in — availablePoints in state was
-  // loaded on page mount and could be stale by the time the customer
-  // actually submits (e.g. redeemed in another tab in the meantime).
-  const validateRewardPoints = async () => {
-    if (!redeemPoints || rewardValue <= 0) return true;
-
-    const firebaseUser = auth.currentUser;
-    if (!firebaseUser) return true; // the login check elsewhere catches this
-
-    try {
-      const snap = await getDoc(doc(db, "users", firebaseUser.uid));
-      const realBalance = snap.exists()
-        ? Number(snap.data().rewardPoints || 0)
-        : 0;
-
-      if (rewardValue > realBalance) {
-        alert("Your reward point balance has changed — please review your order again.");
-        setAvailablePoints(realBalance);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error("Failed to re-validate reward points:", error);
-      return true;
-    }
-  };
 
   const placeCODOrder = async () => {
     if (!validateForm()) return;
@@ -469,7 +429,7 @@ setAddress(userData.address || "");
       //
       // Stock, blocked-account and reward-balance checks now happen inside
       // that transaction against current state, so the pre-flight
-      // validateStock() / validateRewardPoints() / Blocked reads this
+      // validateStock() / Blocked reads this
       // function used to perform are redundant round trips. The route
       // returns the same message strings those checks used to show.
       const idToken = await firebaseUser.getIdToken();
@@ -491,7 +451,6 @@ setAddress(userData.address || "");
             variantId: item.variantId,
           })),
           couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
-          redeemPoints,
           paymentMethod: "PAY_ON_DELIVERY_UPI",
           customerName: name,
           phone,
@@ -590,7 +549,6 @@ setAddress(userData.address || "");
     }
 
       if (!(await validateStock())) { setLoading(false); return; }
-      if (!(await validateRewardPoints())) { setLoading(false); return; }
 
     const res: any = await loadRazorpayScript();
     if (!res) {
@@ -626,7 +584,6 @@ setAddress(userData.address || "");
         variantId: item.variantId,
       })),
         couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
-        redeemPoints,
         // Delivery details are user input, not money. The server stores them
         // with the priced intent so finalisation — and the webhook, which has
         // no session at all — can build the order without the browser
@@ -1141,27 +1098,6 @@ Easy Returns
                 </p>
               </div>
 
-              {/* REDEEM POINTS */}
-              <div className="border rounded-2xl p-5 mt-5 bg-yellow-50">
-
-<p className="font-semibold mb-3">
-
-⭐ Reward Points
-
-</p>
-              <label className="flex items-center gap-2 mt-5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={redeemPoints}
-                  onChange={() => setRedeemPoints(!redeemPoints)}
-                  className="w-4 h-4 accent-green-600"
-                />
-                <span className="text-sm">
-                  Redeem Reward Points ({availablePoints} available)
-                </span>
-              </label>
-              </div>
-
               {/* PRICE BREAKDOWN */}
               <div className="border-t mt-5 pt-5 space-y-3 text-gray-700">
                 <div className="flex justify-between">
@@ -1184,13 +1120,6 @@ Easy Returns
                     {shipping === 0 ? "FREE" : `₹${shipping}`}
                   </span>
                 </div>
-
-                {redeemPoints && rewardValue > 0 && (
-                  <div className="flex justify-between text-purple-600">
-                    <span>Reward discount</span>
-                    <span>- ₹{rewardValue.toLocaleString("en-IN")}</span>
-                  </div>
-                )}
 
                 <div className="flex justify-between text-xs text-gray-500">
                   <span>Estimated delivery</span>

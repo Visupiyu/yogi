@@ -99,10 +99,21 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
       );
     }
 
+    // Rewards B1: YOMICO Points can no longer be spent at checkout (a points
+    // discount reduced the seller's share — lib/vendorEarnings). Refused here,
+    // before pricing and before any Razorpay order or payment intent exists.
+    // Intents created before this change keep their stored pricing and still
+    // finalize through lib/onlineOrder unchanged.
+    if (body.redeemPoints === true) {
+      return Response.json(
+        { error: "YOMICO Points can't be used at checkout. Your points balance is unchanged." },
+        { status: 400 }
+      );
+    }
+
     // body.discountAmount is deliberately NOT read. Any client that still
-    // sends it is ignored — the only discount inputs accepted are which
-    // coupon to look up and whether to spend points, both resolved against
-    // Firestore below.
+    // sends it is ignored — the only discount input accepted is which coupon
+    // to look up, resolved against Firestore below.
     const rawCode = typeof body.couponCode === "string" ? body.couponCode.trim() : "";
     const couponCode =
       rawCode && rawCode.length <= 50 ? rawCode.toUpperCase() : null;
@@ -111,7 +122,7 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
       items,
       requester.uid,
       couponCode,
-      body.redeemPoints === true
+      false
     );
 
     if (!priced.ok) {
@@ -224,7 +235,7 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
           phone,
           address,
           couponCode,
-          redeemPoints: body.redeemPoints === true,
+          redeemPoints: false,
           deliveryDate: deliveryDateString(),
           expectedAmountPaise: finalAmount * 100,
           razorpayOrderId: order.id,

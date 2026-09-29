@@ -88,7 +88,8 @@ const { getAdminDb } = await import("../../../lib/firebaseAdmin.ts");
 const { creditOneOrder } = await import("../../../lib/rewardCreditServer.ts");
 const { POST: webPlaceOrder } = await import("../../../app/api/place-order/route.ts");
 const { POST: webCreateOrder } = await import("../../../app/api/create-order/route.ts");
-const { finalizeOnlineOrder } = await import("../../../lib/onlineOrder.ts");
+const { finalizeOnlineOrder, onlineOrderIdFor } = await import("../../../lib/onlineOrder.ts");
+const { computeVendorShare } = await import("../../../lib/vendorEarnings.ts");
 const { POST: cancelOrder } = await import("../../../app/api/cancel-order/route.ts");
 const { POST: itemTransition } = await import("../../../app/api/item-request/transition/route.ts");
 const { POST: returnStatus } = await import("../../../app/api/admin/returns/[id]/status/route.ts");
@@ -157,11 +158,31 @@ async function codOrder(uid: string, redeemPoints: boolean) {
   const res = await webPlaceOrder(req("http://x/api/place-order", { ...BODY, paymentMethod: "PAY_ON_DELIVERY_UPI", items: [{ id: PRODUCT, qty: 1 }], idempotencyKey: nextKey(), redeemPoints }, uid));
   return { status: res.status, json: await json(res) };
 }
+// Rewards B1: checkout refuses redeemPoints, so an intent that spends points can
+// only be one created BEFORE B1. This builds exactly that: a normal intent,
+// then its stored pricing rewritten the way create-order priced points pre-B1
+// (lib/orderPricing: rewardValue = min(balance, floor(subtotal − coupon)),
+// folded into discountAmount, finalTotal and the Razorpay amount).
+async function asPreB1PointsIntent(razorpayOrderId: string, uid: string) {
+  const ref = db.collection("paymentIntents").doc(razorpayOrderId);
+  const p = ((await ref.get()).data() as any).pricing;
+  const stored = Number(((await db.collection("users").doc(uid).get()).data() as any)?.rewardPoints);
+  const balance = Number.isFinite(stored) && stored > 0 ? stored : 0;
+  const rewardValue = Math.min(balance, Math.floor(Math.max(0, p.subtotal - p.couponDiscount)));
+  const discountAmount = Math.min(p.couponDiscount + rewardValue, p.subtotal + p.shipping);
+  const finalTotal = Math.max(1, Math.round(p.subtotal + p.shipping - discountAmount));
+  await ref.update({
+    "pricing.rewardValue": rewardValue, "pricing.discountAmount": discountAmount, "pricing.finalTotal": finalTotal,
+    "pricing.sellerEarning": finalTotal, "pricing.earnedPoints": Math.floor(finalTotal / 100),
+    expectedAmountPaise: finalTotal * 100, redeemPoints: true,
+  });
+  return (await ref.get()).data() as any;
+}
 async function webIntent(uid: string) {
   control.reset();
-  const res = await webCreateOrder(req("http://x/api/create-order", { ...BODY, items: [{ id: PRODUCT, qty: 1 }], redeemPoints: true }, uid));
+  const res = await webCreateOrder(req("http://x/api/create-order", { ...BODY, items: [{ id: PRODUCT, qty: 1 }] }, uid));
   const j = await json(res);
-  const intent = j.id ? (await db.collection("paymentIntents").doc(j.id).get()).data() as any : null;
+  const intent = j.id ? await asPreB1PointsIntent(j.id, uid) : null;
   return { status: res.status, razorpayOrderId: j.id as string, intent };
 }
 const finalize = (i: { razorpayOrderId: string; intent: any }, paymentId: string, source = "browser") =>
@@ -227,33 +248,72 @@ async function main() {
       !!err && (await balance(F)) === 3 && o.rewardPointsStatus === "pending", `error="${err}" balance=${await balance(F)} status=${o.rewardPointsStatus}`);
   }
 
-  // ============ 2. COD spending ============
+  // ============ 2. B1: points can no longer be spent at checkout ============
   {
     await clearRateLimits();
-    const U = "cod_1";
-    await setUser(U, { rewardPoints: 300 });
-    const r = await codOrder(U, true);
-    const orderId = r.json?.orderId;
-    const lr = orderId ? await row(`redeem_${orderId}`) : null;
-    const rows = await rowsFor(U);
-    record("2  COD spending: exactly one v2 redeem row redeem_{orderId} (delta −300, 300 -> 0), atomic with the order",
-      r.status === 200 && isV2(lr, "checkout_redeem", -300, 300, 0) && lr.type === "Redeemed" && lr.orderId === orderId &&
-        rows.length === 1 && (await balance(U)) === 0,
-      `status=${r.status} rows=${rows.length} balance=${await balance(U)} err="${r.json?.error ?? ""}"`);
+    const U = "b1_eligible";
+    await setUser(U, { rewardPoints: 300, rewardsEligibleAt: Timestamp.now(), rewardsEligibleOrderId: "o_prev" });
+    const R = "b1_referral";
+    await setUser(R, { rewardPoints: 300, referralCode: "YOGI800001", totalReferrals: 3 });
+    const stockOf = async () => ((await db.collection("products").doc(PRODUCT).get()).data() as any).stock;
+    const stockBefore = await stockOf();
+    const ordersBefore = (await db.collection("orders").get()).size;
+    const eligible = await codOrder(U, true);
+    const referralOnly = await codOrder(R, true);
+    const ordersAfter = (await db.collection("orders").get()).size;
+    record("2  B1 COD: redeemPoints:true is REFUSED (400) for an eligible AND a referral-only customer — no order, no stock move, balances and ledger untouched",
+      eligible.status === 400 && referralOnly.status === 400 && /points/i.test(String(eligible.json?.error)) &&
+        ordersAfter === ordersBefore && (await stockOf()) === stockBefore &&
+        (await balance(U)) === 300 && (await balance(R)) === 300 && (await rowsFor(U)).length === 0 && (await rowsFor(R)).length === 0,
+      `statuses=${eligible.status}/${referralOnly.status} orders ${ordersBefore}->${ordersAfter} error="${eligible.json?.error ?? ""}"`);
 
-    // 9b ledger failure on COD: redeem_{orderId} pre-seeded -> no order, no balance change, no stock change
     await clearRateLimits();
-    const F = "cod_fail";
+    const plain = await codOrder(U, false);
+    const o = plain.json?.orderId ? ((await db.collection("orders").doc(plain.json.orderId).get()).data() as any) : null;
+    const share = o ? computeVendorShare(o, VENDOR) : null;
+    record("2b B1 COD without points: full price ₹1000, rewardValue 0, seller share = full ₹1000, balance and ledger untouched",
+      plain.status === 200 && o?.rewardValue === 0 && o?.finalTotal === 1000 && share?.vendorEarning === 1000 &&
+        (await balance(U)) === 300 && (await rowsFor(U)).length === 0,
+      `status=${plain.status} finalTotal=${o?.finalTotal} sellerEarning=${share?.vendorEarning}`);
+
+    // online boundary
+    await clearRateLimits();
+    const W = "b1_online";
+    await setUser(W, { rewardPoints: 400 });
+    control.reset();
+    const intentsBefore = (await db.collection("paymentIntents").get()).size;
+    const refused = await webCreateOrder(req("http://x/api/create-order", { ...BODY, items: [{ id: PRODUCT, qty: 1 }], redeemPoints: true }, W));
+    const refusedJson = await json(refused);
+    const rzpCalls = control.calls.ordersCreate;
+    const intentsAfter = (await db.collection("paymentIntents").get()).size;
+    record("2c B1 online: create-order with redeemPoints:true is REFUSED (400) before any Razorpay order or payment intent exists",
+      refused.status === 400 && rzpCalls === 0 && intentsAfter === intentsBefore && (await balance(W)) === 400 &&
+        /points/i.test(String(refusedJson?.error)),
+      `status=${refused.status} razorpayOrders=${rzpCalls} intents ${intentsBefore}->${intentsAfter}`);
+    control.reset();
+    const ok = await webCreateOrder(req("http://x/api/create-order", { ...BODY, items: [{ id: PRODUCT, qty: 1 }] }, W));
+    const okJson = await json(ok);
+    const intent = okJson.id ? ((await db.collection("paymentIntents").doc(okJson.id).get()).data() as any) : null;
+    record("2d B1 online without points: intent priced at full ₹1000 (rewardValue 0, 100000 paise, redeemPoints false) despite a 400-point balance",
+      ok.status === 200 && intent?.pricing?.rewardValue === 0 && intent?.expectedAmountPaise === 100000 && intent?.redeemPoints === false &&
+        (await balance(W)) === 400,
+      `status=${ok.status} rewardValue=${intent?.pricing?.rewardValue} paise=${intent?.expectedAmountPaise}`);
+
+    // 9b ledger failure on a PRE-B1 points intent: redeem_{orderId} pre-seeded -> finalization rolls back
+    await clearRateLimits();
+    const F = "online_fail";
     await setUser(F, { rewardPoints: 100 });
-    const k = nextKey();
-    await db.collection("rewardTransactions").doc(`redeem_${F}_${k}`).set({ userId: "x", type: "Redeemed", points: 1 });
-    const stockBefore = ((await db.collection("products").doc(PRODUCT).get()).data() as any).stock;
-    const res = await webPlaceOrder(req("http://x/api/place-order", { ...BODY, paymentMethod: "PAY_ON_DELIVERY_UPI", items: [{ id: PRODUCT, qty: 1 }], idempotencyKey: k, redeemPoints: true }, F));
-    const stockAfter = ((await db.collection("products").doc(PRODUCT).get()).data() as any).stock;
-    const orderExists = (await db.collection("orders").doc(`${F}_${k}`).get()).exists;
-    record("9b COD ledger write cannot complete -> the order, stock and balance all roll back",
-      res.status >= 400 && !orderExists && (await balance(F)) === 100 && stockBefore === stockAfter,
-      `status=${res.status} order=${orderExists} balance=${await balance(F)} stock ${stockBefore}->${stockAfter}`);
+    const fi = await webIntent(F);
+    const payId = "pay_fail_9b";
+    await db.collection("rewardTransactions").doc(`redeem_${onlineOrderIdFor(payId)}`).set({ userId: "x", type: "Redeemed", points: 1 });
+    const stockBefore9 = await stockOf();
+    let err = "";
+    let result: any = null;
+    try { result = await finalize(fi, payId); } catch (e) { err = String((e as Error).message).slice(0, 50); }
+    const orderExists = (await db.collection("orders").doc(onlineOrderIdFor(payId)).get()).exists;
+    record("9b ledger write cannot complete on a pre-B1 points intent -> finalization rolls back: no order, stock and balance unchanged",
+      (!!err || result?.kind === "error") && !orderExists && (await balance(F)) === 100 && (await stockOf()) === stockBefore9,
+      `error="${err}" kind=${result?.kind} order=${orderExists} balance=${await balance(F)}`);
   }
 
   // ============ 3. online spending ============
@@ -334,8 +394,10 @@ async function main() {
     await clearRateLimits();
     const U = "cancel_1";
     await setUser(U, { rewardPoints: 100 });
-    const placed = await codOrder(U, true);                     // spends 100 -> 0, finalTotal 900
-    const orderId = placed.json?.orderId as string;
+    // A pre-B1 points order (checkout spending is refused now): spends 100 -> 0, finalTotal 900
+    const i4 = await webIntent(U);
+    await finalize(i4, "pay_cancel_4");
+    const orderId = onlineOrderIdFor("pay_cancel_4");
     // make it a LEGACY order (credited at creation) so the reversal applies
     await db.collection("orders").doc(orderId).update({ rewardPointsStatus: FieldValue.delete() });
     const outs = await Promise.all(Array.from({ length: 4 }, () => cancelOrder(req("http://x/api/cancel-order", { orderId }, U))));
