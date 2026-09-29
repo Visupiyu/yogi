@@ -25,6 +25,10 @@ import { FieldValue, Timestamp, type DocumentSnapshot } from "firebase-admin/fir
 // ledger rows carried returnId and since moved away from "Refunded" cannot be
 // recognised — the documented residual risk the reconciliation report (A5)
 // will list.
+//
+// A first credit also requires the return's parent order to exist. A return
+// whose order is missing (or was never recorded) is refused unchanged — see
+// the guard below and scripts/test/reconciliation.
 // ---------------------------------------------------------------------------
 
 const RATE_LIMIT_MAX = 120;
@@ -65,6 +69,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         refundAmount?: unknown;
         userId?: unknown;
         userEmail?: unknown;
+        orderId?: unknown;
       };
 
       const userId = typeof data.userId === "string" && data.userId ? data.userId : null;
@@ -86,6 +91,25 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       }
 
       const credit = status === "Refunded" && !alreadyCredited;
+
+      // PARENT ORDER GUARD, as in app/api/item-request/transition: a first
+      // credit needs the order it refunds. A missing parent order refuses the
+      // change before any write, so the status, the credit flag, the balance
+      // and the ledger all stay as they were.
+      if (credit) {
+        const parentOrderId = typeof data.orderId === "string" ? data.orderId : "";
+        const parentOrderSnap = isValidDocId(parentOrderId)
+          ? await tx.get(db.collection("orders").doc(parentOrderId))
+          : null;
+        if (!parentOrderSnap?.exists) {
+          return {
+            kind: "error",
+            status: 409,
+            error: "The original order for this return no longer exists, so no refund can be credited. Nothing was changed.",
+          };
+        }
+      }
+
       const userRef = credit && userId && amount > 0 ? db.collection("users").doc(userId) : null;
       const userSnap: DocumentSnapshot | null = userRef ? await tx.get(userRef) : null;
 

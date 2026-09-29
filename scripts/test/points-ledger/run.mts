@@ -430,6 +430,8 @@ async function main() {
     await clearRateLimits();
     const U = "irefund_1";
     await setUser(U, { rewardPoints: 10 });
+    // A refund credit requires the request's parent order to exist.
+    await db.collection("orders").doc("some_order").set({ userId: U, status: "Delivered", items: [] });
     await db.collection("itemRequests").doc("ir_pts_1").set({
       type: "return", status: "REFUND_PENDING", userId: U, userEmail: `${U}@example.com`, orderId: "some_order",
       productId: PRODUCT, vendorId: VENDOR, item: { qty: 1, name: "Points Kettle" }, refund: { amount: 450 }, history: [],
@@ -449,7 +451,9 @@ async function main() {
     await clearRateLimits();
     const U = "oret_1";
     await setUser(U, { rewardPoints: 5 });
-    await db.collection("returns").doc("ret_pts_1").set({ userId: U, userEmail: `${U}@example.com`, refundAmount: 250, status: "Approved" });
+    // A first credit requires the return's parent order to exist.
+    await db.collection("orders").doc("oret_order_1").set({ userId: U, status: "Delivered", items: [] });
+    await db.collection("returns").doc("ret_pts_1").set({ userId: U, userEmail: `${U}@example.com`, orderId: "oret_order_1", refundAmount: 250, status: "Approved" });
     const denied = await returnCall("ret_pts_1", "Refunded", "not_admin");
     const a = await returnCall("ret_pts_1", "Refunded");
     const b = await returnCall("ret_pts_1", "Approved");
@@ -481,7 +485,8 @@ async function main() {
     // parallel Refunded calls
     const P = "oret_par";
     await setUser(P, { rewardPoints: 0 });
-    await db.collection("returns").doc("ret_par").set({ userId: P, refundAmount: 90, status: "Approved" });
+    await db.collection("orders").doc("oret_order_par").set({ userId: P, status: "Delivered", items: [] });
+    await db.collection("returns").doc("ret_par").set({ userId: P, orderId: "oret_order_par", refundAmount: 90, status: "Approved" });
     const outs = await Promise.all(Array.from({ length: 5 }, () => returnCall("ret_par", "Refunded")));
     record("6c five parallel 'Refunded' calls -> exactly one credit (+90) and one row",
       outs.every((o) => o.status === 200) && (await balance(P)) === 90 && (await rowsFor(P)).length === 1,

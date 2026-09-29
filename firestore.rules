@@ -483,6 +483,16 @@ service cloud.firestore {
         && unchanged('rewardPointsCreditedAt');
     }
 
+    // The archive marker is SERVER-ONLY: app/api/admin/orders/[id]/archive
+    // writes it (Admin SDK) together with its audit entry, so no browser —
+    // admin included — can set or clear it directly.
+    function orderArchiveStateUnchanged() {
+      return unchanged('archived')
+        && unchanged('archivedAt')
+        && unchanged('archivedBy')
+        && unchanged('archiveReason');
+    }
+
     match /orders/{orderId} {
       // isAssignedDeliveryPartner() added here as a genuine bug fix, not
       // scope creep: app/delivery/[id]/page.tsx's loadOrder() has always
@@ -536,7 +546,7 @@ service cloud.firestore {
       // unchanged; only creation moves server-side.
       allow create: if false;
 
-      allow update: if (isAdmin() && orderRewardStateUnchanged())
+      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged())
         // No customer branch. Cancelling goes through app/api/cancel-order
         // (web and Customer App), which restores stock/sales, reverses reward
         // points and coupons and notifies the seller in one place. A direct
@@ -567,7 +577,12 @@ service cloud.firestore {
         )
         || isValidDeliveryPaymentSubmission();
 
-      allow delete: if isAdmin();
+      // No client deletes an order, admin included. A deleted order left
+      // seller records, coupon claims, return refunds and ledger rows pointing
+      // at nothing, with no record of who removed it. An admin retires an
+      // order through app/api/admin/orders/[id]/archive instead, which keeps
+      // the document and writes an order_archived audit entry.
+      allow delete: if false;
     }
 
     // ---------------------------------------------------------

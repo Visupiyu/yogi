@@ -4,6 +4,7 @@ import { isWithinRateLimit } from "@/lib/rateLimit";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { mintSequential } from "@/lib/humanIds";
 import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
+import { isValidDocId } from "@/lib/customerAccount/customerGuards";
 import {
   SELLER_REPLACE_TARGETS,
   SELLER_RETURN_TARGETS,
@@ -34,6 +35,8 @@ import {
 //     credited to the customer's reward points — the only refund mechanism
 //     YOMICO has — exactly once (a credited flag + the one-way state machine
 //     both prevent a double credit). The amount is never taken from the client.
+//     A return whose parent order no longer exists is refused before any
+//     credit, leaving everything unchanged.
 //   - STOCK: on APPROVED (replace) one unit is taken from the product's stock
 //     (stock down, sales up — the same conserved pair checkout uses); if the
 //     product is out of stock the approval is refused rather than overselling.
@@ -173,6 +176,7 @@ export async function POST(request: Request) {
   };
 
   userEmail?: string;
+  orderId?: string;
   productId?: string;
   item?: { qty?: number; name?: string };
   refund?: { amount?: number; credited?: boolean };
@@ -333,6 +337,27 @@ export async function POST(request: Request) {
 
       let creditedAmount = 0;
       if (type === "return" && toStatus === "REFUNDED") {
+        // PARENT ORDER GUARD. A refund pays back goods on a real order. When
+        // the order this request belongs to is missing (deleted outside the
+        // app — scripts/test/reconciliation reports those), the move is
+        // refused here, before the refund number is minted or any point is
+        // credited. Nothing in this transaction has been written yet, so the
+        // request, the balance, the ledger and the seller's return deduction
+        // all stay exactly as they were. How such a refund should be settled
+        // is a separate business decision, not made here.
+        const parentOrderId = typeof req.orderId === "string" ? req.orderId : "";
+        const parentOrderSnap = isValidDocId(parentOrderId)
+          ? await tx.get(db.collection("orders").doc(parentOrderId))
+          : null;
+        if (!parentOrderSnap?.exists) {
+          return {
+            kind: "error",
+            status: 409,
+            error:
+              "The original order for this return no longer exists, so no refund can be credited. Nothing was changed.",
+          };
+        }
+
         const alreadyCredited = req.refund?.credited === true;
         const amountNum = Number(req.refund?.amount);
         const amount =
