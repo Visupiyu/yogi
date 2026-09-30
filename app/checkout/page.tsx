@@ -1002,13 +1002,13 @@ Choose your preferred payment option.</p>
 <div className="bg-green-50 rounded-xl p-4 text-center">
 🔒
 <p className="font-semibold mt-2">
-100% Secure
+Secure Payments
 </p>
 </div>
 <div className="bg-blue-50 rounded-xl p-4 text-center">
-🚚
+📦
 <p className="font-semibold mt-2">
-Fast Delivery
+Order Tracking
 </p>
 </div>
 <div className="bg-yellow-50 rounded-xl p-4 text-center">
@@ -1148,7 +1148,7 @@ Easy Returns
               </button>
 
               <p className="text-center text-xs text-gray-400 mt-3">
-                🔒 100% secure &amp; encrypted checkout
+                🔒 Secure checkout over an encrypted connection
               </p>
             </div>
           </div>

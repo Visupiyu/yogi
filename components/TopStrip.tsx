@@ -34,7 +34,7 @@ export default function TopStrip() {
             className="flex items-center gap-2 hover:text-yellow-200 hover:scale-105 transition-all duration-300"
           >
             <Headphones size={16} />
-            <span>24/7 Support</span>
+            <span>Help &amp; Support</span>
           </Link>
 
         </div>

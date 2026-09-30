@@ -108,14 +108,19 @@ export default function Home() {
       {/* Navratri festive banner — reuses the existing reusable PromoBanner
           component (same one used for the Electronics sale further down)
           instead of a new bespoke banner. Replaces the former 15 August /
-          Independence Day launch banner in this slot. */}
+          Independence Day launch banner in this slot. Its buttons lead to
+          products: "Explore Offers" to the real 40%+ discount filter (the
+          same one the Best Deals block uses), "Shop All Products" to the full
+          product search — /store is the stores directory, not products. */}
       <PromoBanner
         badge="NAVRATRI SPECIAL"
         title="Navratri Festive Sale"
         subtitle="Celebrate. Shop. Save."
         image="/navratri-banner.svg"
         button1="Explore Offers"
-        link1="/store"
+        link1="/search?minDiscount=40"
+        button2="Shop All Products"
+        link2="/search"
       />
 
       {/* Coded (no image asset) customer-facing trust/launch banner —
@@ -159,7 +164,16 @@ export default function Home() {
         CATEGORY_ROWS.map(({ title, name }) => {
           const products = byCategory(name);
           if (products.length === 0) return null;
-          return <CategoryRow key={name} title={title} products={products} />;
+          // `name` is the catalog node name, which /category/[name] resolves
+          // with the same findNodeByName lookup used here.
+          return (
+            <CategoryRow
+              key={name}
+              title={title}
+              products={products}
+              viewAllHref={`/category/${encodeURIComponent(name)}`}
+            />
+          );
         })
       )}
 

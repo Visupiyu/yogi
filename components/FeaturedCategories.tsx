@@ -25,11 +25,9 @@ export default function FeaturedCategories() {
             href={`/category/${encodeURIComponent(category.categoryName)}`}
           >
             
+   {/* The blanket "Popular" badge on every tile was removed — nothing
+       measured it. */}
    <div className="relative bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition duration-300 group cursor-pointer">
-
-  <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-md px-2 py-0.5 rounded-full text-[10px] font-bold text-gray-800 shadow-lg z-10">
-    Popular
-  </div>
 
   <div className="overflow-hidden rounded-t-3xl">
                 <img

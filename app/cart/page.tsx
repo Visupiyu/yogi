@@ -631,10 +631,10 @@ Popular Categories
               <div className="bg-white rounded-2xl shadow-sm p-5">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex items-center gap-2 text-gray-600">
-                     🔒 100% Secure Payments
+                     🔒 Secure Payments
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
-                    🚚 Fast Delivery
+                    📦 Order Tracking
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
                     ↩ Easy Returns

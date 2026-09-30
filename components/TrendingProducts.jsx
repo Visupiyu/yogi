@@ -1,41 +1,25 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+
 import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  limit,
-} from "firebase/firestore";
+  BEST_SELLERS_QUERY_KEY,
+  MIN_PRODUCTS_TO_SHOW_SECTION,
+  displayedBestSellerIds,
+  fetchBestSellers,
+  fetchTrendingCandidates,
+  selectTrending,
+} from "@/lib/storefront/homepageMerchandising";
 
-import { db } from "@/lib/firebase";
-import { isProductVisible } from "@/lib/products/visibility";
-
-const TRENDING_LIMIT = 8;
-
-async function fetchTrendingProducts() {
-  // Over-fetch and filter hidden products (lib/products/visibility.ts)
-  // BEFORE slicing to the display size.
-  const q = query(
-    collection(db, "products"),
-    orderBy("views", "desc"),
-    limit(TRENDING_LIMIT * 4)
-  );
-
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs
-    .filter((doc) => isProductVisible(doc.data()))
-    .slice(0, TRENDING_LIMIT)
-    .map((doc) => ({
-      ...doc.data(),
-      id: doc.id,
-    }));
-}
+// "Popular right now": the most-viewed visible, in-stock products (views >= 3),
+// minus anything the Best Sellers row is already showing, at most 8. `views`
+// is an all-time count of signed-in product-page visits, so the copy makes no
+// claim about today. Hidden when fewer than 4 qualify. Rules live in
+// lib/storefront/homepageMerchandising.ts.
 
 function ProductSkeleton() {
   return (
@@ -49,17 +33,38 @@ function ProductSkeleton() {
 
 export default function TrendingProducts() {
   const {
-    data: products,
-    isLoading,
+    data: candidates,
+    isLoading: candidatesLoading,
     error,
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ["trending-products"],
-    queryFn: fetchTrendingProducts,
+    queryKey: ["trending-candidates"],
+    queryFn: fetchTrendingCandidates,
     staleTime: 1000 * 60 * 5,
     retry: 2,
   });
+
+  // Same query key and function as BestSellers, so this reads the shared
+  // cache entry rather than fetching twice. If it fails, nothing is shown
+  // in Best Sellers, so nothing needs excluding here.
+  const { data: bestSellers, isLoading: bestSellersLoading } = useQuery({
+    queryKey: BEST_SELLERS_QUERY_KEY,
+    queryFn: fetchBestSellers,
+    staleTime: 1000 * 60 * 5,
+    retry: 2,
+  });
+
+  const isLoading = candidatesLoading || bestSellersLoading;
+
+  const products = useMemo(
+    () => selectTrending(candidates || [], displayedBestSellerIds(bestSellers)),
+    [candidates, bestSellers]
+  );
+
+  if (!isLoading && !error && products.length < MIN_PRODUCTS_TO_SHOW_SECTION) {
+    return null;
+  }
 
   return (
     <section className="max-w-7xl mx-auto px-2 py-5">
@@ -67,16 +72,16 @@ export default function TrendingProducts() {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
-            🔥 Trending Products
+            🔥 Popular right now
           </h2>
 
           <p className="text-gray-500 mt-1 text-sm md:text-base">
-            Discover what customers are exploring today
+            Most-viewed products on YOMICO
           </p>
         </div>
 
         <Link
-          href="/store"
+          href="/search"
           className="
             hidden
             md:inline-flex
@@ -100,10 +105,10 @@ export default function TrendingProducts() {
       )}
 
       {/* ERROR */}
-      {error && (
+      {!isLoading && error && (
         <div className="bg-red-50 border border-red-200 rounded-3xl p-8 text-center">
           <h2 className="text-red-600 font-bold">
-            Unable to load Trending Products.
+            Unable to load popular products.
           </h2>
 
           <p className="text-red-500 text-sm mt-2">
@@ -123,7 +128,6 @@ export default function TrendingProducts() {
       {/* PRODUCTS */}
       {!isLoading &&
         !error &&
-        products &&
         products.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -230,27 +234,10 @@ export default function TrendingProducts() {
           </motion.div>
         )}
 
-      {/* EMPTY */}
-      {!isLoading &&
-        !error &&
-        (!products || products.length === 0) && (
-          <div className="text-center py-10 bg-gray-50 rounded-3xl">
-            <div className="text-4xl mb-2">🔥</div>
-
-            <h3 className="font-semibold text-gray-800">
-              No Trending Products Yet
-            </h3>
-
-            <p className="text-sm text-gray-500 mt-1">
-              Products will appear here as customers explore them.
-            </p>
-          </div>
-        )}
-
       {/* MOBILE VIEW ALL */}
       <div className="mt-3 md:hidden text-right">
         <Link
-          href="/store"
+          href="/search"
           className="text-blue-700 font-semibold"
         >
           View All →

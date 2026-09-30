@@ -16,6 +16,12 @@ import { db } from "@/lib/firebase";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 import { isProductVisible } from "@/lib/products/visibility";
+import { MIN_PRODUCTS_TO_SHOW_SECTION } from "@/lib/storefront/homepageMerchandising";
+
+// "Explore by Category" (formerly "Recommended For You"): NOT personalised —
+// the newest products in each of these category groups. A group's card is
+// shown only when it has at least MIN_PRODUCTS_TO_SHOW_SECTION (4) visible
+// products to fill its 2x2 grid; the section hides when no card qualifies.
 
 const collections = [
   {
@@ -45,20 +51,37 @@ async function getCategoryProducts(category) {
   const node = findNodeByName(category);
   if (!node) return [];
 
-  const q = query(
-    collection(db, "products"),
-    isTopLevelCategory(node)
-      ? where("categoryId", "==", node.id)
-      : where("subCategoryId", "==", node.id),
-    orderBy("createdAt", "desc"),
-    // Over-fetch; hidden products (pending/rejected/blocked) are dropped
-    // below BEFORE slicing to the 4 shown.
-    limit(16)
+  const top = isTopLevelCategory(node);
+  const snapshot = await getDocs(
+    query(
+      collection(db, "products"),
+      top
+        ? where("categoryId", "==", node.id)
+        : where("subCategoryId", "==", node.id),
+      orderBy("createdAt", "desc"),
+      // Over-fetch; hidden products (pending/rejected/blocked) are dropped
+      // below BEFORE slicing.
+      limit(16)
+    )
   );
 
-  const snapshot = await getDocs(q);
+  let docs = snapshot.docs;
+  if (!top) {
+    // Also products filed with this node as their LEAF category — the same
+    // rule the homepage category rows and search use (subCategoryId OR
+    // leafCategoryId). Equality-only query, so no extra composite index;
+    // merged, de-duplicated and re-sorted newest first here.
+    const leafSnap = await getDocs(
+      query(collection(db, "products"), where("leafCategoryId", "==", node.id), limit(16))
+    );
+    const seen = new Set(docs.map((d) => d.id));
+    const createdMs = (d) => d.get("createdAt")?.toMillis?.() ?? 0;
+    docs = [...docs, ...leafSnap.docs.filter((d) => !seen.has(d.id))].sort(
+      (a, b) => createdMs(b) - createdMs(a)
+    );
+  }
 
-  return snapshot.docs
+  return docs
     .filter((doc) => isProductVisible(doc.data()))
     .slice(0, 4)
     .map((doc) => toLegacyProduct(doc.id, doc.data()));
@@ -171,24 +194,30 @@ export default function RecommendedProducts() {
 
   }
 
+  const groups = collections
+    .map((item, index) => ({ item, products: queries[index].data || [] }))
+    .filter(({ products }) => products.length >= MIN_PRODUCTS_TO_SHOW_SECTION);
+
+  if (groups.length === 0) {
+    return null;
+  }
+
   return (
     <section className="max-w-7xl mx-auto px-2 py-4">
 
   <h2 className="text-2xl md:text-3xl font-bold mb-3">
-    ❤️ Recommended For You
+    🧭 Explore by Category
   </h2>
 
   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
 
-    {collections.map((item, index) => {
-
-      const products = queries[index].data || [];
+    {groups.map(({ item, products }) => {
 
       return (
 
         <div
           key={item.category}
-          className="bg-white rounded-3xl shadow-lg border border-gray-100 p-3 hover:shadow-xl transition"
+          className="bg-white rounded-3xl shadow-lg border border-gray-100 p-2 sm:p-3 hover:shadow-xl transition"
         >
 
           <div className="flex items-center justify-between mb-2">
@@ -210,12 +239,13 @@ export default function RecommendedProducts() {
 
                 <div className="group">
 
-                  <div className="relative h-48 rounded-xl overflow-hidden bg-gray-50">
+                  <div className="relative h-32 sm:h-48 rounded-xl overflow-hidden bg-gray-50">
 
                     <Image
                       src={product.image || "/placeholder.png"}
                       alt={product.name}
                       fill
+                      sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 160px"
                       className="
                       object-contain
                       p-1

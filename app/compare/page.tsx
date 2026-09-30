@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { discountPercent } from "@/lib/products/discount";
 
 export default function ComparePage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -151,14 +152,9 @@ export default function ComparePage() {
               </td>
 
               {products.map((product) => {
-                const off =
-                  product.mrp && product.mrp > product.price
-                    ? Math.round(
-                        ((product.mrp - product.price) /
-                          product.mrp) *
-                          100
-                      )
-                    : 0;
+                // Shared calculation (lib/products/discount); 0 when there is
+                // no MRP above the price, as before.
+                const off = discountPercent(product.price, product.mrp) ?? 0;
 
                 return (
                   <td

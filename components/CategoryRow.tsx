@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 
-export default function CategoryRow({ title, products }: any) {
+// `viewAllHref` points "View All" at the row's own category page; it falls
+// back to the general product search for any caller that doesn't pass one.
+export default function CategoryRow({ title, products, viewAllHref = "/search" }: any) {
   if (!products?.length) {
     return null;
   }
@@ -15,8 +18,8 @@ export default function CategoryRow({ title, products }: any) {
     {title}
   </h2>
 
-  <a
-    href="/search"
+  <Link
+    href={viewAllHref}
     className="
       text-green-600
       hover:text-green-700
@@ -25,7 +28,7 @@ export default function CategoryRow({ title, products }: any) {
     "
   >
     View All →
-  </a>
+  </Link>
 
 </div>
 
@@ -56,6 +59,7 @@ export default function CategoryRow({ title, products }: any) {
               image={product.image}
               stock={product.stock}
               vendorId={product.vendorId}
+              mrp={typeof product.mrp === "number" ? product.mrp : undefined}
             />
           </div>
         ))}

@@ -1,36 +1,19 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { isProductVisible } from "@/lib/products/visibility";
+import {
+  BEST_SELLERS_QUERY_KEY,
+  MIN_PRODUCTS_TO_SHOW_SECTION,
+  fetchBestSellers,
+} from "@/lib/storefront/homepageMerchandising";
 import ProductCard from "./ProductCard";
 import { motion } from "framer-motion";
 
-// Was sorting by createdAt (making this a second "New Arrivals" row
-// under a "Best Sellers" heading) even though `sales` is a real,
-// live-tracked field — checkout increments it on every purchase.
-const BEST_SELLERS_LIMIT = 12;
-
-async function fetchBestSellers() {
-  // Over-fetch, then drop products customers must not see (pending review,
-  // rejected, blocked — lib/products/visibility.ts) BEFORE slicing, so the
-  // row still fills when some top sellers are hidden.
-  const q = query(
-    collection(db, "products"),
-    orderBy("sales", "desc"),
-    limit(BEST_SELLERS_LIMIT * 4)
-  );
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs
-    .filter((doc) => isProductVisible(doc.data()))
-    .slice(0, BEST_SELLERS_LIMIT)
-    .map((doc) => ({
-      ...doc.data(),
-      id: doc.id,
-    }));
-}
+// Ranked by `sales`, the real, server-maintained purchase counter. Only a
+// visible, in-stock product sold at least twice qualifies (at most 8), and the
+// whole row is hidden when fewer than 4 qualify — rules and thresholds live in
+// lib/storefront/homepageMerchandising.ts. The same query (and cache entry) is
+// read by TrendingProducts so it never repeats a product shown here.
 
 function ProductSkeleton() {
   return (
@@ -45,11 +28,17 @@ function ProductSkeleton() {
 
 export default function BestSellers() {
   const { data: products, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["best-sellers"],
-queryFn: fetchBestSellers,
+    queryKey: BEST_SELLERS_QUERY_KEY,
+    queryFn: fetchBestSellers,
     staleTime: 1000 * 60 * 5,
     retry: 2,
   });
+
+  // Not enough genuine best sellers yet: show nothing rather than a thin or
+  // padded row.
+  if (!isLoading && !error && (!products || products.length < MIN_PRODUCTS_TO_SHOW_SECTION)) {
+    return null;
+  }
 
   return (
     <section className="max-w-7xl mx-auto px-2 py-2">
@@ -109,29 +98,12 @@ queryFn: fetchBestSellers,
     }
     stock={product.stock ?? 0}
     vendorId={product.vendorId}
+    mrp={product.mrp}
   />
 ))}
-    
+
         </motion.div>
-      ) : (
-        !error && (
-          <div className="text-center py-10 md:py-16">
-
-  <div className="text-6xl mb-4">
-    🏆
-  </div>
-
-  <h3 className="text-2xl font-bold text-gray-800">
-   No Best Sellers Yet
-  </h3>
-
-  <p className="text-gray-500 mt-2">
-    Top-selling products will appear here as orders come in.
-  </p>
-
-</div>
-        )
-      )}
+      ) : null}
     </section>
   );
 }

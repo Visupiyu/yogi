@@ -6,7 +6,7 @@ import {
   Truck,
   ShieldCheck,
   RotateCcw,
-  BadgeCheck,
+  Headphones,
  } from "lucide-react";
 import {
   FaFacebook,
@@ -31,10 +31,10 @@ export default function Footer() {
   className="h-24 sm:h-28 md:h-28 w-auto object-contain"
 />
           <p className="text-gray-600 leading-7 mt-3">
-  India's Trusted Multi-Vendor Marketplace.
+  India's Modern Multi-Vendor Marketplace.
   <br />
   Shop groceries, fashion, electronics,
-  beauty and much more from trusted sellers.
+  beauty and much more from sellers across India.
 </p>
         </div>
 
@@ -110,12 +110,15 @@ export default function Footer() {
       </div>
       
 
-      {/* TRUST ROW */}
+      {/* TRUST ROW — real features only: order tracking (app/track-order),
+          payments, 7-day returns and the support-ticket page (app/support).
+          "Fast Delivery" and "Trusted Sellers" were removed: nothing in the
+          app guarantees delivery speed or defines a trusted seller. */}
       <div className="border-t border-b py-2 px-4">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-gray-700">
           <div className="flex items-center justify-center gap-2">
   <Truck size={18} className="text-green-600" />
-  Fast Delivery
+  Order Tracking
 </div>
 
 <div className="flex items-center justify-center gap-2">
@@ -129,8 +132,8 @@ export default function Footer() {
 </div>
 
 <div className="flex items-center justify-center gap-2">
-  <BadgeCheck size={18} className="text-green-600" />
-  Trusted Sellers
+  <Headphones size={18} className="text-green-600" />
+  Help &amp; Support
 </div>
         </div>
       </div>

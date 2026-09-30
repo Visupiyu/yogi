@@ -2,19 +2,24 @@
 
 import Link from "next/link";
 
+// Plain category labels. "Up to 40% OFF", "HOT DEAL", "LIMITED OFFER" and the
+// "SAVE BIG" corner badge were removed — no sale, time limit or discount level
+// stands behind them.
 const offers = [
   {
-    title: "Latest Smartphones",
-    subtitle: "Up to 40% OFF",
-    badge: "🔥 HOT DEAL",
+    title: "Smartphones",
+    subtitle: "Browse mobile phones",
+    badge: "📱 MOBILES",
     image: "/offers/mobiles.jpg",
     link: "/category/Mobiles",
   },
   {
     title: "Smart Home Appliances",
     subtitle: "Modern Living Starts Here",
-    badge: "⚡ LIMITED OFFER",
-    image: "/offers/appliances.jpg",
+    badge: "🏠 APPLIANCES",
+    // Neutral artwork: /offers/appliances.jpg (kept, not deleted) has "UP TO
+    // 30% OFF" and its own "SHOP NOW" printed into the image.
+    image: "/offers/appliances-neutral.svg",
     link: "/category/Appliances",
   },
 ];
@@ -51,9 +56,6 @@ export default function OfferCards() {
               <span className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white px-5 py-3 rounded-xl font-semibold w-fit shadow-lg transition">
   Shop Now →
 </span>
-<div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-  SAVE BIG
-</div>
             </div>
           </div>
         </Link>

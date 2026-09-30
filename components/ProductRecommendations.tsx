@@ -139,6 +139,7 @@ export default function ProductRecommendations({
             image={p.image}
             stock={p.stock}
             vendorId={p.vendorId}
+            mrp={typeof p.mrp === "number" ? p.mrp : undefined}
           />
         ))}
       </div>

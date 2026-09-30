@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { FREE_SHIPPING_THRESHOLD, getShippingSettings } from "@/lib/shipping";
 
 // The countdown that used to live here was removed, not rebuilt.
 //
@@ -27,6 +29,13 @@ import { motion } from "framer-motion";
 const DEALS_HREF = "/search?minDiscount=40";
 
 export default function FlashSale() {
+  // Delivery is free only at or above the configured threshold
+  // (settings/global.freeShippingThreshold), so the line below says so.
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(FREE_SHIPPING_THRESHOLD);
+  useEffect(() => {
+    getShippingSettings().then((s) => setFreeShippingThreshold(s.freeShippingThreshold));
+  }, []);
+
 return (
     <section className="py-3 px-2">
       <motion.div
@@ -99,7 +108,7 @@ transition-all
   View All Deals
 </Link>
                 <p className="hidden sm:block mt-4 text-sm font-semibold text-white">
-  🚚 Free Shipping • Secure Payment • Easy Returns
+  🚚 Free delivery above ₹{Number(freeShippingThreshold).toLocaleString("en-IN")} • Secure Payment • Easy Returns
 </p>
             </div>
              </div>

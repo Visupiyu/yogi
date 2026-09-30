@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   // duplicate it here.
   title: "About Us",
   description:
-    "Learn about YOMICO, India's multi-vendor marketplace connecting trusted sellers with customers across groceries, fashion, electronics, beauty and more.",
+    "Learn about YOMICO, India's multi-vendor marketplace connecting independent sellers with customers across groceries, fashion, electronics, beauty and more.",
 };
 
 export default function AboutPage() {
@@ -23,7 +23,7 @@ export default function AboutPage() {
 
         <p className="text-center text-gray-600 max-w-3xl mx-auto mb-12">
           YOMICO is a modern multi-vendor marketplace connecting
-          customers with trusted sellers across India.
+          customers with sellers across India.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -36,7 +36,7 @@ export default function AboutPage() {
 
             <p className="text-gray-600 leading-8">
               To empower local businesses and provide customers with
-              quality products at competitive prices through a trusted
+              quality products at competitive prices through an easy-to-use
               digital marketplace.
             </p>
 
@@ -61,24 +61,26 @@ export default function AboutPage() {
         <div className="bg-white p-8 rounded-2xl shadow mt-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-10">
 
+  {/* Figures here must be real: the former "10K+ Products", "500+ Trusted
+      Sellers", "50+ Categories" and "24/7" were not backed by any data. */}
   <div className="bg-white rounded-2xl shadow p-6 text-center">
-    <h3 className="text-4xl font-bold text-green-600">10K+</h3>
-    <p className="text-gray-600 mt-2">Products</p>
+    <h3 className="text-4xl font-bold text-green-600">0%</h3>
+    <p className="text-gray-600 mt-2">Seller commission during launch</p>
   </div>
 
   <div className="bg-white rounded-2xl shadow p-6 text-center">
-    <h3 className="text-4xl font-bold text-green-600">500+</h3>
-    <p className="text-gray-600 mt-2">Trusted Sellers</p>
+    <h3 className="text-4xl font-bold text-green-600">7-Day</h3>
+    <p className="text-gray-600 mt-2">Easy returns</p>
   </div>
 
   <div className="bg-white rounded-2xl shadow p-6 text-center">
-    <h3 className="text-4xl font-bold text-green-600">50+</h3>
-    <p className="text-gray-600 mt-2">Categories</p>
+    <h3 className="text-4xl font-bold text-green-600">🔒</h3>
+    <p className="text-gray-600 mt-2">Secure payments</p>
   </div>
 
   <div className="bg-white rounded-2xl shadow p-6 text-center">
-    <h3 className="text-4xl font-bold text-green-600">24/7</h3>
-    <p className="text-gray-600 mt-2">Customer Support</p>
+    <h3 className="text-4xl font-bold text-green-600">🎧</h3>
+    <p className="text-gray-600 mt-2">Help &amp; support tickets</p>
   </div>
 
 </div>
@@ -101,21 +103,21 @@ export default function AboutPage() {
 
             <div>
               <h3 className="font-bold text-xl mb-2">
-                ✅ Verified Sellers
+                ✅ Approved Sellers
               </h3>
 
               <p className="text-gray-600">
-                Products from verified vendors.
+                Every seller is reviewed and approved by YOMICO before selling.
               </p>
             </div>
 
             <div>
               <h3 className="font-bold text-xl mb-2">
-                🚚 Fast Delivery
+                📦 Order Tracking
               </h3>
 
               <p className="text-gray-600">
-                Quick and efficient order fulfillment.
+                Follow every order from confirmation to delivery.
               </p>
             </div>
 
@@ -157,13 +159,13 @@ export default function AboutPage() {
 
     <div>✅ Secure Payments</div>
 
-    <div>✅ Verified Sellers</div>
+    <div>✅ Approved Sellers</div>
 
     <div>✅ Easy Returns</div>
 
-    <div>✅ Fast Delivery</div>
+    <div>✅ Order Tracking</div>
 
-    <div>✅ 24/7 Support</div>
+    <div>✅ Help &amp; Support</div>
 
   </div>
 
@@ -179,7 +181,7 @@ export default function AboutPage() {
 
   <p className="text-gray-600 leading-8">
     YOMICO was created with a simple mission—to empower local businesses,
-    retailers, and entrepreneurs by providing a trusted online marketplace.
+    retailers, and entrepreneurs by giving them an online marketplace to reach customers.
     We believe every seller deserves the opportunity to grow through
     technology while offering customers quality products at competitive prices.
   </p>

@@ -24,20 +24,37 @@ async function getProducts(category) {
   const node = findNodeByName(category);
   if (!node) return [];
 
-  const q = query(
-    collection(db, "products"),
-    isTopLevelCategory(node)
-      ? where("categoryId", "==", node.id)
-      : where("subCategoryId", "==", node.id),
-    orderBy("createdAt", "desc"),
-    // Over-fetch; hidden products (pending/rejected/blocked) are dropped
-    // below BEFORE slicing to the 12 shown.
-    limit(48)
+  const top = isTopLevelCategory(node);
+  const snapshot = await getDocs(
+    query(
+      collection(db, "products"),
+      top
+        ? where("categoryId", "==", node.id)
+        : where("subCategoryId", "==", node.id),
+      orderBy("createdAt", "desc"),
+      // Over-fetch; hidden products (pending/rejected/blocked) are dropped
+      // below BEFORE slicing.
+      limit(48)
+    )
   );
 
-  const snapshot = await getDocs(q);
+  let docs = snapshot.docs;
+  if (!top) {
+    // Also products filed with this node as their LEAF category — the same
+    // rule the homepage category rows and search use (subCategoryId OR
+    // leafCategoryId). Equality-only query, so no extra composite index;
+    // merged, de-duplicated and re-sorted newest first here.
+    const leafSnap = await getDocs(
+      query(collection(db, "products"), where("leafCategoryId", "==", node.id), limit(48))
+    );
+    const seen = new Set(docs.map((d) => d.id));
+    const createdMs = (d) => d.get("createdAt")?.toMillis?.() ?? 0;
+    docs = [...docs, ...leafSnap.docs.filter((d) => !seen.has(d.id))].sort(
+      (a, b) => createdMs(b) - createdMs(a)
+    );
+  }
 
-  return snapshot.docs
+  return docs
     .filter((doc) => isProductVisible(doc.data()))
     .slice(0, 12)
     .map((doc) => toLegacyProduct(doc.id, doc.data()));
@@ -205,6 +222,7 @@ export default function CollectionStrip({
               src={product.image || "/placeholder.png"}
               alt={product.name}
               fill
+              sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1280px) 25vw, 200px"
               className="
                 object-contain
                 p-2

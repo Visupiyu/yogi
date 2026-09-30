@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Careers",
   description:
-    "Explore careers at YOMICO, India's multi-vendor marketplace connecting customers with trusted sellers.",
+    "Explore careers at YOMICO, India's multi-vendor marketplace connecting customers with sellers across India.",
 };
 
 export default function CareersPage() {
@@ -16,7 +16,7 @@ export default function CareersPage() {
         </h1>
         <p className="text-center text-gray-600 max-w-2xl mx-auto mb-12">
           We're building a multi-vendor marketplace that connects customers
-          with trusted sellers across India — and we're doing it with a
+          with sellers across India — and we're doing it with a
           small, hands-on team.
         </p>
 

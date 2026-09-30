@@ -6,14 +6,20 @@ import { motion } from "framer-motion";
 
 export default function PromoBanner({
 
-  badge = "⚡ LIMITED TIME OFFER",
+  // Neutral defaults: there is no time-limited sale, no "mega sale" and no
+  // verified "up to 70% off" behind this banner (the largest discounts come
+  // from MRPs still awaiting data review), so it just points at the category.
+  badge = "⚡ ELECTRONICS",
 
-  title = "Electronics Mega Sale",
+  title = "Shop Electronics",
 
   subtitle =
-    "Up to 70% OFF on Smartphones, Laptops, Accessories & More.",
+    "Browse electronics from sellers on YOMICO.",
 
-  image = "/banners/electronics-banner.png",
+  // Neutral artwork: the previous /banners/electronics-banner.png (kept, not
+  // deleted) has "UP TO 70% OFF", "FREE SHIPPING" and "1 YEAR WARRANTY"
+  // printed into the image, none of which YOMICO offers.
+  image = "/banners/electronics-neutral.svg",
 
   button1 = "Shop Collection",
 
@@ -24,12 +30,18 @@ export default function PromoBanner({
   // No dedicated offers/deals page exists anywhere in the app — /offers
   // 404'd. /store is the same general "browse everything" destination
   // already used for "View All" elsewhere on the homepage.
-  link2 = "/store",
+  // The real 40%+ discount filter (same as the Best Deals block) — /store is
+  // the stores directory, not offers.
+  link2 = "/search?minDiscount=40",
 
 }) {
 
+  // Below sm the banner is compacted: smaller badge, title and spacing, the
+  // two buttons side by side instead of stacked, the empty spacer hidden and a
+  // 110px image (the artwork is kept, just smaller). Every sm+ class is the
+  // original, so tablet and desktop are unchanged.
   return (
-    <section className="max-w-7xl mx-auto px-4 py-8">
+    <section className="max-w-7xl mx-auto px-2 py-4 sm:px-4 sm:py-8">
 
   <div
     className="
@@ -60,8 +72,10 @@ grid
 grid-cols-1
 lg:grid-cols-2
 items-center
-px-8
-py-8
+px-5
+py-4
+sm:px-8
+sm:py-8
 lg:px-12
 lg:py-10
 "
@@ -76,10 +90,10 @@ lg:py-10
           inline-block
           bg-yellow-400
           text-black
-          px-4
-          py-2
+          px-3 sm:px-4
+          py-1 sm:py-2
           rounded-full
-          text-sm
+          text-xs sm:text-sm
           font-bold
           shadow-lg
           "
@@ -89,8 +103,8 @@ lg:py-10
 
         <h2
           className="
-          mt-5
-          text-4xl md:text-5xl xl:text-6xl
+          mt-2 sm:mt-5
+          text-2xl sm:text-4xl md:text-5xl xl:text-6xl
           font-extrabold
           text-white
           leading-tight
@@ -101,22 +115,23 @@ lg:py-10
 
         <p
           className="
-          mt-5
+          mt-1 sm:mt-5
           text-white/90
-          text-lg
+          text-sm sm:text-lg
           max-w-xl
           "
         >
           {subtitle}
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-4">
+        <div className="mt-4 sm:mt-8 flex flex-wrap gap-2 sm:gap-4">
 
           <Link
             href={link1}
             className="
-            px-7
-            py-3
+            px-4 sm:px-7
+            py-2.5 sm:py-3
+            text-sm sm:text-base
             rounded-2xl
             bg-white
             text-blue-700
@@ -131,8 +146,9 @@ lg:py-10
           <Link
             href={link2}
             className="
-            px-7
-            py-3
+            px-4 sm:px-7
+            py-2.5 sm:py-3
+            text-sm sm:text-base
             rounded-2xl
             border-2
             border-white
@@ -149,7 +165,7 @@ lg:py-10
         </div>
 
       </div>
-      <div className="mt-8 flex flex-wrap gap-5 text-white text-sm font-medium">
+      <div className="hidden sm:flex mt-8 flex-wrap gap-5 text-white text-sm font-medium">
 
   </div>
 </div>
@@ -177,7 +193,7 @@ lg:py-10
       repeat: Infinity,
       duration: 3,
     }}
-    className="relative w-full h-[280px] lg:h-[320px]"
+    className="relative w-full h-[110px] mt-3 sm:mt-0 sm:h-[280px] lg:h-[320px]"
   >
 
     <Image

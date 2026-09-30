@@ -6,6 +6,7 @@ import {
 } from "react";
 
 import Link from "next/link";
+import { getShippingSettings } from "@/lib/shipping";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
@@ -13,6 +14,17 @@ export default function WishlistPage() {
 
   const [wishlist, setWishlist] =
     useState<any[]>([]);
+
+  // Free delivery applies at or above settings/global.freeShippingThreshold;
+  // null until loaded so nothing is claimed prematurely.
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] =
+    useState<number | null>(null);
+
+  useEffect(() => {
+    getShippingSettings().then((s) =>
+      setFreeDeliveryThreshold(s.freeShippingThreshold)
+    );
+  }, []);
 
   /* LOAD WISHLIST */
 
@@ -262,7 +274,9 @@ window.dispatchEvent(
 
   <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
     <p className="text-gray-500 text-sm">
-      Free Delivery
+      {freeDeliveryThreshold !== null
+        ? `Free delivery above ₹${freeDeliveryThreshold.toLocaleString("en-IN")}`
+        : "Delivery"}
     </p>
 
     <h2 className="text-3xl mt-2">
@@ -444,11 +458,13 @@ duration-500
 
 )}
 
+{freeDeliveryThreshold !== null && Number(item.price) >= freeDeliveryThreshold && (
 <p className="text-sm text-green-600 mt-1">
 
 🚚 Free Delivery
 
 </p>
+)}
 
                   {/* BUTTONS */}
 

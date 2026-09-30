@@ -2,29 +2,49 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import {
+  BookOpen,
+  Baby,
+  Laptop,
+  ShoppingBag,
+  ShoppingBasket,
+  Shirt,
+  Smartphone,
+  Sofa,
+  Sparkles,
+  WashingMachine,
+  type LucideIcon,
+} from "lucide-react";
 
 // `name` is shown to the user; `categoryName` is the real catalog node
 // name used to resolve products (Men/Women are sub-categories of Fashion
 // in the catalog, not their own top-level category — "Men Fashion" and
 // "Women Fashion" don't exist as real category names, so linking to them
 // directly always shows zero products).
-const categories = [
-  { name: "Grocery", categoryName: "Grocery", image: "https://cdn-icons-png.flaticon.com/512/3082/3082037.png", bg: "bg-green-100" },
-  { name: "Men Fashion", categoryName: "Men", image: "https://cdn-icons-png.flaticon.com/512/892/892458.png", bg: "bg-blue-100" },
-  { name: "Women Fashion", categoryName: "Women", image: "https://cdn-icons-png.flaticon.com/512/1785/1785210.png", bg: "bg-pink-100" },
-  { name: "Kids Fashion", categoryName: "Kids Fashion", image: "https://cdn-icons-png.flaticon.com/512/3468/3468378.png", bg: "bg-orange-100" },
-  { name: "Beauty", categoryName: "Beauty", image: "https://cdn-icons-png.flaticon.com/512/3050/3050153.png", bg: "bg-purple-100" },
-  { name: "Electronics", categoryName: "Electronics", image: "https://cdn-icons-png.flaticon.com/512/1041/1041916.png", bg: "bg-cyan-100" },
-  { name: "Furniture", categoryName: "Furniture", image: "https://cdn-icons-png.flaticon.com/512/3081/3081559.png", bg: "bg-yellow-100" },
-  { name: "Mobiles", categoryName: "Mobiles", image: "https://cdn-icons-png.flaticon.com/512/545/545245.png", bg: "bg-red-100" },
-  { name: "Appliances", categoryName: "Appliances", image: "https://cdn-icons-png.flaticon.com/512/3659/3659898.png", bg: "bg-gray-100" },
-  { name: "Books", categoryName: "Books", image: "https://cdn-icons-png.flaticon.com/512/3145/3145765.png", bg: "bg-indigo-100" },
+//
+// Icons are bundled lucide-react components. They replaced ten images
+// hot-linked from a third-party icon CDN, so the strip no longer depends on
+// an external host being reachable.
+const categories: { name: string; categoryName: string; Icon: LucideIcon; bg: string; fg: string }[] = [
+  { name: "Grocery", categoryName: "Grocery", Icon: ShoppingBasket, bg: "bg-green-100", fg: "text-green-700" },
+  { name: "Men Fashion", categoryName: "Men", Icon: Shirt, bg: "bg-blue-100", fg: "text-blue-700" },
+  { name: "Women Fashion", categoryName: "Women", Icon: ShoppingBag, bg: "bg-pink-100", fg: "text-pink-700" },
+  { name: "Kids Fashion", categoryName: "Kids Fashion", Icon: Baby, bg: "bg-orange-100", fg: "text-orange-700" },
+  { name: "Beauty", categoryName: "Beauty", Icon: Sparkles, bg: "bg-purple-100", fg: "text-purple-700" },
+  { name: "Electronics", categoryName: "Electronics", Icon: Laptop, bg: "bg-cyan-100", fg: "text-cyan-700" },
+  { name: "Furniture", categoryName: "Furniture", Icon: Sofa, bg: "bg-yellow-100", fg: "text-yellow-700" },
+  { name: "Mobiles", categoryName: "Mobiles", Icon: Smartphone, bg: "bg-red-100", fg: "text-red-700" },
+  { name: "Appliances", categoryName: "Appliances", Icon: WashingMachine, bg: "bg-gray-100", fg: "text-gray-700" },
+  { name: "Books", categoryName: "Books", Icon: BookOpen, bg: "bg-indigo-100", fg: "text-indigo-700" },
 ];
 
+// Left-aligned on mobile: a centred row wider than the screen can't be
+// scrolled back to its first items (the overflow spills off the left edge).
+// Centred from md up, where all ten fit.
 export default function CategoryStrip() {
   return (
     <section className="bg-gradient-to-r from-green-50 via-white to-blue-50 border-b border-gray-200">
-      <div className="flex items-center justify-center gap-4 py-4 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center justify-start md:justify-center gap-4 px-4 py-4 overflow-x-auto scrollbar-hide">
         {categories.map((cat) => (
           <motion.div
             key={cat.name}
@@ -38,10 +58,10 @@ export default function CategoryStrip() {
               <div
                 className={`w-10 h-10 md:w-12 md:h-12 rounded-full ${cat.bg} flex items-center justify-center shadow-sm group-hover:shadow-lg transition overflow-hidden`}
               >
-                <img
-                  src={cat.image}
-                  alt={cat.name}
-                  className="w-5 h-5 md:w-7 md:h-7 object-contain"
+                <cat.Icon
+                  aria-hidden="true"
+                  strokeWidth={2}
+                  className={`w-5 h-5 md:w-7 md:h-7 ${cat.fg}`}
                 />
               </div>
               <p className="mt-1 text-xs font-semibold text-gray-700 group-hover:text-green-600 transition text-center">

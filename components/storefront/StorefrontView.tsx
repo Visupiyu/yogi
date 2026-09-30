@@ -147,7 +147,7 @@ export default function StorefrontView({
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {products.map((p) => (
-                <ProductCard key={p.id} id={p.id} name={p.name} price={p.price} image={p.image} stock={p.stock} />
+                <ProductCard key={p.id} id={p.id} name={p.name} price={p.price} image={p.image} stock={p.stock} mrp={p.mrp ?? undefined} />
               ))}
             </div>
           )}

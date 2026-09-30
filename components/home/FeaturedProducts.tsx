@@ -4,15 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import {
-  collection,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { isProductVisible } from "@/lib/products/visibility";
+  FEATURED_LIMIT,
+  fetchFeatured,
+  shouldShowFeatured,
+  type HomepageProduct,
+} from "@/lib/storefront/homepageMerchandising";
 
 type Product = {
   id: string;
@@ -21,18 +17,12 @@ type Product = {
   image: string;
   stock: number;
   vendorId?: string;
+  mrp?: number;
 };
 
-const FEATURED_LIMIT = 8;
-// Candidate pool for the fallback ranking below — bounded regardless of
-// catalog size, and large enough to have real active/in-stock products
-// left after filtering.
-const FALLBACK_CANDIDATE_LIMIT = 30;
-
-function toProduct(doc: any): Product {
-  const data = doc.data();
+function toProduct(data: HomepageProduct): Product {
   return {
-    id: doc.id,
+    id: data.id,
     name: data.shortTitle || data.title || data.name || "",
     price: Number(
       data.sellingPrice ??
@@ -46,76 +36,31 @@ function toProduct(doc: any): Product {
       "",
     stock: Number(data.stock || 0),
     vendorId: data.vendorId,
+    mrp: typeof data.mrp === "number" ? data.mrp : undefined,
   };
 }
 
+// Admin-curated only — products an admin marked ★ Featured in
+// app/admin/products. There is deliberately NO fallback: a "Featured" row
+// filled from sales or views would just repeat Best Sellers under a label that
+// implies curation. The whole section stays hidden until at least
+// MIN_FEATURED_TO_SHOW visible products are featured
+// (lib/storefront/homepageMerchandising.ts).
 export default function FeaturedProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  // Tracked separately from an empty result — a genuinely empty
-  // (successful) fetch and a failed one used to look identical to the
-  // customer ("No Featured Products Found" either way), with no way to
-  // tell them apart or retry a real failure.
   const [error, setError] = useState(false);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      // Admin-curated Featured products always take priority — set via
-      // the real ★ Featured toggle in app/admin/products, untouched here.
-      const featuredQuery = query(
-        collection(db, "products"),
-        where("featured", "==", true),
-        limit(FEATURED_LIMIT * 4)
+      const featured = await fetchFeatured();
+      setProducts(
+        shouldShowFeatured(featured)
+          ? featured.slice(0, FEATURED_LIMIT).map(toProduct)
+          : []
       );
-      const featuredSnapshot = await getDocs(featuredQuery);
-
-      // A featured product that is pending review, rejected or blocked is
-      // never shown (lib/products/visibility.ts); filtered before slicing.
-      const featuredVisible = featuredSnapshot.docs
-        .filter((doc) => isProductVisible(doc.data()))
-        .slice(0, FEATURED_LIMIT);
-
-      if (featuredVisible.length > 0) {
-        setProducts(featuredVisible.map(toProduct));
-        return;
-      }
-
-      // No product has ever been marked Featured yet — rather than show
-      // an empty section, fall back to the best-performing active,
-      // in-stock products. Single-field orderBy (same shape as
-      // BestSellers.jsx's orderBy("sales","desc")) needs no new composite
-      // index; the active/in-stock filter and the views/rating blend into
-      // the ranking both happen client-side after the fetch instead, so
-      // this stays compatible with the indexes already deployed. The
-      // moment an admin marks a real product Featured, this whole branch
-      // stops running.
-      const fallbackQuery = query(
-        collection(db, "products"),
-        orderBy("sales", "desc"),
-        limit(FALLBACK_CANDIDATE_LIMIT)
-      );
-      const fallbackSnapshot = await getDocs(fallbackQuery);
-
-      const ranked = fallbackSnapshot.docs
-        .filter((doc) => {
-          const data = doc.data();
-          return isProductVisible(data) && Number(data.stock || 0) > 0;
-        })
-        .map((doc) => {
-          const data = doc.data();
-          const score =
-            Number(data.sales || 0) * 3 +
-            Number(data.views || 0) +
-            Number(data.rating || 0) * 10;
-          return { doc, score };
-        })
-        .sort((a, b) => b.score - a.score)
-        .slice(0, FEATURED_LIMIT)
-        .map(({ doc }) => toProduct(doc));
-
-      setProducts(ranked);
     } catch (err) {
       console.error(err);
       setError(true);
@@ -127,6 +72,11 @@ export default function FeaturedProducts() {
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  // Nothing is rendered while loading or when too few products are featured:
+  // the section is usually hidden, so a skeleton would only flash and vanish.
+  if (loading) return null;
+  if (!error && products.length === 0) return null;
 
   return (
     <section className="py-2 px-2">
@@ -143,22 +93,7 @@ export default function FeaturedProducts() {
           </Link>
         </div>
 
-        {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl overflow-hidden shadow-sm animate-pulse"
-              >
-                <div className="h-40 bg-gray-200" />
-                <div className="p-3 space-y-2">
-                  <div className="h-3 bg-gray-200 rounded w-3/4" />
-                  <div className="h-3 bg-gray-200 rounded w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : error ? (
+        {error ? (
           <div className="text-center py-10 bg-red-50 rounded-2xl border border-red-200">
             <p className="text-red-600 font-semibold">
               Unable to load featured products.
@@ -169,10 +104,6 @@ export default function FeaturedProducts() {
             >
               Retry
             </button>
-          </div>
-        ) : products.length === 0 ? (
-          <div className="text-center py-6 text-gray-500">
-            No Featured Products Found
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -185,6 +116,7 @@ export default function FeaturedProducts() {
                 image={product.image}
                 stock={product.stock}
                 vendorId={product.vendorId}
+                mrp={product.mrp}
               />
             ))}
           </div>

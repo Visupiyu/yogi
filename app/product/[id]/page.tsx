@@ -11,6 +11,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { addToCart as addToCartHelper } from "@/lib/cart";
 import { isProductVisible } from "@/lib/products/visibility";
+import { discountPercent as calcDiscountPercent } from "@/lib/products/discount";
+import { getShippingSettings } from "@/lib/shipping";
 import {
   variantDimensions,
   optionsForDimension,
@@ -153,6 +155,34 @@ export default function ProductPage() {
   const [reviewText, setReviewText] = useState("");
   const [pinCode, setPinCode] = useState("");
 const [deliveryMessage, setDeliveryMessage] = useState("");
+  // Free delivery applies at or above settings/global.freeShippingThreshold
+  // (lib/shipping) — null until loaded, so nothing is claimed before then.
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number | null>(null);
+  // "Verified Seller" is shown only when the seller's public store profile is
+  // admin-Approved (vendors_public/{uid}.status) — never for a seller with no
+  // profile (e.g. a removed seller account).
+  const [sellerVerified, setSellerVerified] = useState(false);
+
+  useEffect(() => {
+    getShippingSettings().then((s) => setFreeDeliveryThreshold(s.freeShippingThreshold));
+  }, []);
+
+  const vendorIdForBadge = product?.vendorId || "";
+  useEffect(() => {
+    let cancelled = false;
+    setSellerVerified(false);
+    if (!vendorIdForBadge) return;
+    getDoc(doc(db, "vendors_public", vendorIdForBadge))
+      .then((snap) => {
+        if (!cancelled) setSellerVerified(snap.exists() && snap.data()?.status === "Approved");
+      })
+      .catch(() => {
+        if (!cancelled) setSellerVerified(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [vendorIdForBadge]);
 const [notifySuccess, setNotifySuccess] = useState(false);
 const [showGallery, setShowGallery] = useState(false);
 const [quantity, setQuantity] = useState(1);
@@ -743,13 +773,17 @@ const usingVariantPrice = price !== (product.price ?? 0);
 
 const hasDiscount = !usingVariantPrice && mrp > price;
 
+// Always calculated from the displayed price and MRP (lib/products/discount),
+// never from the stored discountPercent field, so every storefront surface
+// shows the same whole-number figure.
 const discountPercent =
-  hasDiscount
-    ? product.discountPercent ??
-      Math.round(((mrp - price) / mrp) * 100)
-    : 0;
+  hasDiscount ? calcDiscountPercent(price, mrp) ?? 0 : 0;
 
 const savings = hasDiscount ? mrp - price : 0;
+
+// This item alone meets the configured free-delivery threshold.
+const qualifiesFreeDelivery =
+  freeDeliveryThreshold !== null && price >= freeDeliveryThreshold;
 
   const avgRating = reviews.length
     ? (
@@ -804,7 +838,7 @@ const savings = hasDiscount ? mrp - price : 0;
   ];
 const badges: string[] = [];
 
-if ((product.discountPercent ?? 0) >= 40) {
+if (hasDiscount && discountPercent >= 40) {
   badges.push("🔥 Best Deal");
 }
 
@@ -1002,26 +1036,9 @@ if (product.stock > 20) {
                       : "No ratings yet"}
                   </span>
                 </div>
-                <div
-  className="
-  inline-flex
-  items-center
-  gap-2
-  bg-gradient-to-r
-  from-red-600
-  to-orange-500
-  text-white
-  px-5
-  py-2
-  rounded-full
-  text-sm
-  font-bold
-  shadow-lg
-  mb-5
-  "
->
-  🔥 Limited Time Deal
-</div>
+                {/* The unconditional "Limited Time Deal" pill was removed:
+                    no product carries a sale window, so there was no time
+                    limit behind it. */}
                 {/* PRICE */}
  <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 rounded-3xl p-5">
 
@@ -1057,7 +1074,7 @@ if (product.stock > 20) {
 
     <span>✅ Inclusive of GST</span>
 
-    <span>🚚 Free Delivery</span>
+    {qualifiesFreeDelivery && <span>🚚 Free Delivery</span>}
 
     <span>💳 Secure Payment</span>
 
@@ -1139,9 +1156,9 @@ Secure Payment
 </p>
 </div>
 <div className="bg-yellow-50 rounded-2xl p-3 text-center">
-🚚
+📦
 <p className="text-sm font-semibold">
-Fast Delivery
+Order Tracking
 </p>
 </div>
 <div className="bg-purple-50 rounded-2xl p-3 text-center">
@@ -1152,9 +1169,11 @@ Easy Returns
 </div>
 </div>
                 <div className="flex flex-wrap gap-2 mb-5">
+                  {qualifiesFreeDelivery && (
                   <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
                     🚚 Free Delivery
                   </span>
+                  )}
                   <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
                     🔒 Secure Payment
                   </span>
@@ -1384,9 +1403,11 @@ Easy Returns
 
       <div className="flex items-center gap-2 mt-2">
 
+        {sellerVerified && (
         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
   ✔ Verified Seller
 </span>
+        )}
         <span className="text-sm text-gray-500">
           Secure Marketplace
         </span>
@@ -1453,7 +1474,7 @@ Easy Returns
   </h3>
 
   <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-    Fast Delivery
+    Order Tracking
   </span>
 
 </div>
@@ -1488,7 +1509,7 @@ focus:ring-green-500
         }
 
         setDeliveryMessage(
-          "PIN code received. Standard delivery estimate: 2–5 business days."
+          "PIN code received. Delivery details are shown at checkout."
         );
 
       }}
@@ -1520,11 +1541,15 @@ shrink-0
  <div className="grid grid-cols-2 gap-4 mt-5 text-sm">
 
    <div className="bg-gray-50 rounded-xl p-3">
-  🚚 Free Delivery
+  {qualifiesFreeDelivery
+    ? "🚚 Free Delivery"
+    : freeDeliveryThreshold !== null
+      ? `🚚 Free delivery on orders above ₹${freeDeliveryThreshold.toLocaleString("en-IN")}`
+      : "🚚 Delivery charges shown at checkout"}
 </div>
 
 <div className="bg-gray-50 rounded-xl p-3">
-  📅 2–5 Business Days
+  📅 Delivery details shown at checkout
 </div>
 
 <div className="bg-gray-50 rounded-xl p-3">
@@ -1647,7 +1672,7 @@ hover:-translate-y-0.5
                 </button>
 <p className="text-center text-xs text-gray-500 mt-3">
 
-🔒 Safe & Secure Checkout • 100% Buyer Protection
+🔒 Safe & Secure Checkout
 
 </p>
 

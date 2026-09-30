@@ -9,6 +9,8 @@ import ProductFilters from "@/components/ProductFilters";
 import { addToCart as addToCartHelper } from "@/lib/cart";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 import { toLegacyProduct, isStorefrontVisible } from "@/lib/products/legacyDisplay";
+import { discountPercent } from "@/lib/products/discount";
+import { getShippingSettings } from "@/lib/shipping";
 
 // label = shown in the dropdown, value = the catalog node name used to
 // resolve the real categoryId/subCategoryId (Men/Women are subcategories of
@@ -62,6 +64,14 @@ const [quickQty, setQuickQty] = useState(1);
 const [quickSize, setQuickSize] = useState("");
 const [quickColor, setQuickColor] = useState("");
   const [retryKey, setRetryKey] = useState(0);
+  // Free delivery applies at or above settings/global.freeShippingThreshold;
+  // null until loaded so no card claims it prematurely.
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(null);
+  useEffect(() => {
+    getShippingSettings().then((s) => setFreeDeliveryThreshold(s.freeShippingThreshold));
+  }, []);
+  const qualifiesFreeDelivery = (price) =>
+    freeDeliveryThreshold !== null && Number(price) >= freeDeliveryThreshold;
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
@@ -189,18 +199,11 @@ if (inStockOnly) {
   );
 }
 if (minimumDiscount > 0) {
+  // Same whole-number figure the cards display (lib/products/discount), so a
+  // product shown as "40% OFF" is always inside the 40%+ filter.
   items = items.filter((item) => {
-
-    const mrp = Number(item.mrp || 0);
-    const price = Number(item.price || 0);
-
-    if (mrp <= 0) return false;
-
-    const discount =
-      ((mrp - price) / mrp) * 100;
-
-    return discount >= minimumDiscount;
-
+    const discount = discountPercent(item.price, item.mrp);
+    return discount !== null && discount >= minimumDiscount;
   });
 }
     if (stockOnly) {
@@ -336,13 +339,16 @@ if (minimumDiscount > 0) {
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
             <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-2xl font-bold mb-2">🔍 No products found</h2>
-            <p className="text-gray-500 mb-6">Try another keyword or filter.</p>
-            <Link href="/">
-  <button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold transition">
-    Continue Shopping
-  </button>
-</Link>
+            <h2 className="text-2xl font-bold mb-2">No products found</h2>
+            <p className="text-gray-500 mb-6">
+              Try another keyword or filter, or browse everything on YOMICO.
+            </p>
+            <Link
+              href="/search"
+              className="inline-block bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-semibold transition"
+            >
+              Browse All Products
+            </Link>
 
 <div className="mt-8">
   <p className="font-bold mb-4">
@@ -418,13 +424,8 @@ if (minimumDiscount > 0) {
           ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
             {filtered.map((product) => {
-              const hasMrp =
-                Number(product.mrp) && Number(product.mrp) > Number(product.price);
-              const off = hasMrp
-                ? Math.round(
-                    ((product.mrp - product.price) / product.mrp) * 100
-                  )
-                : 0;
+              const off = discountPercent(product.price, product.mrp);
+              const hasMrp = off !== null;
 
               return (
                 <Link key={product.id} href={`/product/${product.id}`}>
@@ -466,7 +467,9 @@ if (minimumDiscount > 0) {
                         }`}
                       >
                         {product.stock > 0 ? "In Stock" : "Out of Stock"}</p>
-                      <p className="text-xs text-green-600 mt-1">🚚 Free Delivery </p>
+                      {qualifiesFreeDelivery(product.price) && (
+                        <p className="text-xs text-green-600 mt-1">🚚 Free Delivery</p>
+                      )}
                       <button
   onClick={(e) => {
     e.preventDefault();
@@ -576,7 +579,11 @@ Contact Support
   </p>
 
   <p className="text-green-600 font-medium">
-    🚚 Free Delivery
+    {qualifiesFreeDelivery(quickViewProduct.price)
+      ? "🚚 Free Delivery"
+      : freeDeliveryThreshold !== null
+        ? `🚚 Free delivery on orders above ₹${Number(freeDeliveryThreshold).toLocaleString("en-IN")}`
+        : "🚚 Delivery charges shown at checkout"}
   </p>
 
   <p className="text-blue-600">

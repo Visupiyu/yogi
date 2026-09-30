@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: "%s | YOMICO",
   },
   description:
-"Shop groceries, electronics, fashion, beauty, furniture, home essentials and more from trusted sellers across India with fast delivery and secure payments.",
+"Shop fashion, electronics, mobiles, appliances, beauty, groceries and more from sellers across India on YOMICO, with secure payments, order tracking and easy returns.",
   keywords: [
     "YOMICO",
     "Yomico",
