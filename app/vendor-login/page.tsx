@@ -205,7 +205,7 @@ console.error(err);
 
                 <Link
                   href="/vendor-forgot-password"
-                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                  className="text-sm py-2 -my-2 text-blue-600 hover:text-blue-700 hover:underline"
                 >
                   Forgot Password?
                 </Link>
@@ -222,7 +222,7 @@ console.error(err);
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 hover:text-gray-700"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>

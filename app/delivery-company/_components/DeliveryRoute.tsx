@@ -60,9 +60,9 @@ function Step({
           <p className="text-sm text-gray-400">{missing}</p>
         ) : (
           <>
-            <p className="text-sm font-semibold text-gray-900">{title || "—"}</p>
-            {address ? <p className="text-xs text-gray-600">{address}</p> : null}
-            {locality ? <p className="text-xs text-gray-500">{locality}</p> : null}
+            <p className="text-sm font-semibold text-gray-900 break-words">{title || "—"}</p>
+            {address ? <p className="text-xs text-gray-600 break-words">{address}</p> : null}
+            {locality ? <p className="text-xs text-gray-500 break-words">{locality}</p> : null}
           </>
         )}
       </div>

@@ -269,17 +269,16 @@ clearImage();
         from-green-600
         to-blue-600
         text-white
-        p-6
+        p-4 md:p-6
       ">
 
-        <h1 className="text-3xl font-bold">
+        <h1 className="text-2xl md:text-3xl font-bold break-words">
 
 💬 {chat?.customerName || "Customer"}
 
 </h1>
 
-<p className="mt-2 opacity-90">
-
+<p className="mt-2 opacity-90 break-words">
 📦 {chat?.productName}
 
 </p>
@@ -289,7 +288,7 @@ clearImage();
       <div className="
         flex-1
         overflow-y-auto
-        p-6
+        p-4 md:p-6
         space-y-4
       ">
 
@@ -329,7 +328,7 @@ clearImage();
 
                 <div className={`
 
-                  max-w-md
+                  max-w-md break-words
 
                   rounded-3xl
 
@@ -448,7 +447,7 @@ clearImage();
 
         )}
 
-        <div className="flex gap-4">
+        <div className="flex gap-2 md:gap-4">
 
         <input
   value={message}
@@ -465,6 +464,7 @@ clearImage();
 
           className="
             flex-1
+            min-w-0
             border
             rounded-xl
             p-3
@@ -500,7 +500,8 @@ clearImage();
   className="
     bg-green-600
     text-white
-    px-8
+    px-5
+    md:px-8
     rounded-xl
     disabled:opacity-50
     disabled:cursor-not-allowed

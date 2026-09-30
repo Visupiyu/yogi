@@ -171,7 +171,7 @@ export default function SellerOrdersPage() {
   return (
     <div className="p-5">
       <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 rounded-3xl mb-6">
-        <h1 className="text-4xl font-bold">Seller Orders</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold">Seller Orders</h1>
         <p className="opacity-90">
           Each product moves through Confirmed → Accept → Ready for Delivery →
           Handed Over to Courier → Final Delivery on its own.
@@ -213,11 +213,11 @@ export default function SellerOrdersPage() {
                 key={record.id}
                 className="bg-white border rounded-xl p-5 shadow"
               >
-                <h2 className="font-bold text-lg" title={record.orderId}>
+                <h2 className="font-bold text-lg break-words" title={record.orderId}>
                   Order ID: {record.orderNumber || shortOrderLabel(record.orderId || "")}
                 </h2>
 
-                <p>Customer: {record.customerName || "Customer"}</p>
+                <p className="break-words">Customer: {record.customerName || "Customer"}</p>
 
                 <p>Confirmed: {formatIst(record.confirmedAt)}</p>
 
@@ -294,7 +294,7 @@ export default function SellerOrdersPage() {
                         className="border rounded-xl p-3 flex flex-wrap items-center justify-between gap-3"
                       >
                         <div className="min-w-0">
-                          <p className="font-semibold">{item.name}</p>
+                          <p className="font-semibold break-words">{item.name}</p>
                           <p className="text-sm text-gray-600">
                             ₹{item.price} × {item.qty} = ₹
                             {(item.price || 0) * (item.qty || 0)}

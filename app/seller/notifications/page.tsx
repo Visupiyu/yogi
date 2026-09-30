@@ -175,17 +175,17 @@ export default function SellerNotificationsPage() {
 
   return (
 
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-6">
 
       <div className="max-w-6xl mx-auto">
 
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-8 mb-8">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-5 md:p-8 mb-8">
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
 
             <div>
 
-              <h1 className="text-4xl font-bold">
+              <h1 className="text-3xl md:text-4xl font-bold">
 
                 🔔 Seller Notifications
 
@@ -261,13 +261,13 @@ export default function SellerNotificationsPage() {
 
                 </span>
 
-                <h2 className="text-xl font-bold">
+                <h2 className="text-xl font-bold break-words">
 
                   {item.title}
 
                 </h2>
 
-                <p className="mt-2 text-gray-600">
+                <p className="mt-2 text-gray-600 break-words">
 
                   {item.message}
 

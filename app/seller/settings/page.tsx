@@ -200,15 +200,15 @@ const uploadStoreImage = async (
 
   return (
 
-<div className="min-h-screen bg-gray-100 p-6">
+<div className="min-h-screen bg-gray-100 p-4 md:p-6">
 
 <div className="max-w-5xl mx-auto">
 
-<h1 className="text-4xl font-bold mb-8">
+<h1 className="text-3xl md:text-4xl font-bold mb-8">
 Store Settings
 </h1>
 
-<div className="bg-white rounded-3xl shadow p-8 space-y-6">
+<div className="bg-white rounded-3xl shadow p-5 md:p-8 space-y-6">
 
 {/* Store Logo & Banner */}
 

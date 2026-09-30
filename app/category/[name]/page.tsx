@@ -26,6 +26,8 @@ export default function CategoryPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [sortBy, setSortBy] = useState("default");
   const [priceFilter, setPriceFilter] = useState("all");
   const [brandFilter, setBrandFilter] = useState("all");
@@ -34,6 +36,7 @@ export default function CategoryPage() {
   useEffect(() => {
     async function loadProducts() {
       setLoading(true);
+      setError(false);
       try {
         // categoryId/subCategoryId on product docs are the catalog node's
         // internal codes (e.g. "FASHION", "FASHION_MEN"), not display
@@ -74,13 +77,14 @@ export default function CategoryPage() {
         setProducts(items);
       } catch (error) {
         console.error(error);
+        setError(true);
       } finally {
         setLoading(false);
       }
     }
 
     if (name) loadProducts();
-  }, [name]);
+  }, [name, retryKey]);
 
   const resetFilters = () => {
     setPriceFilter("all");
@@ -144,13 +148,27 @@ export default function CategoryPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-red-600 font-bold text-xl">Unable to load products.</p>
+        <button
+          onClick={() => setRetryKey((k) => k + 1)}
+          className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-xl font-semibold"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-gray-100 p-6 md:p-10">
+    <main className="min-h-screen bg-gray-100 p-4 md:p-10">
       <div className="max-w-7xl mx-auto">
         {/* HEADER */}
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-8 md:p-10 mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold capitalize">{name}</h1>
-          <p className="mt-3 text-green-100 text-lg">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-5 md:p-10 mb-8">
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold capitalize break-words">{name}</h1>
+          <p className="mt-3 text-green-100 text-base md:text-lg break-words">
             Discover the best {name.toLowerCase()} products at great prices.
           </p>
           <div className="mt-5 inline-flex bg-white/20 px-4 py-2 rounded-full text-sm font-semibold">
@@ -164,11 +182,11 @@ export default function CategoryPage() {
             Showing {sortedProducts.length} products
           </p>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
             <select
               value={priceFilter}
               onChange={(e) => setPriceFilter(e.target.value)}
-              className="border rounded-xl px-4 py-2 bg-white"
+              className="w-full sm:w-auto min-w-0 border rounded-xl px-3 sm:px-4 py-2.5 bg-white"
             >
               <option value="all">All Prices</option>
               <option value="0-500">₹0 - ₹500</option>
@@ -180,7 +198,7 @@ export default function CategoryPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="border rounded-xl px-4 py-2 bg-white"
+              className="w-full sm:w-auto min-w-0 border rounded-xl px-3 sm:px-4 py-2.5 bg-white"
             >
               <option value="default">Default</option>
               <option value="low">Price: Low to High</option>
@@ -191,7 +209,7 @@ export default function CategoryPage() {
             <select
               value={brandFilter}
               onChange={(e) => setBrandFilter(e.target.value)}
-              className="border rounded-xl px-4 py-2 bg-white"
+              className="w-full sm:w-auto min-w-0 border rounded-xl px-3 sm:px-4 py-2.5 bg-white"
             >
               {brands.map((brand) => (
                 <option key={brand} value={brand}>
@@ -203,7 +221,7 @@ export default function CategoryPage() {
             <select
               value={ratingFilter}
               onChange={(e) => setRatingFilter(e.target.value)}
-              className="border rounded-xl px-4 py-2 bg-white"
+              className="w-full sm:w-auto min-w-0 border rounded-xl px-3 sm:px-4 py-2.5 bg-white"
             >
               <option value="all">All Ratings</option>
               <option value="4">★★★★☆ &amp; Up</option>
@@ -213,7 +231,7 @@ export default function CategoryPage() {
 
             <button
               onClick={resetFilters}
-              className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-xl font-medium transition"
+              className="col-span-2 sm:col-span-1 bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-medium transition"
             >
               Clear Filters
             </button>
@@ -222,9 +240,9 @@ export default function CategoryPage() {
 
         {/* RESULTS */}
         {sortedProducts.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-md p-12 text-center border">
+          <div className="bg-white rounded-3xl shadow-md p-6 md:p-12 text-center border">
             <div className="text-6xl mb-5">📦</div>
-            <h2 className="text-3xl font-bold mb-3">No Products Found</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-3">No Products Found</h2>
             <p className="text-gray-500 mb-6">
               {products.length === 0
                 ? "No products available in this category yet."
@@ -240,7 +258,7 @@ export default function CategoryPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
             {sortedProducts.map((product) => (
               <ProductCard
                 key={product.id}

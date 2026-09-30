@@ -83,7 +83,7 @@ export default function SellerPayoutsPage() {
     <div className="
       min-h-screen
       bg-gray-100
-      p-6
+      p-4 md:p-6
     ">
 
       <div className="
@@ -96,13 +96,13 @@ export default function SellerPayoutsPage() {
           from-green-600
           to-blue-600
           text-white
-          p-8
+          p-5 md:p-8
           rounded-3xl
           mb-8
         ">
 
           <h1 className="
-            text-4xl
+            text-3xl md:text-4xl
             font-bold
           ">
             Payout Report
@@ -125,7 +125,7 @@ export default function SellerPayoutsPage() {
           ">
             <h3>Total Sales</h3>
             <p className="
-              text-3xl
+              break-words text-3xl
               font-bold
             ">
               ₹{sales}
@@ -140,7 +140,7 @@ export default function SellerPayoutsPage() {
           ">
             <h3>Commission</h3>
             <p className="
-              text-3xl
+              break-words text-3xl
               font-bold
               text-orange-600
             ">
@@ -156,7 +156,7 @@ export default function SellerPayoutsPage() {
           ">
             <h3>Delivery Charges</h3>
             <p className="
-              text-3xl
+              break-words text-3xl
               font-bold
               text-orange-600
             ">
@@ -179,7 +179,7 @@ export default function SellerPayoutsPage() {
           ">
             <h3>Total Earnings</h3>
             <p className="
-              text-3xl
+              break-words text-3xl
               font-bold
               text-green-600
             ">
@@ -202,7 +202,7 @@ export default function SellerPayoutsPage() {
           ">
             <h3>Paid Payout</h3>
             <p className="
-              text-3xl
+              break-words text-3xl
               font-bold
               text-blue-600
             ">

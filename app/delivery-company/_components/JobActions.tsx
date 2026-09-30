@@ -137,7 +137,7 @@ export default function JobActions({
           {confirming === "accept" ? (
             <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 p-3">
               <p className="text-sm text-emerald-900">Accept this handoff for your company?</p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   onClick={doAccept}
                   disabled={busy !== null}
@@ -213,7 +213,7 @@ export default function JobActions({
                   <p className="text-sm text-indigo-900">
                     Assign this shipment to <span className="font-semibold">{selectedPerson.name || selectedPerson.id}</span>?
                   </p>
-                  <div className="mt-2 flex gap-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     <button
                       onClick={doAssign}
                       disabled={busy !== null}
@@ -261,7 +261,7 @@ export default function JobActions({
                 placeholder="e.g. Outside our service area"
               />
             </label>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               <button
                 onClick={doReject}
                 disabled={busy !== null}

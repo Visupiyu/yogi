@@ -283,7 +283,7 @@ export default function RefundsPage() {
                         {f.orderNumber ? ` · Order ${f.orderNumber}` : ""}
                       </span>
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 break-words">
                       To {f.destinationLabel} · Ref {f.reference}
                       {f.providerReference ? ` · Payment ref …${f.providerReference}` : ""}
                     </p>

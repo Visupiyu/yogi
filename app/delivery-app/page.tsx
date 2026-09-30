@@ -128,7 +128,7 @@ function RiderJobs() {
             <Link key={j.id} href={`/delivery-app/jobs/${encodeURIComponent(j.id)}`}
               className="block rounded-lg border bg-white p-4 active:bg-gray-50">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-xs text-gray-600">{j.shipmentNumber || "—"}</span>
+                <span className="min-w-0 break-all font-mono text-xs text-gray-600">{j.shipmentNumber || "—"}</span>
                 <StageBadge status={j.status} />
               </div>
               <div className="mt-2 text-sm">
@@ -275,7 +275,7 @@ function HubTasks() {
                 {receiveTasks.map((t) => (
                   <div key={`recv-${t.jobId}`} className="rounded-lg border bg-white p-4">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-xs text-gray-600">{t.shipmentNumber || "—"}</span>
+                      <span className="min-w-0 break-all font-mono text-xs text-gray-600">{t.shipmentNumber || "—"}</span>
                       <span className="rounded bg-teal-100 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
                         {t.type === "ORIGIN_RECEIVE" ? "From rider" : "From transit"}
                       </span>
@@ -306,7 +306,7 @@ function HubTasks() {
                   return (
                     <div key={`rel-${t.jobId}`} className="rounded-lg border bg-white p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-xs text-gray-600">{t.shipmentNumber || "—"}</span>
+                        <span className="min-w-0 break-all font-mono text-xs text-gray-600">{t.shipmentNumber || "—"}</span>
                         <span className="rounded bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">To rider</span>
                       </div>
                       <div className="mt-2 text-sm">

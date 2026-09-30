@@ -235,7 +235,7 @@ export default function SellerReportsPage(){
     <div className="
       min-h-screen
       bg-gray-100
-      p-6
+      p-4 md:p-6
     ">
 
       <div className="
@@ -249,12 +249,12 @@ export default function SellerReportsPage(){
           to-blue-600
           text-white
           rounded-3xl
-          p-8
+          p-5 md:p-8
           mb-8
         ">
 
           <h1 className="
-            text-4xl
+            text-3xl md:text-4xl
             font-bold
           ">
 
@@ -323,7 +323,7 @@ export default function SellerReportsPage(){
     <p className="text-gray-500">
       Booked Sales
     </p>
-    <h2 className="mt-2 text-4xl font-bold text-green-600">
+    <h2 className="break-words mt-2 text-3xl md:text-4xl font-bold text-green-600">
       ₹{(report?.totals.bookedSales ?? 0).toLocaleString("en-IN")}
     </h2>
     <p className="mt-1 text-xs text-gray-500">
@@ -334,7 +334,7 @@ export default function SellerReportsPage(){
     <p className="text-gray-500">
       Orders
     </p>
-    <h2 className="mt-2 text-4xl font-bold">
+    <h2 className="break-words mt-2 text-3xl md:text-4xl font-bold">
       {report?.totals.orders ?? 0}
     </h2>
     <p className="mt-1 text-xs text-gray-500">
@@ -345,7 +345,7 @@ export default function SellerReportsPage(){
     <p className="text-gray-500">
       Units
     </p>
-    <h2 className="mt-2 text-4xl font-bold">
+    <h2 className="break-words mt-2 text-3xl md:text-4xl font-bold">
       {report?.totals.units ?? 0}
     </h2>
   </div>
@@ -361,6 +361,7 @@ export default function SellerReportsPage(){
 
         <div className="
           flex
+          flex-wrap
           gap-4
           mb-8
         ">

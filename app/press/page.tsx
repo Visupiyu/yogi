@@ -17,7 +17,7 @@ export default function PressPage() {
           covering YOMICO.
         </p>
 
-        <div className="bg-white p-8 rounded-2xl shadow">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow">
           <h2 className="text-2xl font-bold mb-4">About this page</h2>
           <p className="text-gray-600 leading-8">
             YOMICO is a growing multi-vendor marketplace based in India. We
@@ -28,7 +28,7 @@ export default function PressPage() {
           </p>
         </div>
 
-        <div className="bg-white p-8 rounded-2xl shadow mt-8">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow mt-8">
           <h2 className="text-2xl font-bold mb-4">Company overview</h2>
           <p className="text-gray-600 leading-8">
             YOMICO connects customers with independent sellers across
@@ -39,7 +39,7 @@ export default function PressPage() {
           </p>
         </div>
 
-        <div className="bg-white p-8 rounded-2xl shadow mt-8">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow mt-8">
           <h2 className="text-2xl font-bold mb-4">Brand assets</h2>
           <p className="text-gray-600 leading-8 mb-4">
             The current YOMICO logo is available below. For any other brand
@@ -55,7 +55,7 @@ export default function PressPage() {
           </a>
         </div>
 
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-8 mt-8 text-center">
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-5 sm:p-8 mt-8 text-center">
           <h3 className="text-2xl font-bold mb-2">Media contact</h3>
           <p className="text-gray-600 mb-4">
             For interviews, comment, or media inquiries, email{" "}

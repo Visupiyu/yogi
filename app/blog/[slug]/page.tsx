@@ -46,9 +46,9 @@ export default async function BlogPostPage({
           <span>{post.date}</span>
         </div>
 
-        <h1 className="text-4xl font-bold mb-8">{post.title}</h1>
+        <h1 className="text-3xl md:text-4xl font-bold mb-8 break-words">{post.title}</h1>
 
-        <div className="bg-white p-8 rounded-2xl shadow space-y-5">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow space-y-5">
           {post.content.map((paragraph, i) => (
             <p key={i} className="text-gray-700 leading-8">
               {paragraph}

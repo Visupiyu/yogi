@@ -379,7 +379,7 @@ function Row({ k, v, mono }: { k: string; v?: string | null; mono?: boolean }) {
   return (
     <div className="flex justify-between gap-3 border-b py-1.5 text-sm last:border-b-0">
       <dt className="shrink-0 text-gray-400">{k}</dt>
-      <dd className={`text-right text-gray-800 ${mono ? "font-mono text-xs" : ""}`}>{v || "—"}</dd>
+      <dd className={`min-w-0 text-right text-gray-800 ${mono ? "break-all font-mono text-xs" : "break-words"}`}>{v || "—"}</dd>
     </div>
   );
 }

@@ -843,9 +843,9 @@ if (product.stock > 20) {
             <span className="text-gray-700 line-clamp-1">{product.name}</span>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
             <div className="mb-6">
-  <h1 className="text-4xl font-bold">
+  <h1 className="text-3xl md:text-4xl font-bold">
     Product Details
   </h1>
 
@@ -911,27 +911,7 @@ if (product.stock > 20) {
   className="object-contain p-6 transition-transform duration-500 hover:scale-110 cursor-zoom-in"
   sizes="(max-width:768px) 100vw, 50vw"
 />
-</div>
-<div
-  className="
-  absolute
-  top-4
-  right-4
-  bg-white/90
-  backdrop-blur-sm
-  px-3
-  py-2
-  rounded-full
-  shadow-md
-  text-sm
-  opacity-0
-  group-hover:opacity-100
-  transition
-  "
->
-  🔍 Click to Zoom
-</div>
-<div className="absolute bottom-4 right-4 bg-black/70 text-white text-xs px-3 py-1 rounded-full">
+<div className="absolute bottom-4 right-4 pointer-events-none bg-black/70 text-white text-xs px-3 py-1 rounded-full">
 
   {
     (
@@ -951,6 +931,28 @@ if (product.stock > 20) {
   }
 
 </div>
+</div>
+<div
+  className="
+  absolute
+  top-4
+  right-4
+  bg-white/90
+  backdrop-blur-sm
+  px-3
+  py-2
+  rounded-full
+  shadow-md
+  text-sm
+  pointer-events-none
+  opacity-0
+  group-hover:opacity-100
+  transition
+  "
+>
+  🔍 Click to Zoom
+</div>
+
 
 </div>
  </div>
@@ -965,7 +967,7 @@ if (product.stock > 20) {
   text-gray-900
   leading-tight
   tracking-tight
-  mb-3
+  mb-3 break-words
   "
 >
   {product.name}
@@ -1349,9 +1351,9 @@ Easy Returns
   "
 >
 
-  <div className="flex justify-between items-start">
+  <div className="flex justify-between items-start gap-3">
 
-    <div>
+    <div className="min-w-0 break-words">
 
  <div className="flex items-center gap-2 mb-2">
 
@@ -1425,7 +1427,7 @@ Easy Returns
 
    <Link
   href={`/store/${product.vendorId}`}
-  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-2xl font-semibold transition"
+  className="shrink-0 whitespace-nowrap bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-2xl font-semibold transition"
 >
   Visit Store
 </Link>
@@ -1696,7 +1698,7 @@ hover:-translate-y-0.5
         {label}
       </div>
 
-      <div className="p-4">
+      <div className="p-4 break-words min-w-0">
         {value}
       </div>
     </div>
@@ -1731,7 +1733,7 @@ p-6
 
     </div>
 
-    <p className="text-gray-900 leading-8 text-[15px]">
+    <p className="text-gray-900 leading-8 text-[15px] break-words">
 
       {product.description ||
         "This product does not have a description yet. Please contact the seller for more details."}
@@ -1748,7 +1750,7 @@ p-6
           {/* RELATED PRODUCTS */}
           {relatedProducts.length > 0 && (
             <div className="mt-10">
-             <div className="flex items-center justify-between mb-6">
+             <div className="flex items-center justify-between gap-3 mb-6">
 
   <div>
 
@@ -1861,7 +1863,7 @@ p-6
                   if (e.key === "Enter") askAI();
                 }}
                 placeholder="e.g. Is this suitable for daily use?"
-                className="flex-1 border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="flex-1 min-w-0 border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               />
               <button
                 onClick={askAI}
@@ -1876,7 +1878,7 @@ p-6
                 <p className="font-semibold text-indigo-700 mb-2">
                   ✨ AI Answer
                 </p>
-                <p className="text-gray-700 whitespace-pre-line">{aiAnswer}</p>
+                <p className="text-gray-700 whitespace-pre-line break-words">{aiAnswer}</p>
               </div>
             )}
           </div>
@@ -1914,7 +1916,7 @@ p-6
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 placeholder="Ask a question about this product…"
-                className="flex-1 border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
+                className="flex-1 min-w-0 border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
               />
               <button
                 onClick={askQuestion}
@@ -1948,7 +1950,7 @@ p-6
 
     <div>
 
-      <h3 className="text-lg font-bold text-gray-900">
+      <h3 className="text-lg font-bold text-gray-900 break-words">
         ❓ {q.question}
       </h3>
 
@@ -1974,7 +1976,7 @@ mt-5
         ✅ Seller Reply
       </p>
 
-      <p className="text-gray-700">
+      <p className="text-gray-700 break-words">
         {q.answer}
       </p>
 
@@ -2093,7 +2095,7 @@ mt-5
                 value={reviewText}
                 onChange={(e) => setReviewText(e.target.value)}
                 placeholder="Share your experience…"
-                className="flex-1 border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
+                className="flex-1 min-w-0 border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
               />
               <button
                 onClick={submitReview}
@@ -2143,7 +2145,7 @@ p-6
 
   </div>
 
-  <p className="text-gray-700 mt-5 leading-8">
+  <p className="text-gray-700 mt-5 leading-8 break-words">
     {review.review}
   </p>
 
@@ -2160,7 +2162,7 @@ p-6
       {/* SIZE CHART MODAL */}
       {showSizeChart && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl w-80">
+          <div className="bg-white p-6 rounded-2xl w-80 max-w-full">
             <h2 className="text-xl font-bold mb-4">Size Chart</h2>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between border-b pb-1"><span>S</span><span>36</span></div>
@@ -2180,7 +2182,7 @@ p-6
       )}
 
       {/* MOBILE STICKY BAR */}
-      <div className="md:hidden fixed bottom-16 left-0 right-0 bg-white border-t p-3 flex gap-2 z-40">
+      <div className="md:hidden fixed bottom-12 left-0 right-0 bg-white border-t p-3 flex gap-2 z-40">
         <button
           onClick={addToCart}
           disabled={product.stock <= 0}

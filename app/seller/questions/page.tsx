@@ -156,7 +156,7 @@ export default function SellerQuestionsPage(){
     <div className="
       min-h-screen
       bg-gray-100
-      p-6
+      p-4 md:p-6
     ">
 
       <div className="
@@ -169,13 +169,13 @@ export default function SellerQuestionsPage(){
           from-green-600
           to-blue-600
           text-white
-          p-8
+          p-5 md:p-8
           rounded-3xl
           mb-8
         ">
 
           <h1 className="
-            text-4xl
+            text-3xl md:text-4xl
             font-bold
           ">
             Product Questions
@@ -225,13 +225,13 @@ export default function SellerQuestionsPage(){
 
                 <h3 className="
                   font-bold
-                  text-lg
+                  text-lg break-words
                 ">
                   {item.productName}
                 </h3>
 
                 <p className="
-                  mt-3
+                  mt-3 break-words
                 ">
                   ❓
                   {" "}
@@ -241,7 +241,7 @@ export default function SellerQuestionsPage(){
                 <p className="
                   text-sm
                   text-gray-500
-                  mt-2
+                  mt-2 break-words
                 ">
                   {item.customerName}
                 </p>

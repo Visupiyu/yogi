@@ -159,13 +159,14 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
-      <div className="bg-white p-10 rounded-2xl shadow-lg w-full max-w-md">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4 sm:p-6">
+      <div className="bg-white p-6 sm:p-10 rounded-2xl shadow-lg w-full max-w-md">
         <h1 className="text-4xl font-bold text-center mb-8">Signup</h1>
 
         <div className="space-y-5">
           <input
             type="text"
+            autoComplete="name"
             placeholder="Full Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -174,6 +175,7 @@ export default function SignupPage() {
 
           <input
             type="email"
+            autoComplete="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -182,6 +184,7 @@ export default function SignupPage() {
 
           <input
             type="tel"
+            autoComplete="tel"
             placeholder="Mobile Number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -190,6 +193,7 @@ export default function SignupPage() {
 
           <input
             type="password"
+            autoComplete="new-password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

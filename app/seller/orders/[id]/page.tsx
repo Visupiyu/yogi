@@ -549,7 +549,8 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
     <div className="
       min-h-screen
       bg-gray-100
-      p-6
+      p-4
+      md:p-6
     ">
 
       <div className="
@@ -563,12 +564,14 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
           to-blue-600
           text-white
           rounded-3xl
-          p-8
+          p-5
+          md:p-8
           mb-8
         ">
 
           <h1 className="
-            text-4xl
+            text-3xl
+            md:text-4xl
             font-bold
           ">
 
@@ -576,8 +579,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
           </h1>
 
-          <p className="mt-2">
-
+          <p className="mt-2 break-words">
             Order ID :
             {" "}
             {order.orderNumber || order.id}
@@ -693,6 +695,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
                   bg-gray-100
                   rounded-xl
                   p-4
+                  break-words
                 ">
 
                   {order.address}
@@ -759,7 +762,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
                         className="
                           w-24
                           h-24
-                          rounded-xl
+                          shrink-0 rounded-xl
                           object-cover
                         "
 
@@ -767,11 +770,13 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
 
                       <div className="
                         flex-1
+                        min-w-0
                       ">
 
                         <h3 className="
                           font-bold
                           text-lg
+                          break-words
                         ">
 
                           {item.name}

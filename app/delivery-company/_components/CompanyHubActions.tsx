@@ -148,7 +148,7 @@ export default function CompanyHubActions({
                 <p className="text-sm text-teal-900">
                   Dispatch this shipment to <span className="font-semibold">{selected.name || selected.id}</span>?
                 </p>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     onClick={() =>
                       void post(`/api/delivery/company/jobs/${encodeURIComponent(jobId)}/transit-depart`, {

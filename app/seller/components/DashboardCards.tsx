@@ -66,21 +66,21 @@ export default function DashboardCards({
       {cards.map((card) => (
         <div
           key={card.title}
-          className="rounded-2xl border bg-white p-6 shadow-sm transition hover:shadow-md"
+          className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm transition hover:shadow-md"
         >
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-sm text-gray-500">
                 {card.title}
               </p>
 
-              <h2 className="mt-2 text-3xl font-bold text-gray-900">
+              <h2 className="mt-2 text-2xl sm:text-3xl font-bold text-gray-900 break-words">
                 {card.value}
               </h2>
             </div>
 
             <div
-              className={`flex h-14 w-14 items-center justify-center rounded-full text-2xl text-white ${card.color}`}
+              className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-2xl text-white ${card.color}`}
             >
               {card.icon}
             </div>

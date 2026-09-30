@@ -53,9 +53,9 @@ export default function ComparePage() {
   return (
     <section className="max-w-7xl mx-auto py-10 px-4">
 
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-8">
 
-        <h1 className="text-3xl font-bold">
+        <h1 className="text-2xl md:text-3xl font-bold">
           📊 Product Comparison
         </h1>
 
@@ -76,14 +76,14 @@ export default function ComparePage() {
 
             <tr className="border-b bg-gray-50">
 
-              <th className="p-4 text-left">
+              <th className="p-3 md:p-4 text-left sticky left-0 z-10 bg-gray-50">
                 Feature
               </th>
 
               {products.map((product) => (
                 <th
                   key={product.id}
-                  className="p-4 text-center min-w-[220px]"
+                  className="p-3 md:p-4 text-center min-w-[170px] md:min-w-[220px]"
                 >
               <Image
   src={product.image || "/no-image.png"}
@@ -92,13 +92,13 @@ export default function ComparePage() {
   height={112}
   className="w-28 h-28 object-cover mx-auto rounded-lg"
 />
-                  <p className="font-semibold mt-3">
+                  <p className="font-semibold mt-3 break-words">
                     {product.name}
                   </p>
 
                   <button
                     onClick={() => removeProduct(product.id)}
-                    className="mt-3 text-red-500 text-sm hover:underline"
+                    className="mt-2 px-3 py-2 text-red-500 text-sm hover:underline"
                   >
                     Remove
                   </button>
@@ -110,14 +110,14 @@ export default function ComparePage() {
 
             <tr className="border-b">
 
-              <td className="font-semibold p-4">
+              <td className="font-semibold p-3 md:p-4 sticky left-0 z-10 bg-white xl:static xl:bg-transparent">
                 Price
               </td>
 
               {products.map((product) => (
                 <td
                   key={product.id}
-                  className="text-center p-4"
+                  className="text-center p-3 md:p-4 break-words"
                 >
                   ₹{Number(product.price).toLocaleString("en-IN")}
                 </td>
@@ -127,14 +127,14 @@ export default function ComparePage() {
 
             <tr className="border-b">
 
-              <td className="font-semibold p-4">
+              <td className="font-semibold p-3 md:p-4 sticky left-0 z-10 bg-white xl:static xl:bg-transparent">
                 MRP
               </td>
 
               {products.map((product) => (
                 <td
                   key={product.id}
-                  className="text-center p-4"
+                  className="text-center p-3 md:p-4 break-words"
                 >
                   {product.mrp
                     ? `₹${Number(product.mrp).toLocaleString("en-IN")}`
@@ -146,7 +146,7 @@ export default function ComparePage() {
 
             <tr className="border-b">
 
-              <td className="font-semibold p-4">
+              <td className="font-semibold p-3 md:p-4 sticky left-0 z-10 bg-white xl:static xl:bg-transparent">
                 Discount
               </td>
 
@@ -163,7 +163,7 @@ export default function ComparePage() {
                 return (
                   <td
                     key={product.id}
-                    className="text-center p-4 text-green-600 font-semibold"
+                    className="text-center p-3 md:p-4 text-green-600 font-semibold"
                   >
                     {off}%
                   </td>
@@ -174,14 +174,14 @@ export default function ComparePage() {
 
             <tr className="border-b">
 
-              <td className="font-semibold p-4">
+              <td className="font-semibold p-3 md:p-4 sticky left-0 z-10 bg-white xl:static xl:bg-transparent">
                 Rating
               </td>
 
               {products.map((product) => (
                 <td
                   key={product.id}
-                  className="text-center p-4"
+                  className="text-center p-3 md:p-4 break-words"
                 >
                   ⭐ {Number(product.rating || 0).toFixed(1)}
                 </td>
@@ -191,14 +191,14 @@ export default function ComparePage() {
 
             <tr className="border-b">
 
-              <td className="font-semibold p-4">
+              <td className="font-semibold p-3 md:p-4 sticky left-0 z-10 bg-white xl:static xl:bg-transparent">
                 Stock
               </td>
 
               {products.map((product) => (
                 <td
                   key={product.id}
-                  className={`text-center p-4 font-semibold ${
+                  className={`text-center p-3 md:p-4 font-semibold ${
                     product.stock > 0
                       ? "text-green-600"
                       : "text-red-500"
@@ -214,14 +214,14 @@ export default function ComparePage() {
 
             <tr>
 
-              <td className="font-semibold p-4">
+              <td className="font-semibold p-3 md:p-4 sticky left-0 z-10 bg-white xl:static xl:bg-transparent">
                 Category
               </td>
 
               {products.map((product) => (
                 <td
                   key={product.id}
-                  className="text-center p-4"
+                  className="text-center p-3 md:p-4 break-words"
                 >
                   {product.category || "-"}
                 </td>

@@ -766,7 +766,7 @@ className="space-y-8"
 {/* Basic Information */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1017,7 +1017,7 @@ success && (
 {/* Category */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1081,7 +1081,7 @@ Category
 {/* Variants */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1109,7 +1109,7 @@ Variants
 {/* Specifications */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1146,7 +1146,7 @@ specifications,
 {/* Pricing */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1335,7 +1335,7 @@ Math.round(
 {/* Inventory */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1498,7 +1498,7 @@ product.stock<=product.minStock
 {/* Shipping */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1646,7 +1646,7 @@ className="w-full rounded-lg border p-3"
 {/* Warranty */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1730,7 +1730,7 @@ className="w-full rounded-lg border p-3"
 {/* SEO */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 
@@ -1851,7 +1851,7 @@ className="w-full rounded-lg border p-3"
 {/* Product Images */}
 {/* ========================================== */}
 
-<div className="rounded-xl border bg-white p-6 shadow-sm">
+<div className="rounded-xl border bg-white p-4 sm:p-6 shadow-sm">
 
 <h2 className="mb-6 text-2xl font-bold">
 

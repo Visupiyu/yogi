@@ -127,7 +127,7 @@ export default function ContactPage() {
     Follow Us
   </h3>
 
-  <div className="flex gap-4">
+  <div className="flex flex-wrap gap-x-4 gap-y-2">
 
     <a href="#" className="text-blue-600 hover:underline">
   Facebook

@@ -126,7 +126,7 @@ export default function FinalMileAssign({
                 {mode === "reassign" ? "Reassign the final mile to " : "Assign the final mile to "}
                 <span className="font-semibold">{selectedPerson.name || selectedPerson.id}</span>?
               </p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   onClick={doAssign}
                   disabled={busy}

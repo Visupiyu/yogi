@@ -155,7 +155,7 @@ export default function DeliveryCompanyJobsPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3 p-4">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs text-gray-700">{job.shipmentNumber || "—"}</span>
+                      <span className="break-all font-mono text-xs text-gray-700">{job.shipmentNumber || "—"}</span>
                       <StatusBadge status={job.status} />
                       {canAct ? (
                         <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
@@ -163,7 +163,7 @@ export default function DeliveryCompanyJobsPage() {
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-1 text-sm text-gray-700">{job.vendorName || "Seller"}</p>
+                    <p className="mt-1 break-words text-sm text-gray-700">{job.vendorName || "Seller"}</p>
                     <div className="mt-1 grid grid-cols-1 gap-x-4 gap-y-0.5 text-xs text-gray-500 sm:grid-cols-2">
                       <span>Order: {job.orderNumber || "—"}</span>
                       <span>Stage: {stageLabel(job.currentStage)}</span>

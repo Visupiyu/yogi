@@ -185,13 +185,13 @@ const deliveredDeliveries =
 
   return (
 
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-6">
 
       <div className="max-w-7xl mx-auto">
 
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-8 mb-8">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-5 md:p-8 mb-8">
 
-          <h1 className="text-4xl font-bold">
+          <h1 className="text-3xl md:text-4xl font-bold">
 
             🚚 Delivery Dashboard
 
@@ -202,7 +202,7 @@ const deliveredDeliveries =
             {partnerName ? `Welcome, ${partnerName}` : "Assigned deliveries"}
 
           </p>
-          <div className="mt-5 flex gap-3">
+          <div className="mt-5 flex flex-wrap gap-3">
 
   <button
 
@@ -396,7 +396,7 @@ const deliveredDeliveries =
 
                 href={`/delivery/${delivery.id}`}
 
-                className="block bg-white rounded-3xl shadow hover:shadow-lg transition p-6"
+                className="block bg-white rounded-3xl shadow hover:shadow-lg transition p-4 md:p-6"
 
               >
 
@@ -404,7 +404,7 @@ const deliveredDeliveries =
 
                   <div>
 
-                    <h2 className="text-xl font-bold">
+                    <h2 className="text-xl font-bold break-words">
 
                       {delivery.customerName}
 

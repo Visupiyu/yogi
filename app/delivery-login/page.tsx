@@ -151,7 +151,7 @@ export default function DeliveryLoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 hover:text-gray-700"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -174,7 +174,7 @@ export default function DeliveryLoginPage() {
           <p className="text-center mt-4 text-sm">
             <Link
               href="/delivery-forgot-password"
-              className="font-semibold text-blue-600 hover:underline"
+              className="font-semibold text-blue-600 hover:underline inline-block py-2 -my-2"
             >
               Forgot Password?
             </Link>

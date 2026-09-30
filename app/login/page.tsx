@@ -80,8 +80,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-6">
-      <div className="bg-white backdrop-blur-sm border border-gray-100 p-10 rounded-3xl shadow-xl w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4 sm:p-6">
+      <div className="bg-white backdrop-blur-sm border border-gray-100 p-6 sm:p-10 rounded-3xl shadow-xl w-full max-w-md">
         <div className="text-center mb-5">
  <Image
   src="/logo.png"
@@ -141,7 +141,7 @@ export default function LoginPage() {
            <div className="flex justify-end mt-2">
   <Link
     href="/forgot-password"
-    className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+    className="py-2 -my-2 text-sm text-blue-600 hover:text-blue-700 hover:underline"
   >
     Forgot Password?
   </Link>

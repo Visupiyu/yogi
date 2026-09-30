@@ -252,8 +252,10 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
             bg-gradient-to-b
 from-white
 to-gray-50
-            w-6
-            h-6
+            w-8
+            h-8
+            md:w-6
+            md:h-6
             rounded-full
             flex
             items-center

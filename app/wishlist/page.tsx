@@ -201,11 +201,12 @@ window.dispatchEvent(
     to-blue-600
     rounded-3xl
     text-white
-    p-8
+    p-5
+    md:p-8
     mb-8
   "
 >
-  <h1 className="text-4xl font-bold">
+  <h1 className="text-2xl md:text-4xl font-bold">
     ❤️ My Wishlist
   </h1>
 
@@ -218,24 +219,24 @@ window.dispatchEvent(
   </p>
 </div>
 
-<div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-8">
 
-  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+  <div className="bg-white rounded-2xl shadow-sm p-3 md:p-5 text-center min-w-0">
     <p className="text-gray-500 text-sm">
       Wishlist Items
     </p>
 
-    <h2 className="text-3xl font-bold mt-2">
+    <h2 className="text-2xl md:text-3xl font-bold mt-2 break-words">
       {wishlist.length}
     </h2>
   </div>
 
-  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+  <div className="bg-white rounded-2xl shadow-sm p-3 md:p-5 text-center min-w-0">
     <p className="text-gray-500 text-sm">
       In Stock
     </p>
 
-    <h2 className="text-3xl font-bold mt-2">
+    <h2 className="text-2xl md:text-3xl font-bold mt-2 break-words">
       {
         wishlist.filter(
           i=>i.stock>0
@@ -244,12 +245,12 @@ window.dispatchEvent(
     </h2>
   </div>
 
-  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+  <div className="bg-white rounded-2xl shadow-sm p-3 md:p-5 text-center min-w-0">
     <p className="text-gray-500 text-sm">
       Total Value
     </p>
 
-    <h2 className="text-3xl font-bold mt-2">
+    <h2 className="text-2xl md:text-3xl font-bold mt-2 break-words">
       ₹{
         wishlist.reduce(
           (sum,item)=>
@@ -260,7 +261,7 @@ window.dispatchEvent(
     </h2>
   </div>
 
-  <div className="bg-white rounded-2xl shadow-sm p-5 text-center">
+  <div className="bg-white rounded-2xl shadow-sm p-3 md:p-5 text-center min-w-0">
     <p className="text-gray-500 text-sm">
       Free Delivery
     </p>

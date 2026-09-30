@@ -140,7 +140,7 @@ const snapshot = await getDocs(
     <div className="
       min-h-screen
       bg-gray-100
-      p-6
+      p-4 md:p-6
     ">
 
       <div className="
@@ -154,12 +154,12 @@ const snapshot = await getDocs(
           to-blue-600
           text-white
           rounded-3xl
-          p-8
+          p-5 md:p-8
           mb-8
         ">
 
           <h1 className="
-            text-4xl
+            text-3xl md:text-4xl
             font-bold
           ">
 
@@ -256,15 +256,17 @@ const snapshot = await getDocs(
   alt={chat.customerName || "Customer"}
   width={64}
   height={64}
-  className="rounded-full object-cover"
+  className="rounded-full object-cover shrink-0"
 />
                     <div className="
                       flex-1
+                      min-w-0
                     ">
 
                       <h2 className="
                         text-xl
                         font-bold
+                        break-words
                       ">
 
                         {
@@ -289,6 +291,7 @@ const snapshot = await getDocs(
 
                     <div className="
                       text-right
+                      shrink-0
                     ">
 
                       <p className="

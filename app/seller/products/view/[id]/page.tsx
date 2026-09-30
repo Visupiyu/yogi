@@ -90,7 +90,7 @@ export default function ViewProductPage() {
 
   return (
 
-    <div className="mx-auto max-w-7xl p-6">
+    <div className="mx-auto max-w-7xl p-4 sm:p-6">
 
       <div className="mb-8 flex items-center justify-between">
 
@@ -140,9 +140,9 @@ export default function ViewProductPage() {
 
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
 
-          <h2 className="text-2xl font-bold">
+          <h2 className="text-2xl font-bold break-words">
 
             {product.title}
 
@@ -192,7 +192,7 @@ export default function ViewProductPage() {
 
           </p>
 
-          <div className="rounded-lg bg-gray-50 p-4">
+          <div className="rounded-lg bg-gray-50 p-4 break-words">
 
             {product.description}
 

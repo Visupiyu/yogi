@@ -76,17 +76,17 @@ return (
 
   {/* HEADER */}
 
-  <div className="bg-gradient-to-r from-green-700 via-teal-600 to-blue-700 px-8 py-6 text-white">
+  <div className="bg-gradient-to-r from-green-700 via-teal-600 to-blue-700 px-5 md:px-8 py-6 text-white">
 
     <p className="text-sm uppercase tracking-widest opacity-80">
       YOMICO Seller Dashboard
     </p>
 
-    <h1 className="mt-2 text-4xl font-bold md:text-5xl">
+    <h1 className="mt-2 text-3xl font-bold md:text-5xl">
       👋 Welcome Back,
     </h1>
 
-    <h2 className="mt-2 text-2xl">
+    <h2 className="mt-2 text-2xl break-words">
       {vendor?.businessName || vendor?.storeName || "Seller"}
     </h2>
 
@@ -174,7 +174,7 @@ return (
             🏆 Best Seller
           </p>
 
-          <p className="mt-2 text-xl font-bold text-orange-600">
+          <p className="mt-2 text-xl font-bold text-orange-600 break-words">
             {stats.bestSeller}
           </p>
 

@@ -567,7 +567,7 @@ function RequestInner() {
     return (
       <Shell>
         <div className="bg-white rounded-3xl shadow-md p-6 sm:p-8">
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex flex-wrap items-center gap-3 mb-1">
             <h1 className="text-2xl font-bold">
               {exType === "replace" ? "Replacement" : "Return"} status
             </h1>
@@ -664,7 +664,7 @@ function RequestInner() {
                           type="datetime-local"
                           value={counterTime}
                           onChange={(e) => setCounterTime(e.target.value)}
-                          className="border rounded-lg px-2 py-1 text-sm"
+                          className="border rounded-lg px-2 py-1 text-sm max-w-full"
                         />
                         <button
                           disabled={responding || !counterTime}
@@ -692,7 +692,7 @@ function RequestInner() {
                   </>
                 )}
 
-                {address && <p className="text-gray-500 mt-2">{address}</p>}
+                {address && <p className="text-gray-500 mt-2 break-words">{address}</p>}
               </div>
             )}
 
@@ -764,7 +764,7 @@ function RequestInner() {
   return (
     <Shell>
       <div className="bg-white rounded-3xl shadow-md p-6 sm:p-8">
-        <div className="flex items-center gap-3 mb-1">
+        <div className="flex flex-wrap items-center gap-3 mb-1">
           <h1 className="text-2xl sm:text-3xl font-bold">{title}</h1>
           {ActionBadge}
         </div>

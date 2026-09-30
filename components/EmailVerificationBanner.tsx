@@ -57,11 +57,11 @@ export default function EmailVerificationBanner() {
         <button
           onClick={resend}
           disabled={sending}
-          className="font-semibold underline hover:text-amber-900 disabled:opacity-60"
+          className="py-2 -my-2 font-semibold underline hover:text-amber-900 disabled:opacity-60"
         >
           {sending ? "Sending…" : "Resend email"}
         </button>
-        <button onClick={dismiss} className="text-amber-600 hover:text-amber-900" aria-label="Dismiss">
+        <button onClick={dismiss} className="px-2 py-2 -my-2 text-amber-600 hover:text-amber-900" aria-label="Dismiss">
           ✕
         </button>
       </div>

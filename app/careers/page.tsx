@@ -21,7 +21,7 @@ export default function CareersPage() {
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="bg-white p-8 rounded-2xl shadow">
+          <div className="bg-white p-5 sm:p-8 rounded-2xl shadow">
             <h2 className="text-2xl font-bold mb-4">What we're building</h2>
             <p className="text-gray-600 leading-8">
               YOMICO brings customers and independent sellers together across
@@ -33,7 +33,7 @@ export default function CareersPage() {
             </p>
           </div>
 
-          <div className="bg-white p-8 rounded-2xl shadow">
+          <div className="bg-white p-5 sm:p-8 rounded-2xl shadow">
             <h2 className="text-2xl font-bold mb-4">Why work with us</h2>
             <ul className="text-gray-600 leading-8 list-disc list-inside space-y-1">
               <li>Real impact from day one — we're a small team, so your work matters immediately.</li>
@@ -43,7 +43,7 @@ export default function CareersPage() {
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-2xl shadow mt-8">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow mt-8">
           <h2 className="text-2xl font-bold mb-4">Current openings</h2>
           <p className="text-gray-600 leading-8">
             We don't have specific open positions listed right now. YOMICO is
@@ -53,7 +53,7 @@ export default function CareersPage() {
           </p>
         </div>
 
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-8 mt-8 text-center">
+        <div className="bg-green-50 border border-green-200 rounded-2xl p-5 sm:p-8 mt-8 text-center">
           <h3 className="text-2xl font-bold mb-2">Interested anyway?</h3>
           <p className="text-gray-600 mb-4 max-w-xl mx-auto">
             Send us a short note about what you'd like to work on, along with

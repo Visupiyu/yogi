@@ -146,6 +146,7 @@ async()=>{
           <h2 className="
             text-xl
             font-bold
+            break-words
           ">
             {ticket.subject}
           </h2>
@@ -153,6 +154,7 @@ async()=>{
           <p className="
             text-gray-600
             mt-2
+            break-words
           ">
             {ticket.message}
           </p>
@@ -199,6 +201,7 @@ async()=>{
 
               <p className="
                 mt-2
+            break-words
               ">
                 {ticket.adminReply}
               </p>

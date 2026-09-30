@@ -27,7 +27,7 @@ export default function SellerCodePage() {
 and expected behavior for all sellers using the YOMICO marketplace.
 </p>
 
-        <div className="bg-white p-8 rounded-2xl shadow space-y-6">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow space-y-6">
 
           <p>
 

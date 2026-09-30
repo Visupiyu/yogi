@@ -89,11 +89,11 @@ export default function SellerStockNotificationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
 
-        <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-3xl p-8 mb-8">
-          <h1 className="text-4xl font-bold">🔔 Stock Notifications</h1>
+        <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-3xl p-5 md:p-8 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold">🔔 Stock Notifications</h1>
           <p className="mt-2">Customers waiting for your products to return in stock</p>
         </div>
 
@@ -111,8 +111,8 @@ export default function SellerStockNotificationsPage() {
             {items.map((item) => (
               <div key={item.productId} className="bg-white rounded-3xl shadow p-6">
                 <div className="flex flex-wrap justify-between items-start gap-4">
-                  <div>
-                    <h2 className="text-2xl font-bold">{item.productName || "Product"}</h2>
+                  <div className="min-w-0">
+                    <h2 className="text-2xl font-bold break-words">{item.productName || "Product"}</h2>
                     <p className="text-gray-500 mt-2">
                       Waiting Customers :{" "}
                       <span className="font-bold text-green-600">{item.waiting}</span>

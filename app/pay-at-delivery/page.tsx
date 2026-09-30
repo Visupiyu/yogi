@@ -8,8 +8,8 @@ export default function PayAtDeliveryPage() {
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-10 shadow-lg">
-          <h1 className="text-4xl font-bold">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-6 sm:p-10 shadow-lg">
+          <h1 className="text-3xl sm:text-4xl font-bold">
             📱 Pay on Delivery (UPI)
           </h1>
 
@@ -19,7 +19,7 @@ export default function PayAtDeliveryPage() {
         </div>
 
         {/* Information */}
-        <div className="bg-white rounded-3xl shadow-lg p-8 mt-8">
+        <div className="bg-white rounded-3xl shadow-lg p-5 sm:p-8 mt-8">
 
           <h2 className="text-2xl font-bold mb-6">
             How it works

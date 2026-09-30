@@ -107,18 +107,18 @@ export default function DeliveryCompanyLayout({ children }: { children: React.Re
             from the black Admin / Delivery App headers. */}
         <header className="sticky top-0 z-20 border-b border-teal-900 bg-slate-900 text-white">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
               <span className="rounded bg-teal-500/20 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-teal-300">
                 Delivery Company
               </span>
-              <div className="leading-tight">
+              <div className="min-w-0 leading-tight">
                 <p className="text-sm font-semibold">YOMICO Operator Console</p>
-                <p className="text-[11px] text-white/60">{company.companyName}</p>
+                <p className="break-words text-[11px] text-white/60">{company.companyName}</p>
               </div>
             </div>
             <button
               onClick={logout}
-              className="rounded bg-white/15 px-3 py-1.5 text-xs font-medium hover:bg-white/25"
+              className="shrink-0 rounded bg-white/15 px-3 py-2 text-xs font-medium hover:bg-white/25"
             >
               Log out
             </button>
@@ -201,8 +201,8 @@ function CompanyVerificationScreen({ email }: { email: string }) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4 sm:p-6">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 sm:p-8 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <span className="rounded bg-teal-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-teal-700">
             Delivery Company
@@ -218,7 +218,7 @@ function CompanyVerificationScreen({ email }: { email: string }) {
         </p>
         {email ? (
           <p className="mt-2 text-sm text-slate-700">
-            We sent a verification link to <span className="font-semibold">{email}</span>. Open it, then choose
+            We sent a verification link to <span className="break-all font-semibold">{email}</span>. Open it, then choose
             &ldquo;I&apos;ve verified&rdquo; below.
           </p>
         ) : null}

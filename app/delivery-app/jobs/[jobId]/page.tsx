@@ -154,11 +154,11 @@ export default function JobDetailPage() {
       {/* Header */}
       <div className="rounded-lg border bg-white p-4">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-mono text-xs text-gray-600">{detail.shipmentNumber || "—"}</span>
+          <span className="min-w-0 break-all font-mono text-xs text-gray-600">{detail.shipmentNumber || "—"}</span>
           <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium">{detail.status}</span>
         </div>
         <p className="mt-1 text-lg font-semibold">{detail.currentStage || "—"}</p>
-        <p className="text-sm text-gray-500">{detail.vendorName || "Seller"} · Order {detail.orderNumber || "—"}</p>
+        <p className="break-words text-sm text-gray-500">{detail.vendorName || "Seller"} · Order {detail.orderNumber || "—"}</p>
       </div>
 
       {/* Pickup / drop */}
@@ -166,19 +166,19 @@ export default function JobDetailPage() {
         <div className="rounded-lg border bg-white p-4">
           <p className="text-xs uppercase text-gray-400">Pickup</p>
           <p className="text-sm font-medium">{detail.pickup?.sellerName || "—"}</p>
-          {detail.pickup?.area ? <p className="text-sm text-gray-500">{detail.pickup.area}</p> : null}
+          {detail.pickup?.area ? <p className="break-words text-sm text-gray-500">{detail.pickup.area}</p> : null}
         </div>
         <div className="rounded-lg border bg-white p-4">
           <p className="text-xs uppercase text-gray-400">Deliver to</p>
-          <p className="text-sm font-medium">{detail.drop?.customerName || "—"}</p>
-          {detail.drop?.address ? <p className="text-sm text-gray-600">{detail.drop.address}</p> : null}
+          <p className="break-words text-sm font-medium">{detail.drop?.customerName || "—"}</p>
+          {detail.drop?.address ? <p className="break-words text-sm text-gray-600">{detail.drop.address}</p> : null}
           {detail.drop?.phone ? <a href={`tel:${detail.drop.phone}`} className="mt-1 inline-block text-sm text-blue-600 underline">Call {detail.drop.phone}</a> : null}
         </div>
         {detail.parcel?.items?.length ? (
           <div className="rounded-lg border bg-white p-4">
             <p className="text-xs uppercase text-gray-400">Items</p>
             <ul className="mt-1 text-sm text-gray-700">
-              {detail.parcel.items.map((it, i) => <li key={i}>{it.name} × {it.qty}</li>)}
+              {detail.parcel.items.map((it, i) => <li key={i} className="break-words">{it.name} × {it.qty}</li>)}
             </ul>
           </div>
         ) : null}

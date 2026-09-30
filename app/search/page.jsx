@@ -221,6 +221,10 @@ if (minimumDiscount > 0) {
     setCategory("");
      setMinimumRating(0);
       setMinimumDiscount(0);
+    setInStockOnly(false);
+    setSortBy("default");
+    setMinPrice(0);
+    setMaxPrice(1000000);
   };
   const quickChips = ["Shoes", "Mobiles", "Beauty", "Grocery", "Fashion"];
 
@@ -228,8 +232,8 @@ if (minimumDiscount > 0) {
     <section className="py-8 px-4 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* HEADER */}
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-8 mb-8">
-  <h1 className="text-4xl font-bold">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-5 md:p-8 mb-8">
+  <h1 className="text-2xl md:text-4xl font-bold break-words">
     {query
       ? `🔍 Search: "${query}"`
       : "🔍 Explore Products"}
@@ -238,7 +242,6 @@ if (minimumDiscount > 0) {
     {filtered.length} product{filtered.length !== 1 ? "s" : ""} found
   </p>
 </div>
-        </div>
 
      <ProductFilters
   minPrice={minPrice}
@@ -250,10 +253,11 @@ if (minimumDiscount > 0) {
   setInStockOnly={setInStockOnly}
   setSortBy={setSortBy}
 />
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 my-6">
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
+            className="w-full sm:w-auto border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
           >
             <option value="">All Categories</option>
             {CATEGORIES.map((c) => (
@@ -267,7 +271,7 @@ if (minimumDiscount > 0) {
   onChange={(e) =>
     setMinimumRating(Number(e.target.value))
   }
-  className="border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
+  className="w-full sm:w-auto border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
 >
   <option value={0}>All Ratings</option>
   <option value={4}>⭐⭐⭐⭐ & Above</option>
@@ -280,7 +284,7 @@ if (minimumDiscount > 0) {
   onChange={(e) =>
     setMinimumDiscount(Number(e.target.value))
   }
-  className="border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
+  className="w-full sm:w-auto border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
 >
   <option value={0}>All Discounts</option>
   <option value={10}>🏷️ 10% & Above</option>
@@ -305,7 +309,7 @@ if (minimumDiscount > 0) {
             In Stock Only
           </label>
 
-          {(sort || stockOnly || category) && (
+          {(sort || stockOnly || category || minimumRating > 0 || minimumDiscount > 0 || inStockOnly || sortBy !== "default" || minPrice > 0 || maxPrice < 1000000) && (
             <button
               onClick={clearFilters}
               className="bg-red-500 hover:bg-red-600 text-white px-4 py-2.5 rounded-xl font-semibold transition"
@@ -313,7 +317,7 @@ if (minimumDiscount > 0) {
               Clear Filters
             </button>
           )}
-    
+          </div>
 
         {/* RESULTS */}
         {loading ? (
@@ -321,7 +325,7 @@ if (minimumDiscount > 0) {
             Loading products…
           </div>
         ) : error ? (
-          <div className="bg-red-50 border border-red-200 rounded-3xl p-12 text-center">
+          <div className="bg-red-50 border border-red-200 rounded-3xl p-6 md:p-12 text-center">
             <h2 className="text-red-600 font-bold text-2xl mb-2">
               Unable to load search results.
             </h2>
@@ -334,7 +338,7 @@ if (minimumDiscount > 0) {
             </button>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+          <div className="bg-white rounded-3xl shadow-sm p-6 md:p-12 text-center">
             <div className="text-5xl mb-4">🔍</div>
             <h2 className="text-2xl font-bold mb-2">🔍 No products found</h2>
             <p className="text-gray-500 mb-6">Try another keyword or filter.</p>
@@ -416,7 +420,7 @@ if (minimumDiscount > 0) {
 
           </div>
           ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
             {filtered.map((product) => {
               const hasMrp =
                 Number(product.mrp) && Number(product.mrp) > Number(product.price);
@@ -443,13 +447,13 @@ if (minimumDiscount > 0) {
                     </div>
 
                     <div className="p-3">
-                      <h3 className="font-semibold text-sm line-clamp-2 min-h-[40px]">
+                      <h3 className="font-semibold text-sm line-clamp-2 min-h-[40px] break-words">
                         {product.name}
                       </h3>
                       <div className="flex items-center gap-1 mt-2 text-yellow-500">
                        <span className="text-xs text-gray-500">({Number(product.rating || 0).toFixed(1)})</span></div>
 
-                    <div className="bg-white rounded-2xl shadow-sm p-4 flex flex-wrap gap-3 mt-6">
+                    <div className="bg-white rounded-2xl shadow-sm p-2 md:p-4 flex flex-wrap gap-x-3 gap-y-1 mt-3 md:mt-6">
                         <span className="text-green-600 font-bold">
                           ₹{Number(product.price).toLocaleString("en-IN")}
                         </span>
@@ -493,13 +497,14 @@ className="text-green-600 ml-2 hover:underline"
 Contact Support
 </Link>
 </div>
+</div>
 {showQuickView && quickViewProduct && (
   <div
     className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
     onClick={() => setShowQuickView(false)}
   >
     <div
-      className="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl"
+      className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="grid grid-cols-1 md:grid-cols-2">
@@ -508,13 +513,13 @@ Contact Support
           <img
             src={quickViewProduct.image || "/no-image.png"}
             alt={quickViewProduct.name}
-            className="w-full h-80 object-cover"
+            className="w-full h-56 md:h-80 object-cover"
           />
         </div>
 
-        <div className="p-6">
+        <div className="p-4 md:p-6">
 
-          <h2 className="text-2xl font-bold">
+          <h2 className="text-xl md:text-2xl font-bold break-words">
             {quickViewProduct.name}
           </h2>
 
@@ -687,6 +692,7 @@ Contact Support
     </div>
 )}
 
+          <div className="mt-6 flex gap-3">
           <button
   onClick={() => {
 
@@ -750,7 +756,6 @@ Contact Support
             >
               ❤️ Wishlist
             </button>
-
           </div>
 
           <button
@@ -763,6 +768,7 @@ Contact Support
         </div>
 
       </div>
+    </div>
     </div>
 
 )}

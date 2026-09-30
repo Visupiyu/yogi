@@ -116,11 +116,11 @@ export default function SellerAnalyticsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* HEADER */}
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-8">
-          <h1 className="text-4xl font-bold">Seller Analytics</h1>
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-5 md:p-8">
+          <h1 className="text-3xl md:text-4xl font-bold">Seller Analytics</h1>
           <p className="mt-2">Business Performance Dashboard</p>
           <p className="mt-2 text-sm opacity-90">
             Booked Sales is your item value on orders that are not cancelled. Net Earnings is settled money
@@ -133,19 +133,19 @@ export default function SellerAnalyticsPage() {
           {kpis.map((kpi) => (
             <div
               key={kpi.label}
-              className="bg-white rounded-[28px] shadow-lg border border-gray-100 p-8 min-h-[170px] flex items-center gap-6"
+              className="bg-white rounded-[28px] shadow-lg border border-gray-100 p-5 md:p-8 min-h-[170px] flex items-center gap-4 md:gap-6"
             >
-              <div className="w-20 h-20 rounded-3xl bg-blue-100 flex items-center justify-center text-4xl flex-shrink-0">
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-3xl bg-blue-100 flex items-center justify-center text-3xl md:text-4xl flex-shrink-0">
                 {kpi.icon}
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-gray-500 text-lg">{kpi.label}</p>
                 <h2
                   title={String(kpi.value)}
                   className={`font-bold mt-2 break-words ${
                     typeof kpi.value === "string" && kpi.value.length > 14
                       ? "text-xl leading-snug line-clamp-2"
-                      : "text-4xl"
+                      : "text-3xl md:text-4xl"
                   }`}
                 >
                   {kpi.value}
@@ -157,11 +157,11 @@ export default function SellerAnalyticsPage() {
 
         {/* CHARTS — Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[500px]">
+          <div className="bg-white rounded-3xl shadow-lg p-5 md:p-8 min-h-[500px]">
             <h2 className="text-2xl font-bold mb-6">📊 Business Overview</h2>
             <ResponsiveContainer width="100%" height={400}>
               <PieChart>
-                <Pie data={chartData} dataKey="value" cx="50%" cy="50%" outerRadius={140} label>
+                <Pie data={chartData} dataKey="value" cx="50%" cy="50%" outerRadius="70%" label>
                   {chartData.map((entry, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -172,7 +172,7 @@ export default function SellerAnalyticsPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[500px]">
+          <div className="bg-white rounded-3xl shadow-lg p-5 md:p-8 min-h-[500px]">
             <h2 className="text-2xl font-bold mb-6">💰 Sales &amp; Earnings</h2>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={revenueChart}>
@@ -188,7 +188,7 @@ export default function SellerAnalyticsPage() {
 
         {/* CHARTS — Row 2 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[500px]">
+          <div className="bg-white rounded-3xl shadow-lg p-5 md:p-8 min-h-[500px]">
             <h2 className="text-2xl font-bold mb-6">🔥 Best Selling Products</h2>
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={bestSellingProducts}>
@@ -201,7 +201,7 @@ export default function SellerAnalyticsPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[500px]">
+          <div className="bg-white rounded-3xl shadow-lg p-5 md:p-8 min-h-[500px]">
             <h2 className="text-2xl font-bold mb-8">📈 Business Insights</h2>
             <div className="space-y-6 text-lg">
               <div className="flex justify-between border-b pb-3">
@@ -237,7 +237,7 @@ export default function SellerAnalyticsPage() {
         </div>
 
         {/* Monthly booked sales (this calendar year, IST) */}
-        <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[550px]">
+        <div className="bg-white rounded-3xl shadow-lg p-5 md:p-8 min-h-[550px]">
           <h2 className="text-2xl font-bold mb-6">📈 Monthly Booked Sales — {orders.year}</h2>
           <ResponsiveContainer width="100%" height={450}>
             <LineChart data={monthlyRevenue}>
@@ -253,11 +253,11 @@ export default function SellerAnalyticsPage() {
 
         {/* Row 4 */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[500px]">
+          <div className="bg-white rounded-3xl shadow-lg p-5 md:p-8 min-h-[500px]">
             <h2 className="text-2xl font-bold mb-6">📦 Order Status (your items)</h2>
             <ResponsiveContainer width="100%" height={380}>
               <PieChart>
-                <Pie data={orderStatusData} dataKey="value" outerRadius={140} label>
+                <Pie data={orderStatusData} dataKey="value" outerRadius="74%" label>
                   {orderStatusData.map((_, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -268,11 +268,11 @@ export default function SellerAnalyticsPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white rounded-3xl shadow-lg p-8 min-h-[500px]">
+          <div className="bg-white rounded-3xl shadow-lg p-5 md:p-8 min-h-[500px]">
             <h2 className="text-2xl font-bold mb-6">📦 Inventory Health</h2>
             <ResponsiveContainer width="100%" height={380}>
               <PieChart>
-                <Pie data={inventoryData} dataKey="value" outerRadius={140} label>
+                <Pie data={inventoryData} dataKey="value" outerRadius="74%" label>
                   {inventoryData.map((_, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
                   ))}

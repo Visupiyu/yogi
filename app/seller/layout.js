@@ -162,7 +162,7 @@ export default function SellerLayout({ children }) {
       <aside
         className={`
           w-64 shrink-0 bg-gradient-to-b from-green-700 to-blue-700 text-white flex flex-col
-          fixed inset-y-0 left-0 z-50 h-screen transition-transform duration-300 ease-in-out
+          fixed inset-y-0 left-0 z-50 md:h-screen transition-transform duration-300 ease-in-out
           md:sticky md:top-0 md:inset-auto md:z-auto md:translate-x-0
           ${mobileNavOpen ? "translate-x-0" : "-translate-x-full"}
         `}

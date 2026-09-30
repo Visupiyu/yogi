@@ -51,17 +51,17 @@ export default function StoresPage() {
           {stores.map((store: any) => (
             <div
               key={store.id}
-              className="bg-white p-8 rounded-2xl shadow hover:shadow-xl transition"
+              className="bg-white p-5 sm:p-8 rounded-2xl shadow hover:shadow-xl transition"
             >
               <div className="flex items-center gap-4 mb-4">
                 <img
                   src={store.storeLogo || "/user.png"}
                   alt=""
-                  className="w-16 h-16 rounded-full object-cover border"
+                  className="w-16 h-16 shrink-0 rounded-full object-cover border"
                 />
 
-                <div>
-                  <h2 className="text-2xl font-bold">{store.businessName}</h2>
+                <div className="min-w-0">
+                  <h2 className="text-2xl font-bold break-words">{store.businessName}</h2>
                   <p className="text-sm text-gray-500">Verified Seller</p>
                 </div>
               </div>

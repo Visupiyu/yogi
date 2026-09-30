@@ -28,7 +28,7 @@ export default function AboutPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-          <div className="bg-white p-8 rounded-2xl shadow">
+          <div className="bg-white p-5 sm:p-8 rounded-2xl shadow">
 
             <h2 className="text-3xl font-bold mb-4">
               Our Mission
@@ -42,7 +42,7 @@ export default function AboutPage() {
 
           </div>
 
-          <div className="bg-white p-8 rounded-2xl shadow">
+          <div className="bg-white p-5 sm:p-8 rounded-2xl shadow">
 
             <h2 className="text-3xl font-bold mb-4">
               Our Vision
@@ -58,7 +58,7 @@ export default function AboutPage() {
 
         </div>
 
-        <div className="bg-white p-8 rounded-2xl shadow mt-10">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow mt-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-10">
 
   <div className="bg-white rounded-2xl shadow p-6 text-center">
@@ -124,7 +124,7 @@ export default function AboutPage() {
         </div>
         <div className="
   bg-white
-  p-8
+  p-5 sm:p-8
   rounded-2xl
   shadow
   mt-10
@@ -151,7 +151,7 @@ export default function AboutPage() {
   </p>
 
 </div>
-<div className="bg-green-50 border border-green-200 rounded-2xl p-8 mt-10">
+<div className="bg-green-50 border border-green-200 rounded-2xl p-5 sm:p-8 mt-10">
 
   <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-center">
 
@@ -169,9 +169,9 @@ export default function AboutPage() {
 
 </div>
 
-        <div className="bg-green-600 text-white p-10 rounded-2xl mt-10 text-center">
+        <div className="bg-green-600 text-white p-6 sm:p-10 rounded-2xl mt-10 text-center">
 
-          <div className="bg-white p-8 rounded-2xl shadow mt-10">
+          <div className="bg-white p-5 sm:p-8 rounded-2xl shadow mt-10">
 
   <h2 className="text-3xl font-bold mb-4">
     Our Story

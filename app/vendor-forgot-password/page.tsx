@@ -96,7 +96,7 @@ export default function VendorForgotPasswordPage() {
 
       {/* RESET FORM */}
       <div className="max-w-5xl mx-auto px-6 -mt-8">
-        <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-lg p-8">
+        <div className="max-w-xl mx-auto bg-white rounded-2xl shadow-lg p-5 sm:p-8">
 
           <form onSubmit={handleReset} className="space-y-5">
 
@@ -106,6 +106,7 @@ export default function VendorForgotPasswordPage() {
               </label>
               <input
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"

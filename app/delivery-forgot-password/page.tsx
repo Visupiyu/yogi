@@ -92,6 +92,7 @@ export default function DeliveryForgotPasswordPage() {
               </label>
               <input
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-indigo-500"

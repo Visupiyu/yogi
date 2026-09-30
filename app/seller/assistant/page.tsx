@@ -102,10 +102,10 @@ const copyText = (
 
 
   return(
-    <div className="min-h-screen bg-gray-100 p-6 ">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-6 ">
       <div className="max-w-5xl  mx-auto ">
-        <div className=" bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-3xl p-8 mb-8">
-          <h1 className="text-4xl font-bold">
+        <div className=" bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-3xl p-5 md:p-8 mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold">
             🤖 AI Seller Assistant
           </h1>
           <p className="mt-2">
@@ -126,7 +126,7 @@ const copyText = (
           />
         </div>
 
-        <div className="bg-white rounded-3xl shadow p-8 ">
+        <div className="bg-white rounded-3xl shadow p-5 md:p-8 ">
           <div className="
             grid
             md:grid-cols-2

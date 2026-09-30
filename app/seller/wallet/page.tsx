@@ -349,7 +349,7 @@ async()=>{
 
 };
   return (
-    <div className=" min-h-screen bg-gray-100 p-6 ">
+    <div className=" min-h-screen bg-gray-100 p-4 md:p-6 ">
 
       <div className=" max-w-6xl mx-auto ">
 
@@ -358,7 +358,7 @@ async()=>{
           from-green-600
           to-emerald-600
           text-white
-          p-8
+          p-5 md:p-8
           rounded-3xl
           mb-8
         ">
@@ -382,7 +382,8 @@ async()=>{
     </p>
 
     <h2 className="
-      text-4xl
+      text-3xl md:text-4xl
+      break-words
       font-bold
       text-green-600
       mt-3
@@ -414,6 +415,7 @@ async()=>{
 
     <h2 className="
       text-3xl
+      break-words
       font-bold
       text-orange-600
       mt-2
@@ -439,6 +441,7 @@ async()=>{
 
     <h2 className="
       text-3xl
+      break-words
       font-bold
       text-blue-600
       mt-2

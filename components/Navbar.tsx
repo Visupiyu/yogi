@@ -215,7 +215,7 @@ useEffect(() => {
   return (
     <motion.header className="sticky top-0 z-50 bg-gradient-to-r from-green-200 via-green-50 to-blue-100 border-b border-gray-200 shadow-md">
       <div className="max-w-screen-2xl mx-auto px-4">
-        <div className="h-16 flex items-center justify-between gap-6">
+        <div className="h-16 flex items-center justify-between gap-3 md:gap-6">
           {/* LOGO */}
   <Link href="/" className="shrink-0 flex items-center gap-2">
   <Image
@@ -297,7 +297,7 @@ useEffect(() => {
 
 }}
                 onFocus={() => setShowSuggestions(true)}
-                className="w-full border border-gray-300 bg-white text-gray-800 placeholder:text-gray-400 rounded-full py-2.5 pl-5 pr-28 outline-none focus:border-green-500 text-sm md:text-base"
+                className="w-full border border-gray-300 bg-white text-gray-800 placeholder:text-gray-400 rounded-full py-2.5 pl-4 pr-14 md:pl-5 md:pr-28 outline-none focus:border-green-500 text-sm md:text-base"
               />
 
               {showSuggestions && (suggestions.length > 0 || (!search.trim() && recentSearches.length > 0)) && (

@@ -225,7 +225,7 @@ export default function SellerProductsPage() {
 
   if (!vendorId) {
     return (
-      <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+      <div className="m-4 sm:m-6 rounded-2xl bg-white p-6 sm:p-8 text-center shadow-sm">
         <h2 className="text-xl font-bold text-gray-800">
           Seller account not found
         </h2>
@@ -239,7 +239,7 @@ export default function SellerProductsPage() {
 
   if (!approved) {
     return (
-      <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+      <div className="m-4 sm:m-6 rounded-2xl bg-white p-6 sm:p-8 text-center shadow-sm">
         <h2 className="text-xl font-bold text-orange-600">
           Seller Account Pending Approval
         </h2>
@@ -252,7 +252,7 @@ export default function SellerProductsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6">
       {/* HEADER */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>

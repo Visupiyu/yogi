@@ -365,13 +365,13 @@ if (proofImage) {
 
   return (
 
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-6">
 
       <div className="max-w-5xl mx-auto">
 
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-8 mb-8">
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-3xl p-5 md:p-8 mb-8">
 
-          <h1 className="text-4xl font-bold">
+          <h1 className="text-3xl md:text-4xl font-bold">
 
             🚚 Delivery Details
 
@@ -387,7 +387,7 @@ if (proofImage) {
 
         </div>
 
-        <div className="bg-white rounded-3xl shadow p-8 space-y-6">
+        <div className="bg-white rounded-3xl shadow p-5 md:p-8 space-y-6">
 
           <div>
 
@@ -401,7 +401,7 @@ if (proofImage) {
 
             <p>{order.phone}</p>
 
-            <p>{order.address}</p>
+            <p className="break-words">{order.address}</p>
 
           </div>
 
@@ -693,7 +693,7 @@ if (proofImage) {
 
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-3 md:gap-4">
 
             <a
 

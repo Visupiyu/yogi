@@ -112,11 +112,11 @@ export default function NotificationsPanel() {
             className="rounded-xl border border-gray-200 p-4 hover:bg-gray-50"
           >
 
-            <h3 className="font-semibold text-gray-900">
+            <h3 className="font-semibold text-gray-900 break-words">
               {item.title}
             </h3>
 
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-gray-600 break-words">
               {item.message}
             </p>
 
