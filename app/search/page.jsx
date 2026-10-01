@@ -7,6 +7,7 @@ import { collection, getDocs, query as firestoreQuery, where } from "firebase/fi
 import { getVisibleCatalog, CATALOG_MAX_PRODUCTS } from "@/lib/storefront/catalogScan";
 import { db } from "@/lib/firebase";
 import ProductFilters from "@/components/ProductFilters";
+import { useDialogA11y } from "@/components/hooks/useDialogA11y";
 import { addToCart as addToCartHelper } from "@/lib/cart";
 import { hasStockBearingVariants } from "@/lib/products/inventory";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
@@ -63,6 +64,7 @@ const [inStockOnly, setInStockOnly] = useState(false);
 const [sortBy, setSortBy] = useState("default");
 const [quickViewProduct, setQuickViewProduct] = useState(null);
 const [showQuickView, setShowQuickView] = useState(false);
+  const quickViewRef = useDialogA11y(showQuickView, () => setShowQuickView(false));
 const [quickQty, setQuickQty] = useState(1);
 const [quickSize, setQuickSize] = useState("");
 const [quickColor, setQuickColor] = useState("");
@@ -292,7 +294,7 @@ if (minimumDiscount > 0) {
   setSortBy={setSortBy}
 />
           <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 my-6">
-          <select
+          <select aria-label="Filter by category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             className="w-full sm:w-auto border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-green-500"
@@ -304,7 +306,7 @@ if (minimumDiscount > 0) {
               </option>
             ))}
           </select>
-          <select
+          <select aria-label="Minimum rating"
   value={minimumRating}
   onChange={(e) =>
     setMinimumRating(Number(e.target.value))
@@ -317,7 +319,7 @@ if (minimumDiscount > 0) {
   <option value={2}>⭐⭐ & Above</option>
   <option value={1}>⭐ & Above</option>
 </select>
-<select
+<select aria-label="Minimum discount"
   value={minimumDiscount}
   onChange={(e) =>
     setMinimumDiscount(Number(e.target.value))
@@ -554,6 +556,11 @@ Contact Support
     onClick={() => setShowQuickView(false)}
   >
     <div
+      ref={quickViewRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Quick view: ${quickViewProduct.name}`}
+      tabIndex={-1}
       className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
       onClick={(e) => e.stopPropagation()}
     >

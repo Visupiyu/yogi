@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where, addDoc, serverTimestamp,limit,} from "firebase/firestore";
 import RecentlyViewed from "@/components/RecentlyViewed";
+import { useDialogA11y } from "@/components/hooks/useDialogA11y";
 import FrequentlyBoughtTogether from "@/components/FrequentlyBoughtTogether";
 import CustomersAlsoBought from "@/components/CustomersAlsoBought";
 import { auth, db } from "@/lib/firebase";
@@ -156,6 +157,7 @@ export default function ProductPage() {
 const [deliveryMessage, setDeliveryMessage] = useState("");
 const [notifySuccess, setNotifySuccess] = useState(false);
 const [showGallery, setShowGallery] = useState(false);
+const galleryRef = useDialogA11y(showGallery, () => setShowGallery(false));
 const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
@@ -2100,7 +2102,7 @@ mt-5
               <select
                 value={rating}
                 onChange={(e) => setRating(Number(e.target.value))}
-                className="border p-3 rounded-2xl outline-none"
+                className="border p-3 rounded-2xl outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value={0}>Select rating</option>
                 <option value={5}>★★★★★</option>
@@ -2218,12 +2220,18 @@ p-6
       </div>
       {showGallery && (
  <div
+  ref={galleryRef}
+  role="dialog"
+  aria-modal="true"
+  aria-label={`${product.name} image gallery`}
+  tabIndex={-1}
   className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4"
   onClick={() => setShowGallery(false)}
 >
 
     <button
       onClick={() => setShowGallery(false)}
+      aria-label="Close gallery"
       className="absolute top-5 right-5 text-white text-4xl font-bold hover:text-red-400"
     >
       ✕
@@ -2242,6 +2250,7 @@ p-6
           images[(index - 1 + images.length) % images.length]
         );
       }}
+      aria-label="Previous image"
       className="absolute left-5 text-white text-5xl font-bold"
     >
       ‹
@@ -2306,6 +2315,7 @@ p-6
           images[(index + 1) % images.length]
         );
       }}
+      aria-label="Next image"
       className="absolute right-5 text-white text-5xl font-bold"
     >
       ›

@@ -147,7 +147,7 @@ export default function AddAddressPage() {
           className="space-y-5"
         >
 
-          <input
+          <input aria-label="Full Name"
             name="fullName"
             placeholder="Full Name"
             value={form.fullName}
@@ -156,7 +156,7 @@ export default function AddAddressPage() {
             required
           />
 
-          <input
+          <input aria-label="Phone Number"
             name="phone"
             placeholder="Phone Number"
             type="tel"
@@ -168,7 +168,7 @@ export default function AddAddressPage() {
             required
           />
 
-          <input
+          <input aria-label="House No / Street"
             name="addressLine1"
             placeholder="House No / Street"
             value={form.addressLine1}
@@ -177,7 +177,7 @@ export default function AddAddressPage() {
             required
           />
 
-          <input
+          <input aria-label="Area / Locality"
             name="addressLine2"
             placeholder="Area / Locality"
             value={form.addressLine2}
@@ -185,7 +185,7 @@ export default function AddAddressPage() {
             className="w-full border rounded-xl p-3"
           />
 
-          <input
+          <input aria-label="Landmark"
             name="landmark"
             placeholder="Landmark"
             value={form.landmark}
@@ -195,7 +195,7 @@ export default function AddAddressPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <input
+            <input aria-label="City"
               name="city"
               placeholder="City"
               value={form.city}
@@ -204,7 +204,7 @@ export default function AddAddressPage() {
               required
             />
 
-            <input
+            <input aria-label="State"
               name="state"
               placeholder="State"
               value={form.state}
@@ -217,7 +217,7 @@ export default function AddAddressPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <input
+            <input aria-label="Pincode"
               name="pincode"
               placeholder="Pincode"
               inputMode="numeric"

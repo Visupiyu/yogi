@@ -68,6 +68,16 @@ export default function ClientLayout({
 
   return (
     <QueryProvider>
+      {/* Keyboard users can jump past the header/navigation. Visible only on focus.
+          Staff consoles (hideChrome) have their own layout and landmarks. */}
+      {!hideChrome && (
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[10000] focus:rounded-lg focus:bg-green-700 focus:px-4 focus:py-2 focus:font-semibold focus:text-white"
+        >
+          Skip to main content
+        </a>
+      )}
       {!hideChrome && !minimalHeader && (
         <>
           <TopStrip />
@@ -78,7 +88,13 @@ export default function ClientLayout({
 
       {minimalHeader && <MinimalHeader />}
 
-      {children}
+      {hideChrome ? (
+        children
+      ) : (
+        <main id="main-content" tabIndex={-1} className="outline-none">
+          {children}
+        </main>
+      )}
 
       {!hideChrome && !minimalHeader && <MobileBottomNav />}
     </QueryProvider>

@@ -90,7 +90,7 @@ router.push("/admin");
         YOMICO Administration Portal
         </p>
         <div className="space-y-5">
-          <input
+          <input aria-label="Admin Email"
             type="email"
             placeholder="Admin Email"
             value={email}
@@ -98,7 +98,7 @@ router.push("/admin");
             className="w-full border p-4 rounded-xl"
           />
 
-          <input
+          <input aria-label="Password"
            type={showPassword ? "text" : "password"}
             placeholder="Password"
             value={password}

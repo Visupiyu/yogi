@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 via-white to-blue-50 px-4">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 sm:p-8 border">
 
         <div className="text-center mb-8">
@@ -120,6 +120,6 @@ export default function ForgotPasswordPage() {
 
         </form>
       </div>
-    </main>
+    </div>
   );
 }

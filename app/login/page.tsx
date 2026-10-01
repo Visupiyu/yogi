@@ -113,7 +113,7 @@ export default function LoginPage() {
 </p>
 
         <div className="space-y-5">
-         <input
+         <input aria-label="Email"
   type="email"
   placeholder="Email"
   autoComplete="email"
@@ -122,7 +122,7 @@ export default function LoginPage() {
   className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
 />
 
-          <input
+          <input aria-label="Password"
   type={showPassword ? "text" : "password"}
   placeholder="Password"
   autoComplete="current-password"

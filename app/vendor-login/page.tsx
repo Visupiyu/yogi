@@ -193,7 +193,7 @@ console.error(err);
                 type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full p-4 border rounded-xl outline-none"
+                className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
 
@@ -217,7 +217,7 @@ console.error(err);
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-4 border rounded-xl outline-none pr-16"
+                  className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500 pr-16"
                 />
                 <button
                   type="button"

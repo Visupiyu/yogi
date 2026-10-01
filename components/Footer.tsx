@@ -136,22 +136,17 @@ export default function Footer() {
       </div>
 
       {/* SOCIAL */}
+ {/* Decorative for now: no real social profile URLs exist yet, and a link to "#"
+      is a dead, focusable control. Make these <a href=...> with aria-labels when the
+      real URLs are added. */}
  <div className="flex justify-center gap-6 py-3">
-  <Link href="#">
-    <FaFacebook className="text-2xl hover:text-blue-600 transition" />
-  </Link>
+  <span aria-hidden="true"><FaFacebook className="text-2xl hover:text-blue-600 transition" /></span>
 
-  <Link href="#">
-    <FaInstagram className="text-2xl hover:text-pink-600 transition" />
-  </Link>
+  <span aria-hidden="true"><FaInstagram className="text-2xl hover:text-pink-600 transition" /></span>
 
-  <Link href="#">
-    <FaYoutube className="text-2xl hover:text-red-600 transition" />
-  </Link>
+  <span aria-hidden="true"><FaYoutube className="text-2xl hover:text-red-600 transition" /></span>
 
-  <Link href="#">
-    <FaXTwitter className="text-2xl hover:text-black transition" />
-  </Link>
+  <span aria-hidden="true"><FaXTwitter className="text-2xl hover:text-black transition" /></span>
 </div>
 
       {/* BOTTOM */}

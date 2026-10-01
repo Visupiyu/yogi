@@ -204,7 +204,7 @@ export default function EditAddressPage() {
           className="space-y-5"
         >
 
-          <input
+          <input aria-label="Full Name"
             name="fullName"
             value={form.fullName}
             onChange={handleChange}
@@ -213,7 +213,7 @@ export default function EditAddressPage() {
             required
           />
 
-          <input
+          <input aria-label="Phone Number"
             name="phone"
             value={form.phone}
             onChange={handleChange}
@@ -225,7 +225,7 @@ export default function EditAddressPage() {
             required
           />
 
-          <input
+          <input aria-label="House No / Street"
             name="addressLine1"
             value={form.addressLine1}
             onChange={handleChange}
@@ -234,7 +234,7 @@ export default function EditAddressPage() {
             required
           />
 
-          <input
+          <input aria-label="Area / Locality"
             name="addressLine2"
             value={form.addressLine2}
             onChange={handleChange}
@@ -242,7 +242,7 @@ export default function EditAddressPage() {
             className="w-full border rounded-xl p-3"
           />
 
-          <input
+          <input aria-label="Landmark"
             name="landmark"
             value={form.landmark}
             onChange={handleChange}
@@ -252,7 +252,7 @@ export default function EditAddressPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <input
+            <input aria-label="City"
               name="city"
               value={form.city}
               onChange={handleChange}
@@ -261,7 +261,7 @@ export default function EditAddressPage() {
               required
             />
 
-            <input
+            <input aria-label="State"
               name="state"
               value={form.state}
               onChange={handleChange}
@@ -274,7 +274,7 @@ export default function EditAddressPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            <input
+            <input aria-label="Pincode"
               name="pincode"
               value={form.pincode}
               onChange={handleChange}

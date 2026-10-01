@@ -163,7 +163,7 @@ export default function CategoryPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-4 md:p-10">
+    <div className="min-h-screen bg-gray-100 p-4 md:p-10">
       <div className="max-w-7xl mx-auto">
         {/* HEADER */}
         <div className="bg-gradient-to-r from-green-600 to-blue-600 rounded-3xl text-white p-5 md:p-10 mb-8">
@@ -183,7 +183,7 @@ export default function CategoryPage() {
           </p>
 
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-3">
-            <select
+            <select aria-label="Filter by price"
               value={priceFilter}
               onChange={(e) => setPriceFilter(e.target.value)}
               className="w-full sm:w-auto min-w-0 border rounded-xl px-3 sm:px-4 py-2.5 bg-white"
@@ -195,7 +195,7 @@ export default function CategoryPage() {
               <option value="5000+">₹5000+</option>
             </select>
 
-            <select
+            <select aria-label="Sort by"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="w-full sm:w-auto min-w-0 border rounded-xl px-3 sm:px-4 py-2.5 bg-white"
@@ -206,7 +206,7 @@ export default function CategoryPage() {
               <option value="new">Newest First</option>
             </select>
 
-            <select
+            <select aria-label="Filter by brand"
               value={brandFilter}
               onChange={(e) => setBrandFilter(e.target.value)}
               className="w-full sm:w-auto min-w-0 border rounded-xl px-3 sm:px-4 py-2.5 bg-white"
@@ -218,7 +218,7 @@ export default function CategoryPage() {
               ))}
             </select>
 
-            <select
+            <select aria-label="Filter by rating"
               value={ratingFilter}
               onChange={(e) => setRatingFilter(e.target.value)}
               className="w-full sm:w-auto min-w-0 border rounded-xl px-3 sm:px-4 py-2.5 bg-white"
@@ -273,6 +273,6 @@ export default function CategoryPage() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

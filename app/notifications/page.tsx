@@ -157,6 +157,17 @@ export default function NotificationsPage() {
               <div
                 key={item.id}
                 onClick={() => !item.read && markRead(item.id)}
+                // Unread cards are actionable (tap = mark read): make that reachable by
+                // keyboard too.
+                role={item.read ? undefined : "button"}
+                tabIndex={item.read ? undefined : 0}
+                aria-label={item.read ? undefined : `${item.title} — mark as read`}
+                onKeyDown={(e) => {
+                  if (!item.read && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    void markRead(item.id);
+                  }
+                }}
                 className={`rounded-3xl shadow p-6 border-l-4 ${
                   item.read ? "bg-white border-gray-300" : "bg-green-50 border-green-600 cursor-pointer"
                 }`}

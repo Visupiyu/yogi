@@ -259,6 +259,8 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
   }}
 
           onClick={addToWishlist}
+          aria-label="Add to wishlist"
+          title="Add to wishlist"
 
           className="
             absolute
@@ -283,7 +285,7 @@ to-gray-50
           "
         >
 
-          <Heart size={12} />
+          <Heart size={12} aria-hidden="true" />
 
         </motion.button>
 
@@ -301,7 +303,7 @@ to-gray-50
               : "bg-white text-gray-700 hover:bg-green-600 hover:text-white"
           }`}
         >
-          <Scale size={12} />
+          <Scale size={12} aria-hidden="true" />
         </button>
 
      </motion.div>

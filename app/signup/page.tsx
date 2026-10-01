@@ -164,48 +164,48 @@ export default function SignupPage() {
         <h1 className="text-4xl font-bold text-center mb-8">Signup</h1>
 
         <div className="space-y-5">
-          <input
+          <input aria-label="Full Name"
             type="text"
             autoComplete="name"
             placeholder="Full Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full p-4 border rounded-xl outline-none"
+            className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"
           />
 
-          <input
+          <input aria-label="Email"
             type="email"
             autoComplete="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full p-4 border rounded-xl outline-none"
+            className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"
           />
 
-          <input
+          <input aria-label="Mobile Number"
             type="tel"
             autoComplete="tel"
             placeholder="Mobile Number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="w-full p-4 border rounded-xl outline-none"
+            className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"
           />
 
-          <input
+          <input aria-label="Password"
             type="password"
             autoComplete="new-password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-4 border rounded-xl outline-none"
+            className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"
           />
 
-          <input
+          <input aria-label="Referral Code (Optional)"
             type="text"
             placeholder="Referral Code (Optional)"
             value={referralCode}
             onChange={(e) => setReferralCode(e.target.value)}
-            className="w-full p-4 border rounded-xl outline-none"
+            className="w-full p-4 border rounded-xl outline-none focus:ring-2 focus:ring-green-500"
           />
         </div>
 

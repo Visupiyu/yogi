@@ -1430,7 +1430,7 @@ Easy Returns
               {/* COUPON */}
               <div className="mt-6">
                 <div className="flex gap-2">
-                  <input
+                  <input aria-label="Coupon code"
                     type="text"
                     placeholder="🎟 Coupon code"
                     value={coupon}

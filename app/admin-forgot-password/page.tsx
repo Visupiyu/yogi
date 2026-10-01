@@ -65,7 +65,7 @@ export default function AdminForgotPasswordPage() {
         </p>
 
         <form onSubmit={handleReset} className="space-y-5">
-          <input
+          <input aria-label="Admin Email"
             type="email"
             placeholder="Admin Email"
             value={email}

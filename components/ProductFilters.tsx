@@ -45,6 +45,7 @@ export default function ProductFilters({
             onChange={(e) =>
               setMinPrice(Number(e.target.value))
             }
+            aria-label="Minimum price"
             placeholder="Min"
             className="border rounded-xl px-3 py-2"
           />
@@ -55,6 +56,7 @@ export default function ProductFilters({
             onChange={(e) =>
               setMaxPrice(Number(e.target.value))
             }
+            aria-label="Maximum price"
             placeholder="Max"
             className="border rounded-xl px-3 py-2"
           />
@@ -93,7 +95,7 @@ export default function ProductFilters({
           Sort By
         </h3>
 
-        <select
+        <select aria-label="Sort by"
           value={sortBy}
           onChange={(e) =>
             setSortBy(e.target.value)

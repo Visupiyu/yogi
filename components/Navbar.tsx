@@ -242,10 +242,20 @@ useEffect(() => {
             <div className="w-full relative max-w-2xl mx-auto" ref={searchRef}>
               <input
                 type="text"
+                aria-label="Search products"
+                aria-expanded={showSuggestions}
+                aria-controls="search-suggestions"
+                aria-autocomplete="list"
+                autoComplete="off"
                 placeholder="Search on YOMICO..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
          onKeyDown={(e) => {
+
+  if (e.key === "Escape") {
+    setShowSuggestions(false);
+    return;
+  }
 
   if (e.key === "ArrowDown") {
     e.preventDefault();
@@ -301,7 +311,12 @@ useEffect(() => {
               />
 
               {showSuggestions && (suggestions.length > 0 || (!search.trim() && recentSearches.length > 0)) && (
-                <div className="absolute top-full left-0 w-full bg-white border border-slate-200 shadow-xl rounded-2xl mt-2 z-50 overflow-hidden">
+                <div
+                  id="search-suggestions"
+                  role="region"
+                  aria-label="Search suggestions"
+                  className="absolute top-full left-0 w-full bg-white border border-slate-200 shadow-xl rounded-2xl mt-2 z-50 overflow-hidden"
+                >
                   {search.trim() ? (
 
   suggestions.map((item, index) => (
@@ -406,6 +421,7 @@ useEffect(() => {
 
               <button
                 onClick={handleSearch}
+                aria-label="Search"
                 className="absolute right-2 top-1/2 -translate-y-1/2 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white px-3 py-2 rounded-full"
               >
                 <div className="flex items-center gap-2">
@@ -419,8 +435,12 @@ useEffect(() => {
           {/* RIGHT */}
           <div className="hidden md:flex items-center gap-6">
             {/* WISHLIST */}
-            <Link href="/wishlist" className="relative">
-              <Heart className="w-6 h-6 text-gray-700" />
+            <Link
+              href="/wishlist"
+              className="relative"
+              aria-label={wishlistCount > 0 ? `Wishlist, ${wishlistCount} items` : "Wishlist"}
+            >
+              <Heart className="w-6 h-6 text-gray-700" aria-hidden="true" />
               {wishlistCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                   {wishlistCount}
@@ -429,8 +449,12 @@ useEffect(() => {
             </Link>
 
             {/* CART */}
-            <Link href="/cart" className="relative">
-              <ShoppingCart className="w-6 h-6 text-gray-700" />
+            <Link
+              href="/cart"
+              className="relative"
+              aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : "Cart"}
+            >
+              <ShoppingCart className="w-6 h-6 text-gray-700" aria-hidden="true" />
               {cartCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                   {cartCount}

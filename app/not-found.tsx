@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 py-16 text-center">
+    <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center px-4 py-16 text-center">
       <h1 className="text-4xl font-bold">Page not found</h1>
       <p className="mt-3 text-gray-600">
         The page you&apos;re looking for doesn&apos;t exist or is no longer available.
@@ -23,6 +23,6 @@ export default function NotFound() {
           Search products
         </Link>
       </div>
-    </main>
+    </div>
   );
 }
