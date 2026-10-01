@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { auth } from "@/lib/firebase";
@@ -75,8 +76,8 @@ export default function SellerInvoicePage() {
         } catch (error) {
 
           console.error(error);
-
-        } finally {
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    } finally {
 
           setLoading(false);
 

@@ -146,7 +146,8 @@ export default function SellerNotificationsPage() {
         );
       } catch (error) {
         console.error("Failed to mark notification as read:", error);
-      }
+      alert("Couldn't mark all notifications as read. Please try again.");
+    }
     }
 
     // Update local state

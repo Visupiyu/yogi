@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import {
   useEffect,
   useState
@@ -89,8 +90,8 @@ export default function SellerQuestionsPage(){
   } catch (error) {
 
     console.log(error);
-
-  } finally {
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    } finally {
 
     setLoading(false);
 
@@ -131,7 +132,7 @@ export default function SellerQuestionsPage(){
     }catch(error){
 
       console.log(error);
-
+      alert("Couldn't save your answer. Please check your connection and try again.");
     }
 
   };

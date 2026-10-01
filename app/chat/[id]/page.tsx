@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonObject } from "@/lib/safeStorage";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -139,7 +140,7 @@ const sendMessage = async () => {
 
   try {
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const user = readJsonObject("user");
 
     const imageUrl = imageFile
       ? await uploadImage()
@@ -174,8 +175,8 @@ const sendMessage = async () => {
   } catch (error) {
 
     console.error("Failed to send message:", error);
-
-  } finally {
+      alert("Your message wasn't sent. Please check your connection and try again.");
+    } finally {
 
     setSending(false);
 

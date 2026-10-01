@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import { clearCheckoutAfterOrder, removeFromCart } from "@/lib/cart";
 import { payableTotal } from "@/lib/checkoutTotals";
 import { EMPTY_ADDRESS_FORM, validateAddressForm } from "@/lib/addressForm";
@@ -129,9 +130,7 @@ export default function CheckoutPage() {
     });
     getEffectiveCommissionRate().then(setCommissionRate);
 
-    const storedItems = JSON.parse(
-      localStorage.getItem("checkoutItems") || "[]"
-    );
+    const storedItems = readJsonArray("checkoutItems");
     setItems(storedItems);
     // How this checkout was started ("buyNow" = one product, cart left alone).
     // Captured now so a later checkout in another tab can't change what this

@@ -65,6 +65,7 @@ export default function AdminNotificationsPage() {
       await updateDoc(doc(db, "notifications", id), { read: true });
     } catch (error) {
       console.error(error);
+      alert("Couldn't mark the notification as read. Please try again.");
     }
   };
 
@@ -75,7 +76,8 @@ export default function AdminNotificationsPage() {
           await updateDoc(doc(db, "notifications", item.id), { read: true });
         } catch (error) {
           console.error(error);
-        }
+      alert("Couldn't mark all notifications as read. Please try again.");
+    }
       }
     }
   };

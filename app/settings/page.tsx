@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -53,7 +54,7 @@ export default function SettingsPage() {
     if (s.data) setSummary(s.data);
     if (d.data) setDeletion(d.data);
     try {
-      setWishlistCount(JSON.parse(localStorage.getItem("wishlist") || "[]").length || 0);
+      setWishlistCount(readJsonArray("wishlist").length || 0);
     } catch {
       setWishlistCount(0);
     }

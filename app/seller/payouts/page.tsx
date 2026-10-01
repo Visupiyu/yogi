@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -73,8 +74,8 @@ export default function SellerPayoutsPage() {
       }catch(error){
 
         console.log(error);
-
-      }
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    }
 
     };
 

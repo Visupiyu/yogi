@@ -275,7 +275,7 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
     }catch(error){
 
       console.log(error);
-
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     }finally{
 
       setLoading(false);

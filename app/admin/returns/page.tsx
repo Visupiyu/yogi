@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -132,7 +133,8 @@ export default function AdminReturnsPage() {
         }
       } catch (error) {
         console.error("Failed to load item requests:", error);
-      }
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    }
 
       // ---- legacy returns read (isolated) ----
       try {
@@ -281,6 +283,7 @@ export default function AdminReturnsPage() {
       );
     } catch (error) {
       console.error(error);
+      alert("Couldn't complete that action. Please try again.");
     }
   };
 

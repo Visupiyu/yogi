@@ -1,3 +1,5 @@
+import { readJsonArray } from "@/lib/safeStorage";
+
 export interface CartItem {
   id: string;
   name: string;
@@ -118,9 +120,7 @@ export function addToCart(
 
   if (!product) return false;
 
-  const cart: CartItem[] = JSON.parse(
-    localStorage.getItem("cart") || "[]"
-  );
+  const cart: CartItem[] = readJsonArray("cart");
 
   const index = cart.findIndex((item) =>
     isSameLine(item, {
@@ -174,9 +174,7 @@ export function getCartItems(): CartItem[] {
     return [];
   }
 
-  return JSON.parse(
-    localStorage.getItem("cart") || "[]"
-  );
+  return readJsonArray("cart");
 
 }
 export function getCartCount(): number {

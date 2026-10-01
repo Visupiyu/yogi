@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -25,6 +26,7 @@ export default function AdminWithdrawalsPage() {
       setWithdrawals(items);
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     } finally {
       setLoading(false);
     }
@@ -74,6 +76,7 @@ export default function AdminWithdrawalsPage() {
       );
     } catch (error) {
       console.error(error);
+      alert("Couldn't update the withdrawal. Please check its current status and try again.");
     }
   };
 

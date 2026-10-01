@@ -1,5 +1,6 @@
 "use client";
 
+import { parseJson } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -52,6 +53,7 @@ export default function AdminUsersPage() {
 setUsers(items);
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     } finally {
       setLoading(false);
     }
@@ -76,7 +78,7 @@ setUsers(items);
 
 if (
   currentAdmin &&
-  JSON.parse(currentAdmin).email ===
+  parseJson<{ email?: string }>(currentAdmin)?.email ===
     users.find((u) => u.id === id)?.email
 ) {
   toast.error("You cannot delete your own account.");

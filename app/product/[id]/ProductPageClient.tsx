@@ -1,9 +1,11 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where, addDoc, serverTimestamp,limit,} from "firebase/firestore";
 import RecentlyViewed from "@/components/RecentlyViewed";
+import LoadErrorState from "@/components/LoadErrorState";
 import { useDialogA11y } from "@/components/hooks/useDialogA11y";
 import FrequentlyBoughtTogether from "@/components/FrequentlyBoughtTogether";
 import CustomersAlsoBought from "@/components/CustomersAlsoBought";
@@ -133,6 +135,9 @@ export default function ProductPage() {
   // Set when the product exists but is not customer-visible (pending review,
   // rejected or blocked) — rendered as "unavailable", never as a product.
   const [unavailable, setUnavailable] = useState(false);
+  // A failed read is NOT "product not found": it gets its own error with Retry.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [selectedImage, setSelectedImage] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
@@ -162,6 +167,8 @@ const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     async function loadProduct() {
+      setLoadError(false);
+      setLoading(true);
       
       try {
         const snap = await getDoc(
@@ -195,9 +202,7 @@ if (auth.currentUser) {
 }
 
 // ⭐ Save Recently Viewed Product
-const viewed = JSON.parse(
-  localStorage.getItem("recentlyViewed") || "[]"
-);
+const viewed = readJsonArray("recentlyViewed");
 
 const filtered = viewed.filter(
   (item: any) => item.id !== fullProduct.id
@@ -259,13 +264,14 @@ relatedSnap.forEach((d) => {
          }
       } catch (error) {
   console.error("loadProduct error:", error);
+      setLoadError(true);
       } finally {
         setLoading(false);
       }
     }
 
     if (params?.id) loadProduct();
-  }, [params]);
+  }, [params, reloadKey]);
   useEffect(() => {
 
   if (!showGallery) return;
@@ -469,9 +475,7 @@ relatedSnap.forEach((d) => {
   };
 
   const addToWishlist = () => {if (!product) return;
-    const wishlist: Product[] = JSON.parse(
-  localStorage.getItem("wishlist") || "[]"
-);
+    const wishlist: Product[] = readJsonArray("wishlist");
     const exists = wishlist.find((item) => item.id === product.id);
     if (exists) {
       alert("Already In Wishlist");
@@ -733,6 +737,18 @@ relatedSnap.forEach((d) => {
         <Link href="/" className="text-indigo-600 hover:underline">
           Continue shopping
         </Link>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <LoadErrorState
+          className="max-w-md"
+          message="We couldn't load this product. Please check your connection and try again."
+          onRetry={() => setReloadKey((k) => k + 1)}
+        />
       </div>
     );
   }

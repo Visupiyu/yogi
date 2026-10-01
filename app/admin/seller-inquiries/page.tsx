@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { collection, doc, getDocs, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -37,6 +38,7 @@ export default function AdminSellerInquiriesPage() {
       setInquiries(items);
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     } finally {
       setLoading(false);
     }
@@ -56,6 +58,7 @@ export default function AdminSellerInquiriesPage() {
       );
     } catch (error) {
       console.error(error);
+      alert("Couldn't update the inquiry status. Please try again.");
     }
   };
 

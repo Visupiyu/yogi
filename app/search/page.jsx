@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -804,9 +805,7 @@ Contact Support
             <button
               onClick={() => {
                 if (!quickViewProduct) return;
-                const wishlist = JSON.parse(
-                  localStorage.getItem("wishlist") || "[]"
-                );
+                const wishlist = readJsonArray("wishlist");
                 if (wishlist.find((item) => item.id === quickViewProduct.id)) {
                   alert("Already In Wishlist");
                   return;

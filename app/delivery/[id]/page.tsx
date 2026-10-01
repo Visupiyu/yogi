@@ -1,5 +1,6 @@
 "use client";
 
+import { parseJson } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 
 import { useParams, useRouter } from "next/navigation";
@@ -100,9 +101,9 @@ const [proofPreview, setProofPreview] =
         return;
       }
 
-      const session = JSON.parse(sessionRaw);
+      const session = parseJson<{ uid?: string; name?: string; partnerId: string }>(sessionRaw);
 
-      if (session.uid !== user.uid) {
+      if (!session || !session.partnerId || session.uid !== user.uid) {
         router.replace("/delivery-login");
         return;
       }
@@ -165,7 +166,7 @@ const [proofPreview, setProofPreview] =
     } catch (error) {
 
       console.error(error);
-
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     } finally {
 
       setLoading(false);

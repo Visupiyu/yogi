@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import {
   addDoc,
@@ -78,6 +79,7 @@ export default function DeliveryPartnersPage() {
       setCompanies(items);
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     }
   };
 
@@ -96,6 +98,7 @@ export default function DeliveryPartnersPage() {
       setPartners(items);
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     } finally {
       setLoading(false);
     }
@@ -238,8 +241,13 @@ export default function DeliveryPartnersPage() {
     }
 
     if (!confirm("Delete this delivery partner?")) return;
-    await deleteDoc(doc(db, "deliveryPartners", id));
-    loadPartners();
+    try {
+      await deleteDoc(doc(db, "deliveryPartners", id));
+      loadPartners();
+    } catch (error) {
+      console.error(error);
+      alert("Couldn't delete the partner. Please try again.");
+    }
   };
 
   const togglePartnerStatus = async (id: string, currentStatus: string) => {
@@ -250,6 +258,7 @@ export default function DeliveryPartnersPage() {
       loadPartners();
     } catch (error) {
       console.error(error);
+      alert("Couldn't change the partner status. Please try again.");
     }
   };
 

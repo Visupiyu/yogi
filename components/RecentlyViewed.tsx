@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
@@ -18,9 +19,7 @@ export default function RecentlyViewed({
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    const viewed = JSON.parse(
-      localStorage.getItem("recentlyViewed") || "[]"
-    );
+    const viewed = readJsonArray("recentlyViewed");
 
     setProducts(
   viewed.filter(

@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonObject } from "@/lib/safeStorage";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -81,7 +82,7 @@ export default function ProfilePage() {
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, { displayName: fullName });
       }
-      const saved = JSON.parse(localStorage.getItem("user") || "{}");
+      const saved = readJsonObject("user");
       localStorage.setItem("user", JSON.stringify({ ...saved, name: fullName, phone, address }));
       alert("Profile saved");
       load();

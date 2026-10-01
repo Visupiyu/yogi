@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import {
   useEffect,
   useRef,
@@ -25,11 +26,7 @@ export default function WishlistPage() {
   useEffect(() => {
 
     const storedWishlist =
-      JSON.parse(
-        localStorage.getItem(
-          "wishlist"
-        ) || "[]"
-      );
+      readJsonArray("wishlist");
 
     setWishlist(storedWishlist);
 
@@ -157,11 +154,7 @@ export default function WishlistPage() {
     }
 
     const cart =
-      JSON.parse(
-        localStorage.getItem(
-          "cart"
-        ) || "[]"
-      );
+      readJsonArray("cart");
 
     const exists =
       cart.findIndex(

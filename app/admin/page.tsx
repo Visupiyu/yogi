@@ -267,8 +267,13 @@ export default function AdminPage() {
   }, []);
 
   const deleteProduct = async (id: string) => {
-    await deleteDoc(doc(db, "products", id));
-    loadProducts(vendors);
+    try {
+      await deleteDoc(doc(db, "products", id));
+      loadProducts(vendors);
+    } catch (error) {
+      console.error(error);
+      alert("Couldn't delete the product. Please try again.");
+    }
   };
 
   const updateOrderStatus = async (id: string, status: string) => {
@@ -277,6 +282,7 @@ export default function AdminPage() {
       await loadProducts(vendors);
     } catch (error) {
       console.error(error);
+      alert("Couldn't update the order status. Please try again.");
     }
   };
 

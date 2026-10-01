@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -53,7 +54,8 @@ const [chats, setChats] = useState<Chat[]>([]);
         setChats(list);
       } catch (error) {
         console.error("Chat loading failed:", error);
-      } finally {
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    } finally {
         setLoading(false);
       }
     });

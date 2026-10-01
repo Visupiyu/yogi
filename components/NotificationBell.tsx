@@ -171,7 +171,12 @@ export default function NotificationBell() {
     if (mode === "customer") {
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
       setUnreadCount((c) => Math.max(0, c - 1));
-      await markNotificationsRead({ ids: [id] });
+      const result = await markNotificationsRead({ ids: [id] });
+      if (result.error) {
+        // Not confirmed by the server: put it back instead of leaving the bell wrong.
+        setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
+        setUnreadCount((c) => c + 1);
+      }
       return;
     }
     try {

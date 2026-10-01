@@ -1,5 +1,6 @@
 "use client";
 
+import { parseJson, readJsonArray } from "@/lib/safeStorage";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { ShoppingCart, Heart, User, Search } from "lucide-react";
@@ -60,9 +61,7 @@ export default function Navbar() {
     if (!q) return;
     setSuggestions([]);
     setShowSuggestions(false);
-    const history = JSON.parse(
-  localStorage.getItem("recentSearches") || "[]"
-);
+    const history = readJsonArray("recentSearches");
 
 const updated = [
   search,
@@ -81,7 +80,7 @@ localStorage.setItem(
     const updateCounts = () => {
      setCartCount(getCartCount()); 
 
-      const wishlist = JSON.parse(localStorage.getItem("wishlist") || "[]");
+      const wishlist = readJsonArray("wishlist");
       setWishlistCount(wishlist.length);
     };
 
@@ -102,20 +101,22 @@ localStorage.setItem(
 
   /* LOAD USER */
  const loadUser = () => {
-  const savedUser = localStorage.getItem("user");
-  const savedVendor = localStorage.getItem("vendor");
-  const savedAdmin = localStorage.getItem("admin");
+  // Each cached value is parsed defensively: a corrupt "user"/"vendor"/"admin"
+  // entry is treated as signed-out display state instead of throwing on every page.
+  const savedAdmin = parseJson(localStorage.getItem("admin"));
+  const savedVendor = parseJson(localStorage.getItem("vendor"));
+  const savedUser = parseJson(localStorage.getItem("user"));
 
   if (savedAdmin) {
-    setUser(JSON.parse(savedAdmin));
+    setUser(savedAdmin);
     setIsVendor(false);
     setIsAdmin(true);
   } else if (savedVendor) {
-    setUser(JSON.parse(savedVendor));
+    setUser(savedVendor);
     setIsVendor(true);
     setIsAdmin(false);
   } else if (savedUser) {
-    setUser(JSON.parse(savedUser));
+    setUser(savedUser);
     setIsVendor(false);
     setIsAdmin(false);
   } else {
@@ -203,9 +204,7 @@ useEffect(() => {
       : user.email
     : "Login";
     useEffect(() => {
-  const history = JSON.parse(
-    localStorage.getItem("recentSearches") || "[]"
-  );
+  const history = readJsonArray<never>("recentSearches");
 
   setRecentSearches(history);
 }, []);

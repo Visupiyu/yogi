@@ -1,4 +1,5 @@
 "use client";
+import { toast } from "sonner";
 import { useEffect,useState } from "react";
 import { useRouter } from "next/navigation";
 import {collection,   getDocs,   addDoc,   query,   where,   serverTimestamp,} from "firebase/firestore";
@@ -211,8 +212,8 @@ setWalletBalance(available);
   }catch(error){
 
     console.log(error);
-
-  }finally{
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    }finally{
 
 
     setLoading(false);
@@ -340,8 +341,8 @@ async()=>{
  }catch(error){
 
   console.log(error);
-
-}finally{
+      alert("Couldn't submit your withdrawal request. Please check your connection and try again.");
+    }finally{
 
   setSubmitting(false);
 

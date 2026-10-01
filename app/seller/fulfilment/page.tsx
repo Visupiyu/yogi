@@ -85,7 +85,8 @@ export default function SellerFulfilmentPage() {
         setRecords(list);
       } catch (error) {
         console.error("Failed to load fulfilment records:", error);
-      } finally {
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    } finally {
         setLoading(false);
       }
     });

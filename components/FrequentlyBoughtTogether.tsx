@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
@@ -80,9 +81,7 @@ export default function FrequentlyBoughtTogether({
   }, [currentProductId, category]);
 
   const addAllToCart = () => {
-    const cart = JSON.parse(
-      localStorage.getItem("cart") || "[]"
-    );
+    const cart = readJsonArray("cart");
 
     let needOptions = 0;
     products.forEach((product) => {

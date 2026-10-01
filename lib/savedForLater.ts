@@ -8,6 +8,7 @@
 //     instead of creating a duplicate, never exceeds current stock, and refuses a
 //     product that is deleted / blocked / out of stock / missing its variant —
 //     in every refusal (and on a failed read) the item STAYS in saved-for-later.
+import { readJsonArray } from "@/lib/safeStorage";
 import { getCartItems, isSameLine, type CartItem } from "@/lib/cart";
 import { checkLine, fetchProducts, ISSUE_LABEL, type LineIssue } from "@/lib/cartReconcile";
 
@@ -15,7 +16,7 @@ const SAVED_KEY = "savedItems";
 
 export function getSavedItems(): CartItem[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(SAVED_KEY) || "[]");
+    const parsed = readJsonArray(SAVED_KEY);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

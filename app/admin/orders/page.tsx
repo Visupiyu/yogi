@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import {
   collection,
@@ -342,6 +343,7 @@ setOrders(items);
       }
     } catch (error) {
       console.error("Failed to load orders:", error);
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     } finally {
       setLoading(false);
     }
@@ -478,6 +480,7 @@ setOrders(items);
       await loadOrders();
     } catch (error) {
       console.error(error);
+      alert("Couldn't update the order. Please try again.");
     }
   };
 
@@ -523,6 +526,7 @@ setOrders(items);
       );
     } catch (error) {
       console.error(error);
+      alert("Couldn't mark the review as resolved. Please try again.");
     }
   };
 
@@ -556,6 +560,7 @@ setOrders(items);
       );
     } catch (error) {
       console.error(error);
+      alert("Couldn't record the refund as processing. Please try again.");
     }
   };
 
@@ -655,6 +660,7 @@ setOrders(items);
       await updateDoc(doc(db, "orders", orderId), { [field]: value });
     } catch (error) {
       console.error(error);
+      alert("Couldn't save the shipping detail. Please try again.");
     }
   };
 
@@ -684,6 +690,7 @@ setOrders(items);
       );
     } catch (error) {
       console.error(error);
+      alert("Couldn't complete that action. Please try again.");
     }
   };
 const filtered = orders.filter(

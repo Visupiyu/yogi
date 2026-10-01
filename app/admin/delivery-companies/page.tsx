@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import {
   addDoc,
@@ -55,6 +56,7 @@ export default function DeliveryCompaniesPage() {
       setCompanies(items);
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     } finally {
       setLoading(false);
     }
@@ -107,6 +109,7 @@ export default function DeliveryCompaniesPage() {
       await loadCompanies();
     } catch (error) {
       console.error(error);
+      alert("Couldn't change the company status. Please try again.");
     }
   };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -22,7 +23,7 @@ export default function ComparePage() {
     let cancelled = false;
     let saved: any[] = [];
     try {
-      const parsed = JSON.parse(localStorage.getItem("compareProducts") || "[]");
+      const parsed = readJsonArray("compareProducts");
       if (Array.isArray(parsed)) saved = parsed;
     } catch {
       saved = [];

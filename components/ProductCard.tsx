@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 
 import Link from "next/link";
@@ -16,13 +17,7 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
 
     const wishlist =
 
-      JSON.parse(
-
-        localStorage.getItem(
-          "wishlist"
-        ) || "[]"
-
-      );
+      readJsonArray("wishlist");
 
     const exists = wishlist.find( (item:any)=> item.id === id );
 
@@ -63,13 +58,7 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
 
     const existingCart =
 
-      JSON.parse(
-
-        localStorage.getItem(
-          "cart"
-        ) || "[]"
-
-      );
+      readJsonArray("cart");
 
     const existingIndex =
 
@@ -152,7 +141,7 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
   useEffect(() => {
     const sync = () => {
       try {
-        const list = JSON.parse(localStorage.getItem("compareProducts") || "[]");
+        const list = readJsonArray("compareProducts");
         setInCompare(Array.isArray(list) && list.some((item: any) => item.id === id));
       } catch {
         setInCompare(false);
@@ -170,7 +159,7 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
   const toggleCompare = () => {
     let compare: any[] = [];
     try {
-      const parsed = JSON.parse(localStorage.getItem("compareProducts") || "[]");
+      const parsed = readJsonArray("compareProducts");
       if (Array.isArray(parsed)) compare = parsed;
     } catch {
       compare = [];

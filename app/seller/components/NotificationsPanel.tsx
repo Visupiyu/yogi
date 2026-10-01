@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 
 import {
@@ -61,8 +62,8 @@ export default function NotificationsPanel() {
       } catch (err) {
 
         console.error(err);
-
-      } finally {
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    } finally {
 
         setLoading(false);
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ProductRecommendations from "@/components/ProductRecommendations";
@@ -52,9 +53,7 @@ export default function CartPage() {
   setCart(items);
 
   setSavedItems(
-    JSON.parse(
-      localStorage.getItem("savedItems") || "[]"
-    )
+    readJsonArray("savedItems")
   );
 
   // Every line is a snapshot from when it was added. Re-read the products so the

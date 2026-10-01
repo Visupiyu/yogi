@@ -81,7 +81,8 @@ export default function SellerReturnsPage() {
         setRequests(list);
       } catch (error) {
         console.error("Failed to load requests:", error);
-      } finally {
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
+    } finally {
         if (active) setLoading(false);
       }
     });

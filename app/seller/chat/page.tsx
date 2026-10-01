@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "sonner";
 import {
   useEffect,
   useState
@@ -94,7 +95,7 @@ const snapshot = await getDocs(
   "Failed to load seller chats:",
   error
 );
-
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     }finally{
 
       setLoading(false);

@@ -44,6 +44,7 @@ export default function AdminCustomersPage() {
       setCustomers(items);
     } catch (error) {
       console.error(error);
+      toast.error("Couldn't load this page's data. Please check your connection and refresh to try again.");
     } finally {
       setLoading(false);
     }
