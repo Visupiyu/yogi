@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   doc,
   getDoc,
@@ -30,6 +30,8 @@ import DeliveryOtpNotice from "@/components/DeliveryOtpNotice";
 import { mapsSearchUrl } from "@/lib/maps";
 import { customerLoginUrl } from "@/lib/authRedirect";
 import LoadErrorState from "@/components/LoadErrorState";
+import { INVOICE_LINK_LABEL, isInvoiceAvailable } from "@/lib/invoiceAvailability";
+import { requestSellerChat } from "@/lib/account/contactSeller";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -96,9 +98,10 @@ export default function OrderDetailsPage() {
         }
 
         const data: any = { id: snap.id, ...snap.data() };
-        const allowed =
-          data.userEmail?.trim().toLowerCase() ===
-          user.email?.trim().toLowerCase();
+        // Ownership is the account's UID (the same field the orders list queries
+        // and firestore.rules enforce). Comparing userEmail as well wrongly
+        // bounced the owner whenever the order's email was empty or differed.
+        const allowed = data.userId === user.uid;
 
         if (!allowed) {
           router.push("/orders");
@@ -174,30 +177,13 @@ export default function OrderDetailsPage() {
   const openSellerChat = async () => {
     if (!order?.items?.length) return;
 
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        router.push(customerLoginUrl());
-        return;
-      }
-      const token = await user.getIdToken();
-      const res = await fetch("/api/contact-seller", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ orderId: order.id }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.chatId) {
-        alert(data?.error || "Could not open the chat. Please try again.");
-        return;
-      }
-      router.push(`/chat/${data.chatId}`);
-    } catch (error) {
-      console.error("Chat Error:", error);
-      alert("Could not open the chat. Please try again.");
+    const result = await requestSellerChat(order.id);
+    if (result.ok) {
+      router.push(`/chat/${result.chatId}`);
+    } else if (result.loginRequired) {
+      router.push(customerLoginUrl());
+    } else {
+      alert(result.message);
     }
   };
 
@@ -212,9 +198,17 @@ export default function OrderDetailsPage() {
   // performs status + stock/sales + reward reversal + coupon release in one
   // Admin SDK transaction, so there is no cancellation logic to duplicate here
   // and none is added.
+  // Ref + state: the ref closes the window before React re-renders the disabled
+  // button, the state disables it and shows "Cancelling…".
+  const cancellingRef = useRef(false);
+  const [cancelling, setCancelling] = useState(false);
+
   const cancelOrder = async () => {
+    if (cancellingRef.current) return;
     if (!confirm("Cancel this order?")) return;
 
+    cancellingRef.current = true;
+    setCancelling(true);
     try {
       const currentUser = auth.currentUser;
 
@@ -242,10 +236,30 @@ export default function OrderDetailsPage() {
         return;
       }
 
-      setOrder((prev: any) => ({ ...prev, status: "Cancelled" }));
+      // The cancellation is committed. Show what was actually PERSISTED (a paid
+      // online order now carries refundStatus / refundAmountDue, which the
+      // existing refund notice below renders) — re-read it rather than guessing
+      // refund state client-side. If that read fails the cancel still stands, so
+      // fall back to marking it cancelled and tell the customer to refresh for
+      // refund details.
+      try {
+        const fresh = await getDoc(doc(db, "orders", orderId));
+        if (fresh.exists()) {
+          setOrder({ id: fresh.id, ...fresh.data() });
+        } else {
+          setOrder((prev: any) => ({ ...prev, status: "Cancelled" }));
+        }
+      } catch (refreshError) {
+        console.error("Order refresh after cancel failed:", refreshError);
+        setOrder((prev: any) => ({ ...prev, status: "Cancelled" }));
+        alert("Your order was cancelled. Refresh this page to see the latest refund details.");
+      }
     } catch (error) {
       console.error("Cancel Error:", error);
       alert("Couldn't cancel this order.");
+    } finally {
+      cancellingRef.current = false;
+      setCancelling(false);
     }
   };
 
@@ -398,9 +412,10 @@ export default function OrderDetailsPage() {
           <div className="mt-8 bg-white rounded-3xl shadow border p-6">
             <button
               onClick={cancelOrder}
-              className="w-full h-12 rounded-xl bg-red-600 hover:bg-red-700 transition text-white font-semibold"
+              disabled={cancelling}
+              className="w-full h-12 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition text-white font-semibold"
             >
-              ❌ Cancel Order
+              {cancelling ? "Cancelling…" : "❌ Cancel Order"}
             </button>
           </div>
         )}
@@ -554,13 +569,15 @@ export default function OrderDetailsPage() {
         )}
 
         {/* ACTION BUTTONS */}
-        <Link
-  href={`/invoice/${order.id}`}
-  target="_blank"
-  className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
->
-  🖨 Print Invoice
-</Link>
+        {isInvoiceAvailable(order.status) && (
+          <Link
+            href={`/invoice/${order.id}`}
+            target="_blank"
+            className="h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
+          >
+            {INVOICE_LINK_LABEL}
+          </Link>
+        )}
 
           <button
   onClick={openSellerChat}

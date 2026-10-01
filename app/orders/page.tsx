@@ -21,6 +21,8 @@ import LoadErrorState from "@/components/LoadErrorState";
 import { ORDER_STEPS, getStep } from "@/lib/orderTracking";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 import { customerLoginUrl } from "@/lib/authRedirect";
+import { INVOICE_LINK_LABEL, isInvoiceAvailable } from "@/lib/invoiceAvailability";
+import { requestSellerChat } from "@/lib/account/contactSeller";
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
@@ -28,9 +30,13 @@ export default function OrdersPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   // A failed read must never look like "no orders": it gets its own error state
   // with a Retry, and only a SUCCESSFUL empty result shows the empty state.
-  const fetchOrders = useCallback(async (uid: string) => {
-    setLoading(true);
-    setLoadError(null);
+  const fetchOrders = useCallback(async (uid: string, quiet = false) => {
+    // `quiet` re-reads without flashing the page into its loading state — used
+    // after a cancellation to show the order exactly as persisted.
+    if (!quiet) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       // firestore.rules gates orders reads on resource.data.userId,
       // not userEmail -- querying a different field than the rule
@@ -51,9 +57,10 @@ export default function OrdersPage() {
       setOrders(unique);
     } catch (error) {
       console.error("Orders load failed:", error);
-      setLoadError("We couldn't load your orders. Please try again.");
+      if (!quiet) setLoadError("We couldn't load your orders. Please try again.");
+      else throw error;
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, []);
   useEffect(() => {
@@ -76,15 +83,23 @@ export default function OrdersPage() {
   // with app/orders/[id] and app/track-order. This page's copy had already
   // drifted — it still read "Placed" for the stored status "Pending" after the
   // detail page was corrected.
+  // One cancellation at a time: the ref closes the window before React renders
+  // the disabled button; the state disables it and shows "Cancelling…".
+  const cancellingRef = useRef(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
   const cancelOrder = async (
     id: string
   ) => {
+    if (cancellingRef.current) return;
     if (
       !confirm(
         "Cancel this order?"
       )
     )
       return;
+    cancellingRef.current = true;
+    setCancellingId(id);
     try {
       // Cancellation is server-authoritative: /api/cancel-order re-reads the
       // order, authorizes the caller against it, and performs the status
@@ -119,21 +134,53 @@ export default function OrdersPage() {
         return;
       }
 
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.id === id
-            ? {
-                ...o,
-                status: "Cancelled",
-              }
-            : o
-        )
-      );
+      // The cancellation is committed. Re-read the orders so each shows what was
+      // PERSISTED — a paid online order now carries refundStatus/refundAmountDue,
+      // which the existing refund notice renders — instead of guessing refund
+      // state here. If the re-read fails the cancel still stands: mark it
+      // cancelled locally and tell the customer to refresh for refund details.
+      try {
+        await fetchOrders(currentUser.uid, true);
+      } catch {
+        setOrders((prev) =>
+          prev.map((o) => (o.id === id ? { ...o, status: "Cancelled" } : o))
+        );
+        alert("Your order was cancelled. Refresh this page to see the latest refund details.");
+      }
     } catch (error) {
       console.error("Cancel order failed:", error);
       alert("Couldn't cancel this order. Please check your connection and try again.");
+    } finally {
+      cancellingRef.current = false;
+      setCancellingId(null);
     }
   };
+  // Contact Seller goes through the same /api/contact-seller flow as the order
+  // detail page (lib/account/contactSeller.ts): the server verifies ownership and
+  // finds or creates the chat. Nothing is stored on the order. For an order with
+  // several sellers it opens the chat with the first seller, as the detail page
+  // does today.
+  const contactingRef = useRef(false);
+  const [contactingId, setContactingId] = useState<string | null>(null);
+  const openSellerChat = async (orderId: string) => {
+    if (contactingRef.current) return;
+    contactingRef.current = true;
+    setContactingId(orderId);
+    try {
+      const result = await requestSellerChat(orderId);
+      if (result.ok) {
+        router.push(`/chat/${result.chatId}`);
+      } else if (result.loginRequired) {
+        router.push(customerLoginUrl());
+      } else {
+        alert(result.message);
+      }
+    } finally {
+      contactingRef.current = false;
+      setContactingId(null);
+    }
+  };
+
   const reorderingRef = useRef(false);
   // Order again: every line is re-planned from the product's CURRENT document
   // (lib/cartReorder.ts) — never from the old order item, which carries no
@@ -326,7 +373,7 @@ export default function OrdersPage() {
     👁️ View Details
   </a>
   {/* Download Invoice */}
- {["Confirmed", "Shipped", "Delivered"].includes(order.status) && (
+ {isInvoiceAvailable(order.status) && (
     <a
       href={`/invoice/${order.id}`}
       target="_blank"
@@ -344,17 +391,19 @@ export default function OrdersPage() {
         justify-center
       "
     >
-      📄 Download Invoice
+      {INVOICE_LINK_LABEL}
     </a>
 
   )}
 
   {/* Contact Seller */}
 
-  {order.chatId && (
+  {Array.isArray(order.items) && order.items.length > 0 && (
 
-    <a
-      href={`/chat/${order.chatId}`}
+    <button
+      type="button"
+      onClick={() => openSellerChat(order.id)}
+      disabled={contactingId === order.id}
       className="
         w-full
         h-12
@@ -366,10 +415,10 @@ export default function OrdersPage() {
         flex
         items-center
         justify-center
-      "
+       disabled:opacity-60"
     >
-      💬 Contact Seller
-    </a>
+      {contactingId === order.id ? "Opening chat…" : "💬 Contact Seller"}
+    </button>
 
   )}
 
@@ -411,9 +460,9 @@ export default function OrdersPage() {
   {/* Cancel Order */}
 
   {order.status === "Pending" && (
-
     <button
       onClick={() => cancelOrder(order.id)}
+      disabled={cancellingId !== null}
       className="
         w-full
         h-12
@@ -422,9 +471,9 @@ export default function OrdersPage() {
         hover:bg-red-700
         text-white
         font-semibold
-      "
+       disabled:opacity-60 disabled:cursor-not-allowed"
     >
-      ❌ Cancel Order
+      {cancellingId === order.id ? "Cancelling…" : "❌ Cancel Order"}
     </button>
 
 )}
