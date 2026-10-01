@@ -102,6 +102,7 @@ export default function ProfilePage() {
     // account left in them.
     localStorage.removeItem("cart");
     localStorage.removeItem("checkoutItems");
+    localStorage.removeItem("checkoutSource");
     localStorage.removeItem("wishlist");
     window.dispatchEvent(new Event("cartUpdated"));
     window.dispatchEvent(new Event("wishlistUpdated"));
@@ -160,6 +161,7 @@ export default function ProfilePage() {
     { href: "/orders", icon: "📦", title: "My Orders", desc: "Track and manage your orders" },
     { href: "/wishlist", icon: "❤️", title: "Wishlist", desc: "Your saved favourite products" },
     { href: "/cart", icon: "🛒", title: "Cart", desc: "Review your shopping cart" },
+    { href: "/compare", icon: "📊", title: "Compare", desc: "Products you picked to compare" },
     { href: "/profile/wallet", icon: "🏆", title: "Reward Wallet", desc: "Balance, pending points & history" },
     { href: "/profile/refunds", icon: "↩️", title: "Returns & Refunds", desc: "Track returns, pickups & refunds" },
     { href: "/profile/tickets", icon: "🎫", title: "Support Tickets", desc: "View your requests and replies" },

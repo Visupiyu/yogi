@@ -239,6 +239,8 @@ const moveToCart = (index: number) => {
       return;
     }
     localStorage.setItem("checkoutItems", JSON.stringify(cart));
+    // A cart checkout, not a Buy Now one — checkout clears the cart after it.
+    localStorage.removeItem("checkoutSource");
     window.location.href = "/checkout";
   };
 

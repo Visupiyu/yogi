@@ -3,15 +3,59 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { isStorefrontVisible, toLegacyProduct } from "@/lib/products/legacyDisplay";
 
 export default function ComparePage() {
   const [products, setProducts] = useState<any[]>([]);
 
+  const persist = (list: any[]) => {
+    // Same slim shape the product cards save — not the whole product document.
+    const slim = list.map(({ id, name, price, image, stock }) => ({ id, name, price, image, stock }));
+    localStorage.setItem("compareProducts", JSON.stringify(slim));
+    // Product cards listen for this to refresh their selected state.
+    window.dispatchEvent(new Event("compareUpdated"));
+  };
+
   useEffect(() => {
-    const saved = JSON.parse(
-      localStorage.getItem("compareProducts") || "[]"
-    );
+    let cancelled = false;
+    let saved: any[] = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem("compareProducts") || "[]");
+      if (Array.isArray(parsed)) saved = parsed;
+    } catch {
+      saved = [];
+    }
     setProducts(saved);
+
+    // Product cards only save id/name/price/image/stock. Refresh each (at most 4)
+    // from its live product doc so price, MRP, rating, category and stock are
+    // current and complete, and drop products that are no longer on sale. If a
+    // read fails the saved snapshot is kept as-is.
+    (async () => {
+      const fresh = await Promise.all(
+        saved.map(async (item) => {
+          try {
+            const snap = await getDoc(doc(db, "products", String(item.id)));
+            if (!snap.exists()) return null;
+            const data = snap.data();
+            if (!isStorefrontVisible(data)) return null;
+            return { ...item, ...toLegacyProduct(snap.id, data) };
+          } catch {
+            return item;
+          }
+        })
+      );
+      if (cancelled) return;
+      const live = fresh.filter(Boolean) as any[];
+      setProducts(live);
+      if (live.length !== saved.length) persist(live);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const removeProduct = (id: string) => {
@@ -19,14 +63,12 @@ export default function ComparePage() {
 
     setProducts(updated);
 
-    localStorage.setItem(
-      "compareProducts",
-      JSON.stringify(updated)
-    );
+    persist(updated);
   };
 
   const clearAll = () => {
     localStorage.removeItem("compareProducts");
+    window.dispatchEvent(new Event("compareUpdated"));
     setProducts([]);
   };
 

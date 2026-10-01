@@ -147,6 +147,7 @@ export default function SettingsPage() {
     // device would inherit this account's cart and saved products.
     localStorage.removeItem("cart");
     localStorage.removeItem("checkoutItems");
+    localStorage.removeItem("checkoutSource");
     localStorage.removeItem("wishlist");
     window.dispatchEvent(new Event("cartUpdated"));
     window.dispatchEvent(new Event("wishlistUpdated"));

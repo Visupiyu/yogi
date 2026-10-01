@@ -1,8 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getVisibleCatalog } from "@/lib/storefront/catalogScan";
 import CategoryStrip from "@/components/CategoryStrip";
 import Footer from "@/components/Footer";
 import HeroSlider from "@/components/heroSlider";
@@ -21,7 +20,7 @@ import CollectionStrip from "@/components/home/CollectionStrip";
 import PromoBanner from "@/components/home/PromoBanner";
 import { catalogTree } from "@/lib/catalog/catalogTree";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog/categoryUtils";
-import { toLegacyProduct, isStorefrontVisible, type LegacyProductView } from "@/lib/products/legacyDisplay";
+import { toLegacyProduct, type LegacyProductView } from "@/lib/products/legacyDisplay";
 
 type Product = LegacyProductView;
 
@@ -48,15 +47,14 @@ async function loadProducts(): Promise<Product[]> {
   // takeover with no error indication and no way to retry. Letting the
   // rejection propagate is what makes useQuery's own isError/refetch work
   // correctly below.
-  const snapshot = await getDocs(collection(db, "products"));
-  const items: Product[] = [];
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-    // Admin-blocked products must not appear on the storefront.
-    if (!isStorefrontVisible(data)) return;
-    items.push(toLegacyProduct(docSnap.id, data));
-  });
-  return items;
+  // Shared, cached, paged scan of the visible catalog (lib/storefront/
+  // catalogScan.ts) — the same read Navbar suggestions and text search use, so
+  // opening the homepage then searching does not read the collection again.
+  // It already drops blocked / pending / rejected products. The category
+  // shelves below show every product in their category (merchandising is
+  // unchanged), so the full visible set is genuinely what they need.
+  const { products } = await getVisibleCatalog();
+  return products.map(({ id, data }) => toLegacyProduct(id, data));
 }
 
 export default function Home() {

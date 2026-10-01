@@ -3,7 +3,8 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { collection, getDocs, limit, query as firestoreQuery } from "firebase/firestore";
+import { collection, getDocs, query as firestoreQuery, where } from "firebase/firestore";
+import { getVisibleCatalog, CATALOG_MAX_PRODUCTS } from "@/lib/storefront/catalogScan";
 import { db } from "@/lib/firebase";
 import ProductFilters from "@/components/ProductFilters";
 import { addToCart as addToCartHelper } from "@/lib/cart";
@@ -26,6 +27,8 @@ const CATEGORIES = [
   { label: "Mobiles", value: "Mobiles" },
   { label: "Books", value: "Books" },
 ];
+
+const PAGE_STEP = 48;
 
 function SearchContent() {
   const router = useRouter();
@@ -64,20 +67,15 @@ const [quickQty, setQuickQty] = useState(1);
 const [quickSize, setQuickSize] = useState("");
 const [quickColor, setQuickColor] = useState("");
   const [retryKey, setRetryKey] = useState(0);
+  const [truncated, setTruncated] = useState(false);
+  // Results render PAGE_STEP at a time ("Show more"), so a broad query over a
+  // large catalog doesn't mount thousands of cards at once.
+  const [visibleCount, setVisibleCount] = useState(PAGE_STEP);
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       setError(false);
       try {
-        // Firestore has no server-side substring/full-text search, so this
-        // still has to scan and filter client-side — the limit() just
-        // bounds the worst-case read cost as the catalog grows. A real fix
-        // would need a dedicated search index (e.g. Algolia), which is a
-        // separate initiative, not a one-line change.
-        const snapshot = await getDocs(
-          firestoreQuery(collection(db, "products"), limit(300))
-        );
-
         // An exact category-NAME query ("Grocery", "Men Fashion", …) is
         // resolved to its catalog node and matched against the product's stored
         // categoryId / subCategoryId — the SAME authoritative resolution the
@@ -101,32 +99,56 @@ const [quickColor, setQuickColor] = useState("");
           : undefined;
 
         const items = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          // Admin-blocked products must not appear in search results.
-          if (!isStorefrontVisible(data)) return;
+        let scanTruncated = false;
 
-          // Exact category-name search: match on the resolved catalog id, never
-          // on product-name/description text.
-          if (categoryNode) {
-            const matchesCategory = isTopLevelCategory(categoryNode)
-              ? data.categoryId === categoryNode.id
-              : data.subCategoryId === categoryNode.id ||
-                data.leafCategoryId === categoryNode.id;
-            if (matchesCategory) {
+        if (categoryNode) {
+          // Exact category-name search: ask Firestore for exactly that category's
+          // products by the resolved catalog id, never match product-name or
+          // description text — and never through a capped scan, so every product
+          // in the category is returned regardless of catalog size.
+          const field = isTopLevelCategory(categoryNode)
+            ? ["categoryId"]
+            : ["subCategoryId", "leafCategoryId"];
+          const snapshots = await Promise.all(
+            field.map((f) =>
+              getDocs(
+                firestoreQuery(
+                  collection(db, "products"),
+                  where(f, "==", categoryNode.id)
+                )
+              )
+            )
+          );
+          const seen = new Set();
+          snapshots.forEach((snapshot) =>
+            snapshot.forEach((doc) => {
+              if (seen.has(doc.id)) return;
+              seen.add(doc.id);
+              const data = doc.data();
+              // Admin-blocked products must not appear in search results.
+              if (!isStorefrontVisible(data)) return;
               items.push(toLegacyProduct(doc.id, data));
+            })
+          );
+        } else {
+          // Firestore has no server-side substring/full-text search, so a text
+          // query still matches in the browser. It used to scan only
+          // limit(300) documents, so a product outside that arbitrary first 300
+          // could never be found. The shared catalog scan pages through every
+          // product (cached, so Navbar suggestions and repeat searches reuse it).
+          const scan = await getVisibleCatalog();
+          scanTruncated = scan.truncated;
+          for (const { id, data } of scan.products) {
+            const searchText = `${data.title || data.name || ""} ${
+              data.shortTitle || ""
+            } ${data.brand || ""} ${data.description || ""}`.toLowerCase();
+
+            if (searchText.includes(lower)) {
+              items.push(toLegacyProduct(id, data));
             }
-            return;
           }
-
-          const searchText = `${data.title || data.name || ""} ${
-            data.shortTitle || ""
-          } ${data.brand || ""} ${data.description || ""}`.toLowerCase();
-
-          if (searchText.includes(lower)) {
-            items.push(toLegacyProduct(doc.id, data));
-          }
-        });
+        }
+        setTruncated(scanTruncated);
         setProducts(items);
       } catch (err) {
         console.error(err);
@@ -214,6 +236,7 @@ if (minimumDiscount > 0) {
     if (sort === "stock") items.sort((a, b) => b.stock - a.stock);
 
     setFiltered(items);
+    setVisibleCount(PAGE_STEP);
   }, [products, category, stockOnly, sort, minPrice, maxPrice, inStockOnly, sortBy, minimumRating,minimumDiscount,]);
   
 
@@ -251,6 +274,11 @@ if (minimumDiscount > 0) {
   <p className="mt-2 text-lg opacity-90">
     {filtered.length} product{filtered.length !== 1 ? "s" : ""} found
   </p>
+  {truncated && (
+    <p className="mt-1 text-sm opacity-90">
+      Results are limited to the first {CATALOG_MAX_PRODUCTS.toLocaleString("en-IN")} products.
+    </p>
+  )}
 </div>
 
      <ProductFilters
@@ -431,7 +459,7 @@ if (minimumDiscount > 0) {
           </div>
           ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
-            {filtered.map((product) => {
+            {filtered.slice(0, visibleCount).map((product) => {
               const hasMrp =
                 Number(product.mrp) && Number(product.mrp) > Number(product.price);
               const off = hasMrp
@@ -496,6 +524,16 @@ if (minimumDiscount > 0) {
                 </Link>
               );
             })}
+          </div>
+        )}
+        {!loading && !error && filtered.length > visibleCount && (
+          <div className="text-center mt-8">
+            <button
+              onClick={() => setVisibleCount((n) => n + PAGE_STEP)}
+              className="bg-white border rounded-xl px-8 py-3 font-semibold text-gray-700 hover:bg-gray-50 shadow-sm"
+            >
+              Show more ({filtered.length - visibleCount} more)
+            </button>
           </div>
         )}
         <div className="text-center py-10 text-gray-400">

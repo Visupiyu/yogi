@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import Link from "next/link";
 
-import { Heart, Star } from "lucide-react";
+import { Heart, Scale, Star } from "lucide-react";
 
 import { motion } from "framer-motion";
 
@@ -141,41 +143,52 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
 );
 
   };
-  const addToCompare = () => {
+  // Compare list: localStorage "compareProducts" (the list /compare renders),
+  // max 4. The button toggles — click to add, click again to remove — and its
+  // selected state is kept in sync across cards and tabs via "compareUpdated".
+  const MAX_COMPARE = 4;
+  const [inCompare, setInCompare] = useState(false);
 
-  const compare = JSON.parse(
-    localStorage.getItem("compareProducts") || "[]"
-  );
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const list = JSON.parse(localStorage.getItem("compareProducts") || "[]");
+        setInCompare(Array.isArray(list) && list.some((item: any) => item.id === id));
+      } catch {
+        setInCompare(false);
+      }
+    };
+    sync();
+    window.addEventListener("compareUpdated", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("compareUpdated", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [id]);
 
-  const exists = compare.find(
-    (item: any) => item.id === id
-  );
+  const toggleCompare = () => {
+    let compare: any[] = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem("compareProducts") || "[]");
+      if (Array.isArray(parsed)) compare = parsed;
+    } catch {
+      compare = [];
+    }
 
-  if (exists) {
-    alert("Product already added for comparison");
-    return;
-  }
+    if (compare.some((item) => item.id === id)) {
+      compare = compare.filter((item) => item.id !== id);
+    } else {
+      if (compare.length >= MAX_COMPARE) {
+        alert(`You can compare up to ${MAX_COMPARE} products only`);
+        return;
+      }
+      compare.push({ id, name, price, image, stock });
+    }
 
-  if (compare.length >= 4) {
-    alert("You can compare up to 4 products only");
-    return;
-  }
-
-  compare.push({
-    id,
-    name,
-    price,
-    image,
-    stock,
-  });
-
-  localStorage.setItem(
-    "compareProducts",
-    JSON.stringify(compare)
-  );
-
-  alert("Added to Compare");
-};
+    localStorage.setItem("compareProducts", JSON.stringify(compare));
+    window.dispatchEvent(new Event("compareUpdated"));
+  };
 
   return(
 
@@ -271,6 +284,23 @@ to-gray-50
           <Heart size={12} />
 
         </motion.button>
+
+        {/* COMPARE */}
+
+        <button
+          type="button"
+          onClick={toggleCompare}
+          aria-pressed={inCompare}
+          aria-label={inCompare ? "Remove from compare" : "Add to compare"}
+          title={inCompare ? "Remove from compare" : "Add to compare"}
+          className={`absolute top-12 right-2 w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center shadow-md hover:scale-110 transition ${
+            inCompare
+              ? "bg-green-600 text-white"
+              : "bg-white text-gray-700 hover:bg-green-600 hover:text-white"
+          }`}
+        >
+          <Scale size={12} />
+        </button>
 
      </motion.div>
 

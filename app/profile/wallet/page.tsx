@@ -9,10 +9,12 @@ import { useRouter } from "next/navigation";
 import { customerLoginUrl } from "@/lib/authRedirect";
 
 // Reward Wallet. From app/api/account/wallet:
-//   - the BALANCE is the stored users.rewardPoints — exactly what checkout
-//     spends. This page used to add up the history in the browser, which got
-//     cancellations backwards and missed some rows, so it could show a
-//     different number from the one checkout honoured;
+//   - the BALANCE is the stored users.rewardPoints. This page used to add up the
+//     history in the browser, which got cancellations backwards and missed some
+//     rows, so it could show a different number from the stored balance. Points
+//     are NOT spendable at checkout (/api/place-order and /api/create-order
+//     refuse redeemPoints), so this page must not imply a rupee value or a
+//     checkout discount;
 //   - PENDING points and why each is held, from the same rule the credit job
 //     applies (lib/rewardCredit);
 //   - the signed history, 50 entries at a time. No lifetime totals.
@@ -85,7 +87,7 @@ export default function RewardWalletPage() {
         <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-6 sm:p-8 rounded-3xl">
           <p className="opacity-90">🏆 Reward Wallet</p>
           <h1 className="text-4xl sm:text-5xl font-bold mt-2">{wallet?.balance ?? 0} points</h1>
-          <p className="mt-1 opacity-90">≈ ₹{wallet?.balance ?? 0} to spend at checkout</p>
+          <p className="mt-1 opacity-90">Points balance — kept safe in your wallet (not usable at checkout)</p>
           {wallet && wallet.pending.points > 0 && (
             <p className="mt-2 text-sm opacity-90">+ {wallet.pending.points} points pending</p>
           )}

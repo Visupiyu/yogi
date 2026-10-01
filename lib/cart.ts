@@ -71,6 +71,46 @@ function isSameLine(
   return item.size === target.size && item.color === target.color;
 }
 
+/**
+ * The single place a purchasable line is shaped (id, price, stock, qty, variant
+ * identity). Used by addToCart for the persistent cart and by Buy Now for its
+ * one-line checkout, so both produce identical lines. Pure: touches no storage.
+ */
+export function buildCartLine(
+  product: any,
+  options: AddToCartOptions
+): CartItem {
+  const addQty = Math.max(1, Math.floor(Number(options.qty)) || 1);
+  const rawStock = Number(product.stock);
+  const liveStock = Number.isFinite(rawStock) ? Math.max(0, rawStock) : null;
+
+  return {
+    id: product.id,
+    name: product.name ?? "",
+    // Prefer the caller-resolved effective unit price; fall back to the
+    // product's own price for callers that don't pass one. Display state
+    // only — the server re-prices from the product document at checkout.
+    price:
+      typeof options.unitPrice === "number" && options.unitPrice > 0
+        ? options.unitPrice
+        : product.price ?? 0,
+    mrp: product.mrp,
+    image: product.image,
+    stock: liveStock ?? 0,
+    qty: liveStock !== null && liveStock > 0 ? Math.min(addQty, liveStock) : addQty,
+    size: options.size,
+    color: options.color,
+    vendorId: product.vendorId ?? "",
+    vendorName: product.vendorName ?? "",
+    // Omitted entirely rather than written as undefined, so a line for a
+    // product with no variants stays byte-identical to what it was before.
+    ...(options.variantId ? { variantId: options.variantId } : {}),
+    ...(options.attributes && Object.keys(options.attributes).length > 0
+      ? { attributes: options.attributes }
+      : {}),
+  };
+}
+
 export function addToCart(
   product: any,
   options: AddToCartOptions
@@ -113,31 +153,7 @@ export function addToCart(
 
   } else {
 
-    cart.push({
-      id: product.id,
-      name: product.name ?? "",
-      // Prefer the caller-resolved effective unit price; fall back to the
-      // product's own price for callers that don't pass one. Display state
-      // only — the server re-prices from the product document at checkout.
-      price:
-        typeof options.unitPrice === "number" && options.unitPrice > 0
-          ? options.unitPrice
-          : product.price ?? 0,
-      mrp: product.mrp,
-      image: product.image,
-      stock: liveStock ?? 0,
-      qty: liveStock !== null && liveStock > 0 ? Math.min(addQty, liveStock) : addQty,
-      size: options.size,
-      color: options.color,
-      vendorId: product.vendorId ?? "",
-      vendorName: product.vendorName ?? "",
-      // Omitted entirely rather than written as undefined, so a line for a
-      // product with no variants stays byte-identical to what it was before.
-      ...(options.variantId ? { variantId: options.variantId } : {}),
-      ...(options.attributes && Object.keys(options.attributes).length > 0
-        ? { attributes: options.attributes }
-        : {}),
-    });
+    cart.push(buildCartLine(product, options));
 
   }
 
@@ -259,4 +275,25 @@ export function clearCart(): void {
     new Event("cartUpdated")
   );
 
+}
+
+/**
+ * Buy Now (product page) checks out ONE line from "checkoutItems" and marks it
+ * with checkoutSource="buyNow"; a cart checkout (app/cart) clears that marker.
+ * After an order is placed, a cart checkout empties the cart, but a Buy Now
+ * checkout only discards its own one-line list — the customer's cart is left
+ * exactly as it was.
+ */
+export function clearCheckoutAfterOrder(source?: string | null): void {
+  // `source` is what this checkout was STARTED as (captured when the checkout
+  // page loaded). Falling back to storage only covers callers that did not
+  // capture it; storage is shared between tabs, so another tab starting a Buy
+  // Now / cart checkout in the meantime must not change what THIS order clears.
+  const startedAs = source !== undefined ? source : localStorage.getItem("checkoutSource");
+  if (startedAs !== "buyNow") {
+    localStorage.removeItem("cart");
+  }
+  localStorage.removeItem("checkoutItems");
+  localStorage.removeItem("checkoutSource");
+  window.dispatchEvent(new Event("cartUpdated"));
 }

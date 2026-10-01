@@ -34,6 +34,7 @@ const SECTIONS: MenuSection[] = [
       { label: "My Profile", href: "/profile" },
       { label: "Orders", href: "/orders" },
       { label: "Wishlist", href: "/wishlist" },
+      { label: "Compare", href: "/compare" },
       { label: "Saved Addresses", href: "/addresses" },
       { label: "Notifications", href: "/notifications" },
     ],
@@ -118,6 +119,7 @@ export default function AccountMenu({ user }: { user: AccountUser | null }) {
     localStorage.removeItem("user");
     localStorage.removeItem("cart");
     localStorage.removeItem("checkoutItems");
+    localStorage.removeItem("checkoutSource");
     localStorage.removeItem("wishlist");
     // Keep the existing header event behavior so counts + user label reset.
     window.dispatchEvent(new Event("cartUpdated"));
@@ -235,6 +237,9 @@ export default function AccountMenu({ user }: { user: AccountUser | null }) {
                 </p>
                 <Link href="/wishlist" role="menuitem" onClick={close} className={itemClass}>
                   Wishlist
+                </Link>
+                <Link href="/compare" role="menuitem" onClick={close} className={itemClass}>
+                  Compare
                 </Link>
                 <Link href="/orders" role="menuitem" onClick={close} className={itemClass}>
                   Orders

@@ -9,7 +9,7 @@ import CustomersAlsoBought from "@/components/CustomersAlsoBought";
 import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
-import { addToCart as addToCartHelper } from "@/lib/cart";
+import { addToCart as addToCartHelper, buildCartLine, type AddToCartOptions } from "@/lib/cart";
 import { isProductVisible } from "@/lib/products/visibility";
 import {
   variantDimensions,
@@ -371,8 +371,11 @@ relatedSnap.forEach((d) => {
     });
   };
 
-   const addItemToCart = (): boolean => {
-  if (!product) return false;
+   // Validates the current selection and returns the cart options for it, or null
+  // (after telling the customer why). Shared by Add to Cart and Buy Now so both
+  // apply exactly the same variant / size / colour / stock checks.
+   const resolveCartOptions = (): AddToCartOptions | null => {
+  if (!product) return null;
 
   // An admin-blocked product must not enter the cart. Until now this was
   // caught only at checkout (computeOrderPricing / validateStock), so the
@@ -380,7 +383,7 @@ relatedSnap.forEach((d) => {
   // it was unavailable. Matches the server's own `active === false` test.
   if (!isProductVisible(product)) {
     alert("This product is currently unavailable.");
-    return false;
+    return null;
   }
 
   if (hasVariants) {
@@ -389,7 +392,7 @@ relatedSnap.forEach((d) => {
     if (!isSelectionComplete(variantList, selection)) {
       const missing = dimensions.filter((d) => !selection[d]);
       alert("Please select " + missing.join(" and ") + ".");
-      return false;
+      return null;
     }
 
     // Complete but unresolvable means the combination was never listed, or
@@ -397,7 +400,7 @@ relatedSnap.forEach((d) => {
     // an ambiguous variant — refuse rather than guess which one they meant.
     if (!selectedVariant) {
       alert("That combination isn't available. Please choose another.");
-      return false;
+      return null;
     }
 
     // The chosen variant may have sold out since the page loaded (another order
@@ -406,24 +409,24 @@ relatedSnap.forEach((d) => {
     // stock. The server re-checks and stays the final authority.
     if (!(Number(selectedVariant.stock) > 0)) {
       alert("This option is out of stock. Please choose another.");
-      return false;
+      return null;
     }
   } else {
     if (sizes.length > 0 && !selectedSize) {
       alert("Please select a size");
-      return false;
+      return null;
     }
 
     if (colors.length > 0 && !selectedColor) {
       alert("Please select a color");
-      return false;
+      return null;
     }
   }
 
   const attributes = variantAttributes(selectedVariant);
   const legacy = legacySizeColor(attributes);
 
-  return addToCartHelper(product, {
+  return {
     qty: quantity,
     // size/color stay populated for the dimensions they have always meant, so
     // existing cart, checkout and order displays keep working untouched.
@@ -436,18 +439,32 @@ relatedSnap.forEach((d) => {
     // main sellingPrice). Display state only — the server re-prices from the
     // product document at checkout, so a tampered value can never be charged.
     unitPrice: effectiveUnitPrice,
-  });
+  };
 };
+
+  const addItemToCart = (): boolean => {
+    const options = resolveCartOptions();
+    return !!options && !!product && addToCartHelper(product, options);
+  };
+
   const addToCart = () => {
     if (addItemToCart()) alert("Added To Cart");
   };
 
+  // Buy Now purchases ONLY this product/variant/quantity. It never reads or
+  // writes the cart: checkout takes its lines from "checkoutItems", so a
+  // one-line list is written there and the persistent cart stays untouched.
+  // "checkoutSource" tells checkout not to clear the cart after this order.
   const buyNow = () => {
-  if (!addItemToCart()) return;
-  const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-  localStorage.setItem("checkoutItems", JSON.stringify(cart));
-  router.push("/checkout");
-};
+    const options = resolveCartOptions();
+    if (!options || !product) return;
+    localStorage.setItem(
+      "checkoutItems",
+      JSON.stringify([buildCartLine(product, options)])
+    );
+    localStorage.setItem("checkoutSource", "buyNow");
+    router.push("/checkout");
+  };
 
   const addToWishlist = () => {if (!product) return;
     const wishlist: Product[] = JSON.parse(

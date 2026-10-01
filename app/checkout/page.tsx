@@ -1,5 +1,6 @@
 "use client";
 
+import { clearCheckoutAfterOrder } from "@/lib/cart";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ProductRecommendations from "@/components/ProductRecommendations";
@@ -85,6 +86,7 @@ export default function CheckoutPage() {
   // can fire again (e.g. token refresh), and addresses must load exactly once,
   // only after Firebase Auth restoration confirms a signed-in user.
   const addressesLoadedRef = useRef(false);
+  const checkoutSourceRef = useRef<string | null>(null);
 
   useEffect(() => {
     getShippingSettings().then((settings) => {
@@ -97,6 +99,10 @@ export default function CheckoutPage() {
       localStorage.getItem("checkoutItems") || "[]"
     );
     setItems(storedItems);
+    // How this checkout was started ("buyNow" = one product, cart left alone).
+    // Captured now so a later checkout in another tab can't change what this
+    // order's cleanup clears.
+    checkoutSourceRef.current = localStorage.getItem("checkoutSource");
 
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
     setName(userData.name || "");
@@ -383,9 +389,7 @@ setAddress(userData.address || "");
     // before this function runs — writing it here too would create a second,
     // redundant record for the same order.
 
-    localStorage.removeItem("cart");
-    localStorage.removeItem("checkoutItems");
-    window.dispatchEvent(new Event("cartUpdated"));
+    clearCheckoutAfterOrder(checkoutSourceRef.current);
   };
 
   const validateForm = () => {
@@ -483,9 +487,7 @@ setAddress(userData.address || "");
       // Firestore, and leaving a placed order sitting in the cart is its own
       // bug.
       if (data.alreadyPlaced) {
-        localStorage.removeItem("cart");
-        localStorage.removeItem("checkoutItems");
-        window.dispatchEvent(new Event("cartUpdated"));
+        clearCheckoutAfterOrder(checkoutSourceRef.current);
 
         alert(
           "This order has already been placed.\n\n" +
@@ -676,9 +678,7 @@ setAddress(userData.address || "");
               true
             );
           } else {
-            localStorage.removeItem("cart");
-            localStorage.removeItem("checkoutItems");
-            window.dispatchEvent(new Event("cartUpdated"));
+            clearCheckoutAfterOrder(checkoutSourceRef.current);
           }
 
           alert(

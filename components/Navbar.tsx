@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { ShoppingCart, Heart, User, Search } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { isProductVisible } from "@/lib/products/visibility";
+import { getVisibleCatalog } from "@/lib/storefront/catalogScan";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -147,33 +145,33 @@ useEffect(() => {
 
     const t = setTimeout(async () => {
       try {
-        const snapshot = await getDocs(collection(db, "products"));
+        // One shared, cached, paged read of the visible catalog (never a
+        // per-keystroke read of the whole collection, and no hidden cap).
+        // Already limited to customer-visible products.
+        const { products } = await getVisibleCatalog();
         const items: ProductSuggestion[] = [];
-        snapshot.forEach((doc) => {
-  const data = doc.data();
-  // Only customer-visible products may be suggested — never one pending
-  // review, rejected or blocked (lib/products/visibility.ts).
-  if (!isProductVisible(data)) return;
-  const fullTitle: string = data.title || data.name || "";
-  const shortTitle: string = data.shortTitle || "";
-  const q = trimmed.toLowerCase();
+        const q = trimmed.toLowerCase();
+        for (const { id, data } of products) {
+          const fullTitle: string = data.title || data.name || "";
+          const shortTitle: string = data.shortTitle || "";
 
-  if (
-    fullTitle.toLowerCase().includes(q) ||
-    shortTitle.toLowerCase().includes(q)
-  ) {
-    items.push({
-      id: doc.id,
-      name: shortTitle || fullTitle,
-      image:
-        data.thumbnail ||
-        (Array.isArray(data.images) ? data.images[0] : "") ||
-        data.image ||
-        "",
-      price: Number(data.sellingPrice ?? data.price ?? 0),
-    });
-  }
-});
+          if (
+            fullTitle.toLowerCase().includes(q) ||
+            shortTitle.toLowerCase().includes(q)
+          ) {
+            items.push({
+              id,
+              name: shortTitle || fullTitle,
+              image:
+                data.thumbnail ||
+                (Array.isArray(data.images) ? data.images[0] : "") ||
+                data.image ||
+                "",
+              price: Number(data.sellingPrice ?? data.price ?? 0),
+            });
+            if (items.length >= 5) break;
+          }
+        }
         setSuggestions(items.slice(0, 5));
         setShowSuggestions(true);
       } catch (error) {
