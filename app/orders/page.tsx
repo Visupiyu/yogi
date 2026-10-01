@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   collection,
+  doc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -14,6 +16,7 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { addToCart } from "@/lib/cart";
+import { planReorderLine } from "@/lib/cartReorder";
 import { ORDER_STEPS, getStep } from "@/lib/orderTracking";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 export default function OrdersPage() {
@@ -138,23 +141,52 @@ export default function OrdersPage() {
       console.log(error);
     }
   };
-  const reorderItems = (items: any[]) => {
-  items.forEach((item) => {
-    addToCart(item, {
-      qty: item.qty,
-      size: item.size,
-      color: item.color,
-      // Absent on older order items, which fall back to size/color exactly
-      // as before.
-      variantId: item.variantId,
-      attributes: item.attributes,
-    });
-  });
-  toast.success(
-  `${items.length} item(s) added to your cart.`
-);
-  router.push("/cart");
-};
+  const reorderingRef = useRef(false);
+  // Order again: every line is re-planned from the product's CURRENT document
+  // (lib/cartReorder.ts) — never from the old order item, which carries no
+  // stock and may have a stale price. A line whose product/variant is gone,
+  // out of stock, or now needs an option choice is skipped and reported; the
+  // rest are added. Nothing is added for a line that cannot be added correctly.
+  const reorderItems = async (items: any[]) => {
+    if (reorderingRef.current) return;
+    reorderingRef.current = true;
+    let added = 0;
+    const skipped: string[] = [];
+    try {
+      for (const item of Array.isArray(items) ? items : []) {
+        const label = item?.name || "An item";
+        try {
+          const snap = item?.id ? await getDoc(doc(db, "products", item.id)) : null;
+          const plan = planReorderLine(item, snap && snap.exists() ? snap.data() : null);
+          if (!plan.ok) {
+            skipped.push(
+              plan.reason === "needs-options"
+                ? `${label} (choose an option on the product page)`
+                : plan.reason === "option-unavailable"
+                ? `${label} (that option is no longer available)`
+                : plan.reason === "out-of-stock"
+                ? `${label} (out of stock)`
+                : `${label} (no longer available)`
+            );
+            continue;
+          }
+          if (addToCart(plan.product, plan.options)) added += 1;
+        } catch (error) {
+          console.error("Reorder line failed:", error);
+          skipped.push(`${label} (couldn't be checked)`);
+        }
+      }
+    } finally {
+      reorderingRef.current = false;
+    }
+    if (added > 0) {
+      toast.success(`${added} item(s) added to your cart.`);
+    }
+    if (skipped.length > 0) {
+      toast.error(`Not added: ${skipped.join("; ")}.`);
+    }
+    if (added > 0) router.push("/cart");
+  };
   const steps = ORDER_STEPS;
   if (loading) {
     return (

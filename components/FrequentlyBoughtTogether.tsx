@@ -5,6 +5,7 @@ import Link from "next/link";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { isProductVisible } from "@/lib/products/visibility";
+import { hasStockBearingVariants } from "@/lib/products/inventory";
 import Image from "next/image";
 
 type Product = {
@@ -14,6 +15,9 @@ type Product = {
   price: number;
   stock: number;
   category?: string;
+  // Stock lives on its variants (the server's own test): such a product can only
+  // be ordered with a chosen variantId, which this bundle has no way to pick.
+  needsOptions?: boolean;
 };
 
 type Props = {
@@ -59,6 +63,7 @@ export default function FrequentlyBoughtTogether({
                   : Number(data.price || 0),
               stock: Number(data.stock || 0),
               category: data.categoryId || "",
+              needsOptions: hasStockBearingVariants(data.variants),
             });
           }
         });
@@ -79,14 +84,23 @@ export default function FrequentlyBoughtTogether({
       localStorage.getItem("cart") || "[]"
     );
 
+    let needOptions = 0;
     products.forEach((product) => {
+      // A variant product cannot be added without a chosen variant (the server
+      // refuses the line) and this bundle never invents one — leave it for the
+      // customer to open and choose.
+      if (product.needsOptions) {
+        needOptions += 1;
+        return;
+      }
+      const { needsOptions: _needsOptions, ...line } = product;
       const exists = cart.find(
         (item: any) => item.id === product.id
       );
 
       if (!exists) {
         cart.push({
-          ...product,
+          ...line,
           qty: 1,
         });
       }
@@ -101,7 +115,11 @@ export default function FrequentlyBoughtTogether({
       new Event("cartUpdated")
     );
 
-    alert("Products added to cart");
+    alert(
+      needOptions > 0
+        ? `Products added to cart. ${needOptions} item(s) need an option (such as size or colour) — open them to choose.`
+        : "Products added to cart"
+    );
   };
 
   if (products.length === 0) {

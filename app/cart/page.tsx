@@ -81,9 +81,14 @@ export default function CartPage() {
               ? variantPrice
               : sellingPrice;
 
+          // A variant line is capped by ITS OWN stock — the product-level figure is
+          // the sum across every variant and would let the + button run past it.
+          const variantStock = variant ? Number((variant as any).stock) : NaN;
           return {
             ...item,
-            stock: Number(data.stock ?? 0),
+            stock: Number.isFinite(variantStock)
+              ? variantStock
+              : Number(data.stock ?? 0),
             price: effectivePrice,
           };
         })
@@ -119,11 +124,14 @@ export default function CartPage() {
       ? item.qty + 1
       : item.qty - 1;
 
+  // variantId is part of a line's identity (lib/cart.ts isSameLine): without it a
+  // variant line never matches and the quantity silently does not change.
   updateCartQuantity(
     item.id,
     newQty,
     item.size,
-    item.color
+    item.color,
+    item.variantId
   );
 
   setCart(getCartItems());

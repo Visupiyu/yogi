@@ -91,12 +91,25 @@ export function addToCart(
     })
   );
 
+  // Quantity/stock are sanitised once here so no caller can write a NaN, zero or
+  // negative quantity into the cart. `product.stock` is the CURRENT stock when
+  // the caller has the product (product page, Quick View, reorder); a caller
+  // that has none (undefined/NaN) simply gets no cap here — the cart page and the
+  // server still enforce stock — instead of Math.min(..., undefined) === NaN.
+  const addQty = Math.max(1, Math.floor(Number(options.qty)) || 1);
+  const rawStock = Number(product.stock);
+  const liveStock = Number.isFinite(rawStock) ? Math.max(0, rawStock) : null;
+
   if (index > -1) {
 
-    cart[index].qty = Math.min(
-      cart[index].qty + options.qty,
-      product.stock
+    const merged = cart[index].qty + addQty;
+    cart[index].qty = Math.max(
+      1,
+      liveStock !== null ? Math.min(merged, liveStock) : merged
     );
+    // Keep the stored stock current so the cart's + button caps on today's
+    // figure, not the one captured when the line was first added.
+    if (liveStock !== null) cart[index].stock = liveStock;
 
   } else {
 
@@ -112,8 +125,8 @@ export function addToCart(
           : product.price ?? 0,
       mrp: product.mrp,
       image: product.image,
-      stock: product.stock ?? 0,
-      qty: options.qty,
+      stock: liveStock ?? 0,
+      qty: liveStock !== null && liveStock > 0 ? Math.min(addQty, liveStock) : addQty,
       size: options.size,
       color: options.color,
       vendorId: product.vendorId ?? "",
@@ -198,9 +211,14 @@ export function updateCartQuantity(
     if (isSameLine(item, { id, variantId, size, color })) {
       return {
         ...item,
+        // A stored line without a numeric stock (older carts, bundle adds) must
+        // not turn the quantity into NaN: with no usable cap the requested
+        // quantity stands (the server still enforces stock at checkout).
         qty: Math.max(
           1,
-          Math.min(qty, item.stock)
+          Number.isFinite(Number(item.stock))
+            ? Math.min(Math.floor(Number(qty)) || 1, Number(item.stock))
+            : Math.floor(Number(qty)) || 1
         ),
       };
     }

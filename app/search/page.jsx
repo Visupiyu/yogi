@@ -2,11 +2,12 @@
 
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { collection, getDocs, limit, query as firestoreQuery } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import ProductFilters from "@/components/ProductFilters";
 import { addToCart as addToCartHelper } from "@/lib/cart";
+import { hasStockBearingVariants } from "@/lib/products/inventory";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 import { toLegacyProduct, isStorefrontVisible } from "@/lib/products/legacyDisplay";
 
@@ -27,6 +28,7 @@ const CATEGORIES = [
 ];
 
 function SearchContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const query = searchParams.get("q") || "";
 
@@ -227,6 +229,14 @@ if (minimumDiscount > 0) {
     setMaxPrice(1000000);
   };
   const quickChips = ["Shoes", "Mobiles", "Beauty", "Grocery", "Fashion"];
+
+  // Quick View has no variant picker. For a product whose stock lives on its
+  // variants (the server's own test, lib/orderPricing.ts) it must not add a line
+  // — the server refuses a variant product's line without a variantId, and the
+  // client never invents one. Those products send the customer to the product
+  // page, where the real option selection lives.
+  const quickNeedsOptions =
+    !!quickViewProduct && hasStockBearingVariants(quickViewProduct.variants);
 
   return (
     <section className="py-8 px-4 bg-gray-50 min-h-screen">
@@ -589,6 +599,7 @@ Contact Support
   </p>
 
 </div>
+{!quickNeedsOptions && (
 <div className="mt-6">
 
   <p className="font-semibold mb-2">
@@ -627,7 +638,8 @@ Contact Support
   </div>
 
 </div>
-{quickViewProduct.sizes &&
+)}
+{!quickNeedsOptions && quickViewProduct.sizes &&
   quickViewProduct.sizes.filter((s) => s?.trim()).length > 0 && (
     <div className="mt-6">
 
@@ -659,7 +671,7 @@ Contact Support
 
     </div>
 )}
-{quickViewProduct.colors &&
+{!quickNeedsOptions && quickViewProduct.colors &&
   quickViewProduct.colors.filter((c) => c?.trim()).length > 0 && (
     <div className="mt-6">
 
@@ -693,6 +705,17 @@ Contact Support
 )}
 
           <div className="mt-6 flex gap-3">
+          {quickNeedsOptions ? (
+          <button
+            onClick={() => {
+              setShowQuickView(false);
+              router.push(`/product/${quickViewProduct.id}`);
+            }}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold"
+          >
+            Choose options →
+          </button>
+          ) : (
           <button
   onClick={() => {
 
@@ -730,6 +753,7 @@ Contact Support
 >
   🛒 Add to Cart
 </button>
+          )}
             <button
               onClick={() => {
                 if (!quickViewProduct) return;

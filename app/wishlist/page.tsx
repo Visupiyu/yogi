@@ -2,14 +2,20 @@
 
 import {
   useEffect,
+  useRef,
   useState,
 } from "react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { hasStockBearingVariants } from "@/lib/products/inventory";
+import { isProductVisible } from "@/lib/products/visibility";
 
 export default function WishlistPage() {
+
+  const router = useRouter();
 
   const [wishlist, setWishlist] =
     useState<any[]>([]);
@@ -90,11 +96,63 @@ export default function WishlistPage() {
 
   /* MOVE TO CART */
 
-  const moveToCart = (
+  // The live-product check below is async, so a second tap while it is in
+  // flight would otherwise add the product twice.
+  const movingRef = useRef(false);
+
+  const moveToCart = async (item: any) => {
+    if (movingRef.current) return;
+    movingRef.current = true;
+    try {
+      await moveToCartCore(item);
+    } finally {
+      movingRef.current = false;
+    }
+  };
+
+  const moveToCartCore = async (
     item: any
   ) => {
 
     if (item.stock <= 0) {
+      return;
+    }
+
+    // A wishlist entry is a PRODUCT, not a chosen variant (the heart on a card or
+    // the product page never records a selection), so for a product whose stock
+    // lives on its variants there is nothing to say WHICH variant to add — and
+    // the server refuses a variant product's line without a variantId. Check the
+    // live product (the saved snapshot may predate the variants) and, for those
+    // products, send the customer to pick an option instead of adding a line
+    // that would fail at checkout. No variant is ever guessed.
+    let live: any;
+    try {
+      const liveSnap = await getDoc(doc(db, "products", item.id));
+      if (!liveSnap.exists() || !isProductVisible(liveSnap.data())) {
+        alert("This product is no longer available.");
+        return;
+      }
+      live = liveSnap.data();
+    } catch (error) {
+      console.error("Wishlist: could not check product:", error);
+      alert("Couldn't check this product right now. Please try again.");
+      return;
+    }
+
+    if (hasStockBearingVariants(live.variants)) {
+      alert(
+        "This product has options (such as size or colour). Please choose one on the product page."
+      );
+      router.push(`/product/${item.id}`);
+      return;
+    }
+
+    const liveStock = Number.isFinite(Number(live.stock))
+      ? Number(live.stock)
+      : Number(item.stock);
+
+    if (liveStock <= 0) {
+      alert("This product is out of stock.");
       return;
     }
 
@@ -117,7 +175,7 @@ export default function WishlistPage() {
 
   cart[exists].qty <
 
-  item.stock
+  liveStock
 
 ){
 
@@ -138,7 +196,7 @@ export default function WishlistPage() {
   item.vendorId,
 
 stock:
-  item.stock,
+  liveStock,
 
       });
 
