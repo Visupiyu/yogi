@@ -1,6 +1,9 @@
 "use client";
 
 import { clearCheckoutAfterOrder } from "@/lib/cart";
+import { payableTotal } from "@/lib/checkoutTotals";
+import { EMPTY_ADDRESS_FORM, validateAddressForm } from "@/lib/addressForm";
+import LoadErrorState from "@/components/LoadErrorState";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ProductRecommendations from "@/components/ProductRecommendations";
@@ -41,9 +44,6 @@ export default function CheckoutPage() {
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
   // Saved structured addresses (source of truth: the `addresses` collection).
   // `name`/`phone`/`address` above are derived from the SELECTED one and remain
   // the snapshot sent to the order — the existing order API contract is unchanged.
@@ -62,12 +62,22 @@ export default function CheckoutPage() {
   };
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  // Delivery details come ONLY from the selected saved address. localStorage's
+  // cached "user" is never an address source here (it can be stale, belong to a
+  // previous order's recipient, or be missing entirely).
+  const [addressStatus, setAddressStatus] = useState<"loading" | "ready" | "error">("loading");
+  // `coupon` is only the text box. `appliedCode` is the code that was actually
+  // validated and is the ONLY coupon ever sent to the server, so editing the box
+  // can never leave a discount for one code attached to another.
   const [coupon, setCoupon] = useState("");
+  const [appliedCode, setAppliedCode] = useState<string | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const couponRequestRef = useRef(false);
   const [shipping, setShipping] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState(PAY_ON_DELIVERY_METHOD);
   const [deliveryDate, setDeliveryDate] = useState("");
   const [discount, setDiscount] = useState(0);
-  const [couponApplied, setCouponApplied] = useState(false);
+  const couponApplied = appliedCode !== null;
   const [FREE_SHIPPING_THRESHOLD, setFreeShippingThreshold] = useState(
     DEFAULT_FREE_SHIPPING_THRESHOLD
   );
@@ -104,10 +114,6 @@ export default function CheckoutPage() {
     // order's cleanup clears.
     checkoutSourceRef.current = localStorage.getItem("checkoutSource");
 
-    const userData = JSON.parse(localStorage.getItem("user") || "{}");
-    setName(userData.name || "");
-setPhone(userData.phone || "");
-setAddress(userData.address || "");
 
     // Reward balance must come from Firestore, not the cached localStorage
     // value — that's trivially editable client-side and was never actually
@@ -145,7 +151,11 @@ setAddress(userData.address || "");
   // YOMICO Points are not spent at checkout (Rewards B1) — /api/place-order and
   // /api/create-order refuse redeemPoints, so the total never includes a
   // points discount.
-  const grandTotal = Math.max(0, finalAmount + shipping);
+  // Same rounding / ₹1 floor the server charges with (lib/checkoutTotals.ts).
+  const grandTotal = payableTotal(total, discount, shipping);
+  // The discount actually taken off the displayed payable, so the lines add up
+  // to the rounded total with no fractional rupee.
+  const displayedDiscount = discount > 0 ? Math.max(0, total + shipping - grandTotal) : 0;
   const commission = Math.round(grandTotal * commissionRate);
 
   // Shipping + delivery date recompute whenever the amount changes, or once
@@ -174,6 +184,10 @@ setAddress(userData.address || "");
   }, [total, finalAmount, FREE_SHIPPING_THRESHOLD, SHIPPING_FEE]);
 
   const applyCoupon = async () => {
+    // Ref, not state: a second click in the same tick (before React re-renders
+    // the disabled button) must not start a second request.
+    if (couponRequestRef.current) return;
+
     if (couponApplied) {
       alert("Coupon already applied");
       return;
@@ -185,9 +199,15 @@ setAddress(userData.address || "");
       return;
     }
 
-    try {
-      const code = coupon.trim().toUpperCase();
+    const code = coupon.trim().toUpperCase();
+    if (!code) {
+      alert("Enter a coupon code.");
+      return;
+    }
 
+    couponRequestRef.current = true;
+    setCouponLoading(true);
+    try {
       const q = query(
         collection(db, "coupons"),
         where("code", "==", code)
@@ -225,11 +245,32 @@ setAddress(userData.address || "");
       }
 
       setDiscount(evaluated.discountAmount);
-      setCouponApplied(true);
+      setAppliedCode(code);
       alert(`${evaluated.percent}% discount applied`);
     } catch (error) {
       console.error(error);
       alert("Coupon check failed");
+    } finally {
+      couponRequestRef.current = false;
+      setCouponLoading(false);
+    }
+  };
+
+  // Clears the applied coupon completely: the code sent to the server, the
+  // discount on screen, and the text box.
+  const removeCoupon = () => {
+    setAppliedCode(null);
+    setDiscount(0);
+    setCoupon("");
+  };
+
+  // Typing a different code than the one applied invalidates it immediately —
+  // Apply must be pressed again before the new text counts.
+  const onCouponChange = (value: string) => {
+    setCoupon(value);
+    if (appliedCode !== null && value.trim().toUpperCase() !== appliedCode) {
+      setAppliedCode(null);
+      setDiscount(0);
     }
   };
   // Flatten a structured address into the single string the order API expects.
@@ -246,27 +287,20 @@ setAddress(userData.address || "");
       .join(", ");
   }
 
-  // Apply a chosen address to the order snapshot fields (name/phone/address).
-  function applyAddress(a: SavedAddress) {
-    setName(a.fullName || "");
-    setPhone(a.phone || "");
-    setAddress(flattenAddress(a));
-  }
-
   function selectAddress(id: string) {
-    const a = savedAddresses.find((x) => x.id === id);
-    if (!a) return;
+    if (!savedAddresses.some((x) => x.id === id)) return;
     setSelectedAddressId(id);
-    applyAddress(a);
   }
 
   // Loads ALL of the customer's saved addresses (single-field userEmail query —
   // no composite index) and preselects one: an address just added from checkout
-  // (?newAddress=<id>), else the default, else the first.
+  // (?newAddress=<id>), else the default, else the first. A failure is shown
+  // (with Retry) — it never falls back to cached data.
   async function loadAddresses() {
+    setAddressStatus("loading");
     try {
-     const firebaseUser = auth.currentUser;
-     if (!firebaseUser?.email) return;
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser?.email) throw new Error("no signed-in email");
 
       const snapshot = await getDocs(
         query(collection(db, "addresses"), where("userEmail", "==", firebaseUser.email))
@@ -276,7 +310,11 @@ setAddress(userData.address || "");
         ...(d.data() as Omit<SavedAddress, "id">),
       }));
       setSavedAddresses(list);
-      if (list.length === 0) return;
+      setAddressStatus("ready");
+      if (list.length === 0) {
+        setSelectedAddressId("");
+        return;
+      }
 
       const paramId =
         typeof window !== "undefined"
@@ -288,11 +326,43 @@ setAddress(userData.address || "");
         list[0];
 
       setSelectedAddressId(chosen.id);
-      applyAddress(chosen);
     } catch (error) {
       console.error(error);
+      setSavedAddresses([]);
+      setSelectedAddressId("");
+      setAddressStatus("error");
     }
   }
+
+  // The one address this order will ship to — null until addresses have loaded
+  // and one is selected (or if the selection no longer exists).
+  const selectedAddress =
+    addressStatus === "ready"
+      ? savedAddresses.find((a) => a.id === selectedAddressId) ?? null
+      : null;
+
+  // Same rules as the address form (10-digit phone, 6-digit pincode, required
+  // fields). Null when the selected address can be shipped to.
+  const selectedAddressProblem = selectedAddress
+    ? validateAddressForm({
+        ...EMPTY_ADDRESS_FORM,
+        fullName: String(selectedAddress.fullName ?? ""),
+        phone: String(selectedAddress.phone ?? ""),
+        addressLine1: String(selectedAddress.addressLine1 ?? ""),
+        addressLine2: String(selectedAddress.addressLine2 ?? ""),
+        landmark: String(selectedAddress.landmark ?? ""),
+        city: String(selectedAddress.city ?? ""),
+        state: String(selectedAddress.state ?? ""),
+        pincode: String(selectedAddress.pincode ?? ""),
+      })
+    : null;
+
+  // Name / phone / address snapshot sent with the order — derived from the
+  // selected saved address only.
+  const deliveryName = (selectedAddress?.fullName ?? "").trim();
+  const deliveryPhone = (selectedAddress?.phone ?? "").trim();
+  const deliveryAddress = selectedAddress ? flattenAddress(selectedAddress) : "";
+  const canSubmitOrder = !!selectedAddress && !selectedAddressProblem;
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -350,7 +420,7 @@ setAddress(userData.address || "");
           Authorization: `Bearer ${emailIdToken}`,
         },
         body: JSON.stringify({
-          customerName: name,
+          customerName: deliveryName,
           orderId,
           total: grandTotal,
         }),
@@ -380,9 +450,9 @@ setAddress(userData.address || "");
     // firestore.rules now forbids any client write to users.rewardPoints, so
     // re-adding a browser write here would simply be denied.
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    user.name = name; user.phone = phone; user.address = address;
-    localStorage.setItem("user", JSON.stringify(user));
+    // The shipping recipient is order/address data only. The cached "user" is the
+    // ACCOUNT's identity (Navbar / AccountMenu read it), so it is deliberately not
+    // touched here — a gift order to "Mom" must not rename the account.
 
     // couponRedemptions is claimed server-side, inside the order transaction
     // (/api/place-order for Pay on Delivery, lib/onlineOrder.ts for Razorpay),
@@ -393,12 +463,22 @@ setAddress(userData.address || "");
   };
 
   const validateForm = () => {
-    if (!name.trim() || !phone.trim() || !address.trim()) {
-      alert("Fill all checkout fields");
+    if (addressStatus === "loading") {
+      alert("Your saved addresses are still loading. Please wait a moment.");
       return false;
     }
-    if (!/^\d{10}$/.test(phone)) {
-      alert("Enter valid 10 digit phone number");
+    if (addressStatus === "error") {
+      alert("We couldn't load your saved addresses. Please tap Retry in the Delivery Address section.");
+      return false;
+    }
+    if (!selectedAddress) {
+      alert("Please select or add a valid delivery address.");
+      return false;
+    }
+    if (selectedAddressProblem) {
+      alert(
+        `${selectedAddressProblem}\n\nThe selected address needs to be updated — tap "Edit this address", or choose or add another address.`
+      );
       return false;
     }
     if (items.length === 0) {
@@ -455,11 +535,11 @@ setAddress(userData.address || "");
             color: item.color || "",
             variantId: item.variantId,
           })),
-          couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
+          couponCode: appliedCode,
           paymentMethod: "PAY_ON_DELIVERY_UPI",
-          customerName: name,
-          phone,
-          address,
+          customerName: deliveryName,
+          phone: deliveryPhone,
+          address: deliveryAddress,
           idempotencyKey: codIdempotencyKey.current,
         }),
       });
@@ -586,14 +666,14 @@ setAddress(userData.address || "");
         color: item.color || "",
         variantId: item.variantId,
       })),
-        couponCode: couponApplied && coupon ? coupon.trim().toUpperCase() : null,
+        couponCode: appliedCode,
         // Delivery details are user input, not money. The server stores them
         // with the priced intent so finalisation — and the webhook, which has
         // no session at all — can build the order without the browser
         // supplying anything financial afterwards.
-        customerName: name,
-        phone,
-        address,
+        customerName: deliveryName,
+        phone: deliveryPhone,
+        address: deliveryAddress,
       }),
     });
     const data = await response.json();
@@ -887,10 +967,19 @@ setAddress(userData.address || "");
 <p className="text-gray-500 mb-6">
 Select a delivery address for this order.
 </p>
-              {savedAddresses.length === 0 ? (
+              {addressStatus === "loading" ? (
+                <div className="text-center text-gray-500 py-8">
+                  Loading your saved addresses…
+                </div>
+              ) : addressStatus === "error" ? (
+                <LoadErrorState
+                  message="We couldn't load your saved addresses. Please check your connection and try again."
+                  onRetry={() => void loadAddresses()}
+                />
+              ) : savedAddresses.length === 0 ? (
                 <div className="text-center border border-dashed border-gray-300 rounded-2xl py-8 px-4">
                   <p className="text-gray-500 mb-4">
-                    You have no saved addresses yet.
+                    You have no saved addresses yet. Add a delivery address to place your order.
                   </p>
                   <Link
                     href="/addresses/add?returnTo=checkout"
@@ -949,6 +1038,18 @@ Select a delivery address for this order.
                     );
                   })}
 
+                  {selectedAddress && selectedAddressProblem && (
+                    <div role="alert" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+                      <p className="font-semibold">This address needs to be updated.</p>
+                      <p className="mt-1">{selectedAddressProblem}</p>
+                      <Link
+                        href={`/addresses/edit/${selectedAddress.id}`}
+                        className="inline-block mt-2 font-semibold text-green-700 hover:underline"
+                      >
+                        Edit this address
+                      </Link>
+                    </div>
+                  )}
                   <Link
                     href="/addresses/add?returnTo=checkout"
                     className="inline-block text-green-700 font-semibold hover:underline mt-1"
@@ -1099,17 +1200,34 @@ Easy Returns
                     type="text"
                     placeholder="🎟 Coupon code"
                     value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    className="flex-1 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
+                    onChange={(e) => onCouponChange(e.target.value)}
+                    disabled={couponLoading}
+                    className="flex-1 min-w-0 border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-50"
                   />
-                  <button
-                    onClick={applyCoupon}
-                    disabled={couponApplied}
-                    className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-5 rounded-xl font-semibold transition"
-                  >
-                    {couponApplied ? "Applied" : "Apply"}
-                  </button>
+                  {couponApplied ? (
+                    <button
+                      type="button"
+                      onClick={removeCoupon}
+                      className="border border-red-300 text-red-600 hover:bg-red-50 px-5 rounded-xl font-semibold transition"
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={applyCoupon}
+                      disabled={couponLoading}
+                      className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-5 rounded-xl font-semibold transition"
+                    >
+                      {couponLoading ? "Checking…" : "Apply"}
+                    </button>
+                  )}
                 </div>
+                {couponApplied && (
+                  <p className="mt-2 text-xs text-green-700 font-semibold">
+                    Coupon {appliedCode} applied.
+                  </p>
+                )}
                 <p className="mt-2 text-xs text-gray-400">
                 💡 Enter a valid coupon code to receive available discounts.
                 </p>
@@ -1122,10 +1240,10 @@ Easy Returns
                   <span>₹{total.toLocaleString("en-IN")}</span>
                 </div>
 
-                {discount > 0 && (
+                {displayedDiscount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Coupon discount</span>
-                    <span>- ₹{discount.toLocaleString("en-IN")}</span>
+                    <span>- ₹{displayedDiscount.toLocaleString("en-IN")}</span>
                   </div>
                 )}
 
@@ -1154,7 +1272,7 @@ Easy Returns
 
               <button
                 onClick={handlePlaceOrder}
-                disabled={loading}
+                disabled={loading || !canSubmitOrder}
                 className="w-full mt-6 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-4 rounded-2xl font-bold text-lg transition"
               >
                 {loading
@@ -1164,6 +1282,17 @@ Easy Returns
                   : "🔒 Place Secure Order"}
               </button>
 
+              {!canSubmitOrder && !loading && (
+                <p role="status" className="text-center text-sm text-amber-700 mt-3">
+                  {addressStatus === "loading"
+                    ? "Loading your saved addresses…"
+                    : addressStatus === "error"
+                    ? "Retry loading your addresses to continue."
+                    : selectedAddressProblem
+                    ? "Update the selected address to continue."
+                    : "Select or add a delivery address to continue."}
+                </p>
+              )}
               <p className="text-center text-xs text-gray-400 mt-3">
                 🔒 100% secure &amp; encrypted checkout
               </p>
