@@ -461,7 +461,10 @@ export default function CheckoutPage() {
   const deliveryPhone = (selectedAddress?.phone ?? "").trim();
   const deliveryAddress = selectedAddress ? flattenAddress(selectedAddress) : "";
   const canSubmitOrder =
-    !!selectedAddress && !selectedAddressProblem && lineCheck.status === "ok";
+    items.length > 0 &&
+    !!selectedAddress &&
+    !selectedAddressProblem &&
+    lineCheck.status === "ok";
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -591,7 +594,7 @@ export default function CheckoutPage() {
       return false;
     }
     if (items.length === 0) {
-      alert("Cart is empty");
+      alert("Your checkout is empty. Add items from your cart to continue.");
       return false;
     }
     return true;
@@ -671,7 +674,10 @@ export default function CheckoutPage() {
       const data = await response.json();
 
       if (!response.ok || data.error || !data.orderId) {
-        alert(data.error || "Order Failed");
+        alert(
+          data.error ||
+            "We couldn't place your order. You haven't been charged. Please review your details and try again, or contact support if it keeps happening."
+        );
         return;
       }
 
@@ -693,11 +699,8 @@ export default function CheckoutPage() {
       if (data.alreadyPlaced) {
         clearCheckoutAfterOrder(checkoutSourceRef.current);
 
-        alert(
-          "This order has already been placed.\n\n" +
-            `Amount to Pay: ₹${paymentAmount.toLocaleString("en-IN")}`
-        );
-        window.location.href = "/orders";
+        // The order page shows the confirmation (?placed=) with its number.
+        window.location.href = `/orders/${encodeURIComponent(data.orderId)}?placed=already`;
         return;
       }
 
@@ -706,16 +709,18 @@ export default function CheckoutPage() {
       // and wrote the ledger rows atomically with the order.
       await applyPostOrderEffects(firebaseUser, data.orderId, "Pending", true);
 
-      alert(
-        "🎉 Your Order is Confirmed!\n\n" +
-          "Payment: Pay on Delivery (UPI Only)\n" +
-          `Amount to Pay: ₹${paymentAmount.toLocaleString("en-IN")}\n\n` +
-          "Please pay the exact amount by UPI when your order arrives."
-      );
-      window.location.href = "/orders";
+      // Confirmation (number, amount to pay, View Order) is shown on the order
+      // page itself rather than in a blocking alert.
+      window.location.href = `/orders/${encodeURIComponent(data.orderId)}?placed=cod`;
     } catch (error) {
       console.error("Checkout Error:", error);
-      alert("Order Failed");
+      // The request may have reached the server before the connection dropped, so
+      // don't promise either outcome — point at My Orders and say retry is safe
+      // (the same idempotency key is reused, so it cannot create a second order).
+      alert(
+        "We couldn't confirm whether your order was placed because the connection dropped.\n\n" +
+          "Please check My Orders first. If it isn't there, tap Place Secure Order again — retrying is safe and won't create a duplicate."
+      );
     } finally {
       setLoading(false);
     }
@@ -744,7 +749,7 @@ export default function CheckoutPage() {
     localStorage.removeItem("checkoutSource");
   }
 
-  const startOnlinePayment = async () => {
+  const startOnlinePayment = async (): Promise<boolean> => {
     // Set immediately, before any validation/network work, so a second
     // click can't re-enter this function while the first click is still
     // validating/creating the order — every exit path below must reset
@@ -753,12 +758,12 @@ export default function CheckoutPage() {
 
     if (!validateForm()) {
       setLoading(false);
-      return;
+      return false;
     }
 
     if (!(await lineChecksPass())) {
       setLoading(false);
-      return;
+      return false;
     }
 
     // Must check login BEFORE opening Razorpay, not after payment succeeds
@@ -769,7 +774,7 @@ export default function CheckoutPage() {
       alert("Please login again.");
       router.push(customerLoginUrl());
       setLoading(false);
-      return;
+      return false;
     }
 
     // Same reasoning as the login check above: a blocked customer can
@@ -780,22 +785,28 @@ export default function CheckoutPage() {
     if (payingUserSnap.exists() && payingUserSnap.data().status === "Blocked") {
       alert("Your account has been blocked. Please contact support.");
       setLoading(false);
-      return;
+      return false;
     }
 
-      if (!(await validateStock())) { setLoading(false); return; }
+      if (!(await validateStock())) { setLoading(false); return false; }
 
     const res: any = await loadRazorpayScript();
     if (!res) {
-      alert("Razorpay failed");
+      alert(
+        "We couldn't load the secure payment window. Please check your connection and try again, or choose Pay on Delivery."
+      );
       setLoading(false);
-      return;
+      return false;
     }
 
     if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY) {
-      alert("Razorpay Key Missing");
+      // Configuration problem — logged for the team, not described to the customer.
+      console.error("Online payment unavailable: NEXT_PUBLIC_RAZORPAY_KEY is not set.");
+      alert(
+        "Online payment isn't available right now. Please choose Pay on Delivery, or try again later."
+      );
       setLoading(false);
-      return;
+      return false;
     }
 
     const idToken = await payingUser.getIdToken();
@@ -833,7 +844,7 @@ export default function CheckoutPage() {
     if (!response.ok || data.error) {
       alert(data.error || "Couldn't start payment. Please try again.");
       setLoading(false);
-      return;
+      return false;
     }
 
     const options = {
@@ -909,23 +920,22 @@ export default function CheckoutPage() {
             clearCheckoutAfterOrder(checkoutSourceRef.current);
           }
 
-          alert(
-            finalizeData.alreadyPlaced
-              ? "This order has already been placed."
-              : "Order Placed Successfully"
-          );
-          window.location.href = "/orders";
+          window.location.href = `/orders/${encodeURIComponent(finalizeData.orderId)}?placed=${
+            finalizeData.alreadyPlaced ? "already" : "online"
+          }`;
         } catch (error) {
           console.error("Checkout Error:", error);
           handlePaymentUnconfirmed(rzp);
         } finally {
           setLoading(false);
+          onlineBusyRef.current = false;
         }
       },
       modal: {
         ondismiss: function () {
           setLoading(false);
-          alert("Payment Cancelled");
+          onlineBusyRef.current = false;
+          alert("Payment cancelled — you haven't been charged. You can try again whenever you're ready.");
         },
       },
       theme: { color: "#16a34a" },
@@ -933,6 +943,7 @@ export default function CheckoutPage() {
 
     const paymentObject = new (window as any).Razorpay(options);
     paymentObject.open();
+    return true;
   };
 
   // Wraps everything that runs BEFORE the Razorpay modal opens (blocked-account
@@ -942,13 +953,24 @@ export default function CheckoutPage() {
   // disabled until a reload, with an unhandled rejection and no message. The
   // payment steps themselves are unchanged; once the modal is open the handler
   // below owns its own error handling and loading state.
+  // Synchronous in-flight guard for the whole online attempt — from the click
+  // until the payment window is dismissed or the payment handler finishes. State
+  // (`loading`) alone can let several clicks in the same JS task through, and
+  // every one of them would create its own payment intent. It is released on any
+  // path where the Razorpay window never opened.
+  const onlineBusyRef = useRef(false);
+
   const payNow = async () => {
+    if (onlineBusyRef.current) return;
+    onlineBusyRef.current = true;
     try {
-      await startOnlinePayment();
+      const opened = await startOnlinePayment();
+      if (!opened) onlineBusyRef.current = false;
     } catch (error) {
       console.error("Pay Now failed before payment opened:", error);
       alert("Couldn't start payment. Please check your connection and try again.");
       setLoading(false);
+      onlineBusyRef.current = false;
     }
   };
   const handlePlaceOrder = () => {
@@ -1092,6 +1114,29 @@ export default function CheckoutPage() {
           ))}
         </div>
 
+        {lineCheck.status === "ok" && items.length === 0 && (
+          <div role="status" className="mb-6 rounded-2xl border border-gray-200 bg-white p-8 text-center">
+            <div className="text-5xl mb-3">🛒</div>
+            <h2 className="text-xl font-bold">Your checkout is empty</h2>
+            <p className="mt-1 text-gray-500">
+              There is nothing to pay for. Add items to your cart, or keep browsing.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <Link
+                href="/cart"
+                className="rounded-xl bg-green-600 px-6 py-3 font-semibold text-white hover:bg-green-700"
+              >
+                Go to Cart
+              </Link>
+              <Link
+                href="/"
+                className="rounded-xl border border-gray-300 px-6 py-3 font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Continue shopping
+              </Link>
+            </div>
+          </div>
+        )}
         {lineCheck.status === "checking" && items.length > 0 && (
           <p role="status" className="mb-6 text-center text-sm text-gray-500">
             Checking your items for the latest prices and availability…
@@ -1473,7 +1518,9 @@ Easy Returns
 
               {!canSubmitOrder && !loading && (
                 <p role="status" className="text-center text-sm text-amber-700 mt-3">
-                  {lineCheck.status === "checking"
+                  {items.length === 0 && lineCheck.status === "ok"
+                    ? "Add items to your cart to place an order."
+                    : lineCheck.status === "checking"
                     ? "Checking your items…"
                     : lineCheck.status === "error"
                     ? "Retry verifying your items to continue."

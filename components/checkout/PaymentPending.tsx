@@ -20,8 +20,10 @@ export default function PaymentPending({ pending }: { pending: PendingPayment })
   const resolved = useCallback(() => {
     clearCheckoutAfterOrder(pending.source);
     clearPendingPayment();
-    window.location.href = "/orders";
-  }, [pending.source]);
+    // The online order's id is the Razorpay payment id; the order page shows the
+    // confirmation banner.
+    window.location.href = `/orders/${encodeURIComponent(pending.razorpayPaymentId)}?placed=online`;
+  }, [pending.source, pending.razorpayPaymentId]);
 
   // The online order's document id IS the Razorpay payment id, and the owner can
   // read it — so "has the webhook created it yet?" needs no new endpoint.

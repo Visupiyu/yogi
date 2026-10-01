@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
@@ -12,6 +12,7 @@ import {
   type CustomerNotification,
 } from "@/lib/account/accountClient";
 import { customerLoginUrl } from "@/lib/authRedirect";
+import LoadErrorState from "@/components/LoadErrorState";
 
 // The customer notification centre. Everything comes from
 // app/api/account/notifications — the signed-in customer's own customer
@@ -37,10 +38,18 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Failures of an ACTION (mark read / mark all / load more) — shown inline while
+  // the list stays on screen. Distinct from `error`, which is the first load.
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
+  const markingAllRef = useRef(false);
+  const loadingMoreRef = useRef(false);
 
   const load = useCallback(async () => {
+    setLoading(true);
     const result = await fetchNotifications();
-    setError(result.error);
+    // Fixed wording: server/client error strings are never shown to the customer.
+    setError(result.error ? "We couldn't load your notifications. Please check your connection and try again." : null);
     if (result.data) {
       setNotifications(result.data.notifications);
       setUnreadCount(result.data.unreadCount);
@@ -61,28 +70,49 @@ export default function NotificationsPage() {
   }, [router, load]);
 
   const loadMore = async () => {
-    if (!nextCursor) return;
+    if (!nextCursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
     setLoadingMore(true);
+    setActionError(null);
     const result = await fetchNotifications(nextCursor);
+    loadingMoreRef.current = false;
     setLoadingMore(false);
     if (result.data) {
       setNotifications((prev) => [...prev, ...result.data!.notifications]);
       setNextCursor(result.data.nextCursor);
       setUnreadCount(result.data.unreadCount);
+    } else {
+      setActionError("We couldn't load older notifications. Please try again.");
     }
   };
 
+  // Optimistic, but never left wrong: if the server doesn't confirm, the
+  // notification goes back to unread and the customer is told.
   const markRead = async (id: string) => {
+    setActionError(null);
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     setUnreadCount((c) => Math.max(0, c - 1));
-    await markNotificationsRead({ ids: [id] });
+    const result = await markNotificationsRead({ ids: [id] });
+    if (result.error) {
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
+      setUnreadCount((c) => c + 1);
+      setActionError("We couldn't mark that notification as read. Please try again.");
+    }
   };
 
   const markAllRead = async () => {
+    if (markingAllRef.current) return;
+    markingAllRef.current = true;
+    setMarkingAll(true);
+    setActionError(null);
     const result = await markNotificationsRead({ all: true });
+    markingAllRef.current = false;
+    setMarkingAll(false);
     if (!result.error) {
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
+    } else {
+      setActionError("We couldn't mark all notifications as read. Please try again.");
     }
   };
 
@@ -99,17 +129,23 @@ export default function NotificationsPage() {
         <div className="flex justify-end mb-5">
           <button
             onClick={markAllRead}
-            disabled={unreadCount === 0}
+            disabled={unreadCount === 0 || markingAll}
             className="bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-5 py-2 rounded-xl"
           >
-            Mark All Read
+            {markingAll ? "Marking…" : "Mark All Read"}
           </button>
         </div>
+
+        {actionError && (
+          <div role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+            {actionError}
+          </div>
+        )}
 
         {loading ? (
           <div className="bg-white rounded-3xl shadow p-10 text-center">Loading...</div>
         ) : error && notifications.length === 0 ? (
-          <div className="bg-red-50 rounded-3xl p-6 text-red-700">{error}</div>
+          <LoadErrorState message={error} onRetry={() => void load()} />
         ) : notifications.length === 0 ? (
           <div className="bg-white rounded-3xl shadow p-10 text-center">
             <h2 className="text-2xl font-bold">🔔 No Notifications</h2>

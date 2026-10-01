@@ -57,6 +57,17 @@ export default function OrderDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Set when checkout just placed this order (?placed=cod|online|already). Only a
+  // display hint — the order data shown comes from the order itself.
+  const [placed, setPlaced] = useState<string | null>(null);
+  useEffect(() => {
+    const value = new URLSearchParams(window.location.search).get("placed");
+    if (value === "cod" || value === "online" || value === "already") setPlaced(value);
+  }, []);
+  const dismissPlaced = () => {
+    setPlaced(null);
+    window.history.replaceState(null, "", window.location.pathname);
+  };
   const [order, setOrder] = useState<any>(null);
 
   // Per-item fulfilment. Item status lives in sellerOrders, which customers
@@ -300,6 +311,39 @@ export default function OrderDetailsPage() {
   return (
     <section className="bg-gray-50 min-h-screen py-10">
       <div className="max-w-6xl mx-auto px-5">
+        {placed && (
+          <div role="status" className="mb-8 rounded-3xl border border-green-200 bg-green-50 p-6 text-green-900">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-bold">
+                  {placed === "already" ? "This order was already placed" : "🎉 Your order is confirmed!"}
+                </h2>
+                <p className="mt-2">
+                  Order number:{" "}
+                  <strong>{order.orderNumber || String(order.id).slice(0, 8)}</strong>
+                </p>
+                {placed === "cod" && (
+                  <p className="mt-2">
+                    Pay on Delivery (UPI only): please pay the exact amount of{" "}
+                    <strong>₹{Number(order.finalTotal || order.total || 0).toLocaleString("en-IN")}</strong> by UPI when your
+                    order arrives. Cash is not accepted.
+                  </p>
+                )}
+                {placed === "online" && (
+                  <p className="mt-2">Payment received. You can follow your order below.</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={dismissPlaced}
+                aria-label="Dismiss confirmation"
+                className="rounded-full px-3 py-1 text-xl leading-none text-green-800 hover:bg-green-100"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
         {/* HEADER */}
         <div className="flex items-center justify-between mb-8">
           <div>
