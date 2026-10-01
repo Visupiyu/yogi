@@ -10,6 +10,8 @@ import {
   respondToPickup,
   type AccountReturns,
 } from "@/lib/account/accountClient";
+import { useRouter } from "next/navigation";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 // Returns & Refunds. Everything comes from app/api/account/returns — the
 // customer's own requests, legacy returns and ONE refund timeline across all
@@ -34,6 +36,7 @@ const REFUND_TONE: Record<string, string> = {
 };
 
 export default function RefundsPage() {
+  const router = useRouter();
   const [data, setData] = useState<AccountReturns | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -52,13 +55,16 @@ export default function RefundsPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        setLoading(false);
+        // Signed out: send to the customer login (back here afterwards) and stay
+        // in the loading state meanwhile — never render a signed-out wallet/
+        // refunds page as if it were an empty account.
+        router.push(customerLoginUrl());
         return;
       }
       load();
     });
     return () => unsub();
-  }, [load]);
+  }, [load, router]);
 
   const respond = async (id: string, action: "accept" | "counter") => {
     setBusyId(id);

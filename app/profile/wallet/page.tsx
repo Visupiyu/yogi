@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { fetchAccountWallet, formatDate, type AccountWallet } from "@/lib/account/accountClient";
+import { useRouter } from "next/navigation";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 // Reward Wallet. From app/api/account/wallet:
 //   - the BALANCE is the stored users.rewardPoints — exactly what checkout
@@ -27,6 +29,7 @@ const HELD_BY: Record<PendingOrder["heldBy"], string> = {
 };
 
 export default function RewardWalletPage() {
+  const router = useRouter();
   const [wallet, setWallet] = useState<AccountWallet | null>(null);
   const [ledger, setLedger] = useState<LedgerEntry[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -48,13 +51,16 @@ export default function RewardWalletPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        setLoading(false);
+        // Signed out: send to the customer login (back here afterwards) and stay
+        // in the loading state meanwhile — never render a signed-out wallet/
+        // refunds page as if it were an empty account.
+        router.push(customerLoginUrl());
         return;
       }
       load();
     });
     return () => unsub();
-  }, [load]);
+  }, [load, router]);
 
   const loadMore = async () => {
     if (!nextCursor) return;

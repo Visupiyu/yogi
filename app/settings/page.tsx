@@ -15,6 +15,7 @@ import {
   type AccountSummary,
   type DeletionRequestView,
 } from "@/lib/account/accountClient";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 // Account & Security. Everything shown comes from the server
 // (app/api/account/summary, app/api/account/deletion-request) — this page no
@@ -61,7 +62,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
       load();

@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import Invoice from "@/components/invoice/Invoice";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 export default function InvoicePage(){
 
@@ -24,7 +25,7 @@ useEffect(() => {
 
     if (!user) {
       alert("Please login first");
-      window.location.href = "/login";
+      window.location.href = customerLoginUrl();
       return;
     }
 

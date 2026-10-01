@@ -7,24 +7,37 @@ import { useRouter } from "next/navigation";
 import {
   addDoc,
   collection,
+  getDocs,
+  limit,
+  query,
   serverTimestamp,
+  where,
 } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { customerLoginUrl } from "@/lib/authRedirect";
+import { EMPTY_ADDRESS_FORM, normalizeAddressForm, validateAddressForm } from "@/lib/addressForm";
 
 export default function AddAddressPage() {
-    const [form, setForm] = useState({
-    fullName: "",
-    phone: "",
-    addressLine1: "",
-    addressLine2: "",
-    landmark: "",
-    city: "",
-    state: "",
-    pincode: "",
-    type: "Home",
-  });
+  const [form, setForm] = useState(EMPTY_ADDRESS_FORM);
+  const [authReady, setAuthReady] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const router = useRouter();
-  
+
+  // Signed-out visitors go to /login and come back here. Nothing renders until
+  // auth has initialised, so a signed-in customer never sees a flash of the form
+  // (or a premature redirect) while Firebase restores the session.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.push(customerLoginUrl());
+        return;
+      }
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -38,53 +51,62 @@ export default function AddAddressPage() {
   async function handleSubmit(e: React.FormEvent) {
   e.preventDefault();
 
+  // Double-submit guard: a second click/Enter while the first save is in flight
+  // must not create a duplicate address.
+  if (saving) return;
+
+  const user = auth.currentUser;
+  if (!user) {
+    router.push(customerLoginUrl());
+    return;
+  }
+
+  const problem = validateAddressForm(form);
+  if (problem) {
+    setFormError(problem);
+    return;
+  }
+
+  setFormError(null);
+  setSaving(true);
+
   try {
+
+    const values = normalizeAddressForm(form);
+
+    // Same default rule the list page maintains (delete promotes the next
+    // address; "Set as default" keeps exactly one): a customer's FIRST address is
+    // their default, later ones are not.
+    const existing = await getDocs(
+      query(
+        collection(db, "addresses"),
+        where("userEmail", "==", user.email),
+        limit(1)
+      )
+    );
 
     // A stale/missing localStorage email here doesn't match
     // request.auth.token.email, so firestore.rules rejects the write —
-    // read the live signed-in identity instead.
-    if (!auth.currentUser) {
-      alert("Please login first.");
-      router.push("/login");
-      return;
-    }
-
+    // use the live signed-in identity.
     const ref = await addDoc(
       collection(db, "addresses"),
       {
-        userEmail: auth.currentUser.email,
+        userEmail: user.email,
         // Owned by the account's uid as well (firestore.rules require every
         // identifier on an address to be the caller's own).
-        userId: auth.currentUser.uid,
+        userId: user.uid,
 
-        fullName: form.fullName,
-        phone: form.phone,
+        ...values,
 
-        addressLine1: form.addressLine1,
-        addressLine2: form.addressLine2,
-
-        landmark: form.landmark,
-
-        city: form.city,
-        state: form.state,
-        pincode: form.pincode,
-
-        type: form.type,
-
-        isDefault: false,
+        isDefault: existing.empty,
 
         createdAt: serverTimestamp(),
       }
     );
 
-    alert("Address saved successfully!");
-
     // When launched from checkout (?returnTo=checkout), return there with the
     // new address's id so checkout can preselect it. Otherwise go to the list.
-    const returnTo =
-      typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("returnTo")
-        : null;
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
 
     if (returnTo === "checkout") {
       router.push(`/checkout?newAddress=${ref.id}`);
@@ -96,10 +118,21 @@ export default function AddAddressPage() {
 
     console.error(error);
 
-    alert("Failed to save address.");
+    setFormError("We couldn't save this address. Please check your connection and try again.");
+
+    setSaving(false);
 
   }
 }
+
+  if (!authReady) {
+    return (
+      <section className="min-h-screen flex items-center justify-center">
+        <h2 className="text-2xl font-semibold">Loading...</h2>
+      </section>
+    );
+  }
+
  return (
     <section className="min-h-screen bg-gray-100 py-10 px-4">
 
@@ -126,6 +159,9 @@ export default function AddAddressPage() {
           <input
             name="phone"
             placeholder="Phone Number"
+            type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={form.phone}
             onChange={handleChange}
             className="w-full border rounded-xl p-3"
@@ -184,6 +220,8 @@ export default function AddAddressPage() {
             <input
               name="pincode"
               placeholder="Pincode"
+              inputMode="numeric"
+              maxLength={6}
               value={form.pincode}
               onChange={handleChange}
               className="border rounded-xl p-3"
@@ -203,11 +241,18 @@ export default function AddAddressPage() {
 
           </div>
 
+          {formError && (
+            <p role="alert" className="text-red-600 font-semibold">
+              {formError}
+            </p>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold transition"
+            disabled={saving}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold transition"
           >
-            Save Address
+            {saving ? "Saving..." : "Save Address"}
           </button>
 
         </form>

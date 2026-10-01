@@ -11,6 +11,7 @@ import {
   formatDate,
   type AccountReferrals,
 } from "@/lib/account/accountClient";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 // Referral History. From app/api/account/referrals: the customer's own code,
 // the bonus rules and this month's cap, and an ANONYMOUS history — "A friend",
@@ -41,7 +42,7 @@ export default function ReferralsPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
       load();

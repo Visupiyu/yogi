@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import LoadErrorState from "@/components/LoadErrorState";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 import {
   BarChart,
@@ -26,8 +27,11 @@ export default function AdminAnalyticsPage() {
   const [vendors, setVendors] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
 
-  useEffect(() => {
-    const load = async () => {
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+      setLoading(true);
+      setLoadError(null);
       try {
         const [oSnap, pSnap, vSnap, uSnap] = await Promise.all([
           getDocs(collection(db, "orders")),
@@ -46,12 +50,15 @@ export default function AdminAnalyticsPage() {
         );
       } catch (error) {
         console.error(error);
+        setLoadError("We couldn't load analytics. Please check your connection and try again.");
       } finally {
         setLoading(false);
       }
-    };
-    load();
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // Revenue excludes cancelled orders
   const validOrders = orders.filter((o) => o.status !== "Cancelled");
@@ -118,6 +125,14 @@ export default function AdminAnalyticsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
         Loading analytics…
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <LoadErrorState message={loadError} onRetry={load} className="max-w-md" />
       </div>
     );
   }

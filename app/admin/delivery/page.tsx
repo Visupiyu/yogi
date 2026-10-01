@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import LoadErrorState from "@/components/LoadErrorState";
 import AssignDelivery from "@/app/admin/delivery/_components/AssignDelivery";
 
 type Delivery = {
@@ -33,12 +34,15 @@ export default function AdminDeliveryPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadDeliveries();
   }, []);
 
   const loadDeliveries = async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
       const snapshot = await getDocs(
         query(collection(db, "orders"), orderBy("createdAt", "desc"))
@@ -68,6 +72,7 @@ export default function AdminDeliveryPage() {
       // Delivery Control Tower (the current delivery engine).
     } catch (error) {
       console.error(error);
+      setLoadError("We couldn't load deliveries. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -161,6 +166,7 @@ export default function AdminDeliveryPage() {
           </div>
         </div>
 
+        {!loadError && (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-5 mb-8">
           <div className="bg-white rounded-3xl p-6 shadow-lg">
             <p className="text-gray-500">Total Deliveries</p>
@@ -189,6 +195,7 @@ export default function AdminDeliveryPage() {
             <h2 className="text-3xl font-bold text-red-600">{failedCount}</h2>
           </div>
         </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <input
@@ -218,6 +225,8 @@ export default function AdminDeliveryPage() {
 
         {loading ? (
           <div className="bg-white rounded-3xl p-10 text-center">Loading deliveries...</div>
+        ) : loadError ? (
+          <LoadErrorState message={loadError} onRetry={loadDeliveries} />
         ) : (
           <div className="space-y-4">
             {filtered.map((order) => (

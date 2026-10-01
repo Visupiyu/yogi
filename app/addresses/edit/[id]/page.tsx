@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import {
@@ -9,7 +9,12 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged, type User } from "firebase/auth";
+
+import { auth, db } from "@/lib/firebase";
+import { customerLoginUrl } from "@/lib/authRedirect";
+import { EMPTY_ADDRESS_FORM, normalizeAddressForm, validateAddressForm } from "@/lib/addressForm";
+import LoadErrorState from "@/components/LoadErrorState";
 
 export default function EditAddressPage() {
 
@@ -19,23 +24,21 @@ export default function EditAddressPage() {
 
   const [loading, setLoading] = useState(true);
 
-  const [form, setForm] = useState({
-    fullName: "",
-    phone: "",
-    addressLine1: "",
-    addressLine2: "",
-    landmark: "",
-    city: "",
-    state: "",
-    pincode: "",
-    type: "Home",
-  });
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAddress();
-  }, []);
+  const [notFound, setNotFound] = useState(false);
 
-  async function loadAddress() {
+  const [saving, setSaving] = useState(false);
+
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const [form, setForm] = useState(EMPTY_ADDRESS_FORM);
+
+  const loadAddress = useCallback(async (user: User) => {
+
+    setLoading(true);
+    setLoadError(null);
+    setNotFound(false);
 
     try {
 
@@ -43,9 +46,32 @@ export default function EditAddressPage() {
         doc(db, "addresses", id as string)
       );
 
-      if (snapshot.exists()) {
+      const data: any = snapshot.exists() ? snapshot.data() : null;
 
-        setForm(snapshot.data() as any);
+      // Only the signed-in customer's own address is editable here (the rules
+      // enforce it too); anything else reads as not found.
+      const owned =
+        data &&
+        (data.userId === user.uid ||
+          (!!user.email && data.userEmail === user.email));
+
+      if (!owned) {
+
+        setNotFound(true);
+
+      } else {
+
+        setForm({
+          fullName: data.fullName ?? "",
+          phone: data.phone ?? "",
+          addressLine1: data.addressLine1 ?? "",
+          addressLine2: data.addressLine2 ?? "",
+          landmark: data.landmark ?? "",
+          city: data.city ?? "",
+          state: data.state ?? "",
+          pincode: data.pincode ?? "",
+          type: data.type ?? "Home",
+        });
 
       }
 
@@ -53,13 +79,28 @@ export default function EditAddressPage() {
 
       console.error(error);
 
+      setLoadError("We couldn't load this address. Please check your connection and try again.");
+
     } finally {
 
       setLoading(false);
 
     }
 
-  }
+  }, [id]);
+
+  // Wait for auth to initialise before reading (a signed-out read would just be
+  // permission-denied); signed-out visitors go to /login and come back here.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.push(customerLoginUrl());
+        return;
+      }
+      loadAddress(user);
+    });
+    return () => unsubscribe();
+  }, [loadAddress, router]);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -78,24 +119,25 @@ export default function EditAddressPage() {
 
     e.preventDefault();
 
+    // Double-submit guard.
+    if (saving) return;
+
+    const problem = validateAddressForm(form);
+
+    if (problem) {
+      setFormError(problem);
+      return;
+    }
+
+    setFormError(null);
+    setSaving(true);
+
     try {
 
       await updateDoc(
         doc(db, "addresses", id as string),
-        {
-          fullName: form.fullName,
-          phone: form.phone,
-          addressLine1: form.addressLine1,
-          addressLine2: form.addressLine2,
-          landmark: form.landmark,
-          city: form.city,
-          state: form.state,
-          pincode: form.pincode,
-          type: form.type,
-        }
+        normalizeAddressForm(form)
       );
-
-      alert("Address updated successfully!");
 
       router.push("/addresses");
 
@@ -103,7 +145,9 @@ export default function EditAddressPage() {
 
       console.error(error);
 
-      alert("Failed to update address.");
+      setFormError("We couldn't update this address. Please check your connection and try again.");
+
+      setSaving(false);
 
     }
 
@@ -116,6 +160,30 @@ export default function EditAddressPage() {
         <h2 className="text-2xl font-semibold">
           Loading...
         </h2>
+      </section>
+    );
+
+  }
+
+  if (loadError || notFound) {
+
+    return (
+      <section className="min-h-screen bg-gray-100 py-10 px-4">
+        <div className="max-w-3xl mx-auto">
+          <LoadErrorState
+            message={loadError ?? "This address could not be found."}
+            onRetry={
+              loadError && auth.currentUser
+                ? () => loadAddress(auth.currentUser as User)
+                : undefined
+            }
+          />
+          <div className="text-center mt-6">
+            <a href="/addresses" className="text-green-700 font-semibold hover:underline">
+              ← Back to My Addresses
+            </a>
+          </div>
+        </div>
       </section>
     );
 
@@ -150,6 +218,9 @@ export default function EditAddressPage() {
             value={form.phone}
             onChange={handleChange}
             placeholder="Phone Number"
+            type="tel"
+            inputMode="numeric"
+            maxLength={10}
             className="w-full border rounded-xl p-3"
             required
           />
@@ -208,6 +279,8 @@ export default function EditAddressPage() {
               value={form.pincode}
               onChange={handleChange}
               placeholder="Pincode"
+              inputMode="numeric"
+              maxLength={6}
               className="border rounded-xl p-3"
               required
             />
@@ -225,11 +298,18 @@ export default function EditAddressPage() {
 
           </div>
 
+          {formError && (
+            <p role="alert" className="text-red-600 font-semibold">
+              {formError}
+            </p>
+          )}
+
           <button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl font-bold transition"
+            disabled={saving}
+            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold transition"
           >
-            Update Address
+            {saving ? "Updating..." : "Update Address"}
           </button>
 
         </form>

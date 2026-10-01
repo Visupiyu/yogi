@@ -1,32 +1,38 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import LoadErrorState from "@/components/LoadErrorState";
 
 export default function StoresPage() {
   const [stores, setStores] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadStores = async () => {
-      try {
-        const snap = await getDocs(collection(db, "vendors_public"));
-        const data = snap.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((vendor: any) => vendor.status === "Approved");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-        setStores(data);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadStores = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const snap = await getDocs(collection(db, "vendors_public"));
+      const data = snap.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((vendor: any) => vendor.status === "Approved");
 
-    loadStores();
+      setStores(data);
+    } catch (error) {
+      console.error(error);
+      setLoadError("We couldn't load stores right now. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadStores();
+  }, [loadStores]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
@@ -37,13 +43,19 @@ export default function StoresPage() {
           Explore stores and discover products from trusted vendors.
         </p>
 
-        <p className="text-center text-green-600 font-semibold mb-10">
-          {stores.length} Stores Available
-        </p>
+        {!loadError && (
+          <p className="text-center text-green-600 font-semibold mb-10">
+            {stores.length} Stores Available
+          </p>
+        )}
+
+        {loadError && (
+          <LoadErrorState message={loadError} onRetry={loadStores} className="max-w-xl mx-auto mb-10" />
+        )}
 
         {loading && <p className="text-center">Loading stores...</p>}
 
-        {!loading && stores.length === 0 && (
+        {!loading && !loadError && stores.length === 0 && (
           <p className="text-center text-gray-500">No stores found.</p>
         )}
 

@@ -28,6 +28,8 @@ import {
 } from "@/lib/itemRequests";
 import DeliveryOtpNotice from "@/components/DeliveryOtpNotice";
 import { mapsSearchUrl } from "@/lib/maps";
+import { customerLoginUrl } from "@/lib/authRedirect";
+import LoadErrorState from "@/components/LoadErrorState";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -51,6 +53,8 @@ export default function OrderDetailsPage() {
   const params = useParams();
   const orderId = params.id as string;
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [order, setOrder] = useState<any>(null);
 
   // Per-item fulfilment. Item status lives in sellerOrders, which customers
@@ -78,9 +82,10 @@ export default function OrderDetailsPage() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         alert("Please login first");
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
+      setLoadError(null);
       try {
         const ref = doc(db, "orders", orderId);
         const snap = await getDoc(ref);
@@ -151,14 +156,16 @@ export default function OrderDetailsPage() {
           console.error("Return/replace requests unavailable:", requestsError);
         }
       } catch (err) {
+        // A failed read used to leave order === null and render a BLANK page.
         console.error("Order page error:", err);
+        setLoadError("We couldn't load this order. Please try again.");
       } finally {
         setLoading(false);
       }
     });
 
     return () => unsub();
-  }, [orderId, router]);
+  }, [orderId, router, reloadKey]);
   // Contact Seller is server-authorized: the API verifies (from the ID token)
   // that the caller OWNS this order, then finds/creates the chat with the Admin
   // SDK. The client no longer queries the chats collection directly (a customer
@@ -170,7 +177,7 @@ export default function OrderDetailsPage() {
     try {
       const user = auth.currentUser;
       if (!user) {
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
       const token = await user.getIdToken();
@@ -213,7 +220,7 @@ export default function OrderDetailsPage() {
 
       if (!currentUser) {
         alert("Please login first");
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
 
@@ -247,6 +254,23 @@ export default function OrderDetailsPage() {
       <div className="min-h-screen flex flex-col items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-600 border-t-transparent"></div>
         <p className="mt-5 font-semibold">Loading your order...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-3xl mx-auto px-5 py-16 space-y-4 text-center">
+        <LoadErrorState
+          message={loadError}
+          onRetry={() => {
+            setLoading(true);
+            setReloadKey((k) => k + 1);
+          }}
+        />
+        <Link href="/orders" className="inline-block text-sm font-medium text-gray-600 hover:text-gray-900">
+          ← Back to My Orders
+        </Link>
       </div>
     );
   }

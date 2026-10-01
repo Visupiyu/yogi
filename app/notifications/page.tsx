@@ -11,6 +11,7 @@ import {
   markNotificationsRead,
   type CustomerNotification,
 } from "@/lib/account/accountClient";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 // The customer notification centre. Everything comes from
 // app/api/account/notifications — the signed-in customer's own customer
@@ -51,7 +52,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
       load();

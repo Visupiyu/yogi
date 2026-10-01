@@ -20,6 +20,7 @@ import { db, storage, auth } from "@/lib/firebase";
 import { chatImagePath } from "@/lib/storagePaths";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { onAuthStateChanged } from "firebase/auth";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 export default function ChatRoomPage() {
   const params = useParams();
@@ -44,7 +45,7 @@ export default function ChatRoomPage() {
     // cannot be replaced by the other party or by any other signed-in user.
     const senderUid = auth.currentUser?.uid;
     if (!senderUid) {
-      router.push("/login");
+      router.push(customerLoginUrl());
       return "";
     }
     const storageRef = ref(
@@ -60,7 +61,7 @@ export default function ChatRoomPage() {
 
   const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
     if (!firebaseUser) {
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
 

@@ -23,6 +23,7 @@ import {
 import { categoryFields } from "@/lib/catalog/categoryFields";
 import { findNodeById } from "@/lib/catalog/categoryUtils";
 import { UNIVERSAL_SPEC_FIELDS } from "@/lib/catalog/universalSpecFields";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 type Product = { id: string; name: string; active?: boolean; approvalStatus?: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
@@ -468,7 +469,7 @@ relatedSnap.forEach((d) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
       alert("Please login first.");
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
 
@@ -508,7 +509,7 @@ relatedSnap.forEach((d) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
       alert("Please login first.");
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
 
@@ -572,7 +573,7 @@ relatedSnap.forEach((d) => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
       alert("Please login first.");
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
 
@@ -619,7 +620,7 @@ relatedSnap.forEach((d) => {
 
   if (!currentUser) {
     alert("Please login first.");
-    router.push("/login");
+    router.push(customerLoginUrl());
     return;
   }
 
@@ -658,7 +659,7 @@ relatedSnap.forEach((d) => {
     const currentUser = auth.currentUser;
     if (!currentUser?.email) {
       alert("Please Login First");
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
     const user = { email: currentUser.email, name: currentUser.displayName || "Customer" };

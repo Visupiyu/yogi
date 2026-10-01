@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+import { safeReturnTo } from "@/lib/authRedirect";
 import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
 import Image from "next/image";
@@ -65,7 +66,12 @@ export default function LoginPage() {
       );
 
       alert("Sign In Successful");
-      router.push("/");
+      // Back to the protected page that sent the visitor here (?returnTo=...).
+      // safeReturnTo only ever yields a same-origin application path, so an
+      // attacker-supplied value can never redirect off-site; anything else is "/".
+      router.push(
+        safeReturnTo(new URLSearchParams(window.location.search).get("returnTo"))
+      );
     } catch (err: any) {
       if (err.code === "auth/invalid-credential") {
         alert("Invalid email or password");

@@ -15,6 +15,7 @@ import {
 
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 export default function AddressesPage() {
     const router = useRouter();
@@ -28,7 +29,7 @@ const [userEmail, setUserEmail] = useState("");
 useEffect(() => {
   const unsubscribe = onAuthStateChanged(auth, (user) => {
     if (!user) {
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
     setUserEmail(user.email || "");

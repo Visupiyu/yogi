@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import LoadErrorState from "@/components/LoadErrorState";
 import { applyReturnStatusUpdate } from "@/lib/returns";
 
 export default function AdminRefundsPage() {
@@ -20,6 +21,12 @@ export default function AdminRefundsPage() {
   const [loading,setLoading] =
     useState(true);
 
+  const [loadError,setLoadError] =
+    useState<string | null>(null);
+
+  const [actionError,setActionError] =
+    useState<string | null>(null);
+
   useEffect(()=>{
 
     loadRefunds();
@@ -28,6 +35,10 @@ export default function AdminRefundsPage() {
 
   const loadRefunds =
     async()=>{
+
+      setLoading(true);
+
+      setLoadError(null);
 
       try{
 
@@ -57,7 +68,9 @@ export default function AdminRefundsPage() {
 
       }catch(error){
 
-        console.log(error);
+        console.error(error);
+
+        setLoadError("We couldn't load refund requests. Please check your connection and try again.");
 
       }finally{
 
@@ -72,6 +85,8 @@ export default function AdminRefundsPage() {
       id:string,
       status:string
     )=>{
+
+      setActionError(null);
 
       try{
 
@@ -104,7 +119,9 @@ export default function AdminRefundsPage() {
 
       }catch(error){
 
-        console.log(error);
+        console.error(error);
+
+        setActionError("Couldn't update the refund status. Nothing was changed — please try again.");
 
       }
 
@@ -151,7 +168,9 @@ export default function AdminRefundsPage() {
 
   }catch(error){
 
-    console.log(error);
+    console.error(error);
+
+    setActionError("Couldn't save that change. Please try again.");
 
   }
 
@@ -193,6 +212,12 @@ export default function AdminRefundsPage() {
 
         </div>
 
+        {actionError && (
+          <div role="alert" className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 mb-6 font-semibold">
+            {actionError}
+          </div>
+        )}
+
         {loading ? (
 
           <div className="
@@ -203,6 +228,10 @@ export default function AdminRefundsPage() {
           ">
             Loading...
           </div>
+
+        ) : loadError ? (
+
+          <LoadErrorState message={loadError} onRetry={loadRefunds} />
 
         ) : (
 
@@ -268,6 +297,9 @@ export default function AdminRefundsPage() {
 </tr>
 </thead>
 <tbody>
+{refunds.length === 0 && (
+<tr><td colSpan={7} className="py-10 text-center text-gray-500">No refund requests.</td></tr>
+)}
 {refunds.map((item)=>(
 <tr key={item.id} className=" border-b " >
 <td className=" py-4 ">

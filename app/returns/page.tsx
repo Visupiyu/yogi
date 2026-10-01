@@ -20,6 +20,7 @@ import {
   statusTone,
   type ItemRequestType,
 } from "@/lib/itemRequests";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 // Unified item-level Return / Replace request form.
 //
@@ -255,7 +256,7 @@ function RequestInner() {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
       try {
@@ -346,7 +347,7 @@ function RequestInner() {
     }
     const user = auth.currentUser;
     if (!user) {
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
     try {

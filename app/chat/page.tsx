@@ -7,6 +7,7 @@ import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import Image from "next/image";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 export default function ChatPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ const [chats, setChats] = useState<Chat[]>([]);
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser?.email) {
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
 

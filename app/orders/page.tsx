@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   collection,
   doc,
@@ -17,69 +17,61 @@ import { auth, db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { addToCart } from "@/lib/cart";
 import { planReorderLine } from "@/lib/cartReorder";
+import LoadErrorState from "@/components/LoadErrorState";
 import { ORDER_STEPS, getStep } from "@/lib/orderTracking";
 import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import { customerLoginUrl } from "@/lib/authRedirect";
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // A failed read must never look like "no orders": it gets its own error state
+  // with a Retry, and only a SUCCESSFUL empty result shows the empty state.
+  const fetchOrders = useCallback(async (uid: string) => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      // firestore.rules gates orders reads on resource.data.userId,
+      // not userEmail -- querying a different field than the rule
+      // checks makes Firestore reject the whole query.
+      const q = query(collection(db, "orders"), where("userId", "==", uid));
+      const snapshot = await getDocs(q);
+      const items: any[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({
+          id: docSnap.id,
+          ...docSnap.data(),
+        });
+      });
+      const unique = Array.from(new Map(items.map((o) => [o.id, o])).values());
+      unique.sort(
+        (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+      );
+      setOrders(unique);
+    } catch (error) {
+      console.error("Orders load failed:", error);
+      setLoadError("We couldn't load your orders. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
   useEffect(() => {
     const unsub = onAuthStateChanged(
       auth,
       (firebaseUser) => {
         if (!firebaseUser) {
-          setLoading(false);
+          // Stay in the loading state until the redirect lands — flipping
+          // loading off here flashed "No Orders Found" at a signed-out visitor.
           alert("Please login first");
-          router.push("/login");
+          router.push(customerLoginUrl());
           return;
         }
-        const fetchOrders = async () => {
-          try {
-            // firestore.rules gates orders reads on resource.data.userId,
-            // not userEmail -- querying a different field than the rule
-            // checks makes Firestore reject the whole query.
-            const q = query(
-              collection(db, "orders"),
-              where(
-                "userId",
-                "==",
-                firebaseUser.uid
-              )
-            );
-            const snapshot =
-              await getDocs(q);
-            const items: any[] = [];
-            snapshot.forEach((docSnap) => {
-              items.push({
-                id: docSnap.id,
-                ...docSnap.data(),
-              });
-            });
-            const unique = Array.from(
-              new Map(
-                items.map((o) => [
-                  o.id,
-                  o,
-                ])
-              ).values()
-            );
-            unique.sort(
-              (a, b) =>
-                (b.createdAt?.seconds || 0) -
-                (a.createdAt?.seconds || 0)
-            );
-            setOrders(unique);
-          } catch (error) {
-            console.error(error);
-          } finally {
-            setLoading(false);
-          }
-        };
-        fetchOrders();
+        void fetchOrders(firebaseUser.uid);
       }
     );
     return () => unsub();
-  }, [router]);
+  }, [router, fetchOrders]);
   // getStep() and the step labels now come from lib/orderTracking.ts, shared
   // with app/orders/[id] and app/track-order. This page's copy had already
   // drifted — it still read "Placed" for the stored status "Pending" after the
@@ -105,7 +97,7 @@ export default function OrdersPage() {
 
       if (!currentUser) {
         alert("Please login first");
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
 
@@ -138,7 +130,8 @@ export default function OrdersPage() {
         )
       );
     } catch (error) {
-      console.log(error);
+      console.error("Cancel order failed:", error);
+      alert("Couldn't cancel this order. Please check your connection and try again.");
     }
   };
   const reorderingRef = useRef(false);
@@ -202,7 +195,15 @@ export default function OrdersPage() {
         <h1 className="text-4xl font-bold mb-10">
           My Orders
         </h1>
-        {orders.length === 0 ? (
+        {loadError ? (
+          <LoadErrorState
+            message={loadError}
+            onRetry={() => {
+              const user = auth.currentUser;
+              if (user) void fetchOrders(user.uid);
+            }}
+          />
+        ) : orders.length === 0 ? (
           <div className="bg-white rounded-3xl shadow-md p-10 text-center">
             <p className="text-gray-500 text-lg">
               No Orders Found

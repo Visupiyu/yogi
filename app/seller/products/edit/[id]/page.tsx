@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import {
@@ -10,6 +10,8 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+
+import LoadErrorState from "@/components/LoadErrorState";
 
 import ProductForm from "../../../components/ProductForm";
 
@@ -25,45 +27,53 @@ export default function EditProductPage() {
   const [loading, setLoading] =
     useState(true);
 
+  const [loadError, setLoadError] =
+    useState<string | null>(null);
+
+  const loadProduct = useCallback(async () => {
+
+    if (!id) return;
+
+    setLoading(true);
+    setLoadError(null);
+
+    try {
+
+      const ref = doc(
+        db,
+        "products",
+        id as string
+      );
+
+      const snap = await getDoc(ref);
+
+      setProduct(
+        snap.exists()
+          ? ({ ...snap.data(), id: snap.id } as Product)
+          : null
+      );
+
+    } catch (err) {
+
+      console.error("Failed to load product:", err);
+
+      setLoadError(
+        "We couldn't load this product. Please check your connection and try again."
+      );
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  }, [id]);
+
   useEffect(() => {
-
-    const loadProduct = async () => {
-
-      if (!id) return;
-
-      try {
-
-        const ref = doc(
-          db,
-          "products",
-          id as string
-        );
-
-        const snap = await getDoc(ref);
-
-        if (snap.exists()) {
-
-          setProduct({
-
-            ...snap.data(),
-
-            id: snap.id,
-
-          } as Product);
-
-        }
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
-    };
 
     loadProduct();
 
-  }, [id]);
+  }, [loadProduct]);
 
   if (loading) {
 
@@ -72,6 +82,23 @@ export default function EditProductPage() {
       <div className="p-10 text-center">
 
         Loading...
+
+      </div>
+
+    );
+
+  }
+
+  if (loadError) {
+
+    return (
+
+      <div className="mx-auto max-w-3xl p-4 sm:p-6">
+
+        <LoadErrorState
+          message={loadError}
+          onRetry={loadProduct}
+        />
 
       </div>
 

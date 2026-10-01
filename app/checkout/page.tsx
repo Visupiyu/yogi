@@ -25,6 +25,7 @@ import { getEffectiveCommissionRate } from "@/lib/commission";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { isProductVisible } from "@/lib/products/visibility";
 import { evaluateCoupon } from "@/lib/coupons/couponRules";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 // Business rule: pay-on-delivery orders are settled via UPI only at the
 // moment of delivery — cash is never accepted. This is the stored
@@ -111,7 +112,7 @@ setAddress(userData.address || "");
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         alert("Please login to checkout.");
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
 
@@ -174,7 +175,7 @@ setAddress(userData.address || "");
 
     if (!auth.currentUser) {
       alert("Please login first.");
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
 
@@ -410,7 +411,7 @@ setAddress(userData.address || "");
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
       alert("Please login again.");
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
 
@@ -532,7 +533,7 @@ setAddress(userData.address || "");
     const payingUser = auth.currentUser;
     if (!payingUser) {
       alert("Please login again.");
-      router.push("/login");
+      router.push(customerLoginUrl());
       setLoading(false);
       return;
     }

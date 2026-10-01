@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useParams } from "next/navigation";
 
 import { doc, getDoc } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+
+import LoadErrorState from "@/components/LoadErrorState";
 
 import Invoice from "@/components/invoice/Invoice";
 
@@ -20,47 +22,43 @@ export default function AdminInvoicePage() {
 
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-    async function fetchOrder() {
+  const fetchOrder = useCallback(async () => {
 
-      try {
+    if (!id) return;
 
-        const docRef = doc(db, "orders", id);
+    setLoading(true);
 
-        const snap = await getDoc(docRef);
+    setLoadError(null);
 
-        if (snap.exists()) {
+    try {
 
-          setOrder({
+      const docRef = doc(db, "orders", id);
 
-            id: snap.id,
+      const snap = await getDoc(docRef);
 
-            ...snap.data(),
+      setOrder(snap.exists() ? { id: snap.id, ...snap.data() } : null);
 
-          });
+    } catch (error) {
 
-        }
+      console.error(error);
 
-      } catch (error) {
+      setLoadError("We couldn't load this order. Please check your connection and try again.");
 
-        console.error(error);
+    } finally {
 
-      } finally {
-
-        setLoading(false);
-
-      }
-
-    }
-
-    if (id) {
-
-      fetchOrder();
+      setLoading(false);
 
     }
 
   }, [id]);
+
+  useEffect(() => {
+
+    fetchOrder();
+
+  }, [fetchOrder]);
 
   if (loading) {
 
@@ -69,6 +67,20 @@ export default function AdminInvoicePage() {
       <div className="flex justify-center items-center min-h-screen">
 
         Loading...
+
+      </div>
+
+    );
+
+  }
+
+  if (loadError) {
+
+    return (
+
+      <div className="flex justify-center items-center min-h-screen p-4">
+
+        <LoadErrorState message={loadError} onRetry={fetchOrder} className="max-w-md" />
 
       </div>
 

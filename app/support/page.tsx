@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { auth } from "@/lib/firebase";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 export default function SupportPage() {
 
@@ -35,7 +36,7 @@ async()=>{
 
   if (!currentUser) {
     alert("Please login first.");
-    router.push("/login");
+    router.push(customerLoginUrl());
     return;
   }
 

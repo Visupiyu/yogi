@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 import {
@@ -14,48 +14,49 @@ import { onAuthStateChanged } from "firebase/auth";
 
 import { auth, db } from "@/lib/firebase";
 
+import LoadErrorState from "@/components/LoadErrorState";
+
 import type { Product } from "@/lib/products/product";
 
 export default function SellerInventoryPage() {
 const [products, setProducts] = useState<Product[]>([]);
 const [loading, setLoading] = useState(true);
 const [search, setSearch] = useState("");
+const [loadError, setLoadError] = useState<string | null>(null);
+
+const loadProducts = useCallback(async (uid: string) => {
+  setLoading(true);
+  setLoadError(null);
+  try {
+    const q = query(
+      collection(db, "products"),
+      where("vendorId", "==", uid)
+    );
+    const snapshot = await getDocs(q);
+    const list = snapshot.docs.map((doc) => ({
+      ...doc.data(),
+      id: doc.id,
+    })) as Product[];
+    setProducts(list);
+  } catch (err) {
+    console.error("Failed to load seller inventory:", err);
+    setLoadError("We couldn't load your inventory. Please check your connection and try again.");
+  } finally {
+    setLoading(false);
+  }
+}, []);
+
 useEffect(() => {
-
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
-
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
     if (!user) {
+      // The seller layout owns the signed-out redirect.
       setLoading(false);
       return;
     }
-
-    try {
-
-      const q = query(
-        collection(db, "products"),
-        where("vendorId", "==", user.uid)
-      );
-
-      const snapshot = await getDocs(q);
-
-      const list = snapshot.docs.map((doc) => ({
-        ...doc.data(),
-        id: doc.id,
-      })) as Product[];
-
-      setProducts(list);
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
+    loadProducts(user.uid);
   });
-
   return () => unsubscribe();
-
-}, []);
+}, [loadProducts]);
 
 return (
 
@@ -92,6 +93,14 @@ return (
       className="mb-6 w-full rounded-lg border p-3"
     />
 
+    {loadError ? (
+      <LoadErrorState
+        message={loadError}
+        onRetry={() => {
+          if (auth.currentUser) loadProducts(auth.currentUser.uid);
+        }}
+      />
+    ) : (
     <div className="overflow-hidden rounded-xl border bg-white shadow">
       <div className="overflow-x-auto">
 
@@ -226,6 +235,7 @@ return (
       </div>
 
     </div>
+    )}
 
   </div>
 );

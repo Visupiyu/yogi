@@ -1,8 +1,8 @@
 "use client";
 
-"use client";
-
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 
 import {
   collection,
@@ -11,83 +11,66 @@ import {
   where,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { customerLoginUrl } from "@/lib/authRedirect";
+import LoadErrorState from "@/components/LoadErrorState";
 
 export default function CustomerTicketsPage() {
-    const [tickets,setTickets] =
-  useState<any[]>([]);
+  const router = useRouter();
 
-const [loading,setLoading] =
-  useState(true);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(()=>{
-
-  loadTickets();
-
-},[]);
-
-const loadTickets =
-async()=>{
-
-  try{
-
-    const user =
-
-      JSON.parse(
-
-        localStorage.getItem(
-          "user"
-        ) || "{}"
-
-      );
-
-    const q = query(
-
-      collection(
-        db,
-        "tickets"
-      ),
-
-      where(
-        "userEmail",
-        "==",
-        user.email
-      )
-
-    );
-
-    const snapshot =
-      await getDocs(q);
-
-    const items:any[] = [];
-
-    snapshot.forEach(
-      (docSnap)=>{
-
-        items.push({
-
-          id:docSnap.id,
-
-          ...docSnap.data(),
-
-        });
-
+  // Tickets are owned by the SIGNED-IN account — never by whatever email a
+  // localStorage snapshot says (stale after a logout/login as someone else, or
+  // missing entirely). app/api/support/tickets writes BOTH userId and userEmail,
+  // older web tickets carry only userEmail, and firestore.rules let an owner read
+  // by either, so both are queried (each is a rules-satisfying own-data query)
+  // and merged by id.
+  const loadTickets = useCallback(async (uid: string, email: string | null) => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const queries = [
+        getDocs(query(collection(db, "tickets"), where("userId", "==", uid))),
+      ];
+      if (email) {
+        queries.push(
+          getDocs(query(collection(db, "tickets"), where("userEmail", "==", email)))
+        );
       }
-    );
+      const snapshots = await Promise.all(queries);
+      const byId = new Map<string, any>();
+      snapshots.forEach((snapshot) =>
+        snapshot.forEach((docSnap) => {
+          byId.set(docSnap.id, { id: docSnap.id, ...docSnap.data() });
+        })
+      );
+      const items = Array.from(byId.values()).sort(
+        (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+      );
+      setTickets(items);
+    } catch (error) {
+      console.error("Tickets load failed:", error);
+      setLoadError("We couldn't load your tickets. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    setTickets(items);
-
-  }catch(error){
-
-    console.log(error);
-
-  }finally{
-
-    setLoading(false);
-
-  }
-
-};
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        // Signed out: back to the customer login (and here afterwards); stay in
+        // the loading state meanwhile rather than showing an empty ticket list.
+        router.push(customerLoginUrl());
+        return;
+      }
+      void loadTickets(user.uid, user.email);
+    });
+    return () => unsubscribe();
+  }, [router, loadTickets]);
 
   return (
 
@@ -120,6 +103,22 @@ async()=>{
     rounded-3xl
   ">
     Loading...
+  </div>
+
+) : loadError ? (
+
+  <LoadErrorState
+    message={loadError}
+    onRetry={() => {
+      const user = auth.currentUser;
+      if (user) void loadTickets(user.uid, user.email);
+    }}
+  />
+
+) : tickets.length === 0 ? (
+
+  <div className="bg-white p-8 rounded-3xl text-center text-gray-500">
+    You have no support tickets yet.
   </div>
 
 ) : (

@@ -7,6 +7,7 @@ import { setDoc, doc } from "firebase/firestore";
 import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import { fetchAccountSummary, formatDate, type AccountSummary } from "@/lib/account/accountClient";
+import { customerLoginUrl } from "@/lib/authRedirect";
 
 // The account dashboard. Everything it shows comes from one server call
 // (app/api/account/summary): the customer is the verified token and the
@@ -42,7 +43,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       if (!firebaseUser) {
-        router.push("/login");
+        router.push(customerLoginUrl());
         return;
       }
       load();
@@ -59,7 +60,7 @@ export default function ProfilePage() {
     const uid = auth.currentUser?.uid;
     if (!uid) {
       alert("Please login again.");
-      router.push("/login");
+      router.push(customerLoginUrl());
       return;
     }
 
