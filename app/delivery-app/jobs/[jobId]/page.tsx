@@ -4,9 +4,12 @@
 // FSM. The server is authoritative — buttons are UX hints only, and after every
 // successful action we re-fetch authoritative state (never fabricate the next
 // state). scanToken is never shown; the expected OTP is never displayed (the
-// person types what the customer tells them). Handover is intentionally out of
-// scope in this phase.
+// person types what the customer tells them). Person-to-person scan handovers
+// (HANDOVER_INITIATE/CONFIRM) are intentionally not exposed here; the company
+// hub handovers (Rider 1 -> origin hub, destination hub -> Rider 2) are, via
+// their own server endpoints (see the hub panel below).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import QrScanner from "@/app/delivery-app/_components/QrScanner";
 import { authedFetch, submitScan, type ScanAction, type ScanPayload } from "@/lib/deliveryApp/scanClient";
@@ -23,6 +26,11 @@ type JobDetail = {
   pickup?: { sellerName?: string; area?: string } | null;
   drop?: { customerName?: string; phone?: string; address?: string; slot?: string | null } | null;
   parcel?: { items?: { name?: string; qty?: number }[] } | null;
+  // Company hub journey signals — all server-derived (GET /api/delivery/jobs/[jobId]).
+  pickupLegStatus?: string | null;
+  originHub?: { name?: string } | null;
+  destinationHub?: { name?: string } | null;
+  task?: { finalMileHandoverState?: "ready" | "awaiting_rider_confirmation" | "confirmed" } | null;
 };
 
 const EXCEPTION_CODES = [
@@ -59,7 +67,15 @@ export default function JobDetailPage() {
     try {
       const res = await authedFetch(`/api/delivery/jobs/${encodeURIComponent(jobId)}`);
       const data = await res.json();
-      if (res.status === 401 || res.status === 403) { setError("You are not authorized for this job (or your session expired)."); return; }
+      // 401 = no/expired session. 403 = this person is not the job's current
+      // assignee — which is the NORMAL outcome for Rider 1 once the origin hub
+      // has confirmed receipt (assignment legitimately moves on). Authorization
+      // is deliberately not loosened to keep the old rider on the job.
+      if (res.status === 401) { setError("Your session has expired. Please sign in again."); return; }
+      if (res.status === 403) {
+        setError("This job is no longer assigned to you. If you just handed it over (for example to a hub), your part is complete — return to My jobs.");
+        return;
+      }
       if (!res.ok) throw new Error(data?.error || "Could not load this job.");
       setDetail(data.job as JobDetail);
     } catch (e) {
@@ -90,6 +106,26 @@ export default function JobDetailPage() {
   const delivered = detail?.status === "Delivered";
   const terminal = delivered || detail?.status === "Cancelled" || detail?.status === "Returned";
 
+  // Company hub journey (the SAME Company Job — never a second job). Every flag
+  // below is read straight from the server read model; nothing is inferred here,
+  // and the server re-validates role, custody and state on each action.
+  //   Rider 1: pickup leg PickedUp -> may declare the handover to the origin hub;
+  //            HandoverInitiated -> waiting for the origin hub person to confirm.
+  //   Rider 2: final-mile handover "awaiting_rider_confirmation" -> may confirm
+  //            receipt from the destination hub; "ready" -> hub person not yet released it.
+  const isCompanyJob = detail?.providerType === "COMPANY";
+  const canHandToOriginHub = !terminal && isCompanyJob && detail?.pickupLegStatus === "PickedUp";
+  const awaitingOriginHubReceipt = !terminal && isCompanyJob && detail?.pickupLegStatus === "HandoverInitiated";
+  const finalMileState = isCompanyJob ? detail?.task?.finalMileHandoverState : undefined;
+  // Depart is only ever legal for a parcel-holding rider whose leg is
+  // PickedUp/HandoverConfirmed. The server rejects it for YOMICO Direct and for a
+  // company FINAL-MILE leg (Rider 2 goes straight from "Assigned" to Out for
+  // delivery), so those cases never see the button.
+  const canDepart = isCompanyJob && finalMileState === undefined;
+  const canConfirmHubReceipt = !terminal && finalMileState === "awaiting_rider_confirmation";
+  const awaitingHubRelease = !terminal && finalMileState === "ready";
+  const inHubHandoverPhase = canHandToOriginHub || awaitingOriginHubReceipt || canConfirmHubReceipt || awaitingHubRelease;
+
   // Perform an action with a known payload (from a fresh scan or session cache).
   // The synchronous inFlightRef guard ensures two same-tick taps cannot start
   // two submissions (and thus two clientEventIds) before the disabled state
@@ -114,6 +150,38 @@ export default function JobDetailPage() {
       setBusy(null);
     }
   }, [loadDetail]);
+
+  // Company hub handover actions — NO-BODY POSTs to the existing, fully
+  // server-authoritative company-job endpoints (the server resolves the caller
+  // from the verified token and re-checks role/custody/state). Same in-flight
+  // guard as scans; the job is re-read after success, never assumed.
+  const hubAction = useCallback(async (kind: "ORIGIN_HANDOVER" | "DESTINATION_RECEIPT") => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setBusy(kind);
+    setFeedback(null);
+    try {
+      const path = kind === "ORIGIN_HANDOVER" ? "hub-intake" : "destination-handover/confirm";
+      const res = await authedFetch(`/api/delivery/company/jobs/${encodeURIComponent(jobId)}/${path}`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFeedback({ type: "error", msg: (data?.error as string) || "Could not complete this step." });
+        return;
+      }
+      setFeedback({
+        type: "success",
+        msg: kind === "ORIGIN_HANDOVER"
+          ? "Handover recorded. Waiting for the hub person to confirm receipt."
+          : "Receipt confirmed. This shipment is now with you.",
+      });
+      await loadDetail(); // authoritative re-read
+    } catch {
+      setFeedback({ type: "error", msg: "Network error. Please try again." });
+    } finally {
+      inFlightRef.current = false;
+      setBusy(null);
+    }
+  }, [jobId, loadDetail]);
 
   // Fresh-scan-required actions (PICKUP, DELIVER): always open the scanner.
   const scanThen = (action: ScanAction, extra?: { otp?: string; exceptionCode?: string; notes?: string }) => {
@@ -144,7 +212,10 @@ export default function JobDetailPage() {
   if (error) return (
     <div className="rounded border bg-red-50 p-6 text-center text-red-700">
       <p className="mb-3">{error}</p>
-      <button onClick={() => { setLoading(true); void loadDetail(); }} className="rounded bg-black px-3 py-2 text-sm text-white">Retry</button>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <button onClick={() => { setLoading(true); void loadDetail(); }} className="rounded bg-black px-3 py-2 text-sm text-white">Retry</button>
+        <Link href="/delivery-app" className="rounded border bg-white px-3 py-2 text-sm text-gray-800">Back to my jobs</Link>
+      </div>
     </div>
   );
   if (!detail) return null;
@@ -195,18 +266,70 @@ export default function JobDetailPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {!pickedUp ? (
+          {inHubHandoverPhase && (
+            <div className="rounded-lg border bg-white p-4 space-y-3">
+              {canHandToOriginHub && (
+                <>
+                  <p className="text-sm font-medium text-gray-800">
+                    Hand this shipment to the origin hub{(detail.originHub?.name) ? `: ${detail.originHub.name}` : ""}.
+                  </p>
+                  <p className="text-xs text-gray-500">Tap only when you are physically handing the parcel to the hub person. They will then confirm receipt.</p>
+                  <button
+                    onClick={() => { if (window.confirm("Confirm you are handing this shipment to the origin hub?")) void hubAction("ORIGIN_HANDOVER"); }}
+                    disabled={!!busy}
+                    className="w-full rounded-lg bg-teal-600 px-4 py-4 text-base font-semibold text-white disabled:opacity-50">
+                    {busy === "ORIGIN_HANDOVER" ? "Recording handover…" : "Hand to origin hub"}
+                  </button>
+                </>
+              )}
+              {awaitingOriginHubReceipt && (
+                <>
+                  <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Waiting for the hub person{(detail.originHub?.name) ? ` at ${detail.originHub.name}` : ""} to confirm receipt. Once they do, this job leaves your list.
+                  </p>
+                  <button onClick={() => void loadDetail()} disabled={!!busy}
+                    className="w-full rounded-lg border bg-white px-3 py-3 text-sm font-medium disabled:opacity-50">Refresh status</button>
+                </>
+              )}
+              {canConfirmHubReceipt && (
+                <>
+                  <p className="text-sm font-medium text-gray-800">
+                    The hub person{(detail.destinationHub?.name) ? ` at ${detail.destinationHub.name}` : ""} is handing you this shipment.
+                  </p>
+                  <p className="text-xs text-gray-500">Tap only after you have physically received the parcel. This makes you responsible for it.</p>
+                  <button
+                    onClick={() => { if (window.confirm("Confirm you have received this shipment from the hub?")) void hubAction("DESTINATION_RECEIPT"); }}
+                    disabled={!!busy}
+                    className="w-full rounded-lg bg-emerald-600 px-4 py-4 text-base font-semibold text-white disabled:opacity-50">
+                    {busy === "DESTINATION_RECEIPT" ? "Confirming receipt…" : "Confirm I received this shipment"}
+                  </button>
+                </>
+              )}
+              {awaitingHubRelease && (
+                <>
+                  <p className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Waiting for the hub person{(detail.destinationHub?.name) ? ` at ${detail.destinationHub.name}` : ""} to hand this shipment over to you.
+                  </p>
+                  <button onClick={() => void loadDetail()} disabled={!!busy}
+                    className="w-full rounded-lg border bg-white px-3 py-3 text-sm font-medium disabled:opacity-50">Refresh status</button>
+                </>
+              )}
+            </div>
+          )}
+          {inHubHandoverPhase ? null : !pickedUp ? (
             <button onClick={() => scanThen("PICKUP")} disabled={!!busy}
               className="w-full rounded-lg bg-black px-4 py-4 text-base font-semibold text-white disabled:opacity-50">
               {busy === "PICKUP" ? "Recording pickup…" : "Scan & pick up"}
             </button>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => cachedOrScan("DEPART")} disabled={!!busy}
-                  className="rounded-lg border bg-white px-3 py-3 text-sm font-medium disabled:opacity-50">
-                  {busy === "DEPART" ? "…" : "Depart"}
-                </button>
+              <div className={`grid gap-3 ${canDepart ? "grid-cols-2" : "grid-cols-1"}`}>
+                {canDepart && (
+                  <button onClick={() => cachedOrScan("DEPART")} disabled={!!busy}
+                    className="rounded-lg border bg-white px-3 py-3 text-sm font-medium disabled:opacity-50">
+                    {busy === "DEPART" ? "…" : "Depart"}
+                  </button>
+                )}
                 <button onClick={() => cachedOrScan("OUT_FOR_DELIVERY")} disabled={!!busy}
                   className="rounded-lg border bg-white px-3 py-3 text-sm font-medium disabled:opacity-50">
                   {busy === "OUT_FOR_DELIVERY" ? "…" : "Out for delivery"}

@@ -202,6 +202,13 @@ export async function GET(
       status: job.status,
       currentLegId: job.currentLegId ?? null,
       currentStage: job.currentStage,
+      // The job-level custody mirror (initial SELLER, then written by every scan
+      // and hub/handover transition) — the SAME object /api/delivery/my-jobs
+      // already returns. The Delivery App derives "has the parcel been picked up
+      // / is it with me" from this; without it the job page could never leave
+      // the pre-pickup state. Read-only; the server still gates every action on
+      // the leg's own custody.
+      custody: job.custody ?? null,
       originHubId: job.originHubId ?? null,
       destinationHubId: job.destinationHubId ?? null,
       originHubPersonId: job.originHubPersonId ?? null,

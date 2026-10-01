@@ -514,7 +514,7 @@ setAddress(userData.address || "");
     }
   };
 
-  const payNow = async () => {
+  const startOnlinePayment = async () => {
     // Set immediately, before any validation/network work, so a second
     // click can't re-enter this function while the first click is still
     // validating/creating the order — every exit path below must reset
@@ -709,6 +709,22 @@ setAddress(userData.address || "");
     paymentObject.open();
   };
 
+  // Wraps everything that runs BEFORE the Razorpay modal opens (blocked-account
+  // read, stock check, script load, token, /api/create-order, response parse,
+  // opening Razorpay). Any throw there — offline, a rejected Firestore read, a
+  // non-JSON response — used to leave `loading` true, so the pay button stayed
+  // disabled until a reload, with an unhandled rejection and no message. The
+  // payment steps themselves are unchanged; once the modal is open the handler
+  // below owns its own error handling and loading state.
+  const payNow = async () => {
+    try {
+      await startOnlinePayment();
+    } catch (error) {
+      console.error("Pay Now failed before payment opened:", error);
+      alert("Couldn't start payment. Please check your connection and try again.");
+      setLoading(false);
+    }
+  };
   const handlePlaceOrder = () => {
     if (paymentMethod === "ONLINE") payNow();
     else placeCODOrder();
