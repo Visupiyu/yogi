@@ -57,7 +57,7 @@ export default function RecentlyViewed({
               "
             >
 
-              <img
+              <img loading="lazy" decoding="async"
                 src={product.image || "/no-image.png"}
                 alt={product.name}
                 className="

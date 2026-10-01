@@ -233,6 +233,8 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
 <img
   src={image}
   alt={name}
+  loading="lazy"
+  decoding="async"
   className="
     w-full
     h-48

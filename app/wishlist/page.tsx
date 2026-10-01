@@ -436,7 +436,7 @@ duration-300
 
                 <Link href={`/product/${item.id}`}>
 
-  <img
+  <img loading="lazy" decoding="async"
     src={
       item.image ||
       "/no-image.png"

@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getVisibleCatalog } from "@/lib/storefront/catalogScan";
 import ProductCard from "@/components/ProductCard";
-import { toLegacyProduct, isStorefrontVisible } from "@/lib/products/legacyDisplay";
+import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 
 // Discovery-only recommendation strip, shared by the cart ("Related Products")
 // and checkout ("You May Also Like") pages. It is purely additive: it never
@@ -12,7 +11,7 @@ import { toLegacyProduct, isStorefrontVisible } from "@/lib/products/legacyDispl
 // product page; ProductCard's own Add-to-Cart writes the general `cart` key
 // (never `checkoutItems`), so it cannot alter an in-progress checkout.
 //
-// It fetches the catalog ONCE (client-side — the catalog is small, no index),
+// It reads the visible catalog through the shared cached scan,
 // filters to storefront-visible + in-stock products, excludes what's already
 // in the cart/checkout, prefers products in the same category as those items,
 // then fills from the rest. The set is shuffled and computed ONCE on mount
@@ -52,11 +51,11 @@ export default function ProductRecommendations({
 
     (async () => {
       try {
-        const snap = await getDocs(collection(db, "products"));
-        const all: RawProduct[] = snap.docs.map((d) => ({
-          id: d.id,
-          data: d.data() as Record<string, unknown>,
-        }));
+        // The shared, cached, paged read of the visible catalog (the same one the
+        // Navbar, homepage and search use) — not a fresh full-collection read on
+        // every cart/checkout visit. Already limited to storefront-visible products.
+        const { products } = await getVisibleCatalog();
+        const all: RawProduct[] = products.map(({ id, data }) => ({ id, data }));
 
         // excludeIds captured once from the mount render (the cart/checkout is
         // populated synchronously before this component mounts), so the strip
@@ -79,7 +78,6 @@ export default function ProductRecommendations({
         // Candidates: storefront-visible, in stock, not already in cart/checkout.
         const candidates = all.filter(
           ({ id, data }) =>
-            isStorefrontVisible(data) &&
             Number((data as { stock?: unknown }).stock ?? 0) > 0 &&
             !exclude.has(id)
         );

@@ -32,7 +32,7 @@ export default function FeaturedCategories() {
   </div>
 
   <div className="overflow-hidden rounded-t-3xl">
-                <img
+                <img loading="lazy" decoding="async"
                   src={category.image}
                   alt={category.name}
                   onError={(e) => {

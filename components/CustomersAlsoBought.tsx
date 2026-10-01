@@ -87,7 +87,7 @@ export default function CustomersAlsoBought({
           >
             <div className="bg-white rounded-2xl shadow-sm hover:shadow-lg transition overflow-hidden">
 
-              <img
+              <img loading="lazy" decoding="async"
                 src={product.image || "/no-image.png"}
                 alt={product.name}
                 className="w-full h-40 object-contain p-3"

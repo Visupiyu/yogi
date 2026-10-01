@@ -20,26 +20,55 @@ export {
   type ShippingSettings,
 };
 
-export async function getShippingSettings(): Promise<ShippingSettings> {
+// Cart, checkout and the product page each ask for these on every visit. They
+// change rarely, so a successful read is shared for a few minutes (and concurrent
+// callers share one in-flight read). A FAILED read is never cached.
+const SETTINGS_CACHE_MS = 5 * 60 * 1000;
+let settingsCache: { at: number; value: ShippingSettings } | null = null;
+let settingsInFlight: Promise<ShippingSettings> | null = null;
+
+export function getShippingSettings(): Promise<ShippingSettings> {
+  if (settingsCache && Date.now() - settingsCache.at < SETTINGS_CACHE_MS) {
+    return Promise.resolve(settingsCache.value);
+  }
+  if (settingsInFlight) return settingsInFlight;
+  settingsInFlight = loadShippingSettings()
+    .then(({ value, ok }) => {
+      if (ok) settingsCache = { at: Date.now(), value };
+      return value;
+    })
+    .finally(() => {
+      settingsInFlight = null;
+    });
+  return settingsInFlight;
+}
+
+async function loadShippingSettings(): Promise<{ value: ShippingSettings; ok: boolean }> {
   try {
     const snap = await getDoc(doc(db, "settings", "global"));
     const data = snap.exists() ? (snap.data() as Record<string, unknown>) : null;
 
     return {
-      freeShippingThreshold:
-        typeof data?.freeShippingThreshold === "number"
-          ? data.freeShippingThreshold
-          : FREE_SHIPPING_THRESHOLD,
-      standardShippingCharge:
-        typeof data?.standardShippingCharge === "number"
-          ? data.standardShippingCharge
-          : STANDARD_SHIPPING_CHARGE,
+      ok: true,
+      value: {
+        freeShippingThreshold:
+          typeof data?.freeShippingThreshold === "number"
+            ? data.freeShippingThreshold
+            : FREE_SHIPPING_THRESHOLD,
+        standardShippingCharge:
+          typeof data?.standardShippingCharge === "number"
+            ? data.standardShippingCharge
+            : STANDARD_SHIPPING_CHARGE,
+      },
     };
   } catch (error) {
     console.error("Failed to load shipping settings, using defaults:", error);
     return {
-      freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
-      standardShippingCharge: STANDARD_SHIPPING_CHARGE,
+      ok: false,
+      value: {
+        freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
+        standardShippingCharge: STANDARD_SHIPPING_CHARGE,
+      },
     };
   }
 }

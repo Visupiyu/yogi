@@ -57,7 +57,7 @@ export default function StorefrontView({
       <div className="relative h-40 sm:h-56 md:h-64 w-full bg-gradient-to-r from-green-600 to-blue-600">
         {storefront.storeBanner && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={storefront.storeBanner} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <img loading="lazy" decoding="async" src={storefront.storeBanner} alt="" className="absolute inset-0 w-full h-full object-cover" />
         )}
       </div>
 
@@ -67,7 +67,7 @@ export default function StorefrontView({
           <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gray-100 border-4 border-white shadow overflow-hidden shrink-0">
             {storefront.storeLogo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={storefront.storeLogo} alt={`${storefront.storeName} logo`} className="w-full h-full object-cover" />
+              <img loading="lazy" decoding="async" src={storefront.storeLogo} alt={`${storefront.storeName} logo`} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-gray-400">
                 {storefront.storeName.charAt(0).toUpperCase()}

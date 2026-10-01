@@ -475,6 +475,8 @@ if (minimumDiscount > 0) {
                       <img
                         src={product.image || "/no-image.png"}
                         alt={product.name}
+                        loading="lazy"
+                        decoding="async"
                        className="w-full h-full object-cover hover:scale-105 transition duration-500"
                       />
                       {hasMrp && (

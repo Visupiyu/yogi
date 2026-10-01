@@ -66,7 +66,7 @@ export default function StoresPage() {
               className="bg-white p-5 sm:p-8 rounded-2xl shadow hover:shadow-xl transition"
             >
               <div className="flex items-center gap-4 mb-4">
-                <img
+                <img loading="lazy" decoding="async"
                   src={store.storeLogo || "/user.png"}
                   alt=""
                   className="w-16 h-16 shrink-0 rounded-full object-cover border"
