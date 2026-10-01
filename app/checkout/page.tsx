@@ -1,9 +1,23 @@
 "use client";
 
-import { clearCheckoutAfterOrder } from "@/lib/cart";
+import { clearCheckoutAfterOrder, removeFromCart } from "@/lib/cart";
 import { payableTotal } from "@/lib/checkoutTotals";
 import { EMPTY_ADDRESS_FORM, validateAddressForm } from "@/lib/addressForm";
 import LoadErrorState from "@/components/LoadErrorState";
+import PaymentPending from "@/components/checkout/PaymentPending";
+import {
+  describeChecks,
+  lineKey,
+  mergeRefreshIntoCart,
+  revalidateLines,
+  ISSUE_LABEL,
+  type LineCheck,
+} from "@/lib/cartReconcile";
+import {
+  loadPendingPayment,
+  savePendingPayment,
+  type PendingPayment,
+} from "@/lib/pendingPayment";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ProductRecommendations from "@/components/ProductRecommendations";
@@ -62,6 +76,16 @@ export default function CheckoutPage() {
   };
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  // Live check of every checkout line against its product (price, stock,
+  // availability). Submission is blocked unless it is "ok".
+  const [lineCheck, setLineCheck] = useState<{
+    status: "checking" | "ok" | "issues" | "error";
+    issues: LineCheck[];
+    notices: string[];
+  }>({ status: "checking", issues: [], notices: [] });
+  // A payment that succeeded but whose order could not be confirmed — replaces
+  // the checkout entirely (lib/pendingPayment.ts).
+  const [pending, setPending] = useState<PendingPayment | null>(null);
   // Delivery details come ONLY from the selected saved address. localStorage's
   // cached "user" is never an address source here (it can be stale, belong to a
   // previous order's recipient, or be missing entirely).
@@ -114,6 +138,10 @@ export default function CheckoutPage() {
     // order's cleanup clears.
     checkoutSourceRef.current = localStorage.getItem("checkoutSource");
 
+    // Verify every line against its live product before the customer can pay.
+    if (storedItems.length > 0) void reconcileLines(storedItems);
+    else setLineCheck({ status: "ok", issues: [], notices: [] });
+
 
     // Reward balance must come from Firestore, not the cached localStorage
     // value — that's trivially editable client-side and was never actually
@@ -127,6 +155,10 @@ export default function CheckoutPage() {
         router.push(customerLoginUrl());
         return;
       }
+
+      // A payment that succeeded but is still awaiting order confirmation takes
+      // over the page, so the same items can't be paid for a second time.
+      setPending(loadPendingPayment(user.uid));
 
       // Firebase Auth is now restored and a user is known — load their saved
       // addresses exactly once (loadAddresses reads auth.currentUser, which is
@@ -182,6 +214,72 @@ export default function CheckoutPage() {
   })
 );
   }, [total, finalAmount, FREE_SHIPPING_THRESHOLD, SHIPPING_FEE]);
+
+  // Re-reads each line's product and reconciles the checkout with it: fresh
+  // price / stock, quantity within stock, and unavailable lines identified. The
+  // reconciled lines replace the displayed ones (and are saved back so a refresh
+  // shows them); a normal-cart checkout also updates the cart itself (the same
+  // race-safe merge the cart page uses) while a Buy Now checkout never touches
+  // the cart. A failed read is "could not verify" — it blocks ordering with a
+  // Retry rather than letting stale lines through.
+  async function reconcileLines(
+    lines: any[]
+  ): Promise<{ ok: boolean; changed: boolean }> {
+    setLineCheck((prev) => ({ ...prev, status: "checking" }));
+    try {
+      const checks = await revalidateLines(lines);
+      const nextLines = checks.map((c) => c.line);
+      const issues = checks.filter((c) => c.issue);
+      const notices = describeChecks(checks.filter((c) => !c.issue));
+
+      setItems(nextLines);
+      localStorage.setItem("checkoutItems", JSON.stringify(nextLines));
+      if (checkoutSourceRef.current !== "buyNow") mergeRefreshIntoCart(checks);
+
+      setLineCheck({
+        status: issues.length > 0 ? "issues" : "ok",
+        issues,
+        notices,
+      });
+      return { ok: issues.length === 0, changed: notices.length > 0 };
+    } catch (error) {
+      console.error("Checkout line check failed:", error);
+      setLineCheck((prev) => ({ ...prev, status: "error" }));
+      return { ok: false, changed: false };
+    }
+  }
+
+  // Drops the lines that can't be bought (from this checkout and, for a normal
+  // cart checkout, from the cart too — never the cart on a Buy Now).
+  function removeUnavailableLines() {
+    const blocked = new Set(lineCheck.issues.map((c) => lineKey(c.line)));
+    const remaining = items.filter((item) => !blocked.has(lineKey(item)));
+    if (checkoutSourceRef.current !== "buyNow") {
+      for (const c of lineCheck.issues) {
+        removeFromCart(c.line.id, c.line.size, c.line.color, c.line.variantId);
+      }
+    }
+    setItems(remaining);
+    localStorage.setItem("checkoutItems", JSON.stringify(remaining));
+    setLineCheck((prev) => ({ ...prev, status: "ok", issues: [] }));
+  }
+
+  // Fresh re-verification right before an order/payment is started. Returns true
+  // only if every line is purchasable AND nothing changed under the customer —
+  // if something did change, the page is updated and this attempt stops so the
+  // new total is seen before any money is committed.
+  async function lineChecksPass(): Promise<boolean> {
+    const result = await reconcileLines(items);
+    if (!result.ok) {
+      alert("Some items in your order can't be purchased. Please review the highlighted items.");
+      return false;
+    }
+    if (result.changed) {
+      alert("Some prices or quantities changed. Please review your updated total, then place your order again.");
+      return false;
+    }
+    return true;
+  }
 
   const applyCoupon = async () => {
     // Ref, not state: a second click in the same tick (before React re-renders
@@ -362,7 +460,8 @@ export default function CheckoutPage() {
   const deliveryName = (selectedAddress?.fullName ?? "").trim();
   const deliveryPhone = (selectedAddress?.phone ?? "").trim();
   const deliveryAddress = selectedAddress ? flattenAddress(selectedAddress) : "";
-  const canSubmitOrder = !!selectedAddress && !selectedAddressProblem;
+  const canSubmitOrder =
+    !!selectedAddress && !selectedAddressProblem && lineCheck.status === "ok";
 
   const loadRazorpayScript = () =>
     new Promise((resolve) => {
@@ -463,6 +562,16 @@ export default function CheckoutPage() {
   };
 
   const validateForm = () => {
+    if (lineCheck.status !== "ok") {
+      alert(
+        lineCheck.status === "checking"
+          ? "We're still checking your items. Please wait a moment."
+          : lineCheck.status === "error"
+          ? "We couldn't verify your items. Please tap Retry first."
+          : "Some items in your order can't be purchased. Please remove them to continue."
+      );
+      return false;
+    }
     if (addressStatus === "loading") {
       alert("Your saved addresses are still loading. Please wait a moment.");
       return false;
@@ -489,8 +598,23 @@ export default function CheckoutPage() {
   };
 
 
+  // The line re-check below is async, so a second click could otherwise start a
+  // second attempt before `loading` renders; this ref closes that window. (The
+  // COD idempotency key still guarantees one order if one ever slipped through.)
+  const codSubmitting = useRef(false);
   const placeCODOrder = async () => {
+    if (codSubmitting.current) return;
+    codSubmitting.current = true;
+    try {
+      await placeCODOrderInner();
+    } finally {
+      codSubmitting.current = false;
+    }
+  };
+
+  const placeCODOrderInner = async () => {
     if (!validateForm()) return;
+    if (!(await lineChecksPass())) return;
 
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) {
@@ -597,6 +721,29 @@ export default function CheckoutPage() {
     }
   };
 
+  // Razorpay reported a successful payment but /api/finalize-online-order did not
+  // confirm an order. Record that (lib/pendingPayment.ts) and take over the page
+  // with the "payment received" screen. The checkout lines are removed from the
+  // payable state; the cart itself is left for resolution to clear, because
+  // nothing is confirmed yet. No payment is retried here.
+  function handlePaymentUnconfirmed(rzp: any) {
+    const uid = auth.currentUser?.uid;
+    if (uid && rzp?.razorpay_order_id && rzp?.razorpay_payment_id && rzp?.razorpay_signature) {
+      const marker: PendingPayment = {
+        uid,
+        razorpayOrderId: rzp.razorpay_order_id,
+        razorpayPaymentId: rzp.razorpay_payment_id,
+        razorpaySignature: rzp.razorpay_signature,
+        source: checkoutSourceRef.current,
+        at: Date.now(),
+      };
+      savePendingPayment(marker);
+      setPending(marker);
+    }
+    localStorage.removeItem("checkoutItems");
+    localStorage.removeItem("checkoutSource");
+  }
+
   const startOnlinePayment = async () => {
     // Set immediately, before any validation/network work, so a second
     // click can't re-enter this function while the first click is still
@@ -605,6 +752,11 @@ export default function CheckoutPage() {
     setLoading(true);
 
     if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
+
+    if (!(await lineChecksPass())) {
       setLoading(false);
       return;
     }
@@ -729,14 +881,10 @@ export default function CheckoutPage() {
           const finalizeData = await finalizeResponse.json();
 
           if (!finalizeResponse.ok || !finalizeData?.orderId) {
-            // The payment may well have succeeded even though this call did
-            // not — the webhook reconciles independently. Never tell the
-            // customer to pay again.
-            alert(
-              finalizeData?.error ||
-                "We're confirming your payment. Check My Orders in a moment — do not pay again."
-            );
-            window.location.href = "/orders";
+            // The payment succeeded but the order is not confirmed. The webhook
+            // may still create it, so: never tell the customer to pay again, never
+            // claim an order exists, and stop presenting these lines as payable.
+            handlePaymentUnconfirmed(rzp);
             return;
           }
 
@@ -769,10 +917,7 @@ export default function CheckoutPage() {
           window.location.href = "/orders";
         } catch (error) {
           console.error("Checkout Error:", error);
-          alert(
-            "We're confirming your payment. Check My Orders in a moment — do not pay again."
-          );
-          window.location.href = "/orders";
+          handlePaymentUnconfirmed(rzp);
         } finally {
           setLoading(false);
         }
@@ -892,6 +1037,8 @@ export default function CheckoutPage() {
 
 };
 
+  if (pending) return <PaymentPending pending={pending} />;
+
   return (
     <section className="py-8 px-4 bg-gray-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
@@ -944,6 +1091,48 @@ export default function CheckoutPage() {
             </div>
           ))}
         </div>
+
+        {lineCheck.status === "checking" && items.length > 0 && (
+          <p role="status" className="mb-6 text-center text-sm text-gray-500">
+            Checking your items for the latest prices and availability…
+          </p>
+        )}
+        {lineCheck.status === "error" && (
+          <LoadErrorState
+            className="mb-6"
+            message="We couldn't verify your items right now, so you can't order yet. Please check your connection and try again."
+            onRetry={() => void reconcileLines(items)}
+          />
+        )}
+        {lineCheck.status === "issues" && (
+          <div role="alert" className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+            <p className="font-semibold">Some items can&apos;t be purchased:</p>
+            <ul className="mt-1 list-disc pl-5">
+              {lineCheck.issues.map((c) => (
+                <li key={lineKey(c.line)}>
+                  {c.line.name}: {c.issue ? ISSUE_LABEL[c.issue] : ""}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={removeUnavailableLines}
+              className="mt-3 rounded-xl bg-red-600 hover:bg-red-700 text-white px-5 py-2 font-semibold"
+            >
+              Remove unavailable items
+            </button>
+          </div>
+        )}
+        {lineCheck.notices.length > 0 && (
+          <div role="status" className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-sm text-amber-800">
+            <p className="font-semibold">Your order was updated:</p>
+            <ul className="mt-1 list-disc pl-5">
+              {lineCheck.notices.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* LEFT: ADDRESS + PAYMENT */}
@@ -1284,7 +1473,13 @@ Easy Returns
 
               {!canSubmitOrder && !loading && (
                 <p role="status" className="text-center text-sm text-amber-700 mt-3">
-                  {addressStatus === "loading"
+                  {lineCheck.status === "checking"
+                    ? "Checking your items…"
+                    : lineCheck.status === "error"
+                    ? "Retry verifying your items to continue."
+                    : lineCheck.status === "issues"
+                    ? "Remove the unavailable items to continue."
+                    : addressStatus === "loading"
                     ? "Loading your saved addresses…"
                     : addressStatus === "error"
                     ? "Retry loading your addresses to continue."

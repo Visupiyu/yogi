@@ -16,11 +16,13 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { customerLoginUrl } from "@/lib/authRedirect";
+import LoadErrorState from "@/components/LoadErrorState";
 
 export default function AddressesPage() {
     const router = useRouter();
     const [addresses, setAddresses] = useState<any[]>([]);
 const [loading, setLoading] = useState(true);
+const [loadError, setLoadError] = useState<string | null>(null);
 const [userEmail, setUserEmail] = useState("");
 
 // Was keyed off a stale localStorage snapshot with no login gate at
@@ -40,11 +42,13 @@ useEffect(() => {
 }, [router]);
 
 async function loadAddresses(email?: string) {
+  setLoadError(null);
   try {
 
     const activeEmail = email || userEmail;
 
     if (!activeEmail) {
+      setLoadError("We couldn't identify your account. Please sign in again.");
       setLoading(false);
       return;
     }
@@ -66,6 +70,9 @@ async function loadAddresses(email?: string) {
   } catch (error) {
 
     console.error(error);
+
+    // A failed read is NOT "no addresses" — say so and let the customer retry.
+    setLoadError("We couldn't load your saved addresses. Please check your connection and try again.");
 
   } finally {
 
@@ -177,7 +184,17 @@ async function setDefaultAddress(id: string) {
 
       </div>
 
-      {addresses.length === 0 ? (
+      {loadError ? (
+
+        <LoadErrorState
+          message={loadError}
+          onRetry={() => {
+            setLoading(true);
+            void loadAddresses(auth.currentUser?.email || "");
+          }}
+        />
+
+      ) : addresses.length === 0 ? (
 
         <div className="bg-white rounded-3xl shadow-md p-10 text-center">
 

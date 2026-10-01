@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ProductRecommendations from "@/components/ProductRecommendations";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { findVariantById } from "@/lib/products/variantSelection";
+import {
+  ISSUE_LABEL,
+  lineKey,
+  mergeRefreshIntoCart,
+  revalidateLines,
+  type LineIssue,
+} from "@/lib/cartReconcile";
+import { getSavedItems, moveSavedToCart, saveLineForLater } from "@/lib/savedForLater";
 import {
   getCartItems,
   updateCartQuantity,
@@ -23,6 +28,15 @@ import {
 export default function CartPage() {
   const [cart, setCart] = useState<any[]>([]);
   const [savedItems, setSavedItems] = useState<any[]>([]);
+  // Per-line problems found by the last product refresh (deleted / blocked /
+  // sold out / option gone), keyed by lineKey. Unavailable lines stay visible so
+  // the customer can remove them, but cannot be checked out.
+  const [issues, setIssues] = useState<Record<string, LineIssue>>({});
+  // What the last refresh changed (price / quantity). Replaced — not appended —
+  // on each refresh, and only lists changes actually applied, so it never repeats.
+  const [notices, setNotices] = useState<string[]>([]);
+  const [refreshFailed, setRefreshFailed] = useState(false);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
   const [FREE_DELIVERY_THRESHOLD, setFreeDeliveryThreshold] = useState(
     DEFAULT_FREE_DELIVERY_THRESHOLD
   );
@@ -43,75 +57,32 @@ export default function CartPage() {
     )
   );
 
-  // item.stock is a snapshot from whenever it was added to the cart —
-  // refresh it here so the quantity controls and "only N left" messaging
-  // reflect what's actually available right now, not stock at add time.
-  const refreshStock = async () => {
-    if (items.length === 0) return;
-
+  // Every line is a snapshot from when it was added. Re-read the products so the
+  // cart reflects what can actually be bought now: fresh price/stock, quantity
+  // within stock, and unavailable lines flagged. The result is merged into the
+  // cart AS IT IS WHEN THE READS FINISH (lib/cartReconcile mergeRefreshIntoCart),
+  // so edits made during the async refresh are never overwritten. The server
+  // re-prices authoritatively at checkout regardless.
+  const refreshCart = async () => {
+    const snapshot = getCartItems();
+    if (snapshot.length === 0) return;
     try {
-      const updated = await Promise.all(
-        items.map(async (item: any) => {
-          const snap = await getDoc(doc(db, "products", item.id));
-          if (!snap.exists()) return item;
-
-          const data: any = snap.data();
-
-          // Self-heal the displayed unit price to the current effective price,
-          // using the SAME rule the server charges by (lib/orderPricing.ts): a
-          // resolved variant priced > 0 is authoritative, otherwise the
-          // product's sellingPrice. This corrects an old/pre-fix cart line that
-          // stored the main price for a differently-priced variant. variantId /
-          // attributes / qty are preserved; only stock and price are refreshed.
-          const sellingPrice =
-            typeof data.sellingPrice === "number"
-              ? data.sellingPrice
-              : Number(data.price ?? item.price ?? 0);
-
-          const variant = item.variantId
-            ? findVariantById(
-                Array.isArray(data.variants) ? data.variants : [],
-                item.variantId
-              )
-            : null;
-
-          const variantPrice = variant ? Number((variant as any).price) : NaN;
-          const effectivePrice =
-            Number.isFinite(variantPrice) && variantPrice > 0
-              ? variantPrice
-              : sellingPrice;
-
-          // A variant line is capped by ITS OWN stock — the product-level figure is
-          // the sum across every variant and would let the + button run past it.
-          const variantStock = variant ? Number((variant as any).stock) : NaN;
-          return {
-            ...item,
-            stock: Number.isFinite(variantStock)
-              ? variantStock
-              : Number(data.stock ?? 0),
-            price: effectivePrice,
-          };
-        })
-      );
-
-      setCart(updated);
-      // Persist the self-healed prices so the corrected figure survives a
-      // reload and feeds checkoutItems consistently. The server still re-prices
-      // authoritatively at checkout regardless of what is stored here.
-      localStorage.setItem("cart", JSON.stringify(updated));
+      const checks = await revalidateLines(snapshot);
+      const next: Record<string, LineIssue> = {};
+      for (const c of checks) if (c.issue) next[lineKey(c.line)] = c.issue;
+      setIssues(next);
+      const { notices: applied } = mergeRefreshIntoCart(checks);
+      setNotices(applied);
+      setRefreshFailed(false);
+      setCart(getCartItems());
     } catch (error) {
-      console.error("Failed to refresh cart stock:", error);
+      console.error("Failed to refresh cart:", error);
+      setRefreshFailed(true);
     }
   };
-
-  refreshStock();
+  refreshCart();
 }, []);
 
-  const persist = (updated: any[]) => {
-    setCart(updated);
-    localStorage.setItem("cart", JSON.stringify(updated));
-    window.dispatchEvent(new Event("cartUpdated"));
-  };
 
   const updateQty = (index: number, type: string) => {
 
@@ -163,57 +134,40 @@ const removeItem = (index: number) => {
 };
 
   const saveForLater = (index: number) => {
+    const item = cart[index];
+    if (!item) return;
+    saveLineForLater(item);
+    setCart(getCartItems());
+    setSavedItems(getSavedItems());
+    setSavedMessage(null);
+  };
 
-  const item = cart[index];
+  const moveToCart = async (index: number) => {
+    const item = savedItems[index];
+    if (!item) return;
+    const result = await moveSavedToCart(item);
+    setCart(getCartItems());
+    setSavedItems(getSavedItems());
+    if (!result.ok) {
+      setSavedMessage(`${item.name}: ${result.message}`);
+    } else if (result.kind === "already-in-cart") {
+      setSavedMessage(`${item.name} is already in your cart at the most available.`);
+    } else if (result.capped) {
+      setSavedMessage(`${item.name}: added up to the quantity currently in stock.`);
+    } else {
+      setSavedMessage(null);
+    }
+  };
 
-  const updatedCart =
-    cart.filter((_, i) => i !== index);
+  const purchasable = cart.filter((item) => !issues[lineKey(item)]);
+  const blockedLines = cart.length - purchasable.length;
 
-  const updatedSaved = [
-    ...savedItems,
-    item,
-  ];
-
-  persist(updatedCart);
-
-  setSavedItems(updatedSaved);
-
-  localStorage.setItem(
-    "savedItems",
-    JSON.stringify(updatedSaved)
-  );
-
-};
-
-const moveToCart = (index: number) => {
-
-  const item = savedItems[index];
-
-  const updatedSaved =
-    savedItems.filter((_, i) => i !== index);
-
-  const updatedCart = [
-    ...cart,
-    item,
-  ];
-
-  setSavedItems(updatedSaved);
-
-  localStorage.setItem(
-    "savedItems",
-    JSON.stringify(updatedSaved)
-  );
-
-  persist(updatedCart);
-
-};
-
-  const total = cart.reduce(
+  const total = purchasable.reduce(
     (sum, item) => sum + (Number(item.price) || 0) * (Number(item.qty) || 1),
     0
   );
 
-  const mrpTotal = cart.reduce(
+  const mrpTotal = purchasable.reduce(
     (sum, item) =>
       sum +
       (Number(item.mrp) || Number(item.price) || 0) * (Number(item.qty) || 1),
@@ -228,21 +182,90 @@ const moveToCart = (index: number) => {
   const grandTotal = Math.max(0, total + shipping);
   const totalSavings = productSavings + (shipping === 0 && total > 0 ? SHIPPING_FEE : 0);
 
-  const totalItems = cart.reduce((sum, item) => sum + (Number(item.qty) || 1), 0);
+  const totalItems = purchasable.reduce((sum, item) => sum + (Number(item.qty) || 1), 0);
 
   const deliveryRemaining = Math.max(0, FREE_DELIVERY_THRESHOLD - total);
   const deliveryProgress = Math.min(100, (total / FREE_DELIVERY_THRESHOLD) * 100);
 
   const proceedCheckout = () => {
-    if (cart.length === 0) {
+    // The cart AS IT IS NOW — never the React snapshot (a refresh or another tab
+    // may have changed it).
+    const fresh = getCartItems();
+    if (fresh.length === 0) {
       alert("Cart is empty");
       return;
     }
-    localStorage.setItem("checkoutItems", JSON.stringify(cart));
+    // Lines the last refresh found unavailable can't be bought. Checkout also
+    // re-verifies every line against the live products before an order is placed.
+    if (fresh.some((item) => issues[lineKey(item)])) {
+      alert("Some items in your cart are no longer available. Please remove them to continue.");
+      return;
+    }
+    localStorage.setItem("checkoutItems", JSON.stringify(fresh));
     // A cart checkout, not a Buy Now one — checkout clears the cart after it.
     localStorage.removeItem("checkoutSource");
     window.location.href = "/checkout";
   };
+
+  const savedSection =
+    savedItems.length > 0 ? (
+<div className="mt-10">
+
+    <h2 className="text-2xl font-bold mb-5">
+      ⭐ Saved for Later
+    </h2>
+
+    <div className="space-y-4">
+
+      {savedItems.map((item: any, index: number) => (
+
+        <div
+          key={`${item.id}-${index}`}
+          className="bg-white rounded-2xl shadow-sm p-5 flex flex-col sm:flex-row gap-5"
+        >
+
+          <img
+            src={item.image || "/no-image.png"}
+            alt={item.name}
+            className="w-28 h-28 object-cover rounded-xl"
+          />
+
+          <div className="flex-1">
+
+            <h3 className="font-bold">
+              {item.name}
+            </h3>
+
+            <p className="text-green-700 font-bold mt-2">
+              ₹{Number(item.price).toLocaleString("en-IN")}
+            </p>
+
+            <button
+              onClick={() => moveToCart(index)}
+              className="
+                mt-4
+                bg-green-600
+                hover:bg-green-700
+                text-white
+                px-5
+                py-2
+                rounded-xl
+                transition
+              "
+            >
+              🛒 Move to Cart
+            </button>
+
+          </div>
+
+        </div>
+
+      ))}
+
+    </div>
+
+  </div>
+    ) : null;
 
   return (
     <section className="py-8 px-4 pb-24 md:pb-8 bg-gray-50 min-h-screen">
@@ -302,7 +325,40 @@ const moveToCart = (index: number) => {
   </p>
 </div>
 
+        {(notices.length > 0 || refreshFailed || blockedLines > 0 || savedMessage) && (
+          <div className="mb-6 space-y-3">
+            {blockedLines > 0 && (
+              <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <p className="font-semibold">
+                  {blockedLines} item{blockedLines === 1 ? " is" : "s are"} no longer available.
+                </p>
+                <p>Remove {blockedLines === 1 ? "it" : "them"} to continue to checkout.</p>
+              </div>
+            )}
+            {notices.length > 0 && (
+              <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+                <p className="font-semibold">Your cart was updated:</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {notices.map((n, i) => (
+                    <li key={i}>{n}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {refreshFailed && (
+              <div role="status" className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+                We couldn&apos;t check current prices and stock. Checkout will verify everything before you pay.
+              </div>
+            )}
+            {savedMessage && (
+              <div role="status" className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                {savedMessage}
+              </div>
+            )}
+          </div>
+        )}
         {cart.length === 0 ? (
+          <>
           <div className="bg-white rounded-3xl shadow-md p-16 text-center">
             <div className="text-6xl mb-4">🛒</div>
             <p className="text-gray-500 text-lg mb-2">Your cart is empty</p>
@@ -346,7 +402,8 @@ Popular Categories
 </div>
           
           </div>
-        
+            {savedSection && <div className="mt-8">{savedSection}</div>}
+          </>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* LEFT: ITEMS */}
@@ -378,6 +435,7 @@ Popular Categories
               {cart.map((item: any, index: number) => {
                 const lineTotal =
                   (Number(item.price) || 0) * (Number(item.qty) || 1);
+                const lineIssue = issues[lineKey(item)];
 
                 return (
                   <div
@@ -462,10 +520,12 @@ Popular Categories
                       {/* stock */}
                       <p
                         className={`text-sm mt-1 ${
-                          item.stock > 0 ? "text-gray-500" : "text-red-500"
+                          !lineIssue && item.stock > 0 ? "text-gray-500" : "text-red-600 font-semibold"
                         }`}
                       >
-                        {item.stock > 0
+                        {lineIssue
+                          ? ISSUE_LABEL[lineIssue]
+                          : item.stock > 0
                           ? item.stock <= 5
                             ? `Only ${item.stock} left`
                             : "In stock"
@@ -477,7 +537,7 @@ Popular Categories
                         <div className="flex items-center border rounded-full overflow-hidden">
                           <button
                             onClick={() => updateQty(index, "dec")}
-                            disabled={item.qty <= 1}
+                            disabled={!!lineIssue || item.qty <= 1}
                             className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white transition disabled:bg-gray-300"
                           >
                             −
@@ -487,14 +547,14 @@ Popular Categories
                           </span>
                           <button
                             onClick={() => updateQty(index, "inc")}
-                            disabled={item.qty >= item.stock}
+                            disabled={!!lineIssue || item.qty >= item.stock}
                            className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white transition disabled:bg-gray-300"
                           >
                             +
                           </button>
                         </div>
 
-                        <p className="text-xl font-bold">
+                        <p className={`text-xl font-bold ${lineIssue ? "text-gray-400 line-through" : ""}`}>
                           ₹{lineTotal.toLocaleString("en-IN")}
                         </p>
                       </div>
@@ -502,66 +562,7 @@ Popular Categories
                   </div>
                 );
               })}
-{savedItems.length > 0 && (
-
-  <div className="mt-10">
-
-    <h2 className="text-2xl font-bold mb-5">
-      ⭐ Saved for Later
-    </h2>
-
-    <div className="space-y-4">
-
-      {savedItems.map((item: any, index: number) => (
-
-        <div
-          key={`${item.id}-${index}`}
-          className="bg-white rounded-2xl shadow-sm p-5 flex flex-col sm:flex-row gap-5"
-        >
-
-          <img
-            src={item.image || "/no-image.png"}
-            alt={item.name}
-            className="w-28 h-28 object-cover rounded-xl"
-          />
-
-          <div className="flex-1">
-
-            <h3 className="font-bold">
-              {item.name}
-            </h3>
-
-            <p className="text-green-700 font-bold mt-2">
-              ₹{Number(item.price).toLocaleString("en-IN")}
-            </p>
-
-            <button
-              onClick={() => moveToCart(index)}
-              className="
-                mt-4
-                bg-green-600
-                hover:bg-green-700
-                text-white
-                px-5
-                py-2
-                rounded-xl
-                transition
-              "
-            >
-              🛒 Move to Cart
-            </button>
-
-          </div>
-
-        </div>
-
-      ))}
-
-    </div>
-
-  </div>
-
-)}
+{savedSection}
               <div className="flex flex-wrap gap-4 pt-2">
 
   <button

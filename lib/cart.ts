@@ -52,7 +52,7 @@ export interface AddToCartOptions {
  * may be different variants that happen to share a colour, and silently
  * combining them would reintroduce the ambiguity this change removes.
  */
-function isSameLine(
+export function isSameLine(
   item: CartItem,
   target: {
     id: string;
