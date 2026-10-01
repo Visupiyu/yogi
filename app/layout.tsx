@@ -13,9 +13,9 @@ import ClientLayout from "@/components/ClientLayout";
 export const metadata: Metadata = {
   metadataBase: new URL("https://yomico.in"),
 
-  alternates: {
-    canonical: "https://yomico.in",
-  },
+  // No site-wide canonical here: a root canonical is inherited by every page
+  // without its own and would point all of them at the home page. Pages that are
+  // indexable set their own (home, product, category, store, static pages).
 
   title: {
   default:
@@ -70,24 +70,26 @@ publisher: "YOMICO",
   siteName: "YOMICO",
   type: "website",
   locale: "en_IN",
+  // /og-image.png never existed (every share preview 404'd). The logo is the
+  // real 1024x1024 brand asset in /public.
   images: [
     {
-      url: "/og-image.png",
-      width: 1200,
-      height: 630,
+      url: "/logo.png",
+      width: 1024,
+      height: 1024,
       alt: "YOMICO",
     },
   ],
 },
 twitter: {
-  card: "summary_large_image",
+  card: "summary",
   title: "YOMICO",
   description: "India's Modern Multi-Vendor Marketplace",
-  images: ["/og-image.png"],
+  images: ["/logo.png"],
 },
 icons: {
   icon: "/favicon.ico",
-  apple: "/apple-touch-icon.png",
+  apple: "/logo.png",
 },
 };
 export const viewport: Viewport = {

@@ -1,6 +1,48 @@
 import type { NextConfig } from "next";
 
+// Private / transactional areas: never index (robots.txt alone only stops crawling;
+// a linked URL can still be indexed without this header). Mirrors app/robots.ts.
+const NOINDEX_SECTIONS = [
+  "admin",
+  "admin-login",
+  "admin-forgot-password",
+  "seller",
+  "vendor-login",
+  "vendor-forgot-password",
+  "delivery",
+  "delivery-app",
+  "delivery-company",
+  "delivery-login",
+  "delivery-forgot-password",
+  "cart",
+  "checkout",
+  "orders",
+  "profile",
+  "settings",
+  "addresses",
+  "notifications",
+  "support",
+  "chat",
+  "invoice",
+  "returns",
+  "wishlist",
+  "compare",
+  "search",
+  "login",
+  "signup",
+  "forgot-password",
+  "track-order",
+];
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      {
+        source: `/:section(${NOINDEX_SECTIONS.join("|")})/:path*`,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ];
+  },
   // Deliberately NOT using serverExternalPackages for firebase-admin:
   // excluding it from webpack's bundle means Node's raw require() has to
   // load its dependency chain directly, and jwks-rsa's require() of

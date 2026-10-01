@@ -21,11 +21,15 @@ const load = cache((id: string) => loadPublicStorefront(getAdminDb(), id));
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const result = await load(id);
-  if (result.kind !== "ok") return { title: "Store not found | YOMICO" };
+  if (result.kind !== "ok") return { title: "Store not found | YOMICO", robots: { index: false, follow: false } };
   const { storefront } = result;
+  const description = storefront.about ? storefront.about.slice(0, 160) : `Shop ${storefront.storeName} on YOMICO.`;
+  const url = `/store/${encodeURIComponent(id)}`;
   return {
     title: `${storefront.storeName} | YOMICO`,
-    description: storefront.about ? storefront.about.slice(0, 160) : `Shop ${storefront.storeName} on YOMICO.`,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title: storefront.storeName, description, url, siteName: "YOMICO", type: "website" },
   };
 }
 

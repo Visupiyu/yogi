@@ -226,9 +226,11 @@ useEffect(() => {
     className="h-18 md:h-20 w-auto object-contain"
   />
   <div className="hidden md:block leading-tight">
-    <h1 className="text-lg font-extrabold tracking-wide text-green-700">
+    {/* A brand label, not a heading: every page renders its own h1, and a site-wide
+        h1 here made two on every page. */}
+    <span className="block text-lg font-extrabold tracking-wide text-green-700">
       YOMICO
-    </h1>
+    </span>
     <p className="text-[10px] text-gray-600 -mt-0.5">
       India&apos;s Multi-Vendor Marketplace
     </p>

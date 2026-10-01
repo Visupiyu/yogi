@@ -1,182 +1,40 @@
-"use client";
+import type { Metadata } from "next";
+import HomePage from "@/components/home/HomePage";
+import { SITE_URL, jsonLdString } from "@/lib/seo";
 
-import { useQuery } from "@tanstack/react-query";
-import { getVisibleCatalog } from "@/lib/storefront/catalogScan";
-import CategoryStrip from "@/components/CategoryStrip";
-import Footer from "@/components/Footer";
-import HeroSlider from "@/components/heroSlider";
-import FeaturedProducts from "@/components/home/FeaturedProducts";
-import FlashSale from "@/components/home/FlashSale";
-import FeatureStrip from "@/components/home/FeatureStrip";
-import OfferCards from "@/components/home/OfferCards";
-import LaunchTrustBanner from "@/components/home/LaunchTrustBanner";
-import ProductSkeleton from "@/components/ProductSkeleton";
-import TrendingProducts from "@/components/TrendingProducts";
-import BestSellers from "@/components/BestSellers";
-import RecommendedProducts from "@/components/RecommendedProducts";
-import CategoryRow from "@/components/CategoryRow";
-import FeaturedCategories from "@/components/FeaturedCategories";
-import CollectionStrip from "@/components/home/CollectionStrip";
-import PromoBanner from "@/components/home/PromoBanner";
-import { catalogTree } from "@/lib/catalog/catalogTree";
-import { findNodeByName, isTopLevelCategory } from "@/lib/catalog/categoryUtils";
-import { toLegacyProduct, type LegacyProductView } from "@/lib/products/legacyDisplay";
+// Home. The interactive storefront is HomePage (client); this server wrapper gives
+// the home its own canonical URL (the root layout no longer sets one, which used
+// to canonicalise EVERY page to the home) and site-level structured data.
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
-type Product = LegacyProductView;
-
-// "name" here is the catalog node's own display name (used to resolve the
-// real categoryId/subCategoryId), which isn't always the same as the row's
-// on-page title — e.g. Men/Women are subcategories of "Fashion", not their
-// own top-level category.
-const CATEGORY_ROWS = [
-  { title: "📱 Mobiles", name: "Mobiles" },
-  { title: "👔 Men Fashion", name: "Men" },
-  { title: "👗 Women Fashion", name: "Women" },
-  { title: "🧒 Kids Fashion", name: "Kids Fashion" },
-  { title: "💻 Electronics", name: "Electronics" },
-  { title: "💄 Beauty", name: "Beauty" },
-  { title: "🏠 Appliances", name: "Appliances" },
-  { title: "🛒 Grocery", name: "Grocery" },
+const siteJsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "YOMICO",
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo.png`,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "YOMICO",
+    url: SITE_URL,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${SITE_URL}/search?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  },
 ];
 
-async function loadProducts(): Promise<Product[]> {
-  // Deliberately no try/catch here — swallowing the error and resolving
-  // with [] made a genuine Firestore failure (permission error, network
-  // failure, timeout) indistinguishable from "the catalog is empty",
-  // which surfaced as a misleading full-page "No Products Available"
-  // takeover with no error indication and no way to retry. Letting the
-  // rejection propagate is what makes useQuery's own isError/refetch work
-  // correctly below.
-  // Shared, cached, paged scan of the visible catalog (lib/storefront/
-  // catalogScan.ts) — the same read Navbar suggestions and text search use, so
-  // opening the homepage then searching does not read the collection again.
-  // It already drops blocked / pending / rejected products. The category
-  // shelves below show every product in their category (merchandising is
-  // unchanged), so the full visible set is genuinely what they need.
-  const { products } = await getVisibleCatalog();
-  return products.map(({ id, data }) => toLegacyProduct(id, data));
-}
-
-export default function Home() {
-  const {
-    data: filteredData = [],
-    isLoading,
-    isError,
-    refetch,
-    isFetching,
-  } = useQuery({
-    queryKey: ["products"],
-    queryFn: loadProducts,
-    staleTime: 1000 * 60 * 5,
-    // Explicit and modest, not TanStack's default of 3 — a permission or
-    // config error will never succeed no matter how many times it's
-    // retried, so burning through more attempts (each with a longer
-    // backoff) only delays the customer seeing an actual error+Retry.
-    retry: 2,
-  });
-
-  // This data is used for exactly one thing below (the category-row
-  // shelves) — it used to gate the ENTIRE page (hero, nav, categories,
-  // every other section) via early returns here, so a slow, failed, or
-  // empty result for JUST the shelves took down the whole homepage even
-  // though every other section fetches its own data independently. Now
-  // scoped to only the section that actually needs it, further down.
-  const byCategory = (name: string) => {
-    const node = findNodeByName(name, catalogTree);
-    if (!node) return [];
-
-    if (isTopLevelCategory(node)) {
-      return filteredData.filter((p) => p.categoryId === node.id);
-    }
-    return filteredData.filter(
-      (p) =>
-        p.subCategoryId === node.id || p.leafCategoryId === node.id
-    );
-  };
-
+export default function Page() {
   return (
-    <main className="min-h-screen bg-gray-100 pb-16 md:pb-0">
-      <CategoryStrip />
-      <FeatureStrip />
-
-      <section className="max-w-7xl mx-auto px-2 py-2">
-  <HeroSlider />
-</section>
-
-      {/* Navratri festive banner — reuses the existing reusable PromoBanner
-          component (same one used for the Electronics sale further down)
-          instead of a new bespoke banner. Replaces the former 15 August /
-          Independence Day launch banner in this slot. */}
-      <PromoBanner
-        badge="NAVRATRI SPECIAL"
-        title="Navratri Festive Sale"
-        subtitle="Celebrate. Shop. Save."
-        image="/navratri-banner.svg"
-        button1="Explore Offers"
-        link1="/store"
-      />
-
-      {/* Coded (no image asset) customer-facing trust/launch banner —
-          reinforces the same 0% commission launch, framed for shoppers. */}
-      <LaunchTrustBanner />
-
-<section className="max-w-7xl mx-auto px-2 pb-4">
-  <OfferCards />
-</section>
-
-      <FeaturedCategories />
-      <FlashSale />
-
-      {/* Category rows — an independent section: its own loading/error/
-          empty states, never blocking the hero, categories, or any of
-          the other product sections below (each of which fetches its
-          own data and already handles its own state independently). */}
-      {isLoading ? (
-        <div className="max-w-7xl mx-auto px-2 py-4 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-          {[...Array(10)].map((_, i) => (
-            <ProductSkeleton key={i} />
-          ))}
-        </div>
-      ) : isError ? (
-        <div className="max-w-7xl mx-auto px-2 py-10 text-center bg-red-50 rounded-3xl border border-red-200 my-4">
-          <p className="text-red-600 font-semibold">Unable to load products.</p>
-          <p className="text-red-500 text-sm mt-1">Please try again.</p>
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="mt-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-6 py-2 rounded-xl font-semibold transition"
-          >
-            {isFetching ? "Retrying..." : "Retry"}
-          </button>
-        </div>
-      ) : CATEGORY_ROWS.every(({ name }) => byCategory(name).length === 0) ? (
-        <div className="max-w-7xl mx-auto px-2 py-10 text-center text-gray-500">
-          No products available right now.
-        </div>
-      ) : (
-        CATEGORY_ROWS.map(({ title, name }) => {
-          const products = byCategory(name);
-          if (products.length === 0) return null;
-          return <CategoryRow key={name} title={title} products={products} />;
-        })
-      )}
-
-      <TrendingProducts />
-      <CollectionStrip
-  title="⚡ Electronics Collection"
-  category="Electronics"
-  viewAll="/category/Electronics"
-/>
-      <BestSellers />
-      {/* "Gifts" and "Home Essentials" CollectionStrips removed — neither
-          is a real category in lib/catalog/catalogTree.ts, so both
-          permanently rendered nothing to every visitor. Re-add once a
-          real category (or a proper seasonal-collection tagging
-          mechanism) exists to back them, rather than guessing a mapping. */}
-<PromoBanner />
-      <RecommendedProducts />
-      <FeaturedProducts />
-      <Footer />
-    </main>
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdString(siteJsonLd) }} />
+      <HomePage />
+    </>
   );
 }
