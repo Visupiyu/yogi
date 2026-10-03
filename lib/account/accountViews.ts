@@ -535,7 +535,7 @@ export function buildLedger(rows: Row[], orderNumbers: OrderNumbers): LedgerEntr
 export const WALLET_RULES = {
   pointValueRupees: 1 as const,
   earn: "Earn 1 point for every ₹100 you pay. Points are credited once the order is delivered, paid and its 7-day return window has closed. Items you return and get refunded don't earn points.",
-  redeem: "Points can no longer be used as a discount at checkout. Your balance is kept safe in your wallet.",
+  redeem: "Use your points at checkout toward future YOMICO purchases (1 point = ₹1) once you have completed your first YOMICO purchase of ₹100 or more. Points cover the item value of an order, not delivery, and at least ₹1 stays payable. Refunds for returned items are credited here as points.",
 };
 
 // ---------------------------------------------------------------------------

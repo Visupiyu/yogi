@@ -9,6 +9,7 @@ import {
   type PricedItemInput,
 } from "@/lib/orderPricing";
 import { Timestamp } from "firebase-admin/firestore";
+import { bindPointsHold, claimPointsHold, releasePointsHold } from "@/lib/rewards/pointsHold";
 
 const ORDER_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const ORDER_RATE_LIMIT_MAX = 15;
@@ -99,18 +100,6 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
       );
     }
 
-    // Rewards B1: YOMICO Points can no longer be spent at checkout (a points
-    // discount reduced the seller's share — lib/vendorEarnings). Refused here,
-    // before pricing and before any Razorpay order or payment intent exists.
-    // Intents created before this change keep their stored pricing and still
-    // finalize through lib/onlineOrder unchanged.
-    if (body.redeemPoints === true) {
-      return Response.json(
-        { error: "YOMICO Points can't be used at checkout. Your points balance is unchanged." },
-        { status: 400 }
-      );
-    }
-
     // body.discountAmount is deliberately NOT read. Any client that still
     // sends it is ignored — the only discount input accepted is which coupon
     // to look up, resolved against Firestore below.
@@ -122,7 +111,7 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
       items,
       requester.uid,
       couponCode,
-      false
+      body.redeemPoints === true
     );
 
     if (!priced.ok) {
@@ -142,6 +131,7 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
     }
 
     // ---- ONLINE only, from here down ----
+    const pointsToHold = priced.pricing.rewardValue;
     //
     // Delivery details are user input, not financial data, so they are read
     // from the request — but they are stored SERVER-SIDE now rather than
@@ -201,10 +191,29 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
 
     };
 
-    const order =
-      await razorpay.orders.create(
-        options
+    // Reserve the points this payment will spend BEFORE the Razorpay order
+    // exists, so a second checkout cannot be priced against the same balance
+    // (lib/rewards/pointsHold). Released below if payment cannot start.
+    const db = getAdminDb();
+    if (pointsToHold > 0) {
+      const hold = await claimPointsHold(db, requester.uid, pointsToHold);
+      if (!hold.ok) {
+        return Response.json({ error: hold.error }, { status: hold.status });
+      }
+    }
+
+    let order;
+    try {
+      order = await razorpay.orders.create(options);
+    } catch (razorpayError) {
+      if (pointsToHold > 0) await releasePointsHold(db, requester.uid).catch(() => {});
+      throw razorpayError;
+    }
+    if (pointsToHold > 0) {
+      await bindPointsHold(db, requester.uid, order.id).catch((e) =>
+        console.error("create-order: failed to bind points hold:", e)
       );
+    }
 
     // The authoritative order intent, keyed by the Razorpay order id.
     //
@@ -235,7 +244,7 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
           phone,
           address,
           couponCode,
-          redeemPoints: false,
+          redeemPoints: pointsToHold > 0,
           deliveryDate: deliveryDateString(),
           expectedAmountPaise: finalAmount * 100,
           razorpayOrderId: order.id,
@@ -247,6 +256,7 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
       // so this must fail BEFORE the customer is shown the payment modal
       // rather than after their money is taken.
       console.error("create-order: failed to persist payment intent:", error);
+      if (pointsToHold > 0) await releasePointsHold(db, requester.uid).catch(() => {});
       return Response.json(
         { error: "Couldn't start payment. Please try again." },
         { status: 500 }

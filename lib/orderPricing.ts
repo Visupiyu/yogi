@@ -18,6 +18,15 @@
 // is genuinely shared, via the dependency-free lib/shippingRules.ts, so the
 // price shown in the cart and at checkout is the price charged here.
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { isRewardsEligible } from "@/lib/rewards/eligibility";
+import {
+  REWARD_HOLD_ACTIVE_MESSAGE,
+  REWARD_NONE_AVAILABLE_MESSAGE,
+  REWARD_NOT_ELIGIBLE_MESSAGE,
+  activeHeldPoints,
+  redeemableValue,
+  spendablePoints,
+} from "@/lib/rewards/redemption";
 // Dependency-free shipping rule, shared verbatim with the cart and checkout
 // UI. Imported from lib/shippingRules (not lib/shipping) because that one
 // pulls the client Firebase SDK, which must never reach a server route.
@@ -465,23 +474,38 @@ export async function computeOrderPricing(
   }
 
   // ---- Reward points: the authenticated user's real stored balance ----
-  // The caller passes only a boolean. Capped at the post-coupon subtotal,
-  // the same ceiling the checkout page applies, so points can never pay for
-  // shipping or push the order below zero.
+  // The caller passes only a boolean — never a balance or an amount. The
+  // customer must be Rewards-eligible (a completed qualifying purchase; a
+  // referral-only balance is not enough), and what is applied is capped by
+  // lib/rewards/redemption: the spendable balance (stored balance less any
+  // points held by an unpaid online intent), the post-coupon merchandise
+  // value (points never pay for shipping) and "leave at least ₹1 payable".
+  // The order transaction re-checks all of it against the live balance.
   let rewardValue = 0;
 
   if (redeemPoints) {
-    const userSnap = await db.collection("users").doc(uid).get();
-    const storedPoints = Number(userSnap.data()?.rewardPoints);
-    const balance =
-      userSnap.exists && Number.isFinite(storedPoints) && storedPoints > 0
-        ? storedPoints
-        : 0;
+    const [userSnap, holdSnap] = await Promise.all([
+      db.collection("users").doc(uid).get(),
+      db.collection("pointsHolds").doc(uid).get(),
+    ]);
+    const eligible = isRewardsEligible(userSnap.exists ? userSnap.data() : null);
 
-    rewardValue = Math.min(
-      balance,
-      Math.floor(Math.max(0, subtotal - couponDiscount))
-    );
+    if (!eligible) {
+      return { ok: false, error: REWARD_NOT_ELIGIBLE_MESSAGE, status: 403 };
+    }
+
+    const held = activeHeldPoints(holdSnap.exists ? holdSnap.data() : null, Date.now());
+    const spendable = spendablePoints(userSnap.data()?.rewardPoints, held);
+
+    rewardValue = redeemableValue({ eligible, spendable, subtotal, couponDiscount, shipping });
+
+    if (rewardValue <= 0) {
+      return {
+        ok: false,
+        error: held > 0 ? REWARD_HOLD_ACTIVE_MESSAGE : REWARD_NONE_AVAILABLE_MESSAGE,
+        status: 409,
+      };
+    }
   }
 
   const rawTotal = subtotal + shipping;
@@ -498,7 +522,10 @@ export async function computeOrderPricing(
   // Commission is permanently ₹0 (lib/commissionPolicy.ts). sellerEarning is
   // the legacy whole-order display field and is therefore finalTotal.
   const commission = YOMICO_COMMISSION_AMOUNT;
-  const sellerEarning = finalTotal - commission;
+  // Points are funded by YOMICO (REWARD_FUNDED_BY_YOMICO), so the whole-order
+  // figure adds the points value back: the seller is paid as if the customer
+  // had paid it all in cash.
+  const sellerEarning = finalTotal + rewardValue - commission;
 
   // applyPostOrderEffects()'s formula, unchanged.
   const earnedPoints = Math.floor(finalTotal / 100);

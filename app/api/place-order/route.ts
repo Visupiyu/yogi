@@ -7,6 +7,14 @@ import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { isProductVisible } from "@/lib/products/visibility";
 import { mintNumbers } from "@/lib/humanIds";
 import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
+import { isRewardsEligible } from "@/lib/rewards/eligibility";
+import {
+  REWARD_BALANCE_CHANGED_MESSAGE,
+  REWARD_FUNDED_BY_YOMICO,
+  REWARD_NOT_ELIGIBLE_MESSAGE,
+  activeHeldPoints,
+  spendablePoints,
+} from "@/lib/rewards/redemption";
 import {
   hasStockBearingVariants,
   planVariantDecrements,
@@ -201,27 +209,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Rewards B1: YOMICO Points can no longer be spent at checkout. A points
-    // discount on an order reduced the SELLER's share
-    // (lib/vendorEarnings.computeVendorShare subtracts rewardValue), so a
-    // request asking for one is refused outright — never silently priced
-    // without it. Checked after the idempotent fast path above, so a retry of
-    // an order placed before this change still returns that order. The
-    // customer's points and ledger are untouched.
-    if (body.redeemPoints === true) {
-      return Response.json(
-        { error: "YOMICO Points can't be used at checkout. Your points balance is unchanged." },
-        { status: 400 }
-      );
-    }
+    // Reward points: the request carries only a boolean. Eligibility, the
+    // spendable balance and the rupee value applied are all decided by
+    // computeOrderPricing from the verified uid's own users/{uid} document —
+    // and re-checked below inside the order transaction. YOMICO funds the
+    // points (rewardFundedBy), so the seller's payout basis is unchanged.
+    const redeemPoints = body.redeemPoints === true;
 
-    // ---- The one trusted pricing pass (products, shipping, coupon). Points
-    // are never applied to a new order.
+    // ---- The one trusted pricing pass (products, shipping, coupon, points).
     const priced = await computeOrderPricing(
       items,
       requester.uid,
       couponCode,
-      false
+      redeemPoints
     );
 
     if (!priced.ok) {
@@ -291,6 +291,9 @@ export async function POST(request: Request) {
       const productSnaps = await Promise.all(productRefs.map((ref) => tx.get(ref)));
 
       const txUserSnap = await tx.get(db.collection("users").doc(requester.uid));
+      const txHoldSnap = pricing.rewardValue > 0
+        ? await tx.get(db.collection("pointsHolds").doc(requester.uid))
+        : null;
 
       // Deterministic id, so the claim can be read inside the transaction —
       // transactions cannot run the legacy random-id query. That query
@@ -397,19 +400,23 @@ export async function POST(request: Request) {
         };
       }
 
-      const currentPoints = Number(txUserSnap.data()?.rewardPoints || 0);
-      const balance = Number.isFinite(currentPoints) && currentPoints > 0 ? currentPoints : 0;
-
-      // finalTotal was computed assuming pricing.rewardValue is spendable. If
-      // the balance moved since (another tab, a concurrent order), committing
-      // anyway would hand out a discount the customer cannot pay for. No
-      // money has been captured on a COD order, so refusing is free.
-      if (pricing.rewardValue > balance) {
-        return {
-          kind: "error",
-          status: 409,
-          error: "Your reward point balance has changed — please review your order again.",
-        };
+      // finalTotal was computed assuming pricing.rewardValue is spendable. The
+      // live document decides: still Rewards-eligible, and the balance — less
+      // any points reserved by an unpaid online payment — still covers it.
+      // If not (another tab, a concurrent order), committing anyway would hand
+      // out a discount the customer cannot pay for. No money has been captured
+      // on a COD order, so refusing is free.
+      if (pricing.rewardValue > 0) {
+        if (!isRewardsEligible(txUserSnap.exists ? txUserSnap.data() : null)) {
+          return { kind: "error", status: 403, error: REWARD_NOT_ELIGIBLE_MESSAGE };
+        }
+        const spendable = spendablePoints(
+          txUserSnap.data()?.rewardPoints,
+          activeHeldPoints(txHoldSnap?.exists ? txHoldSnap.data() : null, Date.now())
+        );
+        if (pricing.rewardValue > spendable) {
+          return { kind: "error", status: 409, error: REWARD_BALANCE_CHANGED_MESSAGE };
+        }
       }
 
       // Human-readable numbers, minted after all reads/validation above and
@@ -481,6 +488,8 @@ export async function POST(request: Request) {
         couponCode: normalizedCode || "",
         discount: pricing.couponDiscount,
         rewardValue: pricing.rewardValue,
+        // Points are YOMICO's cost, not the seller's (computeVendorShare).
+        ...(pricing.rewardValue > 0 ? { rewardFundedBy: REWARD_FUNDED_BY_YOMICO } : {}),
         createdAt: Timestamp.now(),
         paymentAmount: pricing.finalTotal,
 

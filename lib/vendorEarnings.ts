@@ -13,6 +13,8 @@ type Order = {
   finalTotal?: number;
   discount?: number;
   rewardValue?: number;
+  /** "yomico" when YOMICO absorbed rewardValue (lib/rewards/redemption). */
+  rewardFundedBy?: string;
   commissionRate?: number;
 };
 
@@ -97,7 +99,12 @@ export function computeVendorShare(
   );
 
   const orderRawSubtotal = orderItemsSubtotalBasis(order);
-  const totalDiscount = (order.discount || 0) + (order.rewardValue || 0);
+  // A reward-points discount stamped rewardFundedBy "yomico" is YOMICO's cost,
+  // not the seller's: it is left out here so the seller's net subtotal,
+  // earning and payout basis equal what a full cash payment would give. Older
+  // orders carry no stamp and keep subtracting rewardValue exactly as before.
+  const sellerBorneReward = order.rewardFundedBy === "yomico" ? 0 : order.rewardValue || 0;
+  const totalDiscount = (order.discount || 0) + sellerBorneReward;
 
   const vendorDiscountShare =
     orderRawSubtotal > 0

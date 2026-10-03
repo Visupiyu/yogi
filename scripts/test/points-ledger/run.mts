@@ -110,7 +110,7 @@ function record(name: string, pass: boolean, detail = "") {
 
 const COLLECTIONS = ["products", "orders", "cart", "paymentIntents", "coupons", "couponRedemptions", "counters",
   "rateLimits", "settings", "notifications", "users", "rewardTransactions", "deliveryJobs", "unmatchedPayments",
-  "itemRequests", "returns", "sellerOrders", "vendors"];
+  "itemRequests", "returns", "sellerOrders", "vendors", "pointsHolds"];
 async function clearAll() { for (const c of COLLECTIONS) await db.recursiveDelete(db.collection(c)); }
 const clearRateLimits = () => db.recursiveDelete(db.collection("rateLimits"));
 
@@ -248,7 +248,7 @@ async function main() {
       !!err && (await balance(F)) === 3 && o.rewardPointsStatus === "pending", `error="${err}" balance=${await balance(F)} status=${o.rewardPointsStatus}`);
   }
 
-  // ============ 2. B1: points can no longer be spent at checkout ============
+  // ============ 2. checkout redemption: eligible customers spend, referral-only customers are refused ============
   {
     await clearRateLimits();
     const U = "b1_eligible";
@@ -258,14 +258,23 @@ async function main() {
     const stockOf = async () => ((await db.collection("products").doc(PRODUCT).get()).data() as any).stock;
     const stockBefore = await stockOf();
     const ordersBefore = (await db.collection("orders").get()).size;
-    const eligible = await codOrder(U, true);
     const referralOnly = await codOrder(R, true);
-    const ordersAfter = (await db.collection("orders").get()).size;
-    record("2  B1 COD: redeemPoints:true is REFUSED (400) for an eligible AND a referral-only customer — no order, no stock move, balances and ledger untouched",
-      eligible.status === 400 && referralOnly.status === 400 && /points/i.test(String(eligible.json?.error)) &&
-        ordersAfter === ordersBefore && (await stockOf()) === stockBefore &&
-        (await balance(U)) === 300 && (await balance(R)) === 300 && (await rowsFor(U)).length === 0 && (await rowsFor(R)).length === 0,
-      `statuses=${eligible.status}/${referralOnly.status} orders ${ordersBefore}->${ordersAfter} error="${eligible.json?.error ?? ""}"`);
+    const ordersAfterRef = (await db.collection("orders").get()).size;
+    record("2  COD: a referral-only customer with 300 points asking to redeem is REFUSED (403) — no order, no stock move, balance and ledger untouched",
+      referralOnly.status === 403 && /first completed YOMICO purchase/i.test(String(referralOnly.json?.error)) &&
+        ordersAfterRef === ordersBefore && (await stockOf()) === stockBefore && (await balance(R)) === 300 && (await rowsFor(R)).length === 0,
+      `status=${referralOnly.status} orders ${ordersBefore}->${ordersAfterRef} error="${referralOnly.json?.error ?? ""}"`);
+    await clearRateLimits();
+    const eligible = await codOrder(U, true);
+    const eo = eligible.json?.orderId ? ((await db.collection("orders").doc(eligible.json.orderId).get()).data() as any) : null;
+    const er = eligible.json?.orderId ? await row(`redeem_${eligible.json.orderId}`) : null;
+    record("2a COD: an eligible customer redeems 300 of 300 points on ₹1000 -> pay ₹700, one v2 redeem row (−300, 300 -> 0), seller share still the full ₹1000",
+      eligible.status === 200 && eo?.rewardValue === 300 && eo?.finalTotal === 700 && eo?.rewardFundedBy === "yomico" &&
+        isV2(er, "checkout_redeem", -300, 300, 0) && (await balance(U)) === 0 && computeVendorShare(eo, VENDOR)?.vendorEarning === 1000,
+      `status=${eligible.status} finalTotal=${eo?.finalTotal} balance=${await balance(U)}`);
+    // Reset U for 2b: put the balance back and drop 2a's ledger row.
+    await setUser(U, { rewardPoints: 300, rewardsEligibleAt: Timestamp.now(), rewardsEligibleOrderId: "o_prev" });
+    for (const d of (await db.collection("rewardTransactions").where("userId", "==", U).get()).docs) await d.ref.delete();
 
     await clearRateLimits();
     const plain = await codOrder(U, false);
@@ -286,9 +295,9 @@ async function main() {
     const refusedJson = await json(refused);
     const rzpCalls = control.calls.ordersCreate;
     const intentsAfter = (await db.collection("paymentIntents").get()).size;
-    record("2c B1 online: create-order with redeemPoints:true is REFUSED (400) before any Razorpay order or payment intent exists",
-      refused.status === 400 && rzpCalls === 0 && intentsAfter === intentsBefore && (await balance(W)) === 400 &&
-        /points/i.test(String(refusedJson?.error)),
+    record("2c online: a customer who is not Rewards-eligible asking to redeem is REFUSED (403) before any Razorpay order, payment intent or hold exists",
+      refused.status === 403 && rzpCalls === 0 && intentsAfter === intentsBefore && (await balance(W)) === 400 &&
+        !(await db.collection("pointsHolds").doc(W).get()).exists && /first completed YOMICO purchase/i.test(String(refusedJson?.error)),
       `status=${refused.status} razorpayOrders=${rzpCalls} intents ${intentsBefore}->${intentsAfter}`);
     control.reset();
     const ok = await webCreateOrder(req("http://x/api/create-order", { ...BODY, items: [{ id: PRODUCT, qty: 1 }] }, W));

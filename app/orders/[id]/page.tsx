@@ -828,6 +828,13 @@ export default function OrderDetailsPage() {
       <span>₹{order.shippingCharge || 0}</span>
     </div>
 
+    {Number(order.rewardValue) > 0 && (
+      <div className="flex justify-between text-green-600">
+        <span>YOMICO Reward Points used</span>
+        <span>- ₹{Number(order.rewardValue).toLocaleString("en-IN")}</span>
+      </div>
+    )}
+
     <div className="flex justify-between font-bold text-xl border-t pt-4">
       <span>Total Paid</span>
       <span>

@@ -5,6 +5,8 @@ import { mintNumbers } from "@/lib/humanIds";
 import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import type { OrderPricing } from "@/lib/orderPricing";
+import { pointsHoldRef } from "@/lib/rewards/pointsHold";
+import { REWARD_FUNDED_BY_YOMICO } from "@/lib/rewards/redemption";
 import {
   planVariantDecrements,
   sumVariantStock,
@@ -358,6 +360,9 @@ export async function finalizeOnlineOrder(params: {
     const userSnap = await tx.get(userRef);
 
     const couponSnap = couponRef ? await tx.get(couponRef) : null;
+    // The reserve taken at /api/create-order for this payment's points.
+    const holdRef = pointsHoldRef(db, intent.uid);
+    const holdSnap = pricing.rewardValue > 0 ? await tx.get(holdRef) : null;
 
     // ---- Assess, but never reject: the money is already taken ----
     // A product-level decrement (legacy shape). A variant-path product records
@@ -510,7 +515,9 @@ export async function finalizeOnlineOrder(params: {
       // from the constant, never from the intent, so an intent priced under an
       // old setting cannot carry a commission onto the order.
       commission: YOMICO_COMMISSION_AMOUNT,
-      sellerEarning: capturedRupees,
+      // Whole-order legacy figure; YOMICO funds redeemed points, so they are
+      // added back (computeVendorShare is what payouts actually read).
+      sellerEarning: capturedRupees + pricing.rewardValue,
       commissionRate: YOMICO_COMMISSION_RATE,
       commissionAmount: YOMICO_COMMISSION_AMOUNT,
       couponCode: intent.couponCode || "",
@@ -530,6 +537,7 @@ export async function finalizeOnlineOrder(params: {
       // The gap between priced and deducted is real money, and it is recorded
       // as rewardShortfall below plus needsReview, not hidden in this field.
       rewardValue: pricing.rewardValue,
+      ...(pricing.rewardValue > 0 ? { rewardFundedBy: REWARD_FUNDED_BY_YOMICO } : {}),
       createdAt: Timestamp.now(),
 
       // Opts this order into deferred reward crediting, exactly as
@@ -582,6 +590,11 @@ export async function finalizeOnlineOrder(params: {
     // pricing.rewardValue the balance could not cover is recorded on the row
     // as an explicit shortfall (the same figure as rewardShortfall above).
     if (pricing.rewardValue > 0) {
+      // This payment's reserve ends with the order (only if it is this
+      // payment's — never another session's).
+      if (holdSnap?.exists && holdSnap.get("razorpayOrderId") === razorpayOrderId) {
+        tx.delete(holdRef);
+      }
       applyPointsMovements(
         tx,
         db,

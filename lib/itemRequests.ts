@@ -250,6 +250,8 @@ export type OrderLike = {
   items?: unknown;
   finalTotal?: unknown;
   total?: unknown;
+  rewardValue?: unknown;
+  rewardFundedBy?: unknown;
   userId?: unknown;
 };
 
@@ -363,11 +365,21 @@ export function refundableForOrderIndex(
 
   const finalTotalNum = Number(order?.finalTotal);
   const totalNum = Number(order?.total);
-  const paid = Number.isFinite(finalTotalNum) && finalTotalNum > 0
+  const tendered = Number.isFinite(finalTotalNum) && finalTotalNum > 0
     ? finalTotalNum
     : Number.isFinite(totalNum) && totalNum > 0
     ? totalNum
     : itemsValue;
+  // Points the customer redeemed at checkout (stamped rewardFundedBy "yomico")
+  // were part of what they paid with, so a refund — itself paid in points —
+  // returns them too; otherwise returning an item would silently confiscate
+  // the points that bought it. Bounded by the line value below, so a refund
+  // can never exceed what the customer tendered.
+  const redeemed = Number(order?.rewardValue);
+  const paid =
+    order?.rewardFundedBy === "yomico" && Number.isFinite(redeemed) && redeemed > 0
+      ? tendered + redeemed
+      : tendered;
 
   const share = paid * (line / itemsValue);
   const rounded = Math.round(share);

@@ -117,6 +117,13 @@ await check("L3 ledger reads unchanged: owner reads own rows; not another custom
   await assertFails(getDoc(doc(Mdb, "rewardTransactions", "redeem_o_alice")));
 });
 
+await check("L4 pointsHolds (checkout points reserve) is server-only: a customer cannot read, create, change or delete it", async () => {
+  await assertFails(getDoc(doc(Mdb, "pointsHolds", M)));
+  await assertFails(setDoc(doc(Mdb, "pointsHolds", M), { uid: M, points: 0, expiresAt: new Date() }));
+  await assertFails(setDoc(doc(Mdb, "pointsHolds", A), { uid: A, points: 999999, expiresAt: new Date(Date.now() + 1e9) }));
+  await assertFails(deleteDoc(doc(Mdb, "pointsHolds", M)));
+});
+
 // ================= customer: order / return / item-request reward state =================
 await check("O1 customer cannot write order reward state (rewardValue, rewardShortfall, rewardPointsStatus, credited)", async () => {
   await assertFails(updateDoc(doc(Mdb, "orders", "o_mal"), { rewardShortfall: 0 }));

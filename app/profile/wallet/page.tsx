@@ -12,9 +12,8 @@ import { customerLoginUrl } from "@/lib/authRedirect";
 //   - the BALANCE is the stored users.rewardPoints. This page used to add up the
 //     history in the browser, which got cancellations backwards and missed some
 //     rows, so it could show a different number from the stored balance. Points
-//     are NOT spendable at checkout (/api/place-order and /api/create-order
-//     refuse redeemPoints), so this page must not imply a rupee value or a
-//     checkout discount;
+//     are spendable at checkout once the customer is Rewards-eligible
+//     (lib/rewards/redemption; enforced server-side), 1 point = ₹1;
 //   - PENDING points and why each is held, from the same rule the credit job
 //     applies (lib/rewardCredit);
 //   - the signed history, 50 entries at a time. No lifetime totals.

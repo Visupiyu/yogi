@@ -3,6 +3,7 @@
 import { readJsonArray } from "@/lib/safeStorage";
 import { clearCheckoutAfterOrder, removeFromCart } from "@/lib/cart";
 import { payableTotal } from "@/lib/checkoutTotals";
+import { redeemableValue } from "@/lib/rewards/redemption";
 import { EMPTY_ADDRESS_FORM, validateAddressForm } from "@/lib/addressForm";
 import LoadErrorState from "@/components/LoadErrorState";
 import PaymentPending from "@/components/checkout/PaymentPending";
@@ -103,6 +104,13 @@ export default function CheckoutPage() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [discount, setDiscount] = useState(0);
   const couponApplied = appliedCode !== null;
+  // Reward points, DISPLAY state only. Loaded from /api/account/reward-redemption
+  // (the verified customer's real balance); the browser sends the server only a
+  // yes/no flag, never a balance or an amount — the server re-derives both.
+  const [rewards, setRewards] = useState<
+    { status: "loading" } | { status: "error" } | { status: "ready"; eligible: boolean; balance: number; spendable: number }
+  >({ status: "loading" });
+  const [usePoints, setUsePoints] = useState(false);
   const [FREE_SHIPPING_THRESHOLD, setFreeShippingThreshold] = useState(
     DEFAULT_FREE_SHIPPING_THRESHOLD
   );
@@ -155,6 +163,8 @@ export default function CheckoutPage() {
         return;
       }
 
+      void loadRewards(user);
+
       // A payment that succeeded but is still awaiting order confirmation takes
       // over the page, so the same items can't be paid for a second time.
       setPending(loadPendingPayment(user.uid));
@@ -172,6 +182,25 @@ export default function CheckoutPage() {
     return () => unsubscribe();
   }, []);
 
+  async function loadRewards(user: { getIdToken: () => Promise<string> }) {
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch("/api/account/reward-redemption", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok || typeof data?.spendable !== "number") throw new Error("bad response");
+      setRewards({
+        status: "ready",
+        eligible: data.eligible === true,
+        balance: Number(data.balance) || 0,
+        spendable: Number(data.spendable) || 0,
+      });
+    } catch {
+      setRewards({ status: "error" });
+    }
+  }
+
   const total = items.reduce(
     (sum, item) => sum + item.price * item.qty,
     0
@@ -179,14 +208,26 @@ export default function CheckoutPage() {
 
   const finalAmount = total - discount;
 
-  // YOMICO Points are not spent at checkout (Rewards B1) — /api/place-order and
-  // /api/create-order refuse redeemPoints, so the total never includes a
-  // points discount.
+  // Points the server would apply to this cart: eligibility, spendable balance,
+  // merchandise-only cap and the ₹1 floor — the same pure rule it enforces
+  // (lib/rewards/redemption). Presentation only; the server decides.
+  const redeemablePoints =
+    rewards.status === "ready"
+      ? redeemableValue({
+          eligible: rewards.eligible,
+          spendable: rewards.spendable,
+          subtotal: total,
+          couponDiscount: discount,
+          shipping,
+        })
+      : 0;
+  const appliedPoints = usePoints ? redeemablePoints : 0;
   // Same rounding / ₹1 floor the server charges with (lib/checkoutTotals.ts).
-  const grandTotal = payableTotal(total, discount, shipping);
-  // The discount actually taken off the displayed payable, so the lines add up
-  // to the rounded total with no fractional rupee.
-  const displayedDiscount = discount > 0 ? Math.max(0, total + shipping - grandTotal) : 0;
+  const grandTotal = payableTotal(total, discount + appliedPoints, shipping);
+  // The coupon discount actually taken off the displayed payable, so the lines
+  // add up to the rounded total with no fractional rupee.
+  const displayedDiscount =
+    discount > 0 ? Math.max(0, total + shipping - payableTotal(total, discount, shipping)) : 0;
   const commission = Math.round(grandTotal * commissionRate);
 
   // Shipping + delivery date recompute whenever the amount changes, or once
@@ -539,9 +580,9 @@ export default function CheckoutPage() {
     // which contradicts the deferred rule the server implements.
     //
     // What replaces it, all with the Admin SDK:
-    //   REDEEM  not at checkout (Rewards B1): /api/place-order and
-    //           /api/create-order refuse redeemPoints, so new orders never
-    //           carry a points discount.
+    //   REDEEM  server-side at checkout: /api/place-order and
+    //           /api/create-order take a redeemPoints flag and re-derive
+    //           eligibility, balance and amount (lib/rewards/redemption).
     //   EARN    the order is stamped rewardPointsStatus: "pending"; points
     //           are credited only once it is delivered, paid and past its
     //           return window, by lib/rewardCreditServer via
@@ -662,6 +703,9 @@ export default function CheckoutPage() {
             variantId: item.variantId,
           })),
           couponCode: appliedCode,
+          // A yes/no flag only. The server checks eligibility, the live
+          // balance and the amount itself.
+          redeemPoints: appliedPoints > 0,
           paymentMethod: "PAY_ON_DELIVERY_UPI",
           customerName: deliveryName,
           phone: deliveryPhone,
@@ -829,6 +873,7 @@ export default function CheckoutPage() {
         variantId: item.variantId,
       })),
         couponCode: appliedCode,
+        redeemPoints: appliedPoints > 0,
         // Delivery details are user input, not money. The server stores them
         // with the priced intent so finalisation — and the webhook, which has
         // no session at all — can build the order without the browser
@@ -934,6 +979,20 @@ export default function CheckoutPage() {
         ondismiss: function () {
           setLoading(false);
           onlineBusyRef.current = false;
+          // Free the points reserved for this unpaid attempt right away.
+          if (appliedPoints > 0) {
+            void payingUser
+              .getIdToken()
+              .then((token) =>
+                fetch("/api/release-points-hold", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ razorpayOrderId: data.id }),
+                })
+              )
+              .then(() => payingUser && loadRewards(payingUser))
+              .catch(() => {});
+          }
           alert("Payment cancelled — you haven't been charged. You can try again whenever you're ready.");
         },
       },
@@ -1466,6 +1525,65 @@ Easy Returns
                 </p>
               </div>
 
+              {/* REWARD POINTS — display only; the server re-checks everything. */}
+              <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-sm" data-testid="reward-points-box">
+                <p className="font-semibold text-gray-800">YOMICO Reward Points</p>
+                {rewards.status === "loading" && <p className="mt-1 text-gray-500">Checking your points…</p>}
+                {rewards.status === "error" && (
+                  <p className="mt-1 text-gray-500">
+                    We couldn&apos;t load your points right now. You can still place your order without them.
+                  </p>
+                )}
+                {rewards.status === "ready" && !rewards.eligible && (
+                  <p className="mt-1 text-gray-600">
+                    {rewards.balance > 0
+                      ? `You have ${rewards.balance.toLocaleString("en-IN")} points. `
+                      : ""}
+                    Points can be used after your first completed YOMICO purchase of ₹100 or more.
+                  </p>
+                )}
+                {rewards.status === "ready" && rewards.eligible && rewards.spendable <= 0 && (
+                  <p className="mt-1 text-gray-600">
+                    {rewards.balance > 0
+                      ? "Your points are reserved by a payment that is still in progress."
+                      : "You have no points to use yet. Points from returns and purchases will appear here."}
+                  </p>
+                )}
+                {rewards.status === "ready" && rewards.eligible && rewards.spendable > 0 && (
+                  <>
+                    <p className="mt-1 text-gray-600">
+                      Available: <span className="font-semibold">{rewards.spendable.toLocaleString("en-IN")} points</span>{" "}
+                      (1 point = ₹1)
+                    </p>
+                    {redeemablePoints > 0 ? (
+                      <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={usePoints}
+                          onChange={(e) => setUsePoints(e.target.checked)}
+                          disabled={loading}
+                        />
+                        <span>
+                          Use {redeemablePoints.toLocaleString("en-IN")} points (₹
+                          {redeemablePoints.toLocaleString("en-IN")} off item value)
+                          {usePoints && (
+                            <span className="block text-xs text-gray-500">
+                              Remaining to pay: ₹{grandTotal.toLocaleString("en-IN")}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    ) : (
+                      <p className="mt-1 text-gray-500">Points can&apos;t be applied to this order.</p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      Points cover item value only, not delivery, and at least ₹1 stays payable.
+                    </p>
+                  </>
+                )}
+              </div>
+
               {/* PRICE BREAKDOWN */}
               <div className="border-t mt-5 pt-5 space-y-3 text-gray-700">
                 <div className="flex justify-between">
@@ -1477,6 +1595,13 @@ Easy Returns
                   <div className="flex justify-between text-green-600">
                     <span>Coupon discount</span>
                     <span>- ₹{displayedDiscount.toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+
+                {appliedPoints > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>YOMICO Reward Points ({appliedPoints.toLocaleString("en-IN")} pts)</span>
+                    <span>- ₹{appliedPoints.toLocaleString("en-IN")}</span>
                   </div>
                 )}
 
