@@ -98,14 +98,25 @@ await check("C6  approved: seller deleting a category field DENIED", async () =>
   await assertFails(updateDoc(sellerP("c_approved"), { leafCategoryId: deleteField() }));
 });
 await check("C7  approved: seller adding a missing category field DENIED", () => assertFails(updateDoc(sellerP("c_nosub"), { subCategoryId: "HOME_DECOR" })));
-await check("C8  approved: seller non-category edit (title, description) still ALLOWED", () =>
-  assertSucceeds(updateDoc(sellerP("c_approved"), { title: "Live Lamp v2", description: "new copy" })));
-await check("C9  approved: whole-document save with the SAME categories still ALLOWED", () =>
-  assertSucceeds(setDoc(sellerP("c_approved"), { ...LIVE, title: "Live Lamp v3", approvalStatus: "approved", approved: true, active: true, featured: false })));
+// Reviewed content (title, description, media, ...) is frozen on an approved or
+// legacy-live product for direct writes — edits go through
+// /api/seller/update-product, which sends it back to review. A pending or
+// rejected product stays freely editable (see the earlier "title still ALLOWED"
+// check on p_pending).
+await check("C8  approved: seller reviewed-field edit (title, description) DENIED (server route only)", () =>
+  assertFails(updateDoc(sellerP("c_approved"), { title: "Live Lamp v2", description: "new copy" })));
+await check("C8b approved: seller non-reviewed listing field (mrp) still ALLOWED", () =>
+  assertSucceeds(updateDoc(sellerP("c_approved"), { mrp: 850 })));
+await check("C9  approved: whole-document save with the SAME categories and NO reviewed field changed still ALLOWED", () =>
+  assertSucceeds(setDoc(sellerP("c_approved"), { ...LIVE, mrp: 820, approvalStatus: "approved", approved: true, active: true, featured: false })));
+await check("C9b approved: whole-document save that changes a reviewed field (title) DENIED", () =>
+  assertFails(setDoc(sellerP("c_approved"), { ...LIVE, title: "Live Lamp v3", approvalStatus: "approved", approved: true, active: true, featured: false })));
 await check("C10 blocked (approved + inactive): seller change category DENIED", () => assertFails(updateDoc(sellerP("c_blocked"), { categoryId: "FASHION" })));
-await check("C11 legacy (no approvalStatus, live): seller change category DENIED; title ALLOWED", async () => {
+// A missing approvalStatus (legacy, live under lib/products/visibility.ts) does NOT
+// bypass the lock: category AND reviewed content are both frozen for direct writes.
+await check("C11 legacy (no approvalStatus, live): seller change category DENIED; title DENIED", async () => {
   await assertFails(updateDoc(sellerP("c_legacy"), { leafCategoryId: "HOME_DECOR_CLOCKS" }));
-  await assertSucceeds(updateDoc(sellerP("c_legacy"), { title: "Legacy Lamp v2" }));
+  await assertFails(updateDoc(sellerP("c_legacy"), { title: "Legacy Lamp v2" }));
 });
 await check("C12 unknown approvalStatus: seller change category DENIED (fail closed)", () => assertFails(updateDoc(sellerP("c_unknown"), { categoryId: "FASHION" })));
 await check("C13 admin may still change the category of an approved product", () =>

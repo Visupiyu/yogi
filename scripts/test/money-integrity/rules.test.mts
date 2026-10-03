@@ -62,12 +62,22 @@ await check("seller direct write: variants (fractional stock) DENIED", () =>
 await check("seller direct write: stock DENIED", () => assertFails(updateDoc(seller(), { stock: 2.5 })));
 await check("seller direct write: gstRate DENIED", () => assertFails(updateDoc(seller(), { gstRate: 7 })));
 await check("seller direct write: gstPercent DENIED", () => assertFails(updateDoc(seller(), { gstPercent: 3 })));
-await check("seller direct write: non-money field (title) still ALLOWED", () => assertSucceeds(updateDoc(seller(), { title: "Rules Lamp v2" })));
+// Reviewed listing content (title, description, media, ...) is frozen for direct
+// client writes on an approved or legacy-live product (this fixture has no
+// approvalStatus, so it is legacy-live): the seller edits it through
+// /api/seller/update-product, which sends the product back to review.
+await check("seller direct write: reviewed field (title) DENIED (must use the server route)", () => assertFails(updateDoc(seller(), { title: "Rules Lamp v2" })));
+// A non-money, non-reviewed listing field is still a permitted direct write.
+await check("seller direct write: non-money, non-reviewed field (returnDays) still ALLOWED", () => assertSucceeds(updateDoc(seller(), { returnDays: 7 })));
 await check("other seller: title write still DENIED", () =>
   assertFails(updateDoc(doc(env.authenticatedContext("seller_rules_2").firestore(), "products", "p_rules"), { title: "x" })));
 await reseed();
-await check("customer stock<->sales transfer rule unchanged (still ALLOWED)", () =>
-  assertSucceeds(updateDoc(doc(env.authenticatedContext("buyer_rules_1").firestore(), "products", "p_rules"), { stock: 6, sales: 1 })));
+// Stock and sales move ONLY on the server (Admin SDK: place-order, online order
+// finalisation, cancel-order). The old client stock<->sales transfer clause was
+// removed on purpose — it let any signed-in user shift a competitor's stock into
+// sales — so a customer's direct write must now be DENIED.
+await check("customer stock<->sales transfer DENIED (stock/sales are server-only)", () =>
+  assertFails(updateDoc(doc(env.authenticatedContext("buyer_rules_1").firestore(), "products", "p_rules"), { stock: 6, sales: 1 })));
 
 await env.cleanup();
 console.log(`\n${pass}/${pass + fail} rules checks passed`);
