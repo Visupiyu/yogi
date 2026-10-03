@@ -326,25 +326,37 @@ async function main() {
       `create=${c.status} update=${u.status}`);
   }
 
-  // Test 8 — valid product accepted (create + update), server-owned fields ignored, other seller refused
+  // Test 8 — valid product accepted (create + update); server-owned money /
+  // accounting / moderation / identity fields are REFUSED, not trimmed (strict
+  // allow-list, lib/products/sellerProductFields.ts); other seller refused.
   {
     const c = await createProduct(req("http://x/api/seller/create-product", { product: VALID_PRODUCT }, SELLER));
     const cj = await json(c);
     const createdDoc = cj.productId ? (await db.collection("products").doc(cj.productId).get()).data() as any : null;
 
-    const u = await updateProduct(req("http://x/api/seller/update-product", {
+    const forged = await updateProduct(req("http://x/api/seller/update-product", {
       productId: P_SELL,
       product: { ...VALID_PRODUCT, sellingPrice: 450, sales: 999, approved: true, vendorId: OTHER_SELLER },
+    }, SELLER));
+    const fj = await json(forged);
+    const afterForged = (await db.collection("products").doc(P_SELL).get()).data() as any;
+    const forgedRefused = forged.status === 400 &&
+      ["sales", "approved", "vendorId"].every((f) => (fj.fields || []).includes(f)) &&
+      afterForged.sellingPrice === 499 && afterForged.sales === 3 && afterForged.vendorId === SELLER;
+
+    const u = await updateProduct(req("http://x/api/seller/update-product", {
+      productId: P_SELL, product: { ...VALID_PRODUCT, sellingPrice: 450 },
     }, SELLER));
     const stored = (await db.collection("products").doc(P_SELL).get()).data() as any;
 
     const other = await updateProduct(req("http://x/api/seller/update-product", { productId: P_SELL, product: { ...VALID_PRODUCT, sellingPrice: 1 } }, OTHER_SELLER));
     const afterOther = (await db.collection("products").doc(P_SELL).get()).data() as any;
-    record("T8 valid product -> accepted (create 200, update 200); sales/approved/vendorId not client-writable; other seller 403",
+    record("T8 valid product -> accepted (create 200, update 200); an update carrying sales/approved/vendorId is refused 400 with nothing applied (not even the price); other seller 403",
       c.status === 200 && createdDoc?.sellingPrice === 499 && createdDoc?.vendorId === SELLER &&
+      forgedRefused &&
       u.status === 200 && stored.sellingPrice === 450 && stored.sales === 3 && stored.approved === false && stored.vendorId === SELLER &&
       other.status === 403 && afterOther.sellingPrice === 450,
-      `create=${c.status} update=${u.status} price=${stored.sellingPrice} sales=${stored.sales} approved=${stored.approved} other=${other.status}`);
+      `create=${c.status} forged=${forged.status} fields=${JSON.stringify(fj.fields)} priceAfterForged=${afterForged.sellingPrice} update=${u.status} price=${stored.sellingPrice} sales=${stored.sales} approved=${stored.approved} other=${other.status}`);
   }
 
   // ============ L3 + L2 — new mobile COD order: paymentAmount + payout fields ============

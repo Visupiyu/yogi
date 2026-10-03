@@ -135,30 +135,51 @@ async function main() {
   }
 
   // ================= F, G: seller create cannot go live =================
+  // The create route takes a strict allow-list (lib/products/sellerProductFields):
+  // a request carrying any moderation field is REFUSED (400, field named,
+  // nothing written) — not silently stripped. A legitimate create then always
+  // starts pending + inactive, whatever the seller wanted.
   let createdId = "";
   {
-    const res = await createProduct(req("http://x/api/seller/create-product", {
+    const before = (await db.collection("products").get()).size;
+    const forged = await createProduct(req("http://x/api/seller/create-product", {
       product: { ...VALID_PRODUCT, approved: true, active: true, featured: true, approvalStatus: "approved", rejectionReason: "x", moderatedBy: SELLER },
     }, SELLER));
+    const fj = await json(forged);
+    const after = (await db.collection("products").get()).size;
+    const named = ["approved", "active", "featured", "approvalStatus", "rejectionReason", "moderatedBy"].every((f) => (fj.fields || []).includes(f));
+    record("F0 create carrying approved/active/featured/approvalStatus/rejectionReason/moderatedBy is refused (400, fields named, nothing written)",
+      forged.status === 400 && named && after === before, `status=${forged.status} fields=${JSON.stringify(fj.fields)} written=${after - before}`);
+
+    const res = await createProduct(req("http://x/api/seller/create-product", { product: VALID_PRODUCT }, SELLER));
     const j = await json(res);
-    createdId = j.productId;
-    const p = await getP(createdId);
-    record("F  seller cannot set approved/approvalStatus on create (stored approved:false, approvalStatus:pending)",
-      res.status === 200 && p.approved === false && p.approvalStatus === "pending" && !("rejectionReason" in p) && !("moderatedBy" in p),
+    createdId = j.productId || "";
+    const p = createdId ? await getP(createdId) : null;
+    record("F  seller create is stored approved:false, approvalStatus:pending (no rejectionReason / moderatedBy)",
+      res.status === 200 && !!p && p.approved === false && p.approvalStatus === "pending" && !("rejectionReason" in p) && !("moderatedBy" in p),
       `status=${res.status} approved=${p?.approved} approvalStatus=${p?.approvalStatus}`);
-    record("G  seller cannot set active/featured on create (stored active:false, featured:false) and product is hidden",
-      p.active === false && p.featured === false && !isProductVisible(p) && productModerationStatus(p) === "pending",
-      `active=${p?.active} featured=${p?.featured} visible=${isProductVisible(p)}`);
+    record("G  seller create is stored active:false, featured:false and the product is hidden",
+      !!p && p.active === false && p.featured === false && !isProductVisible(p) && productModerationStatus(p) === "pending",
+      `active=${p?.active} featured=${p?.featured} visible=${p ? isProductVisible(p) : "n/a"}`);
   }
+  if (!createdId) throw new Error("legitimate seller create failed — later checks depend on it");
 
   // ================= H: seller update cannot change moderation fields =================
   {
-    const res = await updateProduct(req("http://x/api/seller/update-product", {
+    const forged = await updateProduct(req("http://x/api/seller/update-product", {
       productId: createdId,
-      product: { ...VALID_PRODUCT, title: "Approval Lamp v2", approved: true, active: true, featured: true, approvalStatus: "approved", rejectionReason: "hack", moderatedBy: SELLER },
+      product: { ...VALID_PRODUCT, title: "Approval Lamp HACK", approved: true, active: true, featured: true, approvalStatus: "approved", rejectionReason: "hack", moderatedBy: SELLER },
+    }, SELLER));
+    const p0 = await getP(createdId);
+    record("H0 update carrying moderation fields is refused (400) and NOTHING in it is applied (not even the title)",
+      forged.status === 400 && p0.title === VALID_PRODUCT.title && p0.approved === false && p0.active === false && p0.featured === false && p0.approvalStatus === "pending",
+      `status=${forged.status} title=${p0?.title} approvalStatus=${p0?.approvalStatus}`);
+
+    const res = await updateProduct(req("http://x/api/seller/update-product", {
+      productId: createdId, product: { ...VALID_PRODUCT, title: "Approval Lamp v2" },
     }, SELLER));
     const p = await getP(createdId);
-    record("H  seller update cannot change approved/active/featured/approvalStatus (other edits still apply)",
+    record("H  a legitimate seller update applies its edits and leaves approved/active/featured/approvalStatus untouched",
       res.status === 200 && p.title === "Approval Lamp v2" && p.approved === false && p.active === false && p.featured === false &&
       p.approvalStatus === "pending" && !("rejectionReason" in p) && !("moderatedBy" in p),
       `status=${res.status} title=${p?.title} approved=${p?.approved} active=${p?.active} approvalStatus=${p?.approvalStatus}`);
@@ -272,11 +293,13 @@ async function main() {
     await asAdmin(first.productId, { action: "approve" });
     await asAdmin(first.productId, { action: "block" });
     await db.collection("products").doc(first.productId).delete(); // owner delete (allowed by rules)
-    const again = await json(await createProduct(req("http://x/api/seller/create-product", { product: { ...VALID_PRODUCT, active: true, approved: true } }, SELLER)));
-    const p = await getP(again.productId);
-    record("O  re-created product starts pending + inactive, not visible",
-      !!again.productId && again.productId !== first.productId && p.approvalStatus === "pending" && p.active === false && p.approved === false && !isProductVisible(p),
-      `approvalStatus=${p?.approvalStatus} active=${p?.active}`);
+    const forced = await createProduct(req("http://x/api/seller/create-product", { product: { ...VALID_PRODUCT, active: true, approved: true } }, SELLER));
+    const again = await json(await createProduct(req("http://x/api/seller/create-product", { product: VALID_PRODUCT }, SELLER)));
+    const p = again.productId ? await getP(again.productId) : null;
+    record("O  re-creating cannot force it live (active/approved refused 400); the new product starts pending + inactive, not visible",
+      forced.status === 400 && !!again.productId && again.productId !== first.productId &&
+        p?.approvalStatus === "pending" && p?.active === false && p?.approved === false && !isProductVisible(p),
+      `forced=${forced.status} approvalStatus=${p?.approvalStatus} active=${p?.active}`);
   }
 
   // ================= P: category lock via the server routes =================
@@ -312,13 +335,29 @@ async function main() {
         `status=${r.status} ${field}=${p?.[field]} title=${p?.title}`);
     }
 
+    // Whole-form save of an APPROVED product with the categories unchanged:
+    // a non-content edit (stock) applies and the product stays approved.
+    const before = await getP(pid);
     const ok = await updateProduct(req("http://x/api/seller/update-product", {
-      productId: pid, product: { ...VALID_PRODUCT, categoryId: "FASHION", subCategoryId: "FASHION_MEN", leafCategoryId: "FASHION_MEN_SHIRTS", title: "Cat Lock Lamp v2", description: "updated" },
+      productId: pid,
+      product: { ...VALID_PRODUCT, title: before.title, description: before.description, categoryId: "FASHION", subCategoryId: "FASHION_MEN", leafCategoryId: "FASHION_MEN_SHIRTS", stock: 9 },
     }, SELLER));
     const p2 = await getP(pid);
-    record("P4 after approval the seller can still edit non-category fields (whole-form save with unchanged categories)",
-      ok.status === 200 && p2?.title === "Cat Lock Lamp v2" && p2?.description === "updated" && p2?.categoryId === "FASHION" && p2?.approvalStatus === "approved",
-      `status=${ok.status} title=${p2?.title}`);
+    record("P4 after approval a whole-form save with unchanged categories still works (stock edit applied, stays approved + live)",
+      ok.status === 200 && p2?.stock === 9 && p2?.categoryId === "FASHION" && p2?.approvalStatus === "approved" && isProductVisible(p2),
+      `status=${ok.status} stock=${p2?.stock} approvalStatus=${p2?.approvalStatus}`);
+
+    // Editing approved CONTENT sends it back to review (REREVIEW_FIELDS):
+    // pending + hidden until an admin approves again. Categories untouched.
+    const content = await updateProduct(req("http://x/api/seller/update-product", {
+      productId: pid, product: { title: "Cat Lock Lamp v2", description: "updated" },
+    }, SELLER));
+    const p2b = await getP(pid);
+    record("P4b content edit on an approved product applies but returns it to pending review (hidden), categories unchanged",
+      content.status === 200 && p2b?.title === "Cat Lock Lamp v2" && p2b?.approvalStatus === "pending" && p2b?.active === false &&
+        !isProductVisible(p2b) && (p2b?.reReviewFields || []).includes("title") && p2b?.categoryId === "FASHION",
+      `status=${content.status} approvalStatus=${p2b?.approvalStatus} reReview=${JSON.stringify(p2b?.reReviewFields)}`);
+    await asAdmin(pid, { action: "approve" });
 
     await asAdmin(pid, { action: "block" });
     const blocked = await updateProduct(req("http://x/api/seller/update-product", { productId: pid, product: { leafCategoryId: "X" } }, SELLER));
@@ -344,15 +383,18 @@ async function main() {
     await db.collection("products").doc("legacy_nosub").set({
       ...VALID_PRODUCT, categoryId: "HOME", vendorId: SELLER, approved: false, active: true, sales: 0,
     });
+    // A non-content edit (stock), so the product stays live and LOCKED — a
+    // content edit would send it to pending review, which unlocks category by
+    // design (lib/products/categoryLock.ts).
     const formSave = await updateProduct(req("http://x/api/seller/update-product", {
-      productId: "legacy_nosub", product: { ...VALID_PRODUCT, categoryId: "HOME", subCategoryId: "", leafCategoryId: "", title: "Form Save OK" },
+      productId: "legacy_nosub", product: { ...VALID_PRODUCT, categoryId: "HOME", subCategoryId: "", leafCategoryId: "", stock: 11 },
     }, SELLER));
     const ln = await getP("legacy_nosub");
     const realChange = await updateProduct(req("http://x/api/seller/update-product", {
       productId: "legacy_nosub", product: { leafCategoryId: "HOME_DECOR_LAMPS" },
     }, SELLER));
-    record("P6b locked product missing sub/leaf category: form save re-sending \"\" succeeds (title applied, no empty category fields written); a real new value is still 403",
-      formSave.status === 200 && ln?.title === "Form Save OK" && !("subCategoryId" in ln) && !("leafCategoryId" in ln) && realChange.status === 403,
+    record("P6b locked product missing sub/leaf category: form save re-sending \"\" succeeds (edit applied, no empty category fields written); a real new value is still 403",
+      formSave.status === 200 && ln?.stock === 11 && ln?.approvalStatus === undefined && !("subCategoryId" in ln) && !("leafCategoryId" in ln) && realChange.status === 403,
       `formSave=${formSave.status} hasSub=${"subCategoryId" in (ln || {})} realChange=${realChange.status}`);
 
     const adminMove = await asAdmin(pid, { action: "approve" });

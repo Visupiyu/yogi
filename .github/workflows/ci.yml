@@ -10,8 +10,7 @@
 #     part is skipped (app/sitemap.ts) and nothing reaches production data.
 #   * Every step fails the job on a real failure — nothing is masked.
 #
-# Known baseline failures (failing on e88d1aa before Phase 6 medium) are listed
-# in scripts/test/suites.mjs and printed by every run; they are not run here.
+# `npm test` runs every suite in scripts/test/suites.mjs (none is excluded).
 name: CI
 
 on:

@@ -83,7 +83,7 @@ function record(name: string, pass: boolean, detail = "") {
 }
 const near = (a: unknown, b: number) => typeof a === "number" && Math.abs(a - b) < 1e-9;
 
-const COLLECTIONS = ["products", "orders", "cart", "paymentIntents", "coupons", "couponRedemptions", "counters",
+const COLLECTIONS = ["products", "vendors", "orders", "cart", "paymentIntents", "coupons", "couponRedemptions", "counters",
   "rateLimits", "settings", "notifications", "users", "rewardTransactions", "deliveryJobs", "unmatchedPayments",
   "codPaymentReferences"];
 async function clearAll() { for (const name of COLLECTIONS) await db.recursiveDelete(db.collection(name)); }
@@ -139,6 +139,12 @@ async function seed() {
   });
   await db.collection("coupons").add({ code: "SAVE10", discount: 10, active: true });
   for (const [id, data] of Object.entries(PRODUCTS)) await db.collection("products").doc(id).set(data);
+  // The seller who edits a price in B4: app/api/seller/update-product only lets
+  // an admin-Approved seller account change products (403 otherwise).
+  await db.collection("vendors").doc("v_pricing_1").set({
+    uid: SELLER, email: `${SELLER}@example.com`, businessName: "Pricing Traders", status: "Approved", kycStatus: "Approved",
+    taxProfile: { gstStatus: "UNREGISTERED" },
+  });
 }
 
 type Line = { productId: string; qty: number; variantId?: string };

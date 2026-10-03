@@ -249,10 +249,9 @@ Support is staffed Monday–Saturday and replies within 24–48 business hours
 ## Tests and CI
 
 ```bash
-npm test                           # every suite except the known baseline failures
+npm test                           # every suite
 npm test -- kyc-flow order-emails  # only these suites (prefix match)
 npm test -- --list                 # list suites
-npm test -- --known                # also run the known baseline failures
 npx tsx scripts/test/phase6/storefront.test.mts   # one plain-Node suite directly
 ```
 
@@ -261,10 +260,8 @@ npx tsx scripts/test/phase6/storefront.test.mts   # one plain-Node suite directl
   and Gemini credentials from its environment. It works on Windows, macOS and Linux.
 - Razorpay is replaced by an in-repo fake (`scripts/test/mobile-variant/razorpay-fake.mjs`), and
   order emails go to a fake transport. No real payment, refund or email is ever made.
-- **Known baseline failures:** four suites already failed on the clean production baseline
-  `e88d1aa`, before the Phase 6 medium batch: `product-approval-surfaces`, `money-integrity`,
-  `pricing` and `product-approval`. They are stale tests. Each is listed with its exact failure in
-  `scripts/test/suites.mjs` and printed on every run. CI does not run them until they are fixed.
+- Every suite runs in CI; none is excluded. (The four legacy failures inherited from `e88d1aa` were
+  stale tests and have been fixed.)
 - **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: `npx tsc --noEmit`,
   `npm run build`, `npm test`. No secrets are configured, and nothing is masked: any failure
   fails the job.
@@ -311,4 +308,3 @@ To check the redirect: `curl -sI https://www.yomico.in/` should show a `308` sta
 - **No third-party error monitoring** (Sentry or similar) is configured.
 - External services: Firebase (Google Cloud), Razorpay, Resend, Vercel and Google Gemini. If one is
   down, its feature is unavailable. Orders still commit when email fails.
-- Four test suites are known baseline failures and need their own fixes (see Tests and CI).

@@ -2,7 +2,7 @@
 /*
  * Runs the automated test suites listed in scripts/test/suites.mjs.
  *
- *   npm test                    every suite except the known baseline failures
+ *   npm test                    every suite (minus any known baseline failure, currently none)
  *   npm test -- storefront kyc  only the named suites (prefix match)
  *   npm test -- --list          print the suite list
  *   npm test -- --known         also run the known baseline failures (suites.mjs)

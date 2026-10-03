@@ -21,7 +21,7 @@ const fs = (emulators, project = "demo-yomico-test") => ({ emulators, project })
 export const suites = [
   { name: "config", file: "scripts/test/config/preview-isolation.test.mts", emulators: "" },
   { name: "observability", file: "scripts/test/observability/run.test.mts", emulators: "" },
-  { name: "product-approval-surfaces", file: "scripts/test/product-approval/surfaces.test.mts", emulators: "", knownBaselineFailure: true },
+  { name: "product-approval-surfaces", file: "scripts/test/product-approval/surfaces.test.mts", ...fs("firestore") },
   { name: "phase6-storefront", file: "scripts/test/phase6/storefront.test.mts", emulators: "" },
 
   { name: "admin-access-rules", file: "scripts/test/admin-access/rules.test.mts", ...fs("firestore,storage") },
@@ -41,7 +41,7 @@ export const suites = [
   { name: "mobile-blocked-orders", file: "scripts/test/mobile-blocked-orders/run.mts", ...fs("firestore"), harness: true },
   { name: "mobile-variant", file: "scripts/test/mobile-variant/run.mts", ...fs("firestore"), harness: true },
   { name: "money-integrity-rules", file: "scripts/test/money-integrity/rules.test.mts", ...fs("firestore") },
-  { name: "money-integrity", file: "scripts/test/money-integrity/run.mts", ...fs("firestore"), harness: true , knownBaselineFailure: true },
+  { name: "money-integrity", file: "scripts/test/money-integrity/run.mts", ...fs("firestore"), harness: true },
   { name: "order-containment-rules", file: "scripts/test/order-containment/rules.test.mts", ...fs("firestore") },
   { name: "order-containment", file: "scripts/test/order-containment/run.mts", ...fs("firestore"), harness: true },
   { name: "order-emails", file: "scripts/test/order-emails/run.mts", ...fs("firestore"), harness: true },
@@ -49,9 +49,9 @@ export const suites = [
   { name: "payment-intent", file: "scripts/test/payment-intent/run.mts", ...fs("firestore"), harness: true },
   { name: "points-ledger-rules", file: "scripts/test/points-ledger/rules.test.mts", ...fs("firestore") },
   { name: "points-ledger", file: "scripts/test/points-ledger/run.mts", ...fs("firestore"), harness: true },
-  { name: "pricing", file: "scripts/test/pricing/run.mts", ...fs("firestore"), harness: true , knownBaselineFailure: true },
+  { name: "pricing", file: "scripts/test/pricing/run.mts", ...fs("firestore"), harness: true },
   { name: "product-approval-rules", file: "scripts/test/product-approval/rules.test.mts", ...fs("firestore") },
-  { name: "product-approval", file: "scripts/test/product-approval/run.mts", ...fs("firestore"), harness: true , knownBaselineFailure: true },
+  { name: "product-approval", file: "scripts/test/product-approval/run.mts", ...fs("firestore"), harness: true },
   { name: "reconciliation", file: "scripts/test/reconciliation/run.mts", ...fs("firestore") },
   { name: "return-window", file: "scripts/test/return-window/run.mts", ...fs("firestore"), harness: true },
   { name: "reward-redemption", file: "scripts/test/reward-redemption/run.mts", ...fs("firestore"), harness: true },
@@ -85,24 +85,10 @@ export const excluded = [
 ];
 
 /**
- * Suites that ALREADY FAILED on the clean production baseline
- * e88d1aa173d3bba6a3ef71511e02a0f7b5c82f7b, before the Phase 6 medium batch,
- * with the exact failure seen there. They are stale tests, not product bugs
- * introduced here; each needs its own fix. Listed on every run so they are
- * never silently forgotten. Do not add a suite here without a baseline run
- * showing the same failure.
+ * Suites known to fail on the clean baseline and therefore not run by default
+ * (`npm test -- --known` runs them). EMPTY: the four legacy failures from
+ * e88d1aa (product-approval-surfaces, money-integrity, pricing,
+ * product-approval) were stale tests and have been fixed. Only add a suite
+ * here with a baseline run showing the same failure, and fix it soon.
  */
-export const KNOWN_BASELINE_FAILURES = {
-  "product-approval-surfaces":
-    "Source-scan test. Check 'A-C Navbar autocomplete: imports the canonical helper' fails (imported=false), " +
-    "then the script crashes with ENOENT reading components/Header.tsx, a file that no longer exists.",
-  "money-integrity":
-    "16/17. T8 'valid product -> accepted': create=200 but update=400. The test's update body is refused by the " +
-    "current update-product validation.",
-  pricing:
-    "14/16. B4: the seller update returns 403 because the suite seeds no Approved vendor record, so the " +
-    "stale-price edit never happens; F15 'stale product x3' then expects 1215 and gets 1350.",
-  "product-approval":
-    "Harness error after 10 passes: 'Value for argument \"documentPath\" is not a valid resource path' " +
-    "(getP at run.mts:101 is called with an empty product id).",
-};
+export const KNOWN_BASELINE_FAILURES = {};
