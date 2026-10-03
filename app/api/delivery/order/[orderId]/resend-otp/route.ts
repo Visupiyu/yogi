@@ -54,17 +54,22 @@ export async function POST(
     // Regenerate per shipment (fresh hash, reset attempts, new expiry), then
     // notify AFTER commit. A notification failure leaves the durable OTP intact.
     let resent = 0;
+    let emailSent = false;
+    let inAppSent = false;
     for (const d of outForDelivery) {
       const issue = await db.runTransaction((tx) => regenerateDeliveryOtp(tx, db, { jobId: d.id }));
       if (issue.issued) {
         resent += 1;
-        await deliverOtpToCustomer(db, {
+        const notified = await deliverOtpToCustomer(db, {
+          jobId: issue.jobId,
           userId: issue.userId,
           userEmail: issue.userEmail,
           customerName: issue.customerName,
           shipmentNumber: issue.shipmentNumber,
           code: issue.code,
         });
+        emailSent = emailSent || notified.status.email === "sent";
+        inAppSent = inAppSent || notified.status.inApp === "sent";
       }
     }
 
@@ -77,7 +82,8 @@ export async function POST(
     }
 
     // NEVER returns the code — the customer receives it via email + in-app only.
-    return Response.json({ success: true, resent });
+    // Which channels accepted it is returned so the page can say so honestly.
+    return Response.json({ success: true, resent, channels: { email: emailSent, inApp: inAppSent } });
   } catch (error) {
     console.error("delivery/order/resend-otp failed:", error);
     return Response.json({ error: "Could not resend the delivery code. Please try again." }, { status: 500 });

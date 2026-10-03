@@ -102,6 +102,7 @@ export async function POST(request: Request) {
           // Best-effort notification: a failure leaves the durable OTP intact
           // (the customer can Resend); it must not fail the scan.
           await deliverOtpToCustomer(db, {
+            jobId: issue.jobId,
             userId: issue.userId,
             userEmail: issue.userEmail,
             customerName: issue.customerName,

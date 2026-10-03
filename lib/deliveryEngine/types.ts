@@ -500,6 +500,18 @@ export type DeliveryJob = {
   deliveryOtpHash?: string | null;
   deliveryOtpIssuedAt?: unknown | null;
   deliveryOtpAttempts?: number | null;
+  // Set on the DELIVER write, when the hash is cleared (single-use OTP).
+  deliveryOtpConsumedAt?: unknown | null;
+  // Which channels accepted the current code (otpService.deliverOtpToCustomer).
+  // Carries NO code and NO address; projected via deliveryOtpView() only.
+  deliveryOtpDelivery?: {
+    inApp?: string;
+    email?: string;
+    sms?: string;
+    anyDelivered?: boolean;
+    updatedAt?: unknown;
+    sendCount?: unknown;
+  } | null;
   // POD foundation — Part 1. Set ONCE, only by the DELIVER transition in
   // execution.ts, alongside status/deliveredAt on that SAME write. See
   // DeliveryPod above. Absent on every job that has not yet been Delivered.

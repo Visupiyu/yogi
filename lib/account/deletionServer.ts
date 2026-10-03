@@ -134,7 +134,7 @@ async function accountSnapshot(db: Firestore, uid: string): Promise<AdminDeletio
     orders: orders.size,
     openOrders: orders.docs.filter((d) => !closed.has(String(d.get("status")))).length,
     openReturns: requests.docs.filter((d) => !["REFUNDED", "DELIVERED", "REJECTED", "CANCELLED"].includes(String(d.get("status")))).length,
-    refundsDue: orders.docs.filter((d) => d.get("refundStatus") === "Required" || d.get("refundStatus") === "Processing").length,
+    refundsDue: orders.docs.filter((d) => d.get("refundStatus") === "Required" || d.get("refundStatus") === "Processing" || d.get("refundStatus") === "Failed").length,
     rewardBalance: Number.isFinite(points) && points > 0 ? Math.floor(points) : 0,
   };
 }

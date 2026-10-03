@@ -299,7 +299,7 @@ export default function TrackOrderPage() {
             )}
 
             {/* REFUND */}
-            {result.refundStatus === "Required" && (
+            {(result.refundStatus === "Required" || result.refundStatus === "Failed") && (
               <div className="bg-white rounded-3xl shadow border p-6 md:p-8">
                 <p className="font-semibold text-amber-700">Refund pending</p>
                 <p className="text-gray-600 mt-1 text-sm">

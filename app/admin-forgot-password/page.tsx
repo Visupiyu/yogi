@@ -5,7 +5,6 @@ import Link from "next/link";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import Image from "next/image";
-import { ADMIN_EMAIL } from "@/lib/adminConfig";
 
 export default function AdminForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -26,24 +25,24 @@ export default function AdminForgotPasswordPage() {
       return;
     }
 
-    // The admin account is a single known email — no enumeration risk in
-    // confirming it up front, unlike the customer/vendor reset flows.
-    if (cleanEmail !== ADMIN_EMAIL) {
-      setError("This isn't the registered admin email.");
-      return;
-    }
-
+    // Admins are no longer a single known email (owner + granted roles —
+    // lib/adminAccess), so this reset no longer confirms which emails are
+    // admins: every address gets the same answer. Resetting a password grants
+    // nothing; admin access is still decided server-side at sign-in.
     try {
       setLoading(true);
 
       await sendPasswordResetEmail(auth, cleanEmail);
 
-      setMessage("Password reset link sent. Please check the inbox.");
+      setMessage("If that email belongs to a YOMICO account, a password reset link has been sent. Please check the inbox.");
       setEmail("");
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       if (code === "auth/invalid-email") {
         setError("Please enter a valid email address.");
+      } else if (code === "auth/user-not-found") {
+        setMessage("If that email belongs to a YOMICO account, a password reset link has been sent. Please check the inbox.");
+        setEmail("");
       } else {
         setError("Unable to send reset email. Please try again.");
       }

@@ -9,6 +9,7 @@ import {
   finalizeMobileOnlineOrder,
   type MobilePaymentIntent,
 } from "@/lib/mobileOnlineOrder";
+import { applyRefundWebhook } from "@/lib/refunds/orderRefund";
 
 // ---------------------------------------------------------------------------
 // Razorpay webhook — server-to-server reconciliation.
@@ -34,6 +35,8 @@ import {
 //   1. Razorpay Dashboard -> Settings -> Webhooks -> Add New Webhook
 //        URL:    https://www.yomico.in/api/razorpay/webhook
 //        Events: payment.captured
+//                (optional) refund.processed, refund.failed — settles refunds
+//                started from /admin/orders without a manual status check
 //        Secret: generate one and paste it into Razorpay
 //   2. Vercel -> Project -> Settings -> Environment Variables
 //        RAZORPAY_WEBHOOK_SECRET = <the same secret>
@@ -71,6 +74,19 @@ export async function POST(request: Request) {
       event = JSON.parse(rawBody);
     } catch {
       return Response.json({ error: "Invalid payload." }, { status: 400 });
+    }
+
+    // Refund settlement (optional — needs the refund.processed / refund.failed
+    // events enabled on the same Razorpay webhook). Only a refund YOMICO
+    // created (notes.yomicoOrderId) for an order already waiting on that exact
+    // refund id can change anything — see lib/refunds/orderRefund.ts.
+    if (event?.event === "refund.processed" || event?.event === "refund.failed") {
+      const refund = event?.payload?.refund?.entity;
+      if (!refund || typeof refund.id !== "string") {
+        return Response.json({ error: "Malformed refund entity." }, { status: 400 });
+      }
+      const outcome = await applyRefundWebhook(refund);
+      return Response.json({ received: true, refund: outcome.kind });
     }
 
     // Only captured payments create orders. authorized/failed/refunded events

@@ -31,7 +31,58 @@ type JobDetail = {
   originHub?: { name?: string } | null;
   destinationHub?: { name?: string } | null;
   task?: { finalMileHandoverState?: "ready" | "awaiting_rider_confirmation" | "confirmed" } | null;
+  // Customer delivery-code STATUS (never the code) — see otpService.deliveryOtpView.
+  deliveryOtp?: {
+    state?: "not_issued" | "active" | "expired" | "locked" | "used" | "unavailable";
+    attemptsRemaining?: number | null;
+    delivery?: { inApp?: string; email?: string; sms?: string; anyDelivered?: boolean } | null;
+  } | null;
 };
+
+// What the rider needs to know about the customer's code before asking for it.
+// Plain language, and an explicit fallback that stays inside the normal
+// workflow: never hand over without a verified code — the customer can resend
+// it from their order page; if they still can't get it, record a failed attempt.
+function otpStatusLines(o: JobDetail["deliveryOtp"]): { tone: "ok" | "warn" | "bad"; lines: string[] } | null {
+  if (!o?.state) return null;
+  const d = o.delivery;
+  const left = typeof o.attemptsRemaining === "number" ? ` ${o.attemptsRemaining} wrong entr${o.attemptsRemaining === 1 ? "y" : "ies"} left before it locks.` : "";
+  switch (o.state) {
+    case "unavailable":
+      return { tone: "bad", lines: ["Delivery codes are unavailable right now, so delivery can't be confirmed. Do not hand over — record a failed attempt and contact your dispatcher."] };
+    case "not_issued":
+      return { tone: "warn", lines: ["No delivery code has been issued yet. Mark the parcel \"Out for delivery\" to send one to the customer."] };
+    case "used":
+      return null;
+    case "locked":
+      return { tone: "bad", lines: ["Too many wrong codes — this code is locked. Ask the customer to tap \"Resend delivery code\" on their order page, then enter the new code."] };
+    case "expired":
+      return { tone: "warn", lines: ["The customer's code has expired. Ask them to tap \"Resend delivery code\" on their order page."] };
+    case "active": {
+      if (!d) return { tone: "warn", lines: ["The code is being sent to the customer.", `Ask for it at the door.${left}`] };
+      if (!d.anyDelivered) {
+        return {
+          tone: "bad",
+          lines: [
+            "The code could NOT be delivered to the customer (email and app notification both failed).",
+            "Ask them to tap \"Resend delivery code\" on their order page. If they still can't get it, do not hand over — report a failed attempt (customer unavailable / OTP not received).",
+          ],
+        };
+      }
+      if (d.email !== "sent") {
+        return {
+          tone: "warn",
+          lines: [
+            "The code was NOT emailed — it is only in the customer's YOMICO app notifications (bell icon).",
+            `If they can't find it, they can tap "Resend delivery code" on their order page.${left}`,
+          ],
+        };
+      }
+      return { tone: "ok", lines: [`Code sent to the customer's email and YOMICO notifications.${left}`] };
+    }
+  }
+  return null;
+}
 
 const EXCEPTION_CODES = [
   "CUSTOMER_UNAVAILABLE", "SELLER_UNAVAILABLE", "DAMAGED_PACKAGE",
@@ -338,6 +389,21 @@ export default function JobDetailPage() {
 
               {/* Deliver (fresh scan + customer OTP) */}
               <div className="rounded-lg border bg-white p-4">
+                {(() => {
+                  const status = otpStatusLines(detail?.deliveryOtp);
+                  if (!status) return null;
+                  const tone =
+                    status.tone === "ok"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                      : status.tone === "warn"
+                      ? "border-amber-200 bg-amber-50 text-amber-900"
+                      : "border-red-200 bg-red-50 text-red-900";
+                  return (
+                    <div role="status" className={`mb-3 rounded border p-2 text-xs ${tone}`}>
+                      {status.lines.map((line) => <p key={line}>{line}</p>)}
+                    </div>
+                  );
+                })()}
                 <label className="block text-sm font-medium text-gray-700">Customer OTP</label>
                 <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\s/g, ""))} inputMode="numeric"
                   placeholder="Enter the code the customer gives you"

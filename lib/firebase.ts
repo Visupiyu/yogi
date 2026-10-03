@@ -20,10 +20,11 @@ import { selectFirebaseConfig } from "@/lib/firebaseConfig";
 
 
 
-// Production and local development use the original hard-coded production
-// project unchanged; a Vercel Preview (NEXT_PUBLIC_VERCEL_ENV === "preview")
-// supplies its own project via NEXT_PUBLIC_FIREBASE_* and fails closed if any
-// are missing — see lib/firebaseConfig.ts.
+// Production builds use the original hard-coded production project unchanged;
+// a Vercel Preview (NEXT_PUBLIC_VERCEL_ENV === "preview") supplies its own
+// project via NEXT_PUBLIC_FIREBASE_* and fails closed if any are missing; local
+// development (`next dev`) must choose the emulators or a development project
+// and throws otherwise — see lib/firebaseConfig.ts.
 export const firebaseConfig = selectFirebaseConfig();
 
 const app = initializeApp(firebaseConfig);

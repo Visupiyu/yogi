@@ -96,7 +96,27 @@ export type CompanyJobDetail = {
   // still safe. "awaiting_rider_confirmation"/"confirmed" mean it has, and
   // reassignment must not be offered. Absent for every other leg type.
   task?: { finalMileHandoverState?: "ready" | "awaiting_rider_confirmation" | "confirmed" } | null;
+  // Customer delivery-code STATUS only (never the code) — otpService.deliveryOtpView.
+  deliveryOtp?: {
+    state?: string;
+    attemptsRemaining?: number | null;
+    delivery?: { inApp?: string; email?: string; anyDelivered?: boolean } | null;
+  } | null;
 };
+
+/** One-line delivery-code status for the dispatcher (no secret). */
+export function deliveryCodeLabel(o: CompanyJobDetail["deliveryOtp"]): string {
+  if (!o?.state || o.state === "not_issued") return "Not issued yet";
+  if (o.state === "used") return "Used — delivered";
+  if (o.state === "unavailable") return "Unavailable (server not configured) — delivery cannot be confirmed";
+  if (o.state === "locked") return "Locked after wrong entries — customer must resend";
+  if (o.state === "expired") return "Expired — customer must resend";
+  const d = o.delivery;
+  if (!d) return "Sending to customer…";
+  if (!d.anyDelivered) return "NOT delivered to customer — ask them to resend from their order page";
+  if (d.email !== "sent") return "In-app only — email failed";
+  return "Sent by email + in-app";
+}
 
 // GET /api/delivery/company/persons → { companyId, persons: CompanyPerson[] }
 export type CompanyPerson = {

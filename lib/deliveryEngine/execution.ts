@@ -566,6 +566,11 @@ export async function applyScan(
   if (action === "DELIVER") {
     jobUpdate.status = "Delivered";
     jobUpdate.deliveredAt = now;
+    // The OTP is single-use: consumed on the SAME write as the handover, so a
+    // used code can never verify again (the FSM already refuses a second
+    // DELIVER; this removes the secret itself). Only the hash is cleared.
+    jobUpdate.deliveryOtpHash = null;
+    jobUpdate.deliveryOtpConsumedAt = now;
     // POD Part 1 — a durable, server-derived proof-of-delivery projection on
     // the SAME write as the custody/status transition above (no second
     // custody mutation, no second event, no second transaction). Every value

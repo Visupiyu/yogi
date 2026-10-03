@@ -31,6 +31,22 @@ export default class RazorpayFake {
         if (control.paymentsFetch) return control.paymentsFetch(id);
         return { id };
       },
+      // Refund API — never reaches Razorpay; each harness supplies behaviour.
+      refund: async (paymentId, params) => {
+        control.calls.paymentsRefund++;
+        if (control.paymentsRefund) return control.paymentsRefund(paymentId, params);
+        throw { statusCode: 400, error: { code: "BAD_REQUEST_ERROR", description: "refund not stubbed" } };
+      },
+      fetchMultipleRefund: async (paymentId, params) => {
+        control.calls.paymentsFetchMultipleRefund++;
+        if (control.paymentsFetchMultipleRefund) return control.paymentsFetchMultipleRefund(paymentId, params);
+        return { entity: "collection", count: 0, items: [] };
+      },
+      fetchRefund: async (paymentId, refundId) => {
+        control.calls.paymentsFetchRefund++;
+        if (control.paymentsFetchRefund) return control.paymentsFetchRefund(paymentId, refundId);
+        throw { statusCode: 400, error: { code: "BAD_REQUEST_ERROR", description: "refund not found" } };
+      },
     };
   }
 }

@@ -22,6 +22,7 @@ import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { firebaseConfig } from "@/lib/firebase";
+import { PRODUCTION_FIREBASE_CONFIG } from "@/lib/firebaseConfig";
 
 // Parsed once per warm instance and reused by getAdminApp() and
 // getAdminProjectId() — the env var doesn't change at runtime, and this
@@ -60,11 +61,64 @@ function readServiceAccount(): object {
   return serviceAccount;
 }
 
+// The production Firebase project id — a public identifier, not a secret.
+const PRODUCTION_PROJECT_ID = PRODUCTION_FIREBASE_CONFIG.projectId;
+
+// Local Emulator Suite mode: the Admin SDK honours FIRESTORE_EMULATOR_HOST /
+// FIREBASE_STORAGE_EMULATOR_HOST itself, so with those set no real credential
+// is needed. Only ever a demo-* project, which has no live counterpart.
+function emulatorProjectId(): string | null {
+  if (!process.env.FIRESTORE_EMULATOR_HOST) return null;
+  const id = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT || "";
+  return id.startsWith("demo-") ? id : null;
+}
+
+// LOCAL DEVELOPMENT SAFETY (`next dev` only — NODE_ENV is "production" for every
+// build, including Vercel). Refuses to hand out an Admin SDK bound to the
+// PRODUCTION project unless the developer opted in explicitly. Emulator traffic
+// never reaches this check's concern (Firestore goes to the emulator).
+function assertNotProductionInLocalDev(projectId: unknown): void {
+  if (process.env.NODE_ENV !== "development") return;
+  if (process.env.FIRESTORE_EMULATOR_HOST) return;
+  if (process.env.NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV === "true") return;
+  if (projectId === PRODUCTION_PROJECT_ID) {
+    throw new Error(
+      "Refusing to use the PRODUCTION Firebase service account during local development. Use the " +
+        "Firebase Emulator Suite or a development project's service account, or set " +
+        "NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV=true deliberately. See README → Local development."
+    );
+  }
+}
+
 export function getAdminApp(): App {
   const existing = getApps().find((a) => a.name === "yomico-admin");
   if (existing) return existing;
 
+  if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true" && !process.env.FIRESTORE_EMULATOR_HOST) {
+    throw new Error(
+      "NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true but FIRESTORE_EMULATOR_HOST is not set — the server would " +
+        "talk to a real project while the browser talks to the emulators. Set FIRESTORE_EMULATOR_HOST, " +
+        "FIREBASE_AUTH_EMULATOR_HOST and FIREBASE_STORAGE_EMULATOR_HOST (see .env.example)."
+    );
+  }
+
+  const emulatorProject = emulatorProjectId();
+  if (emulatorProject && !process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    return initializeApp({ projectId: emulatorProject }, "yomico-admin");
+  }
+
   const serviceAccount = readServiceAccount();
+  const serviceProjectId = (serviceAccount as { project_id?: unknown }).project_id;
+  assertNotProductionInLocalDev(serviceProjectId);
+  // Emulator mode with the PRODUCTION service account: Firestore would go to
+  // the emulator, but anything that mints Google access tokens (the
+  // verification-email link, account lookups) would still reach production.
+  if (process.env.FIRESTORE_EMULATOR_HOST && serviceProjectId === PRODUCTION_PROJECT_ID) {
+    throw new Error(
+      "FIRESTORE_EMULATOR_HOST is set but FIREBASE_SERVICE_ACCOUNT_KEY is the PRODUCTION service account. " +
+        "Remove FIREBASE_SERVICE_ACCOUNT_KEY when using the emulators."
+    );
+  }
 
   // Preview fail-safe: a Vercel Preview must run its Admin SDK against the SAME
   // Firebase project its client config points at — never a production service
@@ -120,6 +174,9 @@ export function getAdminBucket() {
 // request always targets the project the Bearer token was actually minted
 // for. Throws rather than guessing if the key has no project_id.
 export function getAdminProjectId(): string {
+  const emulatorProject = emulatorProjectId();
+  if (emulatorProject && !process.env.FIREBASE_SERVICE_ACCOUNT_KEY) return emulatorProject;
+
   const projectId = (readServiceAccount() as { project_id?: unknown })
     .project_id;
 

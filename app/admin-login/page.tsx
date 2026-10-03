@@ -32,13 +32,15 @@ const result = await signInWithEmailAndPassword( auth, email.trim().toLowerCase(
 
 const userEmail = (result.user.email || "").toLowerCase();
 
-if (userEmail !== ADMIN_EMAIL) {
-  await signOut(auth);
-  alert("Not Admin Account");
-  return;
-}
-
 if (!result.user.emailVerified) {
+  // Granted admins must already be verified (the grant requires it), so only
+  // the owner account can reach this branch as a would-be admin; anyone else
+  // gets the same answer as any non-admin.
+  if (userEmail !== ADMIN_EMAIL) {
+    await signOut(auth);
+    alert("Not Admin Account");
+    return;
+  }
   // Same branded server-side email as signup — sent while still signed in,
   // since the endpoint authenticates with this user's ID token.
   await sendVerificationEmail(result.user);
@@ -52,7 +54,24 @@ if (!result.user.emailVerified) {
   return;
 }
 
-// 👇 ADD HERE
+// The server decides admin (owner or an active adminRoles grant) — the same
+// check every admin API and firestore.rules apply. Fails closed.
+let isAdmin = false;
+try {
+  const res = await fetch("/api/admin/whoami", {
+    headers: { Authorization: `Bearer ${await result.user.getIdToken()}` },
+    cache: "no-store",
+  });
+  isAdmin = res.ok && (await res.json())?.isAdmin === true;
+} catch {
+  isAdmin = false;
+}
+if (!isAdmin) {
+  await signOut(auth);
+  alert("Not Admin Account");
+  return;
+}
+
 localStorage.removeItem("user");
 localStorage.removeItem("vendor");
 

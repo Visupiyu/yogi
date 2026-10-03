@@ -26,6 +26,7 @@ import {
   pickupAddressLine,
   COMPANY_ACTIONABLE_STATUSES,
   riderResponseSublabel,
+  deliveryCodeLabel,
   type CompanyJobDetail,
   type CompanyPerson,
 } from "@/app/delivery-company/_lib/console";
@@ -172,6 +173,9 @@ export default function DeliveryCompanyJobDetailPage() {
             <Row k="Provider" v={`${job.providerType || "—"}${job.assignedCompanyName ? ` · ${job.assignedCompanyName}` : ""}`} />
             <Row k="Status" v={job.status} />
             <Row k="Stage" v={stageLabel(job.currentStage)} />
+            {(job.currentStage === "OutForDelivery" || job.currentStage === "Delivered") && (
+              <Row k="Customer delivery code" v={deliveryCodeLabel(job.deliveryOtp)} />
+            )}
             <Row k="Items" v={itemsSummary(job.parcel?.items)} />
           </Card>
 

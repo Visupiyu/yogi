@@ -846,7 +846,7 @@ export default function OrderDetailsPage() {
         payment was actually captured; absent on every other order, so
         nothing renders for the normal case. Wording stays honest about
         whether the money has actually been returned yet. */}
-    {order.refundStatus === "Required" && (
+    {(order.refundStatus === "Required" || order.refundStatus === "Failed") && (
       <div className="border-t pt-4 text-sm">
         <p className="font-semibold text-amber-700">Refund pending</p>
         <p className="text-gray-600 mt-1">

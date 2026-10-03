@@ -1,5 +1,5 @@
 import { firebaseConfig } from "@/lib/firebase";
-import { ADMIN_EMAIL } from "@/lib/adminConfig";
+import { resolveIsAdmin } from "@/lib/adminAccess";
 
 export type VerifiedUser = {
   uid: string;
@@ -67,15 +67,20 @@ export async function verifyRequestUser(
       return null;
     }
 
+    const email: string | null = user.email ?? null;
+    const emailVerified = user.emailVerified === true;
+
     return {
       uid: user.localId,
-      email: user.email ?? null,
-      // Admin authorization must match firestore.rules' isAdmin(), which
-      // requires BOTH the admin email AND a verified email — otherwise the
-      // client and server disagree (a write route would admit an admin whose
-      // token the security rules reject on every read).
-      isAdmin: user.email === ADMIN_EMAIL && user.emailVerified === true,
-      emailVerified: user.emailVerified === true,
+      email,
+      // Admin authorization must match firestore.rules' isAdmin(): a VERIFIED
+      // email AND (the owner account OR an active, server-written
+      // adminRoles/{uid} record) — see lib/adminAccess.ts. Otherwise client
+      // and server disagree (a write route would admit an admin whose token
+      // the security rules reject on every read). Never derived from anything
+      // the request body claims.
+      isAdmin: await resolveIsAdmin({ uid: user.localId, email, emailVerified }),
+      emailVerified,
       // When the Auth account was created — accounts:lookup reports it as
       // epoch-ms text. Used by the referral new-customer rule.
       createdAtMs: Number.isFinite(Number(user.createdAt)) && Number(user.createdAt) > 0 ? Number(user.createdAt) : null,

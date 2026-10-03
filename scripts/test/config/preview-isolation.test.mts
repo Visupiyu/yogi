@@ -82,6 +82,71 @@ const FB = {
     cfg.projectId === "yogi-mart", `projectId=${cfg.projectId}`);
 }
 
+// ---- L8: local development must never silently use production ----
+// 4c) `next dev` with nothing configured -> throws (no silent production).
+{
+  const msg = throwsWith(() => selectFirebaseConfig({ NODE_ENV: "development" }));
+  check("4c local dev, nothing configured -> throws (no silent production)",
+    !!msg && msg.includes("NEXT_PUBLIC_USE_FIREBASE_EMULATORS"), msg || "(no throw)");
+}
+// 4d) `next dev` with explicit production opt-in -> production (deliberate only).
+{
+  const cfg = selectFirebaseConfig({ NODE_ENV: "development", NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV: "true" });
+  check("4d local dev + explicit opt-in -> production", cfg.projectId === "yogi-mart");
+}
+// 4e) `next dev` with a development project -> that project.
+{
+  const cfg = selectFirebaseConfig({ ...FB, NODE_ENV: "development" });
+  check("4e local dev + development project -> dev project", cfg.projectId === "yogi-mart-test");
+}
+// 4f) `next dev` naming the PRODUCTION project id via env -> throws without opt-in.
+{
+  const msg = throwsWith(() => selectFirebaseConfig({ ...FB, NEXT_PUBLIC_FIREBASE_PROJECT_ID: "yogi-mart", NODE_ENV: "development" }));
+  check("4f local dev + env names production project -> throws", !!msg, msg || "(no throw)");
+}
+// 4g) Emulator mode -> demo project with inert placeholders, nothing production.
+{
+  const cfg = selectFirebaseConfig({ NODE_ENV: "development", NEXT_PUBLIC_USE_FIREBASE_EMULATORS: "true", NEXT_PUBLIC_FIREBASE_PROJECT_ID: "demo-yomico-local" });
+  const values = Object.values(cfg).join("|");
+  check("4g emulator mode -> demo project, no production values",
+    cfg.projectId === "demo-yomico-local" &&
+      !values.includes(PRODUCTION_FIREBASE_CONFIG.apiKey) &&
+      !values.includes("yogi-mart.") && !values.includes(PRODUCTION_FIREBASE_CONFIG.appId),
+    `projectId=${cfg.projectId}`);
+}
+// 4h) Emulator mode with a real project id -> throws.
+{
+  const msg = throwsWith(() => selectFirebaseConfig({ NEXT_PUBLIC_USE_FIREBASE_EMULATORS: "true", NEXT_PUBLIC_FIREBASE_PROJECT_ID: "yogi-mart" }));
+  check("4h emulator mode + real project -> throws", !!msg && msg.includes("demo-"), msg || "(no throw)");
+}
+// 4i) Production build (NODE_ENV=production) -> production, unchanged.
+{
+  const cfg = selectFirebaseConfig({ NODE_ENV: "production" });
+  check("4i production build -> production project unchanged", cfg === PRODUCTION_FIREBASE_CONFIG);
+}
+// 4j) Local dev + LIVE Razorpay key -> rejected; test key accepted; explicit opt-out allowed.
+{
+  const live = throwsWith(() => assertRazorpayTestKeyInPreview({ NODE_ENV: "development", RAZORPAY_KEY_ID: "rzp_live_ABC" }));
+  const test = throwsWith(() => assertRazorpayTestKeyInPreview({ NODE_ENV: "development", RAZORPAY_KEY_ID: "rzp_test_ABC" }));
+  const optOut = throwsWith(() => assertRazorpayTestKeyInPreview({ NODE_ENV: "development", RAZORPAY_KEY_ID: "rzp_live_ABC", ALLOW_LIVE_RAZORPAY_IN_DEV: "true" }));
+  check("4j local dev LIVE razorpay rejected, test accepted, opt-out explicit",
+    !!live && test === null && optOut === null, live || "(no throw)");
+}
+// 4k) The browser bundle reads NODE_ENV and the selectors through literal references.
+{
+  const src = fs.readFileSync(path.join(REPO, "lib/firebaseConfig.ts"), "utf8");
+  const ok = ["process.env.NODE_ENV", "process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS",
+    "process.env.NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV"].every((s) => src.includes(s));
+  check("4k selectors read via literal process.env references (inlined in browser)", ok);
+}
+// 4l) Admin SDK refuses the production service account under `next dev`.
+{
+  const src = fs.readFileSync(path.join(REPO, "lib/firebaseAdmin.ts"), "utf8");
+  const guard = src.indexOf("assertNotProductionInLocalDev(serviceProjectId)");
+  const init = src.indexOf("initializeApp({ credential: cert(serviceAccount) }");
+  check("4l admin SDK guards production service account before init in local dev", guard !== -1 && init !== -1 && guard < init);
+}
+
 // 5) Razorpay: preview + rzp_test_ -> accepted.
 check("5 razorpay preview test key -> accepted",
   throwsWith(() => assertRazorpayTestKeyInPreview({ VERCEL_ENV: "preview", RAZORPAY_KEY_ID: "rzp_test_ABC" })) === null);
@@ -101,6 +166,7 @@ check("7 razorpay production LIVE key -> accepted (unchanged)",
     "app/api/verify-payments/route.ts",
     "app/api/mobile/create-payment-order/route.ts",
     "lib/razorpayVerify.ts",
+    "lib/refunds/orderRefund.ts",
   ];
   let allGuarded = true;
   const details: string[] = [];

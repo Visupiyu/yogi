@@ -6,7 +6,7 @@
 // the code to the customer is PLUGGABLE (email + in-app today): adding
 // SMS/WhatsApp later is a new channel here — no delivery-FSM or Expo change.
 import type { Transaction, Firestore } from "firebase-admin/firestore";
-import { Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { Resend } from "resend";
 import type { DeliveryJob } from "@/lib/deliveryEngine/types";
 import {
@@ -14,6 +14,7 @@ import {
   hashDeliveryOtp,
   isDeliveryOtpConfigured,
   DELIVERY_OTP_TTL_MS,
+  DELIVERY_OTP_MAX_ATTEMPTS,
 } from "@/lib/deliveryEngine/deliveryOtp";
 
 export type OtpIssue =
@@ -80,7 +81,9 @@ async function issue(tx: Transaction, db: Firestore, jobId: string, force: boole
   const now = Timestamp.now();
   tx.set(
     jobRef,
-    { deliveryOtpHash: hashDeliveryOtp(code), deliveryOtpIssuedAt: now, deliveryOtpAttempts: 0, updatedAt: now },
+    // deliveryOtpDelivery is reset: the previous code's channel outcome must
+    // never be read as this code's (deliverOtpToCustomer records the new one).
+    { deliveryOtpHash: hashDeliveryOtp(code), deliveryOtpIssuedAt: now, deliveryOtpAttempts: 0, deliveryOtpDelivery: null, updatedAt: now },
     { merge: true },
   );
 
@@ -94,16 +97,52 @@ const FROM = "YOMICO <onboarding@yomico.in>";
 const resendKey = process.env.RESEND_API_KEY;
 const resend = resendKey ? new Resend(resendKey) : null;
 
-export type OtpNotifyResult = { channels: { channel: string; ok: boolean }[] };
+// Per-channel outcome. "sent" means the provider ACCEPTED the message — not
+// that the customer read it. SMS is listed explicitly as "not_configured": no
+// SMS provider is integrated (see README → Delivery OTP), and nothing here
+// pretends otherwise.
+export type OtpChannelState = "sent" | "failed" | "no_address" | "not_configured";
+export type OtpDeliveryStatus = {
+  inApp: OtpChannelState;
+  email: OtpChannelState;
+  sms: "not_configured";
+  /** At least one channel accepted the code. */
+  anyDelivered: boolean;
+};
+
+export type OtpNotifyResult = {
+  channels: { channel: string; ok: boolean }[];
+  status: OtpDeliveryStatus;
+};
+
+/** Injectable email sender (tests). Resolves to Resend's own `{ error }` shape. */
+export type OtpEmailSender = (message: {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+}) => Promise<{ error?: unknown } | null | undefined>;
+
+const defaultEmailSender: OtpEmailSender | null = resend
+  ? (message) => resend.emails.send(message) as Promise<{ error?: unknown }>
+  : null;
 
 // Deliver the code to the ORDER OWNER via the customer channels. Never throws
 // (a notification failure must not corrupt the durable OTP/shipment state — the
-// customer can Resend). Never logs the code.
+// customer can Resend). Never logs the code or the address.
+//
+// The per-channel outcome is persisted on the job as deliveryOtpDelivery (no
+// code, no address — just which channels accepted it) so the rider, the
+// delivery company and the customer can all SEE whether the code went out,
+// instead of finding out at the door.
 export async function deliverOtpToCustomer(
   db: Firestore,
-  args: { userId: string; userEmail: string; customerName: string; shipmentNumber: string; code: string },
+  args: { jobId?: string; userId: string; userEmail: string; customerName: string; shipmentNumber: string; code: string },
+  deps: { sendEmail?: OtpEmailSender | null } = {},
 ): Promise<OtpNotifyResult> {
-  const channels: { channel: string; ok: boolean }[] = [];
+  const sendEmail = deps.sendEmail === undefined ? defaultEmailSender : deps.sendEmail;
+  let inApp: OtpChannelState = "failed";
+  let email: OtpChannelState = "failed";
 
   // In-app notification, scoped to the order owner's customer account.
   try {
@@ -116,15 +155,21 @@ export async function deliverOtpToCustomer(
       read: false,
       createdAt: Timestamp.now(),
     });
-    channels.push({ channel: "in-app", ok: true });
+    inApp = "sent";
   } catch {
-    channels.push({ channel: "in-app", ok: false });
+    inApp = "failed";
   }
 
-  // Email to the order's customer email.
-  if (resend && args.userEmail) {
+  // Email to the order's customer email. Resend RESOLVES with { error } on an
+  // API failure rather than throwing, so that must be checked explicitly —
+  // previously a rejected send was recorded as delivered.
+  if (!sendEmail) {
+    email = "not_configured";
+  } else if (!args.userEmail) {
+    email = "no_address";
+  } else {
     try {
-      await resend.emails.send({
+      const result = await sendEmail({
         from: FROM,
         to: args.userEmail,
         subject: "Your YOMICO delivery code",
@@ -134,13 +179,82 @@ export async function deliverOtpToCustomer(
           `Share it only with the delivery person when your parcel is handed over.\n\n` +
           `This code expires in 24 hours. If you didn't expect a delivery, you can ignore this message.\n\n— YOMICO`,
       });
-      channels.push({ channel: "email", ok: true });
+      email = result && result.error ? "failed" : "sent";
     } catch {
-      channels.push({ channel: "email", ok: false });
+      email = "failed";
     }
-  } else {
-    channels.push({ channel: "email", ok: false });
   }
 
-  return { channels };
+  if (email === "failed" || inApp === "failed") {
+    console.warn("delivery OTP: channel delivery failed", { jobId: args.jobId || null, inApp, email });
+  }
+
+  const status: OtpDeliveryStatus = {
+    inApp,
+    email,
+    sms: "not_configured",
+    anyDelivered: inApp === "sent" || email === "sent",
+  };
+
+  if (args.jobId) {
+    try {
+      await db.collection("deliveryJobs").doc(args.jobId).set(
+        { deliveryOtpDelivery: { ...status, updatedAt: Timestamp.now(), sendCount: FieldValue.increment(1) } },
+        { merge: true },
+      );
+    } catch {
+      console.warn("delivery OTP: could not record delivery status", { jobId: args.jobId });
+    }
+  }
+
+  return {
+    channels: [
+      { channel: "in-app", ok: inApp === "sent" },
+      { channel: "email", ok: email === "sent" },
+    ],
+    status,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Read-only projection for the delivery actors and the customer. NEVER carries
+// the code, the hash, the address or the attempt counter's raw document — just
+// what an operator needs to act: is there a live code, did it reach the
+// customer, and how many wrong entries remain before it locks.
+// ---------------------------------------------------------------------------
+export type OtpView = {
+  state: "not_issued" | "active" | "expired" | "locked" | "used" | "unavailable";
+  expiresAt: string | null;
+  attemptsRemaining: number | null;
+  delivery: OtpDeliveryStatus | null;
+};
+
+export function deliveryOtpView(job: DeliveryJob): OtpView {
+  const j = job as Record<string, unknown>;
+  const ms = (v: unknown) =>
+    v && typeof (v as { toMillis?: unknown }).toMillis === "function" ? (v as { toMillis: () => number }).toMillis() : null;
+  const raw = j.deliveryOtpDelivery as Partial<OtpDeliveryStatus> | undefined;
+  const delivery: OtpDeliveryStatus | null =
+    raw && typeof raw === "object"
+      ? {
+          inApp: (raw.inApp as OtpChannelState) || "failed",
+          email: (raw.email as OtpChannelState) || "failed",
+          sms: "not_configured",
+          anyDelivered: raw.anyDelivered === true,
+        }
+      : null;
+
+  if (ms(j.deliveryOtpConsumedAt) !== null || job.status === "Delivered") {
+    return { state: "used", expiresAt: null, attemptsRemaining: null, delivery };
+  }
+  if (!isDeliveryOtpConfigured()) return { state: "unavailable", expiresAt: null, attemptsRemaining: null, delivery };
+  const hash = typeof j.deliveryOtpHash === "string" ? j.deliveryOtpHash : "";
+  const issued = ms(j.deliveryOtpIssuedAt);
+  if (!hash || issued === null) return { state: "not_issued", expiresAt: null, attemptsRemaining: null, delivery: null };
+  const expiresAt = new Date(issued + DELIVERY_OTP_TTL_MS).toISOString();
+  const attempts = typeof j.deliveryOtpAttempts === "number" ? j.deliveryOtpAttempts : 0;
+  const attemptsRemaining = Math.max(0, DELIVERY_OTP_MAX_ATTEMPTS - attempts);
+  if (attemptsRemaining === 0) return { state: "locked", expiresAt, attemptsRemaining: 0, delivery };
+  if (Date.now() - issued > DELIVERY_OTP_TTL_MS) return { state: "expired", expiresAt, attemptsRemaining, delivery };
+  return { state: "active", expiresAt, attemptsRemaining, delivery };
 }

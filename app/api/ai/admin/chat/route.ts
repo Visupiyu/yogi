@@ -64,7 +64,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply: result.text });
   } catch (error) {
     console.error("Admin AI chat error:", error);
-    const message = error instanceof Error ? error.message : "Failed to get a response.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Same safe message as the customer/seller chat routes — the provider's
+    // raw error text (which can carry request details) stays in the server log.
+    return NextResponse.json({ error: "Couldn't get a response right now. Please try again." }, { status: 500 });
   }
 }

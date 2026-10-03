@@ -3,8 +3,16 @@
 // lib/serverAuth.ts's ID-token verification. Kept dependency-free (no Firebase
 // SDK, no server imports) so it can be unit-tested directly.
 //
-// PRODUCTION and local development use the hard-coded production project below,
-// exactly as before. A deployment switches to environment-supplied values when
+// PRODUCTION (any `next build` / `next start`, including Vercel Production)
+// uses the hard-coded production project below, exactly as before. LOCAL
+// DEVELOPMENT (`next dev`, NODE_ENV === "development") no longer does: it must
+// name its target explicitly — the Firebase Emulator Suite, a separate
+// development project, or (deliberately, with
+// NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV=true) production — and throws
+// otherwise, so `npm run dev` can never silently read or write production data.
+// See README "Local development".
+//
+// A deployment switches to environment-supplied values when
 // it explicitly provides its own Firebase project id
 // (NEXT_PUBLIC_FIREBASE_PROJECT_ID) or runs as a Vercel Preview
 // (NEXT_PUBLIC_VERCEL_ENV === "preview") — this deliberately does NOT depend on
@@ -24,7 +32,7 @@ export type FirebaseWebConfig = {
   measurementId?: string;
 };
 
-// The original, unchanged production project. Used for production and dev.
+// The original, unchanged production project. Used for production builds.
 export const PRODUCTION_FIREBASE_CONFIG: FirebaseWebConfig = {
   apiKey: "AIzaSyC_RpmkFRJfWkcg6apFXufz5dz8NvT2P4Q",
   authDomain: "yogi-mart.firebaseapp.com",
@@ -45,6 +53,12 @@ export type PublicFirebaseEnv = {
   NEXT_PUBLIC_FIREBASE_APP_ID?: string;
   NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?: string;
   NEXT_PUBLIC_VERCEL_ENV?: string;
+  /** "true" = point the client SDK at the local Firebase Emulator Suite. */
+  NEXT_PUBLIC_USE_FIREBASE_EMULATORS?: string;
+  /** "true" = a developer DELIBERATELY runs `next dev` against production. */
+  NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV?: string;
+  /** Inlined by Next.js: "development" under `next dev`, "production" for builds. */
+  NODE_ENV?: string;
 };
 
 /**
@@ -67,6 +81,9 @@ export function readPublicFirebaseEnv(): PublicFirebaseEnv {
     NEXT_PUBLIC_FIREBASE_APP_ID: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+    NEXT_PUBLIC_USE_FIREBASE_EMULATORS: process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS,
+    NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV: process.env.NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV,
+    NODE_ENV: process.env.NODE_ENV,
   };
 }
 
@@ -76,7 +93,14 @@ export function readPublicFirebaseEnv(): PublicFirebaseEnv {
  *     NEXT_PUBLIC_VERCEL_ENV === "preview"): built from the
  *     NEXT_PUBLIC_FIREBASE_* variables; throws if any required one is missing
  *     (fail closed — never falls back to production).
- *   - Everything else (production, development, tests): the unchanged
+ *   - Emulator mode (NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true"): requires a
+ *     demo-* NEXT_PUBLIC_FIREBASE_PROJECT_ID; any other value left unset gets
+ *     an inert placeholder (the emulators never check them).
+ *   - Local development (NODE_ENV === "development") with nothing configured:
+ *     THROWS, unless NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV === "true".
+ *     The same opt-in is required for an env-driven dev config that names the
+ *     production project id.
+ *   - Everything else (production builds, tests): the unchanged
  *     PRODUCTION_FIREBASE_CONFIG.
  */
 export function selectFirebaseConfig(
@@ -94,8 +118,50 @@ export function selectFirebaseConfig(
     !!env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
     env.NEXT_PUBLIC_VERCEL_ENV === "preview";
 
+  const isLocalDev = env.NODE_ENV === "development";
+  const allowProductionInDev = env.NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV === "true";
+
+  if (env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true") {
+    const projectId = env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "";
+    if (!projectId.startsWith("demo-")) {
+      throw new Error(
+        "NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true requires a demo-* NEXT_PUBLIC_FIREBASE_PROJECT_ID " +
+          "(e.g. demo-yomico-local). Refusing to pair the emulators with a real project."
+      );
+    }
+    // A demo-* project has no real counterpart and the emulators accept any
+    // key, so these placeholders cannot reach a live backend.
+    return {
+      apiKey: env.NEXT_PUBLIC_FIREBASE_API_KEY || "demo-api-key",
+      authDomain: env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || `${projectId}.firebaseapp.com`,
+      projectId,
+      storageBucket: env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com`,
+      messagingSenderId: env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
+      appId: env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:000000000000:web:demo",
+    };
+  }
+
   if (!wantsEnvConfig) {
+    if (isLocalDev && !allowProductionInDev) {
+      throw new Error(
+        "Local development has no safe Firebase target: `npm run dev` no longer defaults to the " +
+          "PRODUCTION Firebase project. Set NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true with " +
+          "NEXT_PUBLIC_FIREBASE_PROJECT_ID=demo-yomico-local (Firebase Emulator Suite), or the " +
+          "NEXT_PUBLIC_FIREBASE_* values of a separate development project. See README → Local development."
+      );
+    }
     return PRODUCTION_FIREBASE_CONFIG;
+  }
+
+  if (
+    isLocalDev &&
+    !allowProductionInDev &&
+    env.NEXT_PUBLIC_FIREBASE_PROJECT_ID === PRODUCTION_FIREBASE_CONFIG.projectId
+  ) {
+    throw new Error(
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID names the PRODUCTION project during local development. Use the " +
+        "emulators or a development project, or set NEXT_PUBLIC_ALLOW_PRODUCTION_FIREBASE_IN_DEV=true deliberately."
+    );
   }
 
   // Same six required variables as before, checked by explicit name.

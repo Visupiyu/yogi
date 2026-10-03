@@ -6,13 +6,12 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ADMIN_EMAIL } from "@/lib/adminConfig";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: "📊" },
   { href: "/admin/ai-assistant", label: "AI Assistant", icon: "🤖" },
   { href: "/admin/orders", label: "Orders", icon: "📦" },
-  { href: "/admin/users", label: "Users", icon: "👥" },
+  { href: "/admin/users", label: "Admin Access", icon: "👥" },
   { href: "/admin/customers", label: "Customers", icon: "🧑" },
   { href: "/admin/account-deletions", label: "Account Deletions", icon: "🗑" },
   { href: "/admin/vendors", label: "Vendors", icon: "🏬" },
@@ -53,7 +52,7 @@ export default function AdminLayout({
   useEffect(() => {
     let cancelled = false;
     const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user || user.email !== ADMIN_EMAIL) {
+      if (!user) {
         localStorage.removeItem("admin");
         router.replace("/admin-login");
         return;
@@ -85,6 +84,27 @@ export default function AdminLayout({
       // /admin-login, which re-issues the verification email, instead of
       // into a panel that silently fails on every read.
       if (!user.emailVerified) {
+        localStorage.removeItem("admin");
+        router.replace("/admin-login");
+        return;
+      }
+
+      // Admin is decided SERVER-SIDE (owner account or an active adminRoles
+      // grant — lib/adminAccess), never by comparing an email string here.
+      // Any failure fails closed.
+      let isAdmin = false;
+      try {
+        const res = await fetch("/api/admin/whoami", {
+          headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+          cache: "no-store",
+        });
+        const data = res.ok ? ((await res.json()) as { isAdmin?: unknown }) : null;
+        isAdmin = data?.isAdmin === true;
+      } catch {
+        isAdmin = false;
+      }
+      if (cancelled) return;
+      if (!isAdmin) {
         localStorage.removeItem("admin");
         router.replace("/admin-login");
         return;

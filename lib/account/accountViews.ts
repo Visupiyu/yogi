@@ -325,7 +325,7 @@ const REFUND_STATUS_LABEL: Record<RefundView["status"], string> = {
 /**
  * Every refund the customer has, from its three stored sources, as one list:
  *   - item-level returns (itemRequests; credited as reward points);
- *   - cancelled ONLINE orders (orders.refundStatus Required/Processing/Refunded;
+ *   - cancelled ONLINE orders (orders.refundStatus Required/Failed/Processing/Refunded;
  *     returned to the original payment method by YOMICO);
  *   - legacy whole-order returns (returns; credited as reward points by
  *     lib/returns on "Refunded").
@@ -359,7 +359,9 @@ export function buildRefundViews(itemRequests: Row[], orders: Row[], legacyRetur
 
   for (const o of orders) {
     const rs = str(o.data.refundStatus);
-    if (rs !== "Required" && rs !== "Processing" && rs !== "Refunded") continue;
+    // "Failed" = an automatic Razorpay attempt returned no money; to the
+    // customer it is still simply due (lib/refunds/orderRefund.ts).
+    if (rs !== "Required" && rs !== "Processing" && rs !== "Refunded" && rs !== "Failed") continue;
     const status: RefundView["status"] = rs === "Refunded" ? "completed" : rs === "Processing" ? "processing" : "due";
     out.push({
       source: "order-cancellation",

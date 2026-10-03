@@ -5,6 +5,7 @@ import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
 import { deriveRiderTask, deriveNavigationDestination } from "@/lib/deliveryEngine/taskLocation";
 import { readCodPaymentInfo } from "@/lib/deliveryEngine/codPayment";
 import { readDeliveryExceptionInfo } from "@/lib/deliveryEngine/deliveryException";
+import { deliveryOtpView } from "@/lib/deliveryEngine/otpService";
 import type { DeliveryJob, DeliveryLeg, DeliveryEvent, DeliveryPerson } from "@/lib/deliveryEngine/types";
 
 // GET /api/delivery/jobs/[jobId]
@@ -230,6 +231,10 @@ export async function GET(
       navigationDestination,
       codPayment,
       deliveryException,
+      // Customer delivery-code STATUS only (otpService.deliveryOtpView): live /
+      // expired / locked / used, attempts left, and which channels accepted
+      // it. Never the code, the hash or the customer's email address.
+      deliveryOtp: deliveryOtpView(job),
     },
   });
 }

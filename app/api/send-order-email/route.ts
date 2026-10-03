@@ -185,10 +185,12 @@ export async function POST(
       error
     );
 
+    // Never echo the raw exception (provider/Firebase text) to the browser —
+    // the full error stays in the server log above.
     return Response.json(
       {
         success: false,
-        error: String(error),
+        error: "Couldn't send the order email.",
       },
       {
         status: 500,

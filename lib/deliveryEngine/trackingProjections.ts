@@ -30,6 +30,11 @@ export type CustomerShipment = {
   // Carries no secret — the code itself only ever reaches the customer via the
   // email / in-app notification channels.
   outForDelivery: boolean;
+  // Which channels accepted the CURRENT delivery code, while out for delivery
+  // (null otherwise, or before a send was recorded). Booleans only — no code,
+  // no address. Lets the page say "we couldn't email it" instead of claiming
+  // an email that never left.
+  deliveryCodeChannels: { email: boolean; inApp: boolean } | null;
 };
 
 function toIso(value: unknown): string | null {
@@ -205,6 +210,13 @@ export function buildCustomerShipment(job: DeliveryJob): CustomerShipment {
     delivered: job.status === "Delivered",
     deliveredAt: job.status === "Delivered" ? toIso(job.deliveredAt) : null,
     outForDelivery: job.currentStage === "OutForDelivery",
+    deliveryCodeChannels:
+      job.currentStage === "OutForDelivery" && job.deliveryOtpDelivery && typeof job.deliveryOtpDelivery === "object"
+        ? {
+            email: job.deliveryOtpDelivery.email === "sent",
+            inApp: job.deliveryOtpDelivery.inApp === "sent",
+          }
+        : null,
   };
 }
 

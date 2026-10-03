@@ -59,10 +59,20 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/vendors_public/$(uid)).data.status == 'Approved';
     }
 
+    // Same model as firestore.rules' isAdmin(): verified email AND (owner OR an
+    // active adminRoles/{uid} record, which only the Admin SDK can write). Uses
+    // the same cross-service firestore.* access isApprovedVendor() above uses.
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email == 'adminyogimart@gmail.com'
-        && request.auth.token.email_verified == true;
+        && request.auth.token.email_verified == true
+        && (
+          request.auth.token.email == 'adminyogimart@gmail.com'
+          || (
+            firestore.exists(/databases/(default)/documents/adminRoles/$(request.auth.uid))
+            && firestore.get(/databases/(default)/documents/adminRoles/$(request.auth.uid)).data.get('active', false) == true
+            && firestore.get(/databases/(default)/documents/adminRoles/$(request.auth.uid)).data.get('role', '') == 'admin'
+          )
+        );
     }
 
     // KYC legitimately includes PDFs, unlike the image-only paths below.

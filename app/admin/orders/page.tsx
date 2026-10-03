@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   collection,
   getDocs,
+  getDoc,
   updateDoc,
   doc,
   addDoc,
@@ -86,13 +87,19 @@ type Order = {
   duplicateIntentPayment?: string;
   razorpayPaymentId?: string;
   // Set by app/api/cancel-order when a captured ONLINE payment is cancelled.
-  // "Required" means real money is owed back and has NOT been returned yet —
-  // YOMICO does not move the money itself in this phase, so these fields
-  // record an obligation and, once settled elsewhere, the evidence of it.
-  refundStatus?: "Required" | "Processing" | "Refunded";
+  // "Required" means real money is owed back and has NOT been returned yet.
+  // The refund is sent through Razorpay by /api/admin/orders/{id}/refund
+  // (lib/refunds/orderRefund.ts); recording a refund made elsewhere remains
+  // the manual fallback. "Failed" = an automatic attempt returned no money.
+  refundStatus?: "Required" | "Processing" | "Refunded" | "Failed";
   refundAmountDue?: number;
   refundedAmount?: number;
   refundTransactionId?: string;
+  razorpayRefundId?: string;
+  refundMethod?: string;
+  refundLastError?: { code?: string; message?: string };
+  refundAttempt?: { state?: string; startedAt?: { seconds?: number } };
+  refundAttemptCount?: number;
   // Timing. Clock A runs from createdAt and is derived on read (createdAt is
   // on every order, including legacy ones); confirmedLate and
   // adminConfirmDeadlineAt are recorded by app/api/confirm-order for the
@@ -312,6 +319,11 @@ export default function AdminOrdersPage() {
           refundAmountDue: data.refundAmountDue,
           refundedAmount: data.refundedAmount,
           refundTransactionId: data.refundTransactionId,
+          razorpayRefundId: data.razorpayRefundId,
+          refundMethod: data.refundMethod,
+          refundLastError: data.refundLastError,
+          refundAttempt: data.refundAttempt,
+          refundAttemptCount: data.refundAttemptCount,
         });
       });
       // newest-ish: sort by original timestamp if present is lost after formatting,
@@ -527,6 +539,76 @@ setOrders(items);
     } catch (error) {
       console.error(error);
       alert("Couldn't mark the review as resolved. Please try again.");
+    }
+  };
+
+  // Sends (action "refund") or re-checks (action "sync") the refund through
+  // Razorpay on the server. The server decides the amount and the payment;
+  // this only names the order. The order is reloaded afterwards so the panel
+  // shows exactly what the server recorded — never an optimistic "refunded".
+  const [refundBusy, setRefundBusy] = useState<string | null>(null);
+  const runRazorpayRefund = async (order: Order, action: "refund" | "sync") => {
+    if (refundBusy) return;
+    if (
+      action === "refund" &&
+      !confirm(
+        `Refund ₹${Number(order.refundAmountDue || 0).toLocaleString("en-IN")} to the customer's original payment via Razorpay?\n\nThe amount is the one recorded at cancellation. A repeated click will not refund twice.`
+      )
+    ) {
+      return;
+    }
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      alert("Please sign in again.");
+      return;
+    }
+    setRefundBusy(order.id);
+    try {
+      const response = await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}/refund`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${await currentUser.getIdToken()}`,
+        },
+        body: JSON.stringify({ action }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(data?.error || "Couldn't process the refund.");
+      } else if (data.refundStatus === "Refunded" || data.alreadyRefunded) {
+        alert("Refund completed — Razorpay confirmed it.");
+      } else if (data.refundStatus === "Processing") {
+        alert("Razorpay accepted the refund. It is pending at Razorpay; use Check Status later to confirm completion.");
+      }
+    } catch {
+      alert("Couldn't reach the server. Refresh the order before retrying — a retry never refunds twice.");
+    } finally {
+      setRefundBusy(null);
+      try {
+        const fresh = await getDoc(doc(db, "orders", order.id));
+        if (fresh.exists()) {
+          const d = fresh.data() as Partial<Order>;
+          setOrders((list) =>
+            list.map((o) =>
+              o.id === order.id
+                ? {
+                    ...o,
+                    refundStatus: d.refundStatus,
+                    refundedAmount: d.refundedAmount,
+                    refundTransactionId: d.refundTransactionId,
+                    razorpayRefundId: d.razorpayRefundId,
+                    refundMethod: d.refundMethod,
+                    refundLastError: d.refundLastError,
+                    refundAttempt: d.refundAttempt,
+                    refundAttemptCount: d.refundAttemptCount,
+                  }
+                : o
+            )
+          );
+        }
+      } catch {
+        /* the list keeps its previous view; a page refresh shows the truth */
+      }
     }
   };
 
@@ -1148,34 +1230,64 @@ const filtered = orders.filter(
                           </div>
                         )}
 
-                        {/* Refund obligation. YOMICO does not move money from
-                            this screen — these controls record what happened
-                            elsewhere, which is why the labels say "Record". */}
-                        {order.refundStatus === "Required" && (
+                        {/* Refund obligation. "Refund via Razorpay" sends the
+                            money through the server (/api/admin/orders/{id}/
+                            refund); "Mark In Progress" / "Record Refund" are
+                            the manual fallback for a refund made elsewhere. */}
+                        {(order.refundStatus === "Required" || order.refundStatus === "Failed") && (
                           <div className="mt-2 border border-red-300 bg-red-50 rounded-lg p-2">
                             <p className="text-red-800 text-xs font-bold">
-                              ⚠ Refund Required — money NOT yet returned
+                              {order.refundStatus === "Failed"
+                                ? "✖ Refund Failed — money NOT returned"
+                                : "⚠ Refund Required — money NOT yet returned"}
                             </p>
                             <p className="text-red-700 text-[11px] mt-1">
                               Amount owed: ₹
                               {Number(
                                 order.refundAmountDue || 0
                               ).toLocaleString("en-IN")}
-                              . Refund the customer in Razorpay (or by UPI /
-                              bank transfer), then record it here.
+                              .
+                              {order.refundStatus === "Failed"
+                                ? " The last automatic attempt did not return any money. Fix the cause below, then retry — or refund elsewhere and record it."
+                                : " Refund via Razorpay, or refund elsewhere (UPI / bank transfer) and record it."}
                             </p>
+                            {order.refundLastError?.message && (
+                              <p className="text-red-800 text-[11px] mt-1 break-words">
+                                Last attempt: {order.refundLastError.message}
+                                {order.refundLastError.code ? ` (${order.refundLastError.code})` : ""}
+                                {order.refundAttemptCount ? ` · attempts: ${order.refundAttemptCount}` : ""}
+                              </p>
+                            )}
+                            {order.refundAttempt?.state === "calling" && (
+                              <p className="text-red-800 text-[11px] mt-1">
+                                A refund is being submitted to Razorpay right now. Wait a moment, then refresh.
+                              </p>
+                            )}
                             <div className="mt-2 flex flex-wrap gap-2">
+                              {order.paymentMethod === "ONLINE" && (
+                                <button
+                                  onClick={() => runRazorpayRefund(order, "refund")}
+                                  disabled={refundBusy === order.id}
+                                  className="bg-green-700 hover:bg-green-800 disabled:opacity-50 transition text-white px-3 py-1.5 rounded-lg text-xs"
+                                >
+                                  {refundBusy === order.id
+                                    ? "Refunding…"
+                                    : order.refundStatus === "Failed"
+                                    ? "Retry Razorpay Refund"
+                                    : "Refund via Razorpay"}
+                                </button>
+                              )}
                               <button
                                 onClick={() => markRefundProcessing(order.id)}
                                 className="bg-orange-600 hover:bg-orange-700 transition text-white px-3 py-1.5 rounded-lg text-xs"
                               >
-                                Mark In Progress
+                                Mark In Progress (manual)
                               </button>
                               <button
                                 onClick={() => recordRefundCompleted(order)}
                                 className="bg-red-600 hover:bg-red-700 transition text-white px-3 py-1.5 rounded-lg text-xs"
                               >
-                                Record Refund
+                                Record Manual Refund
                               </button>
                             </div>
                           </div>
@@ -1184,30 +1296,52 @@ const filtered = orders.filter(
                         {order.refundStatus === "Processing" && (
                           <div className="mt-2 border border-orange-300 bg-orange-50 rounded-lg p-2">
                             <p className="text-orange-800 text-xs font-bold">
-                              ⏳ Refund In Progress
+                              ⏳ Refund Processing
                             </p>
                             <p className="text-orange-700 text-[11px] mt-1">
-                              Initiated but not yet confirmed. Amount owed: ₹
+                              {order.razorpayRefundId
+                                ? `Razorpay accepted refund ${order.razorpayRefundId}; it has not reported completion yet.`
+                                : "Marked as initiated elsewhere; not yet confirmed."}{" "}
+                              Amount owed: ₹
                               {Number(
                                 order.refundAmountDue || 0
                               ).toLocaleString("en-IN")}
                               .
                             </p>
-                            <button
-                              onClick={() => recordRefundCompleted(order)}
-                              className="mt-2 bg-red-600 hover:bg-red-700 transition text-white px-3 py-1.5 rounded-lg text-xs"
-                            >
-                              Record Refund
-                            </button>
+                            {order.refundLastError?.message && (
+                              <p className="text-orange-800 text-[11px] mt-1 break-words">
+                                Last check: {order.refundLastError.message}
+                              </p>
+                            )}
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {order.razorpayRefundId ? (
+                                <button
+                                  onClick={() => runRazorpayRefund(order, "sync")}
+                                  disabled={refundBusy === order.id}
+                                  className="bg-green-700 hover:bg-green-800 disabled:opacity-50 transition text-white px-3 py-1.5 rounded-lg text-xs"
+                                >
+                                  {refundBusy === order.id ? "Checking…" : "Check Status with Razorpay"}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => recordRefundCompleted(order)}
+                                  className="bg-red-600 hover:bg-red-700 transition text-white px-3 py-1.5 rounded-lg text-xs"
+                                >
+                                  Record Manual Refund
+                                </button>
+                              )}
+                            </div>
                           </div>
                         )}
 
                         {order.refundStatus === "Refunded" && (
                           <div className="mt-2 border border-green-300 bg-green-50 rounded-lg p-2">
                             <p className="text-green-800 text-xs font-bold">
-                              ✅ Refund Recorded
+                              {order.refundMethod === "razorpay_api"
+                                ? "✅ Refund Completed (confirmed by Razorpay)"
+                                : "✅ Refund Recorded (manual)"}
                             </p>
-                            <p className="text-green-700 text-[11px] mt-1">
+                            <p className="text-green-700 text-[11px] mt-1 break-words">
                               ₹
                               {Number(
                                 order.refundedAmount || 0

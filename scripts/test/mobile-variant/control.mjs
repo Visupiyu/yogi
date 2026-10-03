@@ -4,17 +4,32 @@
 // harness resolves it relative to run.mts — tsx can load those as two module
 // instances, so the state must live on globalThis to be shared).
 const g = /** @type {any} */ (globalThis);
+const zeroCalls = () => ({
+  ordersCreate: 0,
+  paymentsFetch: 0,
+  ordersFetch: 0,
+  // Refund API (scripts/test/order-refund).
+  paymentsRefund: 0,
+  paymentsFetchMultipleRefund: 0,
+  paymentsFetchRefund: 0,
+});
 if (!g.__RZP_TEST_CONTROL__) {
   g.__RZP_TEST_CONTROL__ = {
     ordersCreate: null,
     paymentsFetch: null,
     ordersFetch: null,
-    calls: { ordersCreate: 0, paymentsFetch: 0, ordersFetch: 0 },
+    paymentsRefund: null,
+    paymentsFetchMultipleRefund: null,
+    paymentsFetchRefund: null,
+    calls: zeroCalls(),
     reset() {
       this.ordersCreate = null;
       this.paymentsFetch = null;
       this.ordersFetch = null;
-      this.calls = { ordersCreate: 0, paymentsFetch: 0, ordersFetch: 0 };
+      this.paymentsRefund = null;
+      this.paymentsFetchMultipleRefund = null;
+      this.paymentsFetchRefund = null;
+      this.calls = zeroCalls();
     },
   };
 }
