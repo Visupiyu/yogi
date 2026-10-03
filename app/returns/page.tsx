@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { auth, db } from "@/lib/firebase";
-import { RETURN_WINDOW_DAYS } from "@/lib/returnEligibility";
+import { addReturnDays, lineReturnDays } from "@/lib/returnEligibility";
 import {
   REFUND_DESTINATION_LABEL,
   isTerminal,
@@ -21,6 +21,7 @@ import {
   type ItemRequestType,
 } from "@/lib/itemRequests";
 import { customerLoginUrl } from "@/lib/authRedirect";
+import ProductImage from "@/components/ProductImage";
 
 // Unified item-level Return / Replace request form.
 //
@@ -323,10 +324,18 @@ function RequestInner() {
     ? fulfilment.find((f) => f.itemKey === itemKey) || null
     : null;
 
+  // The line's own window, snapshotted on the order when it was placed. The
+  // server (app/api/item-request) re-derives it from the stored order; this
+  // copy only decides what to show.
+  const returnDays = lineReturnDays(
+    order && Array.isArray(order.items) ? order.items[parentIndex] : null
+  );
   const eligibility = itemKey
     ? itemRequestEligibility(
         { itemFulfilment: entry ? { [itemKey]: entry } : {} },
-        itemKey
+        itemKey,
+        new Date(),
+        returnDays
       )
     : { eligible: false, needsReview: false, reason: "not-delivered" as const };
 
@@ -499,9 +508,8 @@ function RequestInner() {
   // Product card (image, name, variant, qty, seller, item price) — req 1 & 6.
   const ProductCard = (
     <div className="rounded-2xl border p-4 flex items-start gap-4 mb-6">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={selected.image || "/no-image.png"}
+      <ProductImage
+        src={selected.image}
         alt={selected.name || "Product"}
         className="w-16 h-16 rounded-xl object-cover bg-gray-100 shrink-0"
       />
@@ -723,10 +731,7 @@ function RequestInner() {
   if (!submitted && !eligibility.eligible && eligibility.reason === "window-closed") {
     const deliveredOn = fmtDate(entry?.deliveredAt);
     const windowEnd = entry?.deliveredAt
-      ? new Date(
-          (toDate(entry.deliveredAt) as Date).getTime() +
-            RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000
-        )
+      ? addReturnDays(toDate(entry.deliveredAt) as Date, returnDays)
       : null;
     return (
       <Shell>
@@ -741,7 +746,7 @@ function RequestInner() {
             </p>
             <p className="text-gray-700 mt-1">
               You cannot return or exchange this item because the{" "}
-              {RETURN_WINDOW_DAYS}-day period has expired.
+              {returnDays}-day period has expired.
             </p>
             <div className="mt-3 text-gray-600 space-y-0.5">
               {deliveredOn && <p>Delivered on {deliveredOn}.</p>}
@@ -806,7 +811,7 @@ function RequestInner() {
             <p className="font-semibold text-amber-800">Eligible</p>
             <p className="text-gray-700 mt-1">
               We don&apos;t have a recorded delivery date for this item, so our
-              team will confirm the {RETURN_WINDOW_DAYS}-day window before
+              team will confirm the {returnDays}-day window before
               approving.
             </p>
           </div>

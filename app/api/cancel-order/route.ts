@@ -1,3 +1,4 @@
+import { sendOrderStatusEmail } from "@/lib/orderStatusEmail";
 import { verifyRequestUser, type VerifiedUser } from "@/lib/serverAuth";
 import { shouldReverseEarnedPoints } from "@/lib/rewardCredit";
 import { vendorsOnOrder } from "@/lib/sellerOrderRecord";
@@ -740,6 +741,9 @@ export async function POST(request: Request) {
         console.error("cancel-order: customer notification failed:", error);
       }
     }
+
+    // Customer "cancelled" email — after the commit, once per order.
+    await sendOrderStatusEmail(orderId, "cancelled");
 
     // Legacy sweep: redemptions created before F010's deterministic ids
     // can only be found by query, which a transaction cannot run.

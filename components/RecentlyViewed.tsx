@@ -3,6 +3,7 @@
 import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ProductImage from "@/components/ProductImage";
 
 type Product = {
   id: string;
@@ -56,8 +57,8 @@ export default function RecentlyViewed({
               "
             >
 
-              <img loading="lazy" decoding="async"
-                src={product.image || "/no-image.png"}
+              <ProductImage loading="lazy" decoding="async"
+                src={product.image}
                 alt={product.name}
                 className="
                   w-full

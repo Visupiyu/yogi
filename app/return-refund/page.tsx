@@ -62,7 +62,7 @@ export default function ReturnRefundPolicyPage() {
 
             <p>
 
-              Return requests must be submitted within 7 days of delivery.
+              Return requests must be submitted within the return window shown on the product page (7 days from delivery unless the product page states a different period). The window is fixed when you place your order.
               Requests made after the applicable period may not be accepted.
 
             </p>

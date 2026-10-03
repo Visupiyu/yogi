@@ -43,17 +43,9 @@ async function isWithinOrderRateLimit(uid: string): Promise<boolean> {
 }
 
 
-// Same "+5 days, en-IN" string the checkout page and /api/place-order
-// produce, so order pages, invoices and emails render what they always have.
-function deliveryDateString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 5);
-  return d.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+// No "+5 days" deliveryDate is written any more: it was the same invented date
+// for every customer and destination. Delivery dates come from the real SLA —
+// see lib/deliveryEstimate.ts.
 
 export async function POST(
   req:Request
@@ -245,7 +237,6 @@ if (userSnap.exists && userSnap.data()?.status === "Blocked") {
           address,
           couponCode,
           redeemPoints: pointsToHold > 0,
-          deliveryDate: deliveryDateString(),
           expectedAmountPaise: finalAmount * 100,
           razorpayOrderId: order.id,
           status: "created",

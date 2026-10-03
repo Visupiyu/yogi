@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, Truck, Headphones, Smartphone } from "lucide-react";
 import { FREE_SHIPPING_THRESHOLD, getShippingSettings } from "@/lib/shipping";
+import { SUPPORT_HOURS_SHORT } from "@/lib/siteConfig";
 
 export default function TopStrip() {
   const [freeShippingThreshold, setFreeShippingThreshold] = useState(
@@ -34,7 +35,7 @@ export default function TopStrip() {
             className="flex items-center gap-2 hover:text-yellow-200 hover:scale-105 transition-all duration-300"
           >
             <Headphones size={16} />
-            <span>24/7 Support</span>
+            <span>{SUPPORT_HOURS_SHORT}</span>
           </Link>
 
         </div>

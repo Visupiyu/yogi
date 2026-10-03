@@ -4,7 +4,7 @@ import { getAdminDb } from "@/lib/firebaseAdmin";
 import { resolveDeliveryActor } from "@/lib/deliveryEngine/serverAuth";
 import { parseQrPayload } from "@/lib/deliveryEngine/qr";
 import { applyScan, ExecutionError, type ScanArgs } from "@/lib/deliveryEngine/execution";
-import { reconcileDeliveredJob } from "@/lib/deliveryEngine/reconcile";
+import { emailAfterReconcile, reconcileDeliveredJob } from "@/lib/deliveryEngine/reconcile";
 import { ensureDeliveryOtp, deliverOtpToCustomer } from "@/lib/deliveryEngine/otpService";
 import type { ExecutionAction } from "@/lib/deliveryEngine/types";
 
@@ -124,7 +124,8 @@ export async function POST(request: Request) {
     // is NOT best-effort-and-forget, the durable state guarantees retry.
     if (result.action === "DELIVER" && result.jobStatus === "Delivered") {
       try {
-        await db.runTransaction((tx) => reconcileDeliveredJob(tx, db, { jobId }));
+        const reconciled = await db.runTransaction((tx) => reconcileDeliveredJob(tx, db, { jobId }));
+        await emailAfterReconcile(reconciled);
       } catch (reconcileError) {
         console.error("post-DELIVER reconciliation deferred (retryable):", reconcileError);
       }

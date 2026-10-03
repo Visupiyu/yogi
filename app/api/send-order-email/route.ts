@@ -1,39 +1,20 @@
-import { Resend } from "resend";
+import { sendOrderStatusEmail } from "@/lib/orderStatusEmail";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { isValidDocId } from "@/lib/customerAccount/customerGuards";
 
-// Sending is not idempotent — every call dispatches another email through
-// Resend — so looping this burns the shared transactional-email quota and can
-// damage sender reputation for every customer, not just the caller. A real
-// checkout sends one, plus the occasional retry; 10 per 10 minutes sits far
-// above legitimate use while still bounding the abuse.
+// The "placed" email is sent at most once per order (lib/orderStatusEmail.ts),
+// so a loop here can no longer send duplicates; the limit still bounds the
+// Firestore reads an abusive caller can cause. A real checkout calls once,
+// plus the occasional retry; 10 per 10 minutes sits far above that.
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-
-const apiKey = process.env.RESEND_API_KEY;
-
-const resend = apiKey
-  ? new Resend(apiKey)
-  : null;
 
 export async function POST(
   request: Request
 ) {
   try {
-
-    if (!resend) {
-      return Response.json(
-        {
-          success: false,
-          error: "RESEND_API_KEY is missing",
-        },
-        {
-          status: 500,
-        }
-      );
-    }
 
     const requester = await verifyRequestUser(request);
 
@@ -105,75 +86,20 @@ export async function POST(
       );
     }
 
-    // finalTotal is what checkout and /api/place-order commit as the
-    // charged amount; total is the pre-discount fallback for orders
-    // written before finalTotal existed. Never the browser's number.
-    const finalTotal = Number(orderData?.finalTotal);
-    const legacyTotal = Number(orderData?.total);
-    const total = Number.isFinite(finalTotal)
-      ? finalTotal
-      : Number.isFinite(legacyTotal)
-      ? legacyTotal
-      : 0;
-
-    const customerName =
-      typeof orderData?.customerName === "string" && orderData.customerName
-        ? orderData.customerName
-        : "there";
-
-    const customerEmail = orderData?.userEmail || requester.email;
-
-    if (!customerEmail) {
-      return Response.json(
-        { success: false, error: "No email on file for this order" },
-        { status: 400 }
-      );
+    // The shared order-status email (lib/orderStatusEmail.ts): recipient and
+    // every value from the stored order, HTML-escaped, and sent at most once
+    // per order — the server's own post-commit send and this browser retry
+    // can never produce two emails.
+    const outcome = await sendOrderStatusEmail(orderId, "placed");
+    if (outcome.status === "failed") {
+      return Response.json({ success: false, error: "Could not send the email." }, { status: 502 });
     }
-
-    const result =
-      await resend.emails.send({
-
-        from:
-          "YOMICO <onboarding@yomico.in>",
-
-        to:
-          customerEmail,
-
-        subject:
-          "Order Confirmation",
-
-        html: `
-          <h2>
-            Thank you for your order,
-            ${customerName}
-          </h2>
-
-          <p>
-            Order ID:
-            ${orderId}
-          </p>
-
-          <p>
-            Customer Email:
-            ${customerEmail}
-          </p>
-
-          <p>
-            Total:
-            ₹${total.toLocaleString("en-IN")}
-          </p>
-
-          <p>
-            Your order has been placed successfully.
-          </p>
-        `,
-      });
-
-    console.log(
-      "Resend Result:",
-      result
-    );
-
+    if (outcome.status === "skipped" && outcome.reason === "not-configured") {
+      return Response.json({ success: false, error: "Email is not configured." }, { status: 500 });
+    }
+    if (outcome.status === "skipped" && outcome.reason === "no-recipient") {
+      return Response.json({ success: false, error: "No email on file for this order" }, { status: 400 });
+    }
     return Response.json({
       success: true,
     });

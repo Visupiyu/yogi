@@ -1,3 +1,5 @@
+import { sendOrderStatusEmail } from "@/lib/orderStatusEmail";
+import { effectiveReturnDays } from "@/lib/returnEligibility";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { mintNumbers } from "@/lib/humanIds";
@@ -133,6 +135,8 @@ function normalizeProduct(data: FirebaseFirestore.DocumentData) {
     gstPercent: typeof data.gstPercent === "number" ? data.gstPercent : 0,
     vendorId: typeof data.vendorId === "string" ? data.vendorId : "",
     vendorName: typeof data.vendorName === "string" ? data.vendorName : "",
+    // Seller-set return window when valid, else the platform default.
+    returnDays: effectiveReturnDays(data),
     stock: data.stock,
     active: data.active,
   };
@@ -482,6 +486,8 @@ export async function POST(request: Request) {
           qty: Number(data.quantity),
           vendorId: product.vendorId,
           vendorName: product.vendorName,
+          // Snapshotted from the server-read product (lib/returnEligibility).
+          returnDays: product.returnDays,
           savedForLater: false,
           ...(selectedVariants ? { selectedVariants } : {}),
           ...(variantId ? { variantId } : {}),
@@ -641,7 +647,7 @@ export async function POST(request: Request) {
         //                existed", so mobile orders were permanently
         //                excluded from it. This credits nothing now: points
         //                are granted only once the order is Delivered, Paid
-        //                and past its 7-day return window.
+        //                and past its return window.
         //
         //   updatedAt    lib/returnEligibility.ts falls back to updatedAt
         //                when deliveredAt is absent, and the reward credit
@@ -700,6 +706,9 @@ export async function POST(request: Request) {
     if (outcome.kind === "error") {
       return Response.json({ error: outcome.error }, { status: outcome.status });
     }
+
+    // Order-placed email, after the commit; never fails the order, sent once.
+    await sendOrderStatusEmail(outcome.orderId, "placed");
 
     return Response.json({ success: true, orderId: outcome.orderId, total: outcome.total });
   } catch (error) {

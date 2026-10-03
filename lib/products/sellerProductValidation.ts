@@ -14,6 +14,8 @@
 // product merged with the edit), so an edit cannot leave an invalid value
 // behind in a field it did not touch without being told about it.
 
+import { MAX_RETURN_DAYS, MIN_RETURN_DAYS, isValidReturnDays } from "@/lib/returnEligibility";
+
 /** The GST slabs the seller form offers (app/seller/components/ProductForm). */
 export const GST_SLABS: readonly number[] = [0, 5, 12, 18, 28];
 
@@ -97,6 +99,13 @@ export function validateSellerProductMoney(
         }
       });
     }
+  }
+
+  // returnDays — the product's return window (whole days). Optional: a
+  // product without one sells with the platform default. When present it must
+  // be in range; it is snapshotted onto each order line at order creation.
+  if (has(product, "returnDays") && !isValidReturnDays(product.returnDays)) {
+    errors.push(`Return days must be a whole number from ${MIN_RETURN_DAYS} to ${MAX_RETURN_DAYS}.`);
   }
 
   return errors.length === 0 ? { ok: true } : { ok: false, errors };

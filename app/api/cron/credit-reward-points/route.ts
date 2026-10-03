@@ -10,7 +10,7 @@ import {
 // Scheduled sweep that actually pays out deferred reward points.
 //
 // Reward points are granted only once an order is delivered, paid for and past
-// its 7-day return window. Nothing about that is time-triggered by the
+// its return window (the longest window among its items). Nothing about that is time-triggered by the
 // customer, so without this job an order that becomes eligible on day 8 would
 // simply never be credited unless the customer happened to open the app.
 //

@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_RETURN_DAYS, effectiveReturnDays } from "@/lib/returnEligibility";
 import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -27,8 +28,11 @@ import { categoryFields } from "@/lib/catalog/categoryFields";
 import { findNodeById } from "@/lib/catalog/categoryUtils";
 import { UNIVERSAL_SPEC_FIELDS } from "@/lib/catalog/universalSpecFields";
 import { customerLoginUrl } from "@/lib/authRedirect";
+import { PRE_ORDER_DELIVERY_TEXT } from "@/lib/deliveryEstimate";
+import ProductImage from "@/components/ProductImage";
+import { PRODUCT_IMAGE_PLACEHOLDER, isOptimizableImageSrc, isUsableImageSrc, productImageAlt, productImageSrc } from "@/lib/productImage";
 
-type Product = { id: string; name: string; active?: boolean; approvalStatus?: string; image?: string;  images?: string[];  price: number;  mrp?: number;
+type Product = { id: string; name: string; returnDays?: number; active?: boolean; approvalStatus?: string; image?: string;  images?: string[];  price: number;  mrp?: number;
   discountPercent?: number;  stock: number;  category?: string;  description?: string;  vendorId: string;  vendorName: string;
   color?: string;  sizes?: string[];  material?: string;  brand?: string;  countryOfOrigin?: string;
   rating?: number;  reviewCount?: number;
@@ -119,6 +123,9 @@ function normalizeProduct(id: string, data: any): Product {
     brand: data.brand,
     countryOfOrigin: data.countryOfOrigin,
     warranty: data.warranty,
+    // The window this product sells with: the seller's value when valid, else
+    // the platform default (lib/returnEligibility). The order snapshots it.
+    returnDays: effectiveReturnDays(data),
     specifications: data.specifications || {},
     rating: typeof data.rating === "number" ? data.rating : 0,
     reviewCount: typeof data.reviewCount === "number" ? data.reviewCount : 0,
@@ -220,10 +227,10 @@ localStorage.setItem(
   JSON.stringify(filtered.slice(0, 10))
 );
 
+// Shared fallback rule (lib/productImage.ts): first usable image, else the
+// placeholder — never an empty/invalid src.
 setSelectedImage(
-  fullProduct.images?.[0] ||
-    fullProduct.image ||
-    "/no-image.png"
+  productImageSrc({ images: fullProduct.images, image: fullProduct.image })
 );
           const relatedSnap = await getDocs(
             query(
@@ -899,11 +906,12 @@ if (product.stock > 20) {
  <div className="order-2 md:order-1 flex md:flex-col gap-3 overflow-x-auto md:overflow-visible min-w-0">
 
   {(product.images ?? [product.image])
-    .filter((img): img is string => Boolean(img))
+    .filter((img): img is string => isUsableImageSrc(img))
     .map((img, index) => (
       <Image
   key={index}
   src={img}
+  unoptimized={!isOptimizableImageSrc(img)}
   alt={`${product.name}-${index + 1}`}
   width={90}
   height={90}
@@ -940,9 +948,11 @@ if (product.stock > 20) {
 
   <div className="relative w-full h-[320px] sm:h-[420px] md:h-[520px] bg-white rounded-3xl border border-gray-200 shadow-md overflow-hidden group">
   <Image
-  src={selectedImage}
-  alt={product.name}
+  src={selectedImage || PRODUCT_IMAGE_PLACEHOLDER}
+  unoptimized={!isOptimizableImageSrc(selectedImage || PRODUCT_IMAGE_PLACEHOLDER)}
+  alt={productImageAlt(product.name)}
   fill
+  onError={() => setSelectedImage(PRODUCT_IMAGE_PLACEHOLDER)}
   onClick={() => setShowGallery(true)}
   className="object-contain p-6 transition-transform duration-500 hover:scale-110 cursor-zoom-in"
   sizes="(max-width:768px) 100vw, 50vw"
@@ -1197,7 +1207,7 @@ Easy Returns
                     🔒 Secure Payment
                   </span>
                   <span className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-medium">
-                    ↩️ 7-Day Returns
+                    ↩️ {product.returnDays ?? DEFAULT_RETURN_DAYS}-Day Returns
                   </span>
                 </div>
 
@@ -1526,7 +1536,7 @@ focus:ring-green-500
         }
 
         setDeliveryMessage(
-          "PIN code received. Standard delivery estimate: 2–5 business days."
+          `PIN code ${pinCode} noted. ${PRE_ORDER_DELIVERY_TEXT}`
         );
 
       }}
@@ -1825,11 +1835,9 @@ p-6
   overflow-hidden
   "
 >
-                    <Image
-  src={item.image || "/no-image.png"}
+                    <ProductImage
+  src={item.image}
   alt={item.name}
-  width={300}
-  height={300}
   className="w-full h-40 object-contain p-2"
 />
                       <div className="p-4">
@@ -2280,9 +2288,11 @@ p-6
   <div className="relative w-full max-w-5xl h-[70vh]">
 
     <Image
-      src={selectedImage}
-      alt={product.name}
+      src={selectedImage || PRODUCT_IMAGE_PLACEHOLDER}
+      unoptimized={!isOptimizableImageSrc(selectedImage || PRODUCT_IMAGE_PLACEHOLDER)}
+      alt={productImageAlt(product.name)}
       fill
+      onError={() => setSelectedImage(PRODUCT_IMAGE_PLACEHOLDER)}
       className="object-contain"
       sizes="100vw"
     />
@@ -2301,6 +2311,7 @@ p-6
         <Image
           key={index}
           src={img as string}
+          unoptimized={!isOptimizableImageSrc(img as string)}
           alt={`${product.name}-${index}`}
           width={70}
           height={70}

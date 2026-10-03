@@ -6,30 +6,8 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { ADMIN_NAV, activeAdminHref } from "@/lib/adminNav";
 
-const navItems = [
-  { href: "/admin", label: "Dashboard", icon: "📊" },
-  { href: "/admin/ai-assistant", label: "AI Assistant", icon: "🤖" },
-  { href: "/admin/orders", label: "Orders", icon: "📦" },
-  { href: "/admin/users", label: "Admin Access", icon: "👥" },
-  { href: "/admin/customers", label: "Customers", icon: "🧑" },
-  { href: "/admin/account-deletions", label: "Account Deletions", icon: "🗑" },
-  { href: "/admin/vendors", label: "Vendors", icon: "🏬" },
-  { href: "/admin/kyc", label: "Vendor KYC", icon: "🪪" },
-  { href: "/admin/business-requests", label: "Business Changes", icon: "📝" },
-  { href: "/admin/seller-inquiries", label: "Seller Inquiries", icon: "📨" },
-  { href: "/admin/coupons", label: "Coupons", icon: "🎟" },
-  { href: "/admin/delivery", label: "Delivery", icon: "🚚" },
-  { href: "/admin/delivery/control-tower", label: "Control Tower", icon: "🗼" },
-  { href: "/admin/delivery/persons", label: "Delivery Persons", icon: "🛵" },
-  { href: "/admin/delivery/applications", label: "Freelancer Applications", icon: "🧑‍💼" },
-  { href: "/admin/delivery/company-applications", label: "Company Applications", icon: "🏢" },
-  { href: "/admin/delivery-partners", label: "Delivery Partners (Legacy)", icon: "🛵" },
-  { href: "/admin/notifications", label: "Notifications", icon: "🔔" },
-  { href: "/admin/support", label: "Support", icon: "🎫" },
-  { href: "/admin/reviews", label: "Reviews", icon: "⭐" },
-  { href: "/admin/settings", label: "Settings", icon: "⚙️" },
-];
 
 export default function AdminLayout({
   children,
@@ -38,6 +16,7 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname() || "";
+  const activeHref = activeAdminHref(pathname);
   const [authorized, setAuthorized] = useState(false);
   const [checking, setChecking] = useState(true);
   // Permanent sidebar only makes sense once there's room for it — below
@@ -191,11 +170,8 @@ export default function AdminLayout({
         </div>
 
         <nav className="flex-1 overflow-y-auto p-4 space-y-1.5">
-          {navItems.map((item) => {
-            const active =
-              item.href === "/admin"
-                ? pathname === "/admin"
-                : pathname.startsWith(item.href);
+          {ADMIN_NAV.map((item) => {
+            const active = item.href === activeHref;
             return (
               <Link
                 key={item.href}

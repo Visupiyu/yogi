@@ -1,7 +1,7 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
-import { reconcileDeliveredJob, ReconcileError } from "@/lib/deliveryEngine/reconcile";
+import { emailAfterReconcile, reconcileDeliveredJob, ReconcileError } from "@/lib/deliveryEngine/reconcile";
 
 // POST /api/delivery/jobs/[jobId]/reconcile
 //
@@ -25,6 +25,7 @@ export async function POST(
     const { jobId } = await ctx.params;
     const db = getAdminDb();
     const result = await db.runTransaction((tx) => reconcileDeliveredJob(tx, db, { jobId }));
+    await emailAfterReconcile(result);
     return Response.json({ success: true, ...result });
   } catch (error) {
     if (error instanceof ReconcileError) {

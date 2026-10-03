@@ -82,21 +82,21 @@ function friendlyStatus(job: DeliveryJob): string {
 function friendlyStage(stage: unknown): string {
   switch (stage) {
     case "PickedUp":
-      return "Picked up";
+      return "Picked up from the seller";
     case "AtOriginHub":
       // COMPANY_HUB journey: received and held at the origin company hub,
       // awaiting transit. A real persisted stage — never fabricated.
-      return "At origin hub";
+      return "At a sorting centre";
     case "AtDestinationHub":
       // COMPANY_HUB journey: received and held at the destination company hub,
       // awaiting final-mile. A real persisted stage — never fabricated. NOT
       // "out for delivery"/"delivered" (those are later slices).
-      return "At destination hub";
+      return "Reached a delivery centre near you";
     case "FinalMileAssigned":
       // COMPANY_HUB journey: a final-mile person has been assigned and has taken
       // custody from the destination hub, but has NOT yet departed. A real
       // persisted stage — never fabricated. NOT "out for delivery"/"delivered".
-      return "Assigned for final delivery";
+      return "Preparing for delivery to you";
     case "InTransit":
     case "ArrivedAtStage":
     case "HandoverInitiated":
@@ -136,13 +136,13 @@ function providerLabel(job: DeliveryJob): CustomerShipment["providerLabel"] {
 function buildMilestones(job: DeliveryJob): { key: string; label: string; at: string }[] {
   const out: { key: string; label: string; at: string }[] = [];
   const created = toIso(job.createdAt);
-  if (created) out.push({ key: "shipment_created", label: "Shipment created", at: created });
+  if (created) out.push({ key: "shipment_created", label: "Shipping arranged", at: created });
   const pickedUp = toIso(job.executionStartedAt);
-  if (pickedUp) out.push({ key: "picked_up", label: "Picked up", at: pickedUp });
+  if (pickedUp) out.push({ key: "picked_up", label: "Picked up from the seller", at: pickedUp });
   // COMPANY_HUB journey: origin-hub intake. Only present when it actually
   // happened (persisted timestamp) — no transit/destination/final-mile invented.
   const atOriginHub = toIso(job.originHubIntakeAt);
-  if (atOriginHub) out.push({ key: "at_origin_hub", label: "At origin hub", at: atOriginHub });
+  if (atOriginHub) out.push({ key: "at_origin_hub", label: "At a sorting centre", at: atOriginHub });
   // COMPANY_HUB journey: departed the origin hub into transit. Present only when
   // it actually happened (persisted timestamp). No destination/arrival invented.
   const inTransit = toIso(job.transitStartedAt);
@@ -150,12 +150,12 @@ function buildMilestones(job: DeliveryJob): { key: string; label: string; at: st
   // COMPANY_HUB journey: received at the destination hub. Present only when it
   // actually happened (persisted timestamp). No final-mile/delivery invented.
   const atDestinationHub = toIso(job.destinationHubReceivedAt);
-  if (atDestinationHub) out.push({ key: "at_destination_hub", label: "At destination hub", at: atDestinationHub });
+  if (atDestinationHub) out.push({ key: "at_destination_hub", label: "Reached a delivery centre near you", at: atDestinationHub });
   // COMPANY_HUB journey: assigned to a final-mile person (custody handed from the
   // destination hub). Present only when it actually happened (persisted timestamp).
   // NOT departure/out-for-delivery/delivery — those are later slices.
   const finalMileAssigned = toIso(job.finalMileAssignedAt);
-  if (finalMileAssigned) out.push({ key: "final_mile_assigned", label: "Assigned for final delivery", at: finalMileAssigned });
+  if (finalMileAssigned) out.push({ key: "final_mile_assigned", label: "Preparing for delivery to you", at: finalMileAssigned });
   const delivered = toIso(job.deliveredAt);
   if (delivered) out.push({ key: "delivered", label: "Delivered", at: delivered });
   return out;

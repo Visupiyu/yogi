@@ -1,5 +1,6 @@
 "use client";
 
+import { lineReturnDays } from "@/lib/returnEligibility";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -48,6 +49,8 @@ type FulfilmentLine = {
   qty?: number;
   size?: string;
   color?: string;
+  /** Return window snapshotted on the line at order creation. */
+  returnDays?: number;
 };
 
 type SellerFulfilmentRecord = {
@@ -983,19 +986,24 @@ const shippingLabelRef = useRef<HTMLDivElement>(null);
                           {stage === "Delivered" &&
                             (() => {
                               const req = itemRequests[key];
+                              // This line's own window, snapshotted at order creation.
+                              const lineDays = lineReturnDays(line);
                               const elig = itemRequestEligibility(
                                 { itemFulfilment: sellerRecord.itemFulfilment },
-                                key
+                                key,
+                                new Date(),
+                                lineDays
                               );
                               const windowEnd = itemReturnWindowEndsAt(
                                 { itemFulfilment: sellerRecord.itemFulfilment },
-                                key
+                                key,
+                                lineDays
                               );
                               return (
                                 <div className="mt-3 border-t pt-3 text-xs space-y-1">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-gray-500">
-                                      7-day return / replace window:
+                                      {lineDays}-day return / replace window:
                                     </span>
                                     <span
                                       className={

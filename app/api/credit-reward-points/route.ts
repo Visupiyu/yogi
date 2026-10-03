@@ -9,7 +9,7 @@ import {
 // Customer-facing entry point for crediting an order's reward points.
 //
 // Points are not granted when an order is placed. They are granted once the
-// order is delivered, paid for, and past its 7-day return window with no
+// order is delivered, paid for, and past its return window (the longest among its items) with no
 // return outstanding — see lib/rewardCredit.ts for the rule and
 // lib/returnEligibility.ts for the window itself.
 //

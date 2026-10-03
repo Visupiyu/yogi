@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sendOrderStatusEmail } from "@/lib/orderStatusEmail";
 import Razorpay from "razorpay";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebaseAdmin";
@@ -194,7 +195,15 @@ type Actor = { uid: string; email: string | null };
  * attempt still owns it (attemptId) — or, for a status sync/webhook
  * (attemptId null), only if the order is waiting on exactly this refund id.
  */
-async function applyRefundResult(params: {
+async function applyRefundResult(params: Parameters<typeof applyRefundResultTx>[0]): Promise<RefundOutcome> {
+  const outcome = await applyRefundResultTx(params);
+  // Customer "refunded" email — only after Razorpay's processed refund is
+  // recorded (committed above), once per order, never able to fail it.
+  if (outcome.kind === "refunded") await sendOrderStatusEmail(params.orderId, "refunded");
+  return outcome;
+}
+
+async function applyRefundResultTx(params: {
   orderId: string;
   attemptId: string | null;
   refund: RazorpayRefundEntity;

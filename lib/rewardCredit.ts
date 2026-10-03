@@ -170,7 +170,7 @@ export function evaluateRewardCredit(
   const blocked = returnBlocks(returnRecord);
   if (blocked) return { eligible: false, reason: blocked };
 
-  // lib/returnEligibility.ts owns the 7-day definition. Reused, never
+  // lib/returnEligibility.ts owns the window definition (the longest line window, snapshotted on the order). Reused, never
   // re-derived — a second copy could drift and start paying out during a
   // window the return route still considers open.
   const endsAt = returnWindowEndsAt(order);

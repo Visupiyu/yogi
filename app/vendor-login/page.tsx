@@ -8,6 +8,7 @@ import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { kycStatusOf } from "@/lib/sellerKyc";
 
 export default function VendorLoginPage() {
   const router = useRouter();
@@ -73,20 +74,22 @@ export default function VendorLoginPage() {
 
       const vendorData = snapshot.docs[0].data();
 
-      const kycStatus =
-        vendorData.kycStatus ||
-        vendorData.kycstatus ||
-        (vendorData.status === "Approved" ? "Approved" : "Pending");
+      const kycStatus = kycStatusOf(vendorData);
 
-      if (kycStatus === "Pending") {
+      // Blocked always wins: KYC review never lifts a block.
+      if (vendorData.status === "Blocked") {
         await signOut(auth);
-        alert("Your KYC is under review.");
+        alert("Your vendor account has been blocked. Please contact support.");
         return;
       }
 
-      if (kycStatus === "Rejected") {
-        await signOut(auth);
-        alert("Your KYC was rejected. Please contact support.");
+      // Pending or Rejected KYC: stay signed in and go to the KYC status page,
+      // where a rejected seller sees the reason and can correct and resubmit
+      // (app/seller-kyc). The seller dashboard itself stays closed until an
+      // admin approves (app/seller/layout.js re-checks on every load).
+      if (kycStatus !== "Approved") {
+        localStorage.removeItem("vendor");
+        router.replace("/seller-kyc");
         return;
       }
 
@@ -102,11 +105,6 @@ export default function VendorLoginPage() {
         return;
       }
 
-      if (vendorData.status === "Blocked") {
-        await signOut(auth);
-        alert("Your vendor account has been blocked. Please contact support.");
-        return;
-      }
 
      // Clear previous customer/admin session
 localStorage.removeItem("user");

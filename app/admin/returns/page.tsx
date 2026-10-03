@@ -14,6 +14,7 @@ import {
   statusTone,
   type ItemRequestType,
 } from "@/lib/itemRequests";
+import ProductImage from "@/components/ProductImage";
 
 // Admin management of BOTH systems:
 //   - itemRequests (new, per-item Return/Replace) — driven through the
@@ -339,9 +340,8 @@ export default function AdminReturnsPage() {
                 >
                   <div className="flex flex-col lg:flex-row gap-4">
                   <div className="flex items-center gap-3 lg:w-1/3">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={r.item?.image || "/no-image.png"}
+                    <ProductImage
+                      src={r.item?.image}
                       alt={r.item?.name || "Product"}
                       className="w-14 h-14 rounded-xl object-cover bg-gray-100 shrink-0"
                     />

@@ -2,9 +2,9 @@
 
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import { collection, getDocs, updateDoc, doc, setDoc } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { logAdminAction } from "@/lib/auditLog";
+import { REJECTION_REASON_MIN } from "@/lib/sellerKyc";
 
 function tsToText(v: unknown): string {
   if (!v) return "";
@@ -230,35 +230,53 @@ setVendors(items);
     void decideTaxVerification(id, "REJECT", reason.trim());
   };
 
-  const updateKYC = async (id: string, status: string) => {
-    try {
-      const previous = vendors.find((vendor) => vendor.id === id);
-      await updateDoc(doc(db, "vendors", id), {
-        kycStatus: status,
-        status: status,
-      });
-      const uid = previous?.uid;
-      if (uid) {
-        await setDoc(
-          doc(db, "vendors_public", uid),
-          { status },
-          { merge: true }
-        );
+  const [kycBusy, setKycBusy] = useState<string | null>(null);
+
+  // KYC approve / reject — decided by the SERVER (app/api/admin/kyc/decision),
+  // which re-checks admin access from the verified token, requires a reason
+  // for a rejection, updates vendors + vendors_public and writes the audit
+  // entry in one transaction. The browser never writes kycStatus itself.
+  const decideKYC = async (id: string, action: "APPROVE" | "REJECT") => {
+    let reason: string | undefined;
+    if (action === "REJECT") {
+      const entered = window.prompt(
+        "Reason for rejecting this seller's KYC (the seller will see this and can correct and resubmit):"
+      );
+      if (entered === null) return; // cancelled
+      if (entered.trim().length < REJECTION_REASON_MIN) {
+        alert(`A rejection reason is required (at least ${REJECTION_REASON_MIN} characters).`);
+        return;
       }
-      await logAdminAction("kyc_status_change", id, {
-        oldStatus: previous?.kycStatus,
-        newStatus: status,
+      reason = entered.trim();
+    }
+    try {
+      setKycBusy(id);
+      const user = auth.currentUser;
+      if (!user) { alert("Please sign in again."); return; }
+      const token = await user.getIdToken();
+      const res = await fetch("/api/admin/kyc/decision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ vendorId: id, action, reason }),
       });
-      setVendors(
-        vendors.map((vendor) =>
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert((data?.error ? `${data.error} ` : "Couldn't update the KYC status. ") + `(HTTP ${res.status})`);
+        return;
+      }
+      setVendors((list) =>
+        list.map((vendor) =>
           vendor.id === id
-            ? { ...vendor, kycStatus: status, status: status }
+            ? { ...vendor, kycStatus: data.kycStatus, status: data.status, kycRejectionReason: data.kycRejectionReason || null }
             : vendor
         )
       );
+      toast.success(action === "APPROVE" ? "KYC approved." : "KYC rejected. The seller can see the reason and resubmit.");
     } catch (error) {
       console.error(error);
       alert("Couldn't update the KYC status. Nothing may have been saved — please try again.");
+    } finally {
+      setKycBusy(null);
     }
   };
 
@@ -271,7 +289,7 @@ setVendors(items);
         </div>
 
         {loading ? (
-          <div className="bg-white p-8 rounded-3xl">Loading vendor KYC records...Loading vendor KYC records...</div>
+          <div className="bg-white p-8 rounded-3xl">Loading vendor KYC records...</div>
         ) : vendors.length === 0 ? (
           <div className="bg-white p-10 rounded-3xl text-center text-gray-500">
             No vendors found.
@@ -387,19 +405,28 @@ setVendors(items);
                       >
                         {vendor.kycStatus || "Pending"}
                       </span>
+                      {vendor.kycStatus === "Rejected" && vendor.kycRejectionReason && (
+                        <p className="mt-1 max-w-[220px] text-xs text-red-600">Reason: {vendor.kycRejectionReason}</p>
+                      )}
+                      {vendor.kycStatus !== "Rejected" && vendor.kycResubmittedAt && (
+                        <p className="mt-1 max-w-[220px] text-xs text-gray-500">
+                          Resubmitted {tsToText(vendor.kycResubmittedAt)}
+                          {vendor.kycPreviousRejectionReason ? ` · previously rejected: ${vendor.kycPreviousRejectionReason}` : ""}
+                        </p>
+                      )}
                     </td>
                     <td>
                       <div className="flex gap-2">
                         <button
-  onClick={() => updateKYC(vendor.id, "Approved")}
-  disabled={vendor.kycStatus === "Approved"}
+  onClick={() => void decideKYC(vendor.id, "APPROVE")}
+  disabled={kycBusy === vendor.id || vendor.kycStatus === "Approved"}
   className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-white px-4 py-2 rounded-lg"
 >
   Approve
 </button>
                         <button
-  onClick={() => updateKYC(vendor.id, "Rejected")}
-  disabled={vendor.kycStatus === "Rejected"}
+  onClick={() => void decideKYC(vendor.id, "REJECT")}
+  disabled={kycBusy === vendor.id || vendor.kycStatus === "Rejected"}
   className="bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition text-white px-4 py-2 rounded-lg"
 >
   Reject

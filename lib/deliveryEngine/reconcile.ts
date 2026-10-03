@@ -14,6 +14,7 @@
 // (a job-covered sellerOrder can only reach Delivered here — see the guard in
 // seller/advance-item), reads-before-writes, and it NEVER touches paymentStatus,
 // earnings, rewards, inventory or refunds.
+import { sendOrderStatusEmail } from "@/lib/orderStatusEmail";
 import type { Transaction, Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import {
@@ -57,6 +58,17 @@ export type ReconcileResult = {
  * sellerOrder's items are already all Delivered, the redundant item write is
  * skipped but the marker + roll-up are still ensured. Safe to call repeatedly.
  */
+/**
+ * After a reconcile transaction has COMMITTED: the customer's "delivered"
+ * email when this reconcile made the whole order Delivered. Once per order
+ * (lib/orderStatusEmail.ts); never throws.
+ */
+export async function emailAfterReconcile(result: ReconcileResult): Promise<void> {
+  if (result.reconciled && result.parentStatus === "Delivered") {
+    await sendOrderStatusEmail(result.orderId, "delivered");
+  }
+}
+
 export async function reconcileDeliveredJob(
   tx: Transaction,
   db: Firestore,

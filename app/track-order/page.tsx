@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ORDER_STEPS, TOTAL_STEPS, getStep } from "@/lib/orderTracking";
-import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import { customerStatusLabel } from "@/lib/orderTracking";
 
 // Guest order tracking.
 //
@@ -19,7 +19,8 @@ import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
 type Tracking = {
   status: string;
   createdAt: string | null;
-  deliveryDate: string | null;
+  // Server-derived from the real SLA (lib/deliveryEstimate.ts) — never invented.
+  deliveryEstimate?: { kind: string; label: string | null; date: string | null; note: string | null } | null;
   expectedDelivery: string | null;
   deliveredAt: string | null;
   courierName: string | null;
@@ -75,7 +76,7 @@ export default function TrackOrderPage() {
 
   const formatDate = (value: string | null) => {
     if (!value) return null;
-    // deliveryDate / expectedDelivery arrive as pre-formatted display strings;
+    // A seller-entered expectedDelivery may be a pre-formatted display string;
     // timestamps arrive as ISO. Only the latter needs converting.
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
@@ -180,7 +181,7 @@ export default function TrackOrderPage() {
                       : "bg-blue-100 text-blue-700"
                   }`}
                 >
-                  {fulfilmentStageLabel(result.status)}
+                  {customerStatusLabel(result.status)}
                 </span>
               </div>
 
@@ -246,7 +247,7 @@ export default function TrackOrderPage() {
             </div>
 
             {/* DELIVERY / COURIER */}
-            {(result.deliveryDate ||
+            {((result.deliveryEstimate && result.deliveryEstimate.kind !== "none") ||
               result.expectedDelivery ||
               result.deliveredAt ||
               result.courierName ||
@@ -262,22 +263,23 @@ export default function TrackOrderPage() {
                       </span>
                     </div>
                   )}
-                  {result.expectedDelivery && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Expected delivery</span>
-                      <span className="font-semibold">
-                        {formatDate(result.expectedDelivery)}
-                      </span>
-                    </div>
-                  )}
-                  {result.deliveryDate && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Estimated delivery</span>
-                      <span className="font-semibold">
-                        {formatDate(result.deliveryDate)}
-                      </span>
-                    </div>
-                  )}
+                  {result.deliveryEstimate &&
+                    result.deliveryEstimate.kind !== "none" &&
+                    result.deliveryEstimate.kind !== "delivered" && (
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <span className="text-gray-600">{result.deliveryEstimate.label}</span>
+                        <span className="text-right">
+                          {result.deliveryEstimate.date && (
+                            <span className="block font-semibold">
+                              {formatDate(result.deliveryEstimate.date)}
+                            </span>
+                          )}
+                          {result.deliveryEstimate.note && (
+                            <span className="block text-gray-500">{result.deliveryEstimate.note}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
                   {result.courierName && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">Courier</span>

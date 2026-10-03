@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="No product image">
+  <rect width="400" height="400" fill="#f3f4f6"/>
+  <rect x="120" y="128" width="160" height="128" rx="14" fill="none" stroke="#9ca3af" stroke-width="10"/>
+  <circle cx="168" cy="172" r="14" fill="#9ca3af"/>
+  <path d="M132 244l46-50 34 36 22-22 34 36z" fill="#9ca3af"/>
+  <text x="200" y="300" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="22" font-weight="600" fill="#6b7280">Image coming soon</text>
+  <text x="200" y="330" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="16" font-weight="700" fill="#16a34a">YOMICO</text>
+</svg>

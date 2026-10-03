@@ -7,8 +7,55 @@
 // lib/shippingRules.ts and lib/orderTracking.ts. The client copy is a
 // convenience; app/api/request-return is the control.
 
-/** Approved policy: returns may be requested for 7 days after delivery. */
-export const RETURN_WINDOW_DAYS = 7;
+/**
+ * Platform default: returns may be requested for 7 days after delivery. Used
+ * when a product has no valid seller-set window, and for every order line
+ * placed before windows were snapshotted (those orders always had 7 days).
+ */
+export const DEFAULT_RETURN_DAYS = 7;
+/** @deprecated The window is per line now — use lineReturnDays / orderReturnDays. */
+export const RETURN_WINDOW_DAYS = DEFAULT_RETURN_DAYS;
+
+/**
+ * The range a seller may set on a product (whole days). Every product is
+ * returnable (the policy has no non-returnable category), and 30 days bounds
+ * how long a seller's payout and the customer's reward points wait.
+ */
+export const MIN_RETURN_DAYS = 1;
+export const MAX_RETURN_DAYS = 30;
+
+export function isValidReturnDays(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= MIN_RETURN_DAYS && value <= MAX_RETURN_DAYS;
+}
+
+/**
+ * The window a product offers: the seller's value when valid, else the
+ * platform default. Read from the server-side product document only (order
+ * creation), never from anything the client sends.
+ */
+export function effectiveReturnDays(product: { returnDays?: unknown } | null | undefined): number {
+  return isValidReturnDays(product?.returnDays) ? product!.returnDays as number : DEFAULT_RETURN_DAYS;
+}
+
+/**
+ * The window for one ORDER LINE: the value snapshotted onto the line when the
+ * order was created, so a later product edit never changes it. Lines without a
+ * snapshot (older orders) get the default they were sold under.
+ */
+export function lineReturnDays(line: { returnDays?: unknown } | null | undefined): number {
+  return isValidReturnDays(line?.returnDays) ? line!.returnDays as number : DEFAULT_RETURN_DAYS;
+}
+
+/**
+ * The window for the WHOLE order: the longest of its lines. Anything that waits
+ * for every return window to close (reward-point credit) must wait for this
+ * one; a single line's eligibility uses lineReturnDays instead.
+ */
+export function orderReturnDays(order: { items?: unknown } | null | undefined): number {
+  const items = Array.isArray(order?.items) ? (order!.items as { returnDays?: unknown }[]) : [];
+  if (items.length === 0) return DEFAULT_RETURN_DAYS;
+  return Math.max(...items.map(lineReturnDays));
+}
 
 /**
  * Anything that carries the two fields the window is derived from. Loose on
@@ -19,6 +66,8 @@ export type ReturnWindowOrder = {
   status?: unknown;
   deliveredAt?: unknown;
   updatedAt?: unknown;
+  /** Order lines; each may carry its snapshotted returnDays. */
+  items?: unknown;
 };
 
 /** Firestore Timestamp | ISO string | Date | epoch millis -> Date | null. */
@@ -86,14 +135,21 @@ export function returnWindowBasis(order: ReturnWindowOrder): {
   return { date: null, source: "unknown" };
 }
 
-/** When the window closes, or null when no basis date could be established. */
+/** `days` whole days after `from` (calendar days, as the 7-day rule always counted). */
+export function addReturnDays(from: Date, days: number): Date {
+  const end = new Date(from.getTime());
+  end.setDate(end.getDate() + days);
+  return end;
+}
+
+/**
+ * When the ORDER's window closes — the latest line window (orderReturnDays) —
+ * or null when no basis date could be established.
+ */
 export function returnWindowEndsAt(order: ReturnWindowOrder): Date | null {
   const { date } = returnWindowBasis(order);
   if (!date) return null;
-
-  const end = new Date(date.getTime());
-  end.setDate(end.getDate() + RETURN_WINDOW_DAYS);
-  return end;
+  return addReturnDays(date, orderReturnDays(order));
 }
 
 /**

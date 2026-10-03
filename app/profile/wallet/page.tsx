@@ -22,9 +22,9 @@ type LedgerEntry = AccountWallet["ledger"][number];
 type PendingOrder = AccountWallet["pending"]["orders"][number];
 
 const HELD_BY: Record<PendingOrder["heldBy"], string> = {
-  "not-delivered": "Credited after delivery and the 7-day return window",
+  "not-delivered": "Credited after delivery and once the return window closes",
   "awaiting-payment": "Waiting for payment confirmation",
-  "return-window": "Credited when the 7-day return window closes",
+  "return-window": "Credited when the return window closes",
   "open-return": "On hold while a return on this order is open",
   processing: "Being credited now",
 };

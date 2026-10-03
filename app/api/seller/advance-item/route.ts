@@ -1,3 +1,4 @@
+import { emailEventForStatus, sendOrderStatusEmail } from "@/lib/orderStatusEmail";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
@@ -70,8 +71,10 @@ async function isWithinRateLimit(uid: string): Promise<boolean> {
 type Outcome =
   | {
       kind: "advanced";
+      orderId: string;
       itemStatus: string;
       parentStatus: string | null;
+      previousParentStatus: string | null;
       allDelivered: boolean;
     }
   | { kind: "error"; status: number; error: string };
@@ -321,15 +324,26 @@ export async function POST(request: Request) {
 
       return {
         kind: "advanced",
+        orderId,
         itemStatus: next,
         parentStatus:
           orderStatus === "Cancelled" ? String(orderStatus) : parentStage,
+        previousParentStatus: typeof orderStatus === "string" ? orderStatus : null,
         allDelivered,
       };
     });
 
     if (outcome.kind === "error") {
       return Response.json({ error: outcome.error }, { status: outcome.status });
+    }
+
+    // Customer status email when the ORDER's status moved (Shipped, Out For
+    // Delivery, Delivered) — after the commit, once per order + event.
+    if (outcome.parentStatus !== outcome.previousParentStatus) {
+      const event = emailEventForStatus(outcome.parentStatus);
+      if (event === "shipped" || event === "out_for_delivery" || event === "delivered") {
+        await sendOrderStatusEmail(outcome.orderId, event);
+      }
     }
 
     return Response.json({

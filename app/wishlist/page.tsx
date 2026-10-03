@@ -13,6 +13,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { hasStockBearingVariants } from "@/lib/products/inventory";
 import { isProductVisible } from "@/lib/products/visibility";
+import ProductImage from "@/components/ProductImage";
 
 export default function WishlistPage() {
 
@@ -429,11 +430,8 @@ duration-300
 
                 <Link href={`/product/${item.id}`}>
 
-  <img loading="lazy" decoding="async"
-    src={
-      item.image ||
-      "/no-image.png"
-    }
+  <ProductImage loading="lazy" decoding="async"
+    src={item.image}
     alt={item.name}
    className="
 w-full

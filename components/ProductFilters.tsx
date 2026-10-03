@@ -103,8 +103,9 @@ export default function ProductFilters({
           className="w-full border rounded-xl px-3 py-2"
         >
 
+          {/* Search results arrive best-match first (lib/storefront/searchRelevance.ts). */}
           <option value="default">
-            Default
+            Relevance
           </option>
 
           <option value="priceLow">

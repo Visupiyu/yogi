@@ -1,3 +1,4 @@
+import { lineReturnDays } from "@/lib/returnEligibility";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
@@ -176,9 +177,13 @@ export async function POST(request: Request) {
       const existingSnap = await tx.get(requestRef);
 
       // ---- validations ----
+      // The line's own window, snapshotted on the stored order at creation
+      // (lib/returnEligibility#lineReturnDays) — never taken from the request.
       const eligibility = itemRequestEligibility(
         sellerRecord as never,
-        itemKey
+        itemKey,
+        new Date(),
+        lineReturnDays(Array.isArray(order.items) ? order.items[parentIndex] : null)
       );
       if (!eligibility.eligible) {
         const msg =

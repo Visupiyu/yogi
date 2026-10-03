@@ -58,7 +58,8 @@ export type PaymentIntent = {
   address: string;
   couponCode: string | null;
   redeemPoints: boolean;
-  deliveryDate: string;
+  /** Legacy intents only. No longer written: see lib/deliveryEstimate.ts. */
+  deliveryDate?: string;
   expectedAmountPaise: number;
 };
 
@@ -510,7 +511,6 @@ export async function finalizeOnlineOrder(params: {
       deliveryCost: pricing.deliveryCost,
       freeDeliveryApplied: pricing.freeDeliveryApplied,
       finalTotal: capturedRupees,
-      deliveryDate: intent.deliveryDate,
       // Commission is permanently 0% / ₹0 (lib/commissionPolicy.ts) — stamped
       // from the constant, never from the intent, so an intent priced under an
       // old setting cannot carry a commission onto the order.

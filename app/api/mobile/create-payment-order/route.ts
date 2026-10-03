@@ -1,3 +1,4 @@
+import { effectiveReturnDays } from "@/lib/returnEligibility";
 import Razorpay from "razorpay";
 import { assertRazorpayTestKeyInPreview } from "@/lib/razorpayEnv";
 import { getAdminDb } from "@/lib/firebaseAdmin";
@@ -75,6 +76,8 @@ function normalizeProduct(data: FirebaseFirestore.DocumentData) {
     gstPercent: typeof data.gstPercent === "number" ? data.gstPercent : 0,
     vendorId: typeof data.vendorId === "string" ? data.vendorId : "",
     vendorName: typeof data.vendorName === "string" ? data.vendorName : "",
+    // Seller-set return window when valid, else the platform default.
+    returnDays: effectiveReturnDays(data),
     stock: data.stock,
     active: data.active,
   };
@@ -319,6 +322,8 @@ export async function POST(request: Request) {
         quantity: Number(data.quantity),
         vendorId: product.vendorId,
         vendorName: product.vendorName,
+        // Snapshotted from the server-read product (lib/returnEligibility).
+        returnDays: product.returnDays,
         savedForLater: false,
         ...(selectedVariants ? { selectedVariants } : {}),
         ...(variantId ? { variantId } : {}),

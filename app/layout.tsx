@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SITE_URL } from "@/lib/siteConfig";
 
 import "./globals.css";
 
@@ -11,7 +12,7 @@ import { Toaster } from "sonner";
 import ClientLayout from "@/components/ClientLayout";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://yomico.in"),
+  metadataBase: new URL(SITE_URL),
 
   // No site-wide canonical here: a root canonical is inherited by every page
   // without its own and would point all of them at the home page. Pages that are
@@ -42,7 +43,7 @@ export const metadata: Metadata = {
   authors: [
   {
     name: "YOMICO",
-    url: "https://yomico.in",
+    url: SITE_URL,
   },
 ],
 creator: "YOMICO",
@@ -66,7 +67,7 @@ publisher: "YOMICO",
   openGraph: {
   title: "YOMICO",
   description: "India's Modern Multi-Vendor Marketplace",
-  url: "https://yomico.in",
+  url: SITE_URL,
   siteName: "YOMICO",
   type: "website",
   locale: "en_IN",

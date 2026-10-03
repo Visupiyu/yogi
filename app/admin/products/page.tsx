@@ -11,7 +11,7 @@ import { auth, db } from "@/lib/firebase";
 import { productModerationStatus, type ModerationStatus } from "@/lib/products/visibility";
 import type { ModerationAction } from "@/lib/products/moderation";
 import { toast } from "sonner";
-import Image from "next/image";
+import ProductImage from "@/components/ProductImage";
 
 type Product = {
   id: string;
@@ -358,12 +358,9 @@ export default function AdminProductsPage() {
                 className="bg-white rounded-2xl shadow-sm hover:shadow-md transition p-3"
               >
                 <div className="relative h-32">
-                  <Image
-                    src={product.image || "/no-image.png"}
+                  <ProductImage
+                    src={product.image}
                     alt={product.name}
-                    onError={(e) => {
-                      e.currentTarget.src = "/no-image.png";
-                    }}
                     className="w-full h-full object-cover rounded-xl"
                   />
                 </div>

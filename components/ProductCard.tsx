@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Heart, Scale, Star } from "lucide-react";
 
 import { motion } from "framer-motion";
+import ProductImage from "@/components/ProductImage";
 
 type Props = { id:string; name:string; price:number; image:string; stock:number; vendorId?:string; };
 
@@ -219,7 +220,7 @@ export default function ProductCard({ id, name, price, image, stock, vendorId
           href={`/product/${id}`}
         >
         
-<img
+<ProductImage
   src={image}
   alt={name}
   loading="lazy"

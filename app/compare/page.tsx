@@ -3,7 +3,7 @@
 import { readJsonArray } from "@/lib/safeStorage";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import ProductImage from "@/components/ProductImage";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { isStorefrontVisible, toLegacyProduct } from "@/lib/products/legacyDisplay";
@@ -128,8 +128,8 @@ export default function ComparePage() {
                   key={product.id}
                   className="p-3 md:p-4 text-center min-w-[170px] md:min-w-[220px]"
                 >
-              <Image
-  src={product.image || "/no-image.png"}
+              <ProductImage
+  src={product.image}
   alt={product.name}
   width={112}
   height={112}

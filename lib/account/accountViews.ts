@@ -11,7 +11,7 @@
 // server-computed figures; statuses and labels come from lib/itemRequests and
 // lib/itemFulfilment. Server-only (node:crypto for opaque ids).
 import { createHash } from "node:crypto";
-import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import { customerStatusLabel } from "@/lib/orderTracking";
 import {
   REFUND_DESTINATION_LABEL,
   isTerminal,
@@ -114,7 +114,7 @@ export function buildOrderCard(o: Row): AccountOrderCard {
     orderNumber: strOrNull(o.data.orderNumber, 60),
     placedAt: iso(o.data.createdAt),
     status,
-    statusLabel: fulfilmentStageLabel(status),
+    statusLabel: customerStatusLabel(status),
     itemCount: items.reduce((s, it) => s + Math.max(0, Math.floor(num(it?.qty ?? it?.quantity))), 0),
     total: money(o.data.finalTotal ?? o.data.total),
     firstItem: first ? { name: str(first.name ?? first.title, 200) || "Product", image: str(first.image, 1000) } : null,
@@ -536,7 +536,7 @@ export function buildLedger(rows: Row[], orderNumbers: OrderNumbers): LedgerEntr
 
 export const WALLET_RULES = {
   pointValueRupees: 1 as const,
-  earn: "Earn 1 point for every ₹100 you pay. Points are credited once the order is delivered, paid and its 7-day return window has closed. Items you return and get refunded don't earn points.",
+  earn: "Earn 1 point for every ₹100 you pay. Points are credited once the order is delivered, paid and the return window for every item has closed. Items you return and get refunded don't earn points.",
   redeem: "Use your points at checkout toward future YOMICO purchases (1 point = ₹1) once you have completed your first YOMICO purchase of ₹100 or more. Points cover the item value of an order, not delivery, and at least ₹1 stays payable. Refunds for returned items are credited here as points.",
 };
 

@@ -1,3 +1,4 @@
+import { sendOrderStatusEmail } from "@/lib/orderStatusEmail";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
@@ -383,6 +384,10 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error("confirm-order: seller notification failed:", error);
     }
+
+    // Customer "confirmed" email — after the commit, once per order, never
+    // able to undo the confirmation (lib/orderStatusEmail.ts).
+    await sendOrderStatusEmail(outcome.orderId, "confirmed");
 
     return Response.json({
       success: true,

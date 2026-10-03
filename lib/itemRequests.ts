@@ -30,7 +30,7 @@
 //   - The legacy order-level `returns` collection is untouched and keeps
 //     working; this is a new `itemRequests` collection alongside it.
 
-import { RETURN_WINDOW_DAYS } from "@/lib/returnEligibility";
+import { DEFAULT_RETURN_DAYS, addReturnDays } from "@/lib/returnEligibility";
 import { itemKeyFor } from "@/lib/itemFulfilment";
 
 export const ITEM_REQUEST_TYPES = ["return", "replace"] as const;
@@ -430,28 +430,31 @@ export function isItemDelivered(
 }
 
 /**
- * When the return window closes for this line, from its own delivered date.
+ * When the return window closes for this line, from its own delivered date and
+ * its own window (`returnDays`: lib/returnEligibility#lineReturnDays of the
+ * stored order line — the value snapshotted at order creation; servers pass it
+ * from the order document, never from the request).
  * Null when no delivered date is recorded — the caller then allows the request
  * but flags it for review, exactly as the order-level flow does.
  */
 export function itemReturnWindowEndsAt(
   sellerRecord: SellerRecordLike | null | undefined,
-  itemKey: string
+  itemKey: string,
+  returnDays: number = DEFAULT_RETURN_DAYS
 ): Date | null {
   const entry = sellerRecord?.itemFulfilment?.[itemKey];
   const delivered = toDate(entry?.deliveredAt);
   if (!delivered) return null;
-  const end = new Date(delivered.getTime());
-  end.setDate(end.getDate() + RETURN_WINDOW_DAYS);
-  return end;
+  return addReturnDays(delivered, returnDays);
 }
 
 export function isItemWithinReturnWindow(
   sellerRecord: SellerRecordLike | null | undefined,
   itemKey: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  returnDays: number = DEFAULT_RETURN_DAYS
 ): boolean {
-  const end = itemReturnWindowEndsAt(sellerRecord, itemKey);
+  const end = itemReturnWindowEndsAt(sellerRecord, itemKey, returnDays);
   if (!end) return true; // fail open, flag for review
   return now.getTime() <= end.getTime();
 }
@@ -474,12 +477,13 @@ export type EligibilityResult = {
 export function itemRequestEligibility(
   sellerRecord: SellerRecordLike | null | undefined,
   itemKey: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  returnDays: number = DEFAULT_RETURN_DAYS
 ): EligibilityResult {
   if (!isItemDelivered(sellerRecord, itemKey)) {
     return { eligible: false, needsReview: false, reason: "not-delivered" };
   }
-  const end = itemReturnWindowEndsAt(sellerRecord, itemKey);
+  const end = itemReturnWindowEndsAt(sellerRecord, itemKey, returnDays);
   if (!end) {
     return { eligible: true, needsReview: true, reason: "needs-review" };
   }

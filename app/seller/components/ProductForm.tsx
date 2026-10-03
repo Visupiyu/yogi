@@ -1,4 +1,5 @@
 "use client";
+import { MAX_RETURN_DAYS, MIN_RETURN_DAYS } from "@/lib/returnEligibility";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Product } from "@/lib/products/product";
 import { generateSKU, generateSlug } from "@/lib/products/helpers";
@@ -1698,9 +1699,21 @@ Return Days
 
 </label>
 
+<p className="mb-2 text-xs text-gray-500">
+
+Whole days after delivery, {MIN_RETURN_DAYS}–{MAX_RETURN_DAYS}. Shown to customers; each order keeps the window it was placed with.
+
+</p>
+
 <input
 
 type="number"
+
+min={MIN_RETURN_DAYS}
+
+max={MAX_RETURN_DAYS}
+
+step={1}
 
 value={product.returnDays}
 

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/siteConfig";
 
 // Private areas are not for search engines: the account, cart/checkout, auth,
 // staff consoles and the API. (The same prefixes also send X-Robots-Tag: noindex —
@@ -45,6 +46,6 @@ export default function robots(): MetadataRoute.Robots {
       disallow: PRIVATE_PATHS,
     },
 
-    sitemap: "https://yomico.in/sitemap.xml",
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }

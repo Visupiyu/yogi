@@ -91,3 +91,20 @@ export function deliveryKycPath(
   const safeLabel = DELIVERY_KYC_LABELS.has(label) ? label : "doc";
   return `delivery-kyc/${safeUid}/${safeLabel}-${uniqueFileName(file?.name)}`;
 }
+
+/**
+ * A seller KYC document re-uploaded on /seller-kyc after a rejection:
+ * vendor-kyc/{uid}/{label}-{unique-name}. Same folder and owner create-only
+ * rule as registration (storage.rules); the server then checks the path is the
+ * seller's own (lib/sellerKyc.ts) before pointing the vendor record at it.
+ */
+const VENDOR_KYC_LABELS = new Set(["gst", "aadhaar", "cheque"]);
+export function vendorKycPath(
+  uid: string | null | undefined,
+  label: string,
+  file: File
+): string {
+  const safeUid = assertUid(uid, "seller KYC document");
+  const safeLabel = VENDOR_KYC_LABELS.has(label) ? label : "doc";
+  return `vendor-kyc/${safeUid}/${safeLabel}-${uniqueFileName(file?.name)}`;
+}

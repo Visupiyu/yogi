@@ -19,10 +19,12 @@ import { addToCart } from "@/lib/cart";
 import { planReorderLine } from "@/lib/cartReorder";
 import LoadErrorState from "@/components/LoadErrorState";
 import { ORDER_STEPS, getStep } from "@/lib/orderTracking";
-import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import { customerStatusLabel } from "@/lib/orderTracking";
+import { customerDeliveryEstimate, formatEstimateDate } from "@/lib/deliveryEstimate";
 import { customerLoginUrl } from "@/lib/authRedirect";
 import { INVOICE_LINK_LABEL, isInvoiceAvailable } from "@/lib/invoiceAvailability";
 import { requestSellerChat } from "@/lib/account/contactSeller";
+import ProductImage from "@/components/ProductImage";
 export default function OrdersPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
@@ -341,7 +343,7 @@ export default function OrdersPage() {
   <div className="flex justify-between">
     <span>Status</span>
     <span className="text-blue-600 font-semibold">
-      {fulfilmentStageLabel(order.status)}
+      {customerStatusLabel(order.status)}
     </span>
   </div>
   <div className="flex justify-between">
@@ -588,7 +590,7 @@ export default function OrdersPage() {
       `}
     >
 
-      {fulfilmentStageLabel(order.status)}
+      {customerStatusLabel(order.status)}
 
     </span>
 
@@ -614,23 +616,21 @@ export default function OrdersPage() {
 
   </div>
 
-  {order.expectedDelivery && (
-
-    <p className="mb-2">
-
-      📅 Expected Delivery:
-
-      {" "}
-
-      <span className="font-semibold">
-
-      {new Date(order.expectedDelivery).toLocaleDateString("en-IN")}
-
-      </span>
-
-    </p>
-
-  )}
+  {/* Real SLA / recorded dates only (lib/deliveryEstimate.ts). */}
+  {(() => {
+    const estimate = customerDeliveryEstimate(order);
+    if (estimate.kind === "none" || estimate.kind === "delivered") return null;
+    return (
+      <p className="mb-2">
+        📅 {estimate.label}:{" "}
+        {estimate.date ? (
+          <span className="font-semibold">{formatEstimateDate(estimate.date)}</span>
+        ) : (
+          <span className="text-gray-600">{estimate.note}</span>
+        )}
+      </p>
+    );
+  })()}
 
   {(order.courierPartner || order.courierName) && (
 
@@ -843,11 +843,8 @@ export default function OrdersPage() {
           "
         >
 
-          <img
-            src={
-              item.image ||
-              "/no-image.png"
-            }
+          <ProductImage
+            src={item.image}
             alt={item.name}
             className="
               w-28

@@ -18,6 +18,7 @@
 // is genuinely shared, via the dependency-free lib/shippingRules.ts, so the
 // price shown in the cart and at checkout is the price charged here.
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { effectiveReturnDays } from "@/lib/returnEligibility";
 import { isRewardsEligible } from "@/lib/rewards/eligibility";
 import {
   REWARD_HOLD_ACTIVE_MESSAGE,
@@ -88,6 +89,9 @@ export type PricedLineItem = {
   vendorId: string;
   vendorName: string;
   lineTotal: number;
+  /** The return window this line was sold with (product's seller-set value or
+   *  the platform default), snapshotted so a later product edit can't change it. */
+  returnDays: number;
 
   // Present only when the line resolved to a real variant. `attributes`
   // carries every dimension — Capacity, RAM, Storage, Processor, Material,
@@ -423,6 +427,8 @@ export async function computeOrderPricing(
       vendorId: typeof product.vendorId === "string" ? product.vendorId : "",
       vendorName: typeof product.vendorName === "string" ? product.vendorName : "",
       lineTotal: price * qty,
+      // From the server-read product, never the client (lib/returnEligibility).
+      returnDays: effectiveReturnDays(product),
       ...(resolvedVariant
         ? {
             variantId: resolvedVariant.id,

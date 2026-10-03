@@ -46,6 +46,8 @@ import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { isProductVisible } from "@/lib/products/visibility";
 import { evaluateCoupon } from "@/lib/coupons/couponRules";
 import { customerLoginUrl } from "@/lib/authRedirect";
+import { PRE_ORDER_DELIVERY_SHORT } from "@/lib/deliveryEstimate";
+import ProductImage from "@/components/ProductImage";
 
 // Business rule: pay-on-delivery orders are settled via UPI only at the
 // moment of delivery — cash is never accepted. This is the stored
@@ -101,7 +103,6 @@ export default function CheckoutPage() {
   const couponRequestRef = useRef(false);
   const [shipping, setShipping] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState(PAY_ON_DELIVERY_METHOD);
-  const [deliveryDate, setDeliveryDate] = useState("");
   const [discount, setDiscount] = useState(0);
   const couponApplied = appliedCode !== null;
   // Reward points, DISPLAY state only. Loaded from /api/account/reward-redemption
@@ -243,16 +244,6 @@ export default function CheckoutPage() {
         standardShippingCharge: SHIPPING_FEE,
       })
     );
-
-    const d = new Date();
-    d.setDate(d.getDate() + 5);
-   setDeliveryDate(
-  d.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
-);
   }, [total, finalAmount, FREE_SHIPPING_THRESHOLD, SHIPPING_FEE]);
 
   // Re-reads each line's product and reconciles the checkout with it: fresh
@@ -1460,8 +1451,8 @@ Easy Returns
               <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
                 {items.map((item: any, index: number) => (
                   <div key={index} className="flex items-center gap-3">
-                    <img
-                      src={item?.image || "/no-image.png"}
+                    <ProductImage
+                      src={item?.image}
                       alt=""
                       className="w-16 h-16 object-cover rounded-xl border border-gray-100"
                     />
@@ -1614,9 +1605,11 @@ Easy Returns
                   </span>
                 </div>
 
-                <div className="flex justify-between text-xs text-gray-500">
-                  <span>Estimated delivery</span>
-                  <span>{deliveryDate}</span>
+                {/* No invented date: the real date exists only once the order
+                    is confirmed (lib/deliveryEstimate.ts). */}
+                <div className="flex justify-between gap-3 text-xs text-gray-500">
+                  <span className="shrink-0">Delivery</span>
+                  <span className="text-right">{PRE_ORDER_DELIVERY_SHORT}</span>
                 </div>
                 <div className="flex justify-between">
                  <span> GST </span>

@@ -1,6 +1,7 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb, getAdminBucket } from "@/lib/firebaseAdmin";
+import { kycDocumentObjectPath } from "@/lib/sellerKyc";
 
 // ---------------------------------------------------------------------------
 // ADMIN-ONLY seller KYC document access — backs BOTH View and Download in
@@ -42,23 +43,9 @@ function isDocType(value: string): value is DocType {
   return value === "gst" || value === "aadhaar" || value === "cheque";
 }
 
-// Firebase Storage download URLs look like:
-//   https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<url-encoded-path>?alt=media&token=...
-// Extracts just the decoded object path (e.g. "vendor-kyc/uid/gst-169...-x.pdf"),
-// never the token. Returns null for anything that doesn't match — callers
-// must treat that as "cannot resolve", never fall back to fetching the URL
-// directly (that would reintroduce the token-trusting behavior this route
-// replaces).
-function extractStorageObjectPath(downloadUrl: string): string | null {
-  try {
-    const parsed = new URL(downloadUrl);
-    const match = parsed.pathname.match(/\/o\/(.+)$/);
-    if (!match) return null;
-    return decodeURIComponent(match[1]);
-  } catch {
-    return null;
-  }
-}
+// Stored pointers are resolved to an object path by kycDocumentObjectPath
+// (lib/sellerKyc.ts) — never fetched as a URL, so a stored token is never
+// trusted. Anything that doesn't resolve is treated as "cannot resolve".
 
 // Keeps the Content-Disposition filename readable and header-safe: only
 // alphanumerics, dash, underscore, dot survive.
@@ -130,7 +117,9 @@ export async function GET(request: Request) {
       return Response.json({ error: "Document not uploaded." }, { status: 404 });
     }
 
-    const objectPath = extractStorageObjectPath(downloadUrl);
+    // A download URL (vendor-register) or, after a KYC resubmission
+    // (app/api/seller/kyc), the object path itself.
+    const objectPath = kycDocumentObjectPath(downloadUrl);
     // Defense in depth: only ever serve an object that actually lives under
     // this vendor's own vendor-kyc/{uid}/ folder, even though downloadUrl
     // came from the vendor's own trusted Firestore record and was never

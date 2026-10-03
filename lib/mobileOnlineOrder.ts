@@ -1,4 +1,5 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
+import { sendOrderStatusEmail } from "@/lib/orderStatusEmail";
 import { mintNumbers } from "@/lib/humanIds";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
 import {
@@ -61,6 +62,9 @@ export type MobilePricedItem = {
   quantity: number;
   vendorId: string;
   vendorName: string;
+  /** Return window snapshotted from the product at create-payment-order time.
+   *  Older intents lack it; lineReturnDays() then applies the default. */
+  returnDays?: number;
   savedForLater: false;
   selectedVariants?: Record<string, string>;
   /** The seller's own id for this exact variant combination (Strategy 1),
@@ -454,6 +458,9 @@ export async function finalizeMobileOnlineOrder(params: {
       console.error("finalizeMobileOnlineOrder: review notification failed:", error);
     }
   }
+
+  // Order-placed email, after the commit; once per order, never fails it.
+  await sendOrderStatusEmail(orderId, "placed");
 
   return { kind: "created", orderId, finalTotal: outcome.finalTotal };
 }

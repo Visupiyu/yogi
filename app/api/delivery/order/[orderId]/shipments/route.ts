@@ -6,6 +6,7 @@ import {
   type CustomerShipment,
 } from "@/lib/deliveryEngine/trackingProjections";
 import type { DeliveryJob } from "@/lib/deliveryEngine/types";
+import { customerDeliveryEstimate } from "@/lib/deliveryEstimate";
 
 // GET /api/delivery/order/[orderId]/shipments
 //
@@ -61,7 +62,9 @@ export async function GET(
       orderId,
       orderNumber: typeof order.orderNumber === "string" ? order.orderNumber : null,
       // Real stored data only — never an invented ETA.
-      expectedDelivery: asIso(order.expectedDelivery) ?? asIso(order.deliveryDate),
+      // Recorded date, else the real SLA target (lib/deliveryEstimate.ts) — never
+      // the legacy invented "+5 days" deliveryDate.
+      expectedDelivery: asIso(order.expectedDelivery) ?? (customerDeliveryEstimate(order).date?.toISOString() ?? null),
       shipments, // [] for historical/no-job orders
     });
   } catch (error) {

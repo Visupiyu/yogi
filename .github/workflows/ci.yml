@@ -1,0 +1,64 @@
+# YOMICO CI — type check, production build and the automated test suites.
+#
+# Safe by construction:
+#   * No secrets are configured or read. FIREBASE_SERVICE_ACCOUNT_KEY,
+#     RAZORPAY_*, RESEND_API_KEY and GEMINI_API_KEY are never set here.
+#   * Tests run only against the local Firebase emulators with demo-* project
+#     ids (Firebase guarantees demo-* has no real project), Razorpay is the
+#     in-repo fake, and order emails go to a fake transport.
+#   * The build runs without a service account, so the sitemap's Firestore
+#     part is skipped (app/sitemap.ts) and nothing reaches production data.
+#   * Every step fails the job on a real failure — nothing is masked.
+#
+# Known baseline failures (failing on e88d1aa before Phase 6 medium) are listed
+# in scripts/test/suites.mjs and printed by every run; they are not run here.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # The Firestore / Storage emulators need Java 11+.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Firebase emulator downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('package-lock.json') }}
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Test suites (emulators + fakes)
+        run: npm test

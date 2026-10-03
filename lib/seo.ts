@@ -1,5 +1,7 @@
 // Shared SEO helpers (server- and client-safe, no I/O).
-export const SITE_URL = "https://yomico.in";
+// The canonical URL lives in lib/siteConfig.ts (one definition for SEO, emails and links).
+export { SITE_URL } from "@/lib/siteConfig";
+import { SITE_URL } from "@/lib/siteConfig";
 export const SITE_NAME = "YOMICO";
 
 export function absoluteUrl(pathOrUrl: string): string {

@@ -7,6 +7,7 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useVendor } from "@/hooks/useVendor";
 import Image from "next/image";
+import { kycStatusOf } from "@/lib/sellerKyc";
 
 const navItems = [
   { href: "/seller", label: "Dashboard", icon: "📊" },
@@ -97,6 +98,14 @@ export default function SellerLayout({ children }) {
       signOut(auth);
       localStorage.removeItem("vendor");
       router.replace("/vendor-login");
+      return;
+    }
+
+    // Pending or Rejected KYC (not blocked): the KYC status page, where a
+    // rejected seller can see the reason and resubmit — still signed in.
+    if (status !== "Blocked" && kycStatusOf(vendor) !== "Approved") {
+      localStorage.removeItem("vendor");
+      router.replace("/seller-kyc");
       return;
     }
 
