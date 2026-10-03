@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { SUPPORT_HOURS_SHORT } from "@/lib/siteConfig";
 
 const TRUST_POINTS = [
   { icon: "🔒", label: "100% Secure Payments" },
   { icon: "🚚", label: "Fast Delivery" },
   { icon: "✅", label: "Verified Sellers" },
-  { icon: "🎧", label: "24/7 Support" },
+  // Real availability (lib/siteConfig.ts) — no 24/7 staffed support exists.
+  { icon: "🎧", label: SUPPORT_HOURS_SHORT },
 ];
 
 export default function LaunchTrustBanner() {

@@ -12,6 +12,7 @@ import {
 import { db } from "@/lib/firebase";
 
 import type { Product } from "@/lib/products/product";
+import ProductImage from "@/components/ProductImage";
 
 export default function ViewProductPage() {
 
@@ -128,9 +129,9 @@ export default function ViewProductPage() {
 
         <div>
 
-          <img
+          <ProductImage
 
-            src={product.thumbnail}
+            src={product}
 
             alt={product.title}
 

@@ -21,6 +21,7 @@ import {
   type ItemRequestType,
 } from "@/lib/itemRequests";
 import { customerLoginUrl } from "@/lib/authRedirect";
+import ProductImage from "@/components/ProductImage";
 
 // Unified item-level Return / Replace request form.
 //
@@ -499,9 +500,8 @@ function RequestInner() {
   // Product card (image, name, variant, qty, seller, item price) — req 1 & 6.
   const ProductCard = (
     <div className="rounded-2xl border p-4 flex items-start gap-4 mb-6">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={selected.image || "/no-image.png"}
+      <ProductImage
+        src={selected.image}
         alt={selected.name || "Product"}
         className="w-16 h-16 rounded-xl object-cover bg-gray-100 shrink-0"
       />

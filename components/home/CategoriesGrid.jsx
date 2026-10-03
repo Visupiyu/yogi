@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { PRODUCT_IMAGE_PLACEHOLDER } from "@/lib/productImage";
 
 // `name` is shown to the user; `categoryName` is the real catalog node
 // name used to resolve products (Men/Women are sub-categories of Fashion,
@@ -95,7 +96,7 @@ export default function CategoriesGrid() {
                   src={category.image}
                   alt={category.name}
                   onError={(e) => {
-                    e.currentTarget.src = "/no-image.png";
+                    e.currentTarget.src = PRODUCT_IMAGE_PLACEHOLDER;
                   }}
                   className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
                 />

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useQueries } from "@tanstack/react-query";
 import {
   collection,
@@ -16,6 +15,7 @@ import { db } from "@/lib/firebase";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 import { isProductVisible } from "@/lib/products/visibility";
+import ProductImage from "@/components/ProductImage";
 
 const collections = [
   {
@@ -212,11 +212,11 @@ export default function RecommendedProducts() {
 
                   <div className="relative h-48 rounded-xl overflow-hidden bg-gray-50">
 
-                    <Image
-                      src={product.image || "/placeholder.png"}
+                    <ProductImage
+                      src={product.image}
                       alt={product.name}
-                      fill
                       className="
+                      absolute inset-0 h-full w-full
                       object-contain
                       p-1
                       group-hover:scale-105

@@ -12,6 +12,7 @@ import {
 } from "@/lib/account/accountClient";
 import { useRouter } from "next/navigation";
 import { customerLoginUrl } from "@/lib/authRedirect";
+import ProductImage from "@/components/ProductImage";
 
 // Returns & Refunds. Everything comes from app/api/account/returns — the
 // customer's own requests, legacy returns and ONE refund timeline across all
@@ -130,9 +131,8 @@ export default function RefundsPage() {
                 return (
                   <div key={r.id} className="bg-white rounded-3xl shadow p-5">
                     <div className="flex items-center gap-4">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={r.item.image || "/no-image.png"}
+                      <ProductImage
+                        src={r.item.image}
                         alt={r.item.name}
                         className="w-16 h-16 rounded-xl object-cover border shrink-0"
                       />

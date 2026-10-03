@@ -4,6 +4,7 @@
 // ==========================================
 
 import type { Product } from "./product";
+import { PRODUCT_IMAGE_PLACEHOLDER } from "@/lib/productImage";
 
 // ------------------------------------------
 // Generate Product Slug
@@ -118,7 +119,7 @@ export function getMainImage(
   if (product.images.length > 0)
     return product.images[0];
 
-  return "/placeholder-product.png";
+  return PRODUCT_IMAGE_PLACEHOLDER;
 
 }
 

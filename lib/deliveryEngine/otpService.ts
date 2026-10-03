@@ -8,6 +8,7 @@
 import type { Transaction, Firestore } from "firebase-admin/firestore";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { Resend } from "resend";
+import { EMAIL_FROM } from "@/lib/siteConfig";
 import type { DeliveryJob } from "@/lib/deliveryEngine/types";
 import {
   generateDeliveryOtp,
@@ -93,7 +94,7 @@ async function issue(tx: Transaction, db: Firestore, jobId: string, force: boole
 // ---------------------------------------------------------------------------
 // Customer notification (POST-COMMIT only — never inside the issue transaction).
 // ---------------------------------------------------------------------------
-const FROM = "YOMICO <onboarding@yomico.in>";
+const FROM = EMAIL_FROM;
 const resendKey = process.env.RESEND_API_KEY;
 const resend = resendKey ? new Resend(resendKey) : null;
 

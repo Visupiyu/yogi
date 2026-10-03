@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 
 import type { Product } from "@/lib/products/product";
 import { productModerationStatus, type ModerationStatus } from "@/lib/products/visibility";
+import ProductImage from "@/components/ProductImage";
 
 // Real moderation state (lib/products/visibility.ts), replacing the old
 // "Approved/Pending" badge that read the legacy `approved` boolean — which
@@ -421,8 +422,8 @@ export default function SellerProductsPage() {
                       <div className="flex items-center gap-4">
                         <div className="h-14 w-14 overflow-hidden rounded-xl bg-gray-100">
                           {product.thumbnail ? (
-                            <img
-                              src={product.thumbnail}
+                            <ProductImage
+                              src={product}
                               alt={product.title}
                               className="h-full w-full object-cover"
                             />

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -14,6 +13,7 @@ import {
 
 import { db } from "@/lib/firebase";
 import { isProductVisible } from "@/lib/products/visibility";
+import ProductImage from "@/components/ProductImage";
 
 const TRENDING_LIMIT = 8;
 
@@ -169,22 +169,16 @@ export default function TrendingProducts() {
                     bg-pink-50
                   "
                 >
-                  <Image
-                    src={
-                      product.thumbnail ||
-                      product.images?.[0] ||
-                      product.image ||
-                      "/placeholder.png"
-                    }
+                  <ProductImage
+                    src={product}
                     alt={
                       product.shortTitle ||
                       product.name ||
                       product.title ||
                       "Product"
                     }
-                    fill
-                    sizes="210px"
                     className="
+                      absolute inset-0 h-full w-full
                       object-contain
                       hover:scale-110
                       transition-all

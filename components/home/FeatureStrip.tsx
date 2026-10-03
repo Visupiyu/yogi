@@ -24,10 +24,11 @@ const features = [
   },
   {
     title: "↩ EASY RETURNS",
-    // Matches RETURN_WINDOW_DAYS in lib/returnEligibility.ts, which
-    // /api/request-return enforces. This read "14 Day Returns" while the
-    // server refused any request past day 7.
-    subtitle: "7 Day Returns",
+    // The return window is set per product (lib/returnEligibility.ts:
+    // product returnDays, snapshotted on the order line; platform default
+    // DEFAULT_RETURN_DAYS) and shown on each product page — so no single
+    // number is promised here.
+    subtitle: "Window shown per product",
     icon: RotateCcw,
     bg: "bg-gradient-to-r from-orange-500 to-red-600",
   },
@@ -38,8 +39,9 @@ const features = [
     bg: "bg-gradient-to-r from-purple-500 to-pink-600",
   },
   {
-    title: "🎧 24/7 SUPPORT",
-    subtitle: "Always Here",
+    // Real availability (lib/siteConfig.ts) — no 24/7 staffed support exists.
+    title: "🎧 HELP & SUPPORT",
+    subtitle: "Replies in 24–48 business hrs",
     icon: Headphones,
     bg: "bg-gradient-to-r from-cyan-500 to-blue-700",
   },

@@ -17,7 +17,8 @@ import { useRouter, useParams } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { ORDER_STEPS, TOTAL_STEPS, getStep } from "@/lib/orderTracking";
-import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import { customerStatusLabel } from "@/lib/orderTracking";
+import { customerDeliveryEstimate, formatEstimateDate } from "@/lib/deliveryEstimate";
 import {
   isTerminal,
   itemKeyForOrderIndex,
@@ -32,6 +33,7 @@ import { customerLoginUrl } from "@/lib/authRedirect";
 import LoadErrorState from "@/components/LoadErrorState";
 import { INVOICE_LINK_LABEL, isInvoiceAvailable } from "@/lib/invoiceAvailability";
 import { requestSellerChat } from "@/lib/account/contactSeller";
+import ProductImage from "@/components/ProductImage";
 
 // Display-only — the underlying paymentStatus values themselves
 // (Pending/AwaitingVerification/Paid) are unchanged; this just avoids
@@ -438,7 +440,7 @@ export default function OrderDetailsPage() {
                       : "text-blue-600"
                   }`}
                 >
-                  {fulfilmentStageLabel(order.status)}
+                  {customerStatusLabel(order.status)}
                 </span>
               </div>
             </div>
@@ -527,7 +529,7 @@ export default function OrderDetailsPage() {
   <p className="mt-4 text-lg">
     Current Status:
     <span className="font-bold ml-2">
-      {fulfilmentStageLabel(order.status)}
+      {customerStatusLabel(order.status)}
     </span>
   </p>
 
@@ -551,19 +553,27 @@ export default function OrderDetailsPage() {
         {/* DELIVERY DETAILS */}
         <div className="mt-8 bg-white rounded-3xl shadow border p-8">
           <h2 className="text-2xl font-bold mb-6">📦 Delivery Details</h2>
-          {order.expectedDelivery ||
-          order.courierPartner ||
+          {/* Delivery date from the real SLA / recorded dates only
+              (lib/deliveryEstimate.ts) — never an invented "+N days". */}
+          {(() => {
+            const estimate = customerDeliveryEstimate(order);
+            if (estimate.kind === "none" || estimate.kind === "delivered") return null;
+            return (
+              <div className="mb-4 flex flex-wrap justify-between gap-2">
+                <span>{estimate.label}</span>
+                <span className="text-right">
+                  {estimate.date && (
+                    <span className="block font-semibold">{formatEstimateDate(estimate.date)}</span>
+                  )}
+                  <span className="block text-sm text-gray-500">{estimate.note}</span>
+                </span>
+              </div>
+            );
+          })()}
+          {order.courierPartner ||
           order.courierName ||
           order.trackingNumber ? (
             <div className="space-y-4">
-              {order.expectedDelivery && (
-                <div className="flex justify-between">
-                  <span>Expected Delivery</span>
-                  <span className="font-semibold">
-                    {order.expectedDelivery}
-                  </span>
-                </div>
-              )}
               {(order.courierPartner || order.courierName) && (
                 <div className="flex justify-between">
                   <span>Courier Partner</span>
@@ -657,8 +667,8 @@ export default function OrderDetailsPage() {
                 key={index}
                 className="border rounded-2xl p-5 flex flex-col md:flex-row gap-6 items-center hover:shadow-md transition"
               >
-                <img
-                  src={item.image || "/no-image.png"}
+                <ProductImage
+                  src={item.image}
                   alt={item.name}
                   className="w-28 h-28 rounded-2xl object-cover border"
                 />
@@ -698,7 +708,7 @@ export default function OrderDetailsPage() {
                             : "bg-blue-100 text-blue-800 border-blue-300"
                         }`}
                       >
-                        {fulfilmentStageLabel(tracked.status)}
+                        {customerStatusLabel(tracked.status)}
                       </span>
                     );
                   })()}

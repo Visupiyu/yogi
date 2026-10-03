@@ -11,7 +11,7 @@
 // server-computed figures; statuses and labels come from lib/itemRequests and
 // lib/itemFulfilment. Server-only (node:crypto for opaque ids).
 import { createHash } from "node:crypto";
-import { fulfilmentStageLabel } from "@/lib/itemFulfilment";
+import { customerStatusLabel } from "@/lib/orderTracking";
 import {
   REFUND_DESTINATION_LABEL,
   isTerminal,
@@ -114,7 +114,7 @@ export function buildOrderCard(o: Row): AccountOrderCard {
     orderNumber: strOrNull(o.data.orderNumber, 60),
     placedAt: iso(o.data.createdAt),
     status,
-    statusLabel: fulfilmentStageLabel(status),
+    statusLabel: customerStatusLabel(status),
     itemCount: items.reduce((s, it) => s + Math.max(0, Math.floor(num(it?.qty ?? it?.quantity))), 0),
     total: money(o.data.finalTotal ?? o.data.total),
     firstItem: first ? { name: str(first.name ?? first.title, 200) || "Product", image: str(first.image, 1000) } : null,

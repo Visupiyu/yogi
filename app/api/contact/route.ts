@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { Resend } from "resend";
+import { EMAIL_FROM, SUPPORT_EMAIL } from "@/lib/siteConfig";
 import { Timestamp } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { verifyRequestUser } from "@/lib/serverAuth";
@@ -28,8 +29,8 @@ import { validateContact } from "@/lib/contactForm";
 // No Firestore rule changes: rateLimits and tickets are written by the Admin SDK.
 // ---------------------------------------------------------------------------
 
-const SUPPORT_INBOX = "yomico.help@gmail.com";
-const FROM = "YOMICO <noreply@yomico.in>";
+const SUPPORT_INBOX = SUPPORT_EMAIL;
+const FROM = EMAIL_FROM;
 const WINDOW_MS = 10 * 60 * 1000;
 const PER_IP_MAX = 8;
 const PER_EMAIL_MAX = 4;

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { SITE_HOST, SUPPORT_EMAIL } from "@/lib/siteConfig";
 
 export default function InvoiceHeader() {
 
@@ -99,7 +100,7 @@ export default function InvoiceHeader() {
             </td>
 
             <td className="border border-black p-1">
-              support@yomico.in
+              {SUPPORT_EMAIL}
             </td>
 
           </tr>
@@ -111,7 +112,7 @@ export default function InvoiceHeader() {
             </td>
 
             <td className="border border-black p-1">
-              www.yomico.in
+              {SITE_HOST}
             </td>
 
           </tr>

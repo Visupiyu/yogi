@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import Link from "next/link";
-import Image from "next/image";
+import ProductImage from "@/components/ProductImage";
 
 type ProductCard = {
   id: string;
@@ -142,12 +142,10 @@ export default function AIChatWidget({
                       className="shrink-0 w-36 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition overflow-hidden"
                     >
                       <div className="relative w-full h-24 bg-gray-50">
-                        <Image
-                          src={p.image || "/no-image.png"}
+                        <ProductImage
+                          src={p.image}
                           alt={p.title}
-                          fill
-                          className="object-contain p-2"
-                          sizes="144px"
+                          className="absolute inset-0 h-full w-full object-contain p-2"
                         />
                       </div>
                       <div className="p-2">

@@ -13,6 +13,7 @@ import {
   statusTone,
   type ItemRequestType,
 } from "@/lib/itemRequests";
+import ProductImage from "@/components/ProductImage";
 
 // Seller Returns & Replacements.
 //
@@ -142,9 +143,8 @@ export default function SellerReturnsPage() {
     return (
       <div className="bg-white rounded-3xl shadow p-5 flex flex-col sm:flex-row gap-4">
         <div className="flex items-center gap-3 sm:w-1/2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={r.item?.image || "/no-image.png"}
+          <ProductImage
+            src={r.item?.image}
             alt={r.item?.name || "Product"}
             className="w-14 h-14 rounded-xl object-cover bg-gray-100 shrink-0"
           />

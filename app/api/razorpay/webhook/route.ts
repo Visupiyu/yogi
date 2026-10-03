@@ -33,7 +33,9 @@ import { applyRefundWebhook } from "@/lib/refunds/orderRefund";
 // CONFIGURATION REQUIRED BEFORE THIS DOES ANYTHING
 // ---------------------------------------------------------------------------
 //   1. Razorpay Dashboard -> Settings -> Webhooks -> Add New Webhook
-//        URL:    https://www.yomico.in/api/razorpay/webhook
+//        URL:    https://yomico.in/api/razorpay/webhook   (the canonical APEX
+//                domain, lib/siteConfig.ts — a www URL would be redirected,
+//                and Razorpay does not follow redirects for webhooks)
 //        Events: payment.captured
 //                (optional) refund.processed, refund.failed — settles refunds
 //                started from /admin/orders without a manual status check

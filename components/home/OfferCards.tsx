@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { PRODUCT_IMAGE_PLACEHOLDER } from "@/lib/productImage";
 
 const offers = [
   {
@@ -35,7 +36,7 @@ export default function OfferCards() {
               src={offer.image}
               alt={offer.title}
               onError={(e) => {
-                e.currentTarget.src = "/no-image.png";
+                e.currentTarget.src = PRODUCT_IMAGE_PLACEHOLDER;
               }}
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-500"
             />

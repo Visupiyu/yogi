@@ -5,6 +5,7 @@ import Link from "next/link";
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { isProductVisible } from "@/lib/products/visibility";
+import ProductImage from "@/components/ProductImage";
 
 type Product = {
   id: string;
@@ -87,8 +88,8 @@ export default function CustomersAlsoBought({
           >
             <div className="bg-white rounded-2xl shadow-sm hover:shadow-lg transition overflow-hidden">
 
-              <img loading="lazy" decoding="async"
-                src={product.image || "/no-image.png"}
+              <ProductImage loading="lazy" decoding="async"
+                src={product.image}
                 alt={product.name}
                 className="w-full h-40 object-contain p-3"
               />

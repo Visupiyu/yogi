@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { EMAIL_FROM, SITE_URL as CANONICAL_SITE_URL } from "@/lib/siteConfig";
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminApp, getAdminDb, getAdminProjectId } from "@/lib/firebaseAdmin";
 
@@ -37,14 +38,14 @@ import { getAdminApp, getAdminDb, getAdminProjectId } from "@/lib/firebaseAdmin"
 const apiKey = process.env.RESEND_API_KEY;
 const resend = apiKey ? new Resend(apiKey) : null;
 
-const FROM = "YOMICO <noreply@yomico.in>";
+const FROM = EMAIL_FROM;
 const SUBJECT = "Verify your YOMICO account";
 
 // Where the customer lands after Firebase accepts the verification. No env var
 // for the site URL exists in this project, so this matches the canonical
 // domain already declared in app/layout.tsx's metadataBase, while still
 // honouring NEXT_PUBLIC_SITE_URL if one is added later. Never a localhost URL.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://yomico.in";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || CANONICAL_SITE_URL;
 
 // Same rateLimits collection / window-count document shape as
 // app/api/create-order/route.ts, namespaced so it has its own budget. Stops

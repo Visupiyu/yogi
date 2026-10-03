@@ -11,8 +11,18 @@ import ProductFilters from "@/components/ProductFilters";
 import { useDialogA11y } from "@/components/hooks/useDialogA11y";
 import { addToCart as addToCartHelper } from "@/lib/cart";
 import { hasStockBearingVariants } from "@/lib/products/inventory";
-import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
+import { findNodeById, findNodeByName, isTopLevelCategory } from "@/lib/catalog";
+import { rankProducts } from "@/lib/storefront/searchRelevance";
+
+// Category NAMES for a product (its stored catalog ids resolved through the
+// catalog tree), so "shirts" or "mobiles" also finds products by category.
+function categoryNamesOf(data) {
+  return [data.categoryId, data.subCategoryId, data.leafCategoryId]
+    .map((id) => (typeof id === "string" && id ? findNodeById(id)?.name : null))
+    .filter(Boolean);
+}
 import { toLegacyProduct, isStorefrontVisible } from "@/lib/products/legacyDisplay";
+import ProductImage from "@/components/ProductImage";
 
 // label = shown in the dropdown, value = the catalog node name used to
 // resolve the real categoryId/subCategoryId (Men/Women are subcategories of
@@ -141,14 +151,13 @@ const [quickColor, setQuickColor] = useState("");
           // product (cached, so Navbar suggestions and repeat searches reuse it).
           const scan = await getVisibleCatalog();
           scanTruncated = scan.truncated;
-          for (const { id, data } of scan.products) {
-            const searchText = `${data.title || data.name || ""} ${
-              data.shortTitle || ""
-            } ${data.brand || ""} ${data.description || ""}`.toLowerCase();
-
-            if (searchText.includes(lower)) {
-              items.push(toLegacyProduct(id, data));
-            }
+          // Word-based match + deterministic relevance order
+          // (lib/storefront/searchRelevance.ts): every query word must appear
+          // in the name, brand, model, keywords, category names or
+          // description; best matches first. The "Relevance" sort keeps this
+          // order; the other sorts re-order it as before.
+          for (const { id, data } of rankProducts(scan.products, trimmed, { categoryNames: categoryNamesOf })) {
+            items.push(toLegacyProduct(id, data));
           }
         }
         setTruncated(scanTruncated);
@@ -475,8 +484,8 @@ if (minimumDiscount > 0) {
                 <Link key={product.id} href={`/product/${product.id}`}>
                   <div className="bg-white rounded-3xl shadow-lg hover:shadow-2xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 overflow-hidden h-full">
                     <div className="h-48 bg-gray-100 relative">
-                      <img
-                        src={product.image || "/no-image.png"}
+                      <ProductImage
+                        src={product.image}
                         alt={product.name}
                         loading="lazy"
                         decoding="async"
@@ -568,8 +577,8 @@ Contact Support
       <div className="grid grid-cols-1 md:grid-cols-2">
 
         <div className="bg-gray-100">
-          <img
-            src={quickViewProduct.image || "/no-image.png"}
+          <ProductImage
+            src={quickViewProduct.image}
             alt={quickViewProduct.name}
             className="w-full h-56 md:h-80 object-cover"
           />

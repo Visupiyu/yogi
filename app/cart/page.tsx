@@ -25,6 +25,7 @@ import {
   calculateShippingCharge,
   getShippingSettings,
 } from "@/lib/shipping";
+import ProductImage from "@/components/ProductImage";
 
 export default function CartPage() {
   const [cart, setCart] = useState<any[]>([]);
@@ -223,8 +224,8 @@ const removeItem = (index: number) => {
           className="bg-white rounded-2xl shadow-sm p-5 flex flex-col sm:flex-row gap-5"
         >
 
-          <img
-            src={item.image || "/no-image.png"}
+          <ProductImage
+            src={item.image}
             alt={item.name}
             className="w-28 h-28 object-cover rounded-xl"
           />
@@ -442,8 +443,8 @@ Popular Categories
                     className="bg-white rounded-2xl shadow-sm hover:shadow-lg transition-shadow duration-300 p-5 flex flex-col sm:flex-row gap-5"
                   >
                     <Link href={`/product/${item.id}`} className="shrink-0 mx-auto sm:mx-0">
-                      <img
-                        src={item.image || "/no-image.png"}
+                      <ProductImage
+                        src={item.image}
                         alt={item.name}
                         className="w-32 h-32 object-cover rounded-2xl border border-gray-100 hover:scale-105 transition-transform"
                       />

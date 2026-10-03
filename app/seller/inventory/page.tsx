@@ -17,6 +17,7 @@ import { auth, db } from "@/lib/firebase";
 import LoadErrorState from "@/components/LoadErrorState";
 
 import type { Product } from "@/lib/products/product";
+import ProductImage from "@/components/ProductImage";
 
 export default function SellerInventoryPage() {
 const [products, setProducts] = useState<Product[]>([]);
@@ -152,8 +153,8 @@ return (
 
                   <td className="p-4">
 
-                    <img
-                      src={product.thumbnail}
+                    <ProductImage
+                      src={product}
                       alt={product.title}
                       className="h-16 w-16 rounded object-cover"
                     />

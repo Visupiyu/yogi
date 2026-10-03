@@ -1,5 +1,6 @@
  import Link from "next/link";
 import type { Metadata } from "next";
+import { SUPPORT_HOURS_SHORT } from "@/lib/siteConfig";
 
 export const metadata: Metadata = {
   // Root layout's title template already appends " | YOMICO" — don't
@@ -77,8 +78,9 @@ export default function AboutPage() {
   </div>
 
   <div className="bg-white rounded-2xl shadow p-6 text-center">
-    <h3 className="text-4xl font-bold text-green-600">24/7</h3>
-    <p className="text-gray-600 mt-2">Customer Support</p>
+    {/* Real availability — lib/siteConfig.ts. No 24/7 staffed support exists. */}
+    <h3 className="text-4xl font-bold text-green-600">24–48h</h3>
+    <p className="text-gray-600 mt-2">Support replies (Mon–Sat)</p>
   </div>
 
 </div>
@@ -163,7 +165,7 @@ export default function AboutPage() {
 
     <div>✅ Fast Delivery</div>
 
-    <div>✅ 24/7 Support</div>
+    <div>✅ {SUPPORT_HOURS_SHORT}</div>
 
   </div>
 

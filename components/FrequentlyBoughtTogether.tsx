@@ -7,7 +7,7 @@ import { collection, getDocs, limit, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { isProductVisible } from "@/lib/products/visibility";
 import { hasStockBearingVariants } from "@/lib/products/inventory";
-import Image from "next/image";
+import ProductImage from "@/components/ProductImage";
 
 type Product = {
   id: string;
@@ -146,7 +146,7 @@ export default function FrequentlyBoughtTogether({
           >
             <div className="border rounded-2xl p-4 hover:shadow-lg transition">
 
-             <Image
+             <ProductImage
   src={product.image}
   alt={product.name}
   width={300}

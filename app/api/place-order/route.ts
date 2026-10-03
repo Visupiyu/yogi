@@ -81,18 +81,9 @@ function orderIdFor(uid: string, idempotencyKey: string): string {
 
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
-// Matches the client's `new Date(+5d).toLocaleDateString("en-IN", …)` output
-// so existing order pages, invoices and emails render the same string they
-// always have.
-function deliveryDateString(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 5);
-  return d.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+// No "+5 days" deliveryDate is written any more: it was the same invented date
+// for every customer and destination. Delivery dates come from the real SLA —
+// see lib/deliveryEstimate.ts.
 
 type PlaceOutcome =
   | { kind: "error"; status: number; error: string }
@@ -479,7 +470,6 @@ export async function POST(request: Request) {
         deliveryCost: pricing.deliveryCost,
         freeDeliveryApplied: pricing.freeDeliveryApplied,
         finalTotal: pricing.finalTotal,
-        deliveryDate: deliveryDateString(),
         commission: pricing.commission,
         sellerEarning: pricing.sellerEarning,
         // Permanently 0% / ₹0 (lib/commissionPolicy.ts), server-stamped.

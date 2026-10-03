@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import { ShoppingCart, Heart, User, Search } from "lucide-react";
 import { getVisibleCatalog } from "@/lib/storefront/catalogScan";
+import { rankProducts } from "@/lib/storefront/searchRelevance";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { getCartCount } from "@/lib/cart";
 import AccountMenu from "@/components/AccountMenu";
+import ProductImage from "@/components/ProductImage";
 
 type ProductSuggestion = {
   id: string;
@@ -151,27 +153,25 @@ useEffect(() => {
         // Already limited to customer-visible products.
         const { products } = await getVisibleCatalog();
         const items: ProductSuggestion[] = [];
-        const q = trimmed.toLowerCase();
-        for (const { id, data } of products) {
+        // Same word-based matching and relevance order as the search page
+        // (lib/storefront/searchRelevance.ts), so the top suggestions are the
+        // best matches — not whichever products come first by document id.
+        // Category names are not resolved here, to keep the catalog tree out
+        // of the site-wide Navbar bundle; the search page does resolve them.
+        for (const { id, data } of rankProducts(products, trimmed)) {
           const fullTitle: string = data.title || data.name || "";
           const shortTitle: string = data.shortTitle || "";
-
-          if (
-            fullTitle.toLowerCase().includes(q) ||
-            shortTitle.toLowerCase().includes(q)
-          ) {
-            items.push({
-              id,
-              name: shortTitle || fullTitle,
-              image:
-                data.thumbnail ||
-                (Array.isArray(data.images) ? data.images[0] : "") ||
-                data.image ||
-                "",
-              price: Number(data.sellingPrice ?? data.price ?? 0),
-            });
-            if (items.length >= 5) break;
-          }
+          items.push({
+            id,
+            name: shortTitle || fullTitle,
+            image:
+              data.thumbnail ||
+              (Array.isArray(data.images) ? data.images[0] : "") ||
+              data.image ||
+              "",
+            price: Number(data.sellingPrice ?? data.price ?? 0),
+          });
+          if (items.length >= 5) break;
         }
         setSuggestions(items.slice(0, 5));
         setShowSuggestions(true);
@@ -334,8 +334,8 @@ useEffect(() => {
       : "hover:bg-gray-100"
   }`}
 >
-        <img
-          src={item.image || "/no-image.png"}
+        <ProductImage
+          src={item.image}
           alt=""
           className="w-14 h-14 object-cover rounded-xl"
         />

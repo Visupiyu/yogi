@@ -1,6 +1,7 @@
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { isValidDocId } from "@/lib/customerAccount/customerGuards";
+import { customerDeliveryEstimate } from "@/lib/deliveryEstimate";
 
 // ---------------------------------------------------------------------------
 // PUBLIC guest order tracking.
@@ -42,7 +43,10 @@ const TRACK_RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 type TrackingProjection = {
   status: string;
   createdAt: string | null;
-  deliveryDate: string | null;
+  // Derived server-side from the real SLA / recorded dates
+  // (lib/deliveryEstimate.ts). Replaces the legacy `deliveryDate`, an invented
+  // "+5 days" string, which is no longer returned.
+  deliveryEstimate: { kind: string; label: string | null; date: string | null; note: string | null };
   expectedDelivery: string | null;
   deliveredAt: string | null;
   courierName: string | null;
@@ -138,7 +142,10 @@ export async function POST(request: Request) {
     const projection: TrackingProjection = {
       status: asString(order.status) || "Pending",
       createdAt: asIsoString(order.createdAt),
-      deliveryDate: asIsoString(order.deliveryDate),
+      deliveryEstimate: (() => {
+        const e = customerDeliveryEstimate(order);
+        return { kind: e.kind, label: e.label, date: e.date ? e.date.toISOString() : null, note: e.note };
+      })(),
       expectedDelivery: asIsoString(order.expectedDelivery),
       deliveredAt: asIsoString(order.deliveredAt),
       courierName: asString(order.courierPartner) || asString(order.courierName),

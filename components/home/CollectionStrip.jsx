@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 
@@ -18,6 +17,7 @@ import { db } from "@/lib/firebase";
 import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
 import { toLegacyProduct } from "@/lib/products/legacyDisplay";
 import { isProductVisible } from "@/lib/products/visibility";
+import ProductImage from "@/components/ProductImage";
 
 async function getProducts(category) {
 
@@ -201,11 +201,11 @@ export default function CollectionStrip({
 
           <div className="relative h-40 bg-gray-50 rounded-xl overflow-hidden">
 
-            <Image
-              src={product.image || "/placeholder.png"}
+            <ProductImage
+              src={product.image}
               alt={product.name}
-              fill
               className="
+                absolute inset-0 h-full w-full
                 object-contain
                 p-2
                 group-hover:scale-105
