@@ -48,7 +48,7 @@ return (
               {/* One badge. This copy was rendered twice — once here and once
                   as a rotated badge in the corner — inside the same card. */}
               <span className="inline-block bg-white text-red-600 px-4 py-1 rounded-full text-sm font-bold shadow-lg mb-4">
-  🔥 BIGGEST DISCOUNTS ON YOMICO
+  🔥 GREAT DEALS ON YOMICO
 </span>
              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold leading-tight">
                 🏷️ Best Deals
@@ -99,7 +99,7 @@ transition-all
   View All Deals
 </Link>
                 <p className="hidden sm:block mt-4 text-sm font-semibold text-white">
-  🚚 Free Shipping • Secure Payment • Easy Returns
+  🚚 Delivery Available • Secure Payment • Easy Returns
 </p>
             </div>
              </div>

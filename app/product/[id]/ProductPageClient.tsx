@@ -1068,7 +1068,7 @@ if (product.stock > 20) {
   mb-5
   "
 >
-  🔥 Limited Time Deal
+  🔥 Best Deal
 </div>
                 {/* PRICE */}
  <div className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-100 rounded-3xl p-5">

@@ -104,13 +104,13 @@ export default function Home() {
 </section>
 
       {/* Navratri festive banner — reuses the existing reusable PromoBanner
-          component (same one used for the Electronics sale further down)
+          component (same one used for the Electronics deals banner further down)
           instead of a new bespoke banner. Replaces the former 15 August /
           Independence Day launch banner in this slot. */}
       <PromoBanner
         badge="NAVRATRI SPECIAL"
-        title="Navratri Festive Sale"
-        subtitle="Celebrate. Shop. Save."
+        title="Celebrate Navratri with YOMICO"
+        subtitle="Shop festive favourites across the store."
         image="/navratri-banner.svg"
         button1="Explore Offers"
         link1="/store"

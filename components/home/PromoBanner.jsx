@@ -6,12 +6,14 @@ import { motion } from "framer-motion";
 
 export default function PromoBanner({
 
-  badge = "⚡ LIMITED TIME OFFER",
+  // Generic wording only: there is no sale start/end or promotion logic
+  // behind this banner, so it must not promise a % off or a time limit.
+  badge = "⚡ ELECTRONICS",
 
-  title = "Electronics Mega Sale",
+  title = "Electronics Deals",
 
   subtitle =
-    "Up to 70% OFF on Smartphones, Laptops, Accessories & More.",
+    "Shop great deals on smartphones, laptops, accessories & more.",
 
   image = "/banners/electronics-banner.png",
 
