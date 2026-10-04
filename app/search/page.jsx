@@ -13,7 +13,8 @@ import { useDialogA11y } from "@/components/hooks/useDialogA11y";
 import { addToCart as addToCartHelper } from "@/lib/cart";
 import { hasStockBearingVariants } from "@/lib/products/inventory";
 import { findNodeById, findNodeByName, isTopLevelCategory } from "@/lib/catalog";
-import { rankProducts } from "@/lib/storefront/searchRelevance";
+import { searchCatalog } from "@/lib/storefront/searchRelevance";
+import { meetsMinimumDiscount } from "@/lib/storefront/searchFilters";
 
 // Category NAMES for a product (its stored catalog ids resolved through the
 // catalog tree), so "shirts" or "mobiles" also finds products by category.
@@ -156,8 +157,10 @@ const [quickColor, setQuickColor] = useState("");
           // (lib/storefront/searchRelevance.ts): every query word must appear
           // in the name, brand, model, keywords, category names or
           // description; best matches first. The "Relevance" sort keeps this
-          // order; the other sorts re-order it as before.
-          for (const { id, data } of rankProducts(scan.products, trimmed, { categoryNames: categoryNamesOf })) {
+          // order; the other sorts re-order it as before. No query words (e.g.
+          // /search?minDiscount=40 from Best Deals): every visible product,
+          // so the filters below decide what shows.
+          for (const { id, data } of searchCatalog(scan.products, trimmed, { categoryNames: categoryNamesOf })) {
             items.push(toLegacyProduct(id, data));
           }
         }
@@ -226,19 +229,7 @@ if (inStockOnly) {
   );
 }
 if (minimumDiscount > 0) {
-  items = items.filter((item) => {
-
-    const mrp = Number(item.mrp || 0);
-    const price = Number(item.price || 0);
-
-    if (mrp <= 0) return false;
-
-    const discount =
-      ((mrp - price) / mrp) * 100;
-
-    return discount >= minimumDiscount;
-
-  });
+  items = items.filter((item) => meetsMinimumDiscount(item, minimumDiscount));
 }
     if (stockOnly) {
       items = items.filter((item) => item.stock > 0);

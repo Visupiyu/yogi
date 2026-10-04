@@ -17,7 +17,9 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), "utf8");
 
-const { rankProducts, relevanceScore, normalizeSearchText } = await import("../../../lib/storefront/searchRelevance.ts");
+const { rankProducts, relevanceScore, normalizeSearchText, searchCatalog } = await import("../../../lib/storefront/searchRelevance.ts");
+const { meetsMinimumDiscount } = await import("../../../lib/storefront/searchFilters.ts");
+const { toLegacyProduct } = await import("../../../lib/products/legacyDisplay.ts");
 const { customerDeliveryEstimate, PRE_ORDER_DELIVERY_TEXT } = await import("../../../lib/deliveryEstimate.ts");
 const { customerStatusLabel, ORDER_STEPS } = await import("../../../lib/orderTracking.ts");
 const { productImageSrc, productImageAlt, PRODUCT_IMAGE_PLACEHOLDER, isOptimizableImageSrc } = await import("../../../lib/productImage.ts");
@@ -69,7 +71,48 @@ record("L13-8 deterministic: same input, same order, ties broken by name then id
   JSON.stringify(rankProducts([...P].reverse(), "shirt").map((p) => p.id)) === JSON.stringify(rankProducts(P, "shirt").map((p) => p.id)));
 record("L13-9 a word that is nowhere in the product does not match", relevanceScore({ title: "Red Shirt" }, "red hat") === null);
 record("L13-10 the search page and Navbar both use the shared ranking",
-  read("app/search/page.jsx").includes("rankProducts(") && read("components/Navbar.tsx").includes("rankProducts("));
+  read("app/search/page.jsx").includes("searchCatalog(") && read("components/Navbar.tsx").includes("rankProducts(") &&
+  /searchCatalog[\s\S]*rankProducts\(products, query, options\)/.test(read("lib/storefront/searchRelevance.ts")));
+
+// ---------------- search with no query words + URL filters ----------------
+// /search?minDiscount=40 (the Best Deals links) has no query words. It must
+// list every visible product that passes the filters, not run a word search
+// that matches nothing. Mirrors the page: searchCatalog -> toLegacyProduct ->
+// the minDiscount filter.
+{
+  const D = [
+    { id: "d1", data: { title: "Redmi A7 Pro 5G Phone", mrp: 26999, sellingPrice: 14999 } }, // 44% off
+    { id: "d2", data: { title: "Steel Bottle", mrp: 1000, sellingPrice: 800 } },             // 20% off
+    { id: "d3", data: { title: "Phone Case", mrp: 500, price: 250 } },                       // 50% off
+    { id: "d4", data: { title: "Desk Lamp", price: 300 } },                                  // no MRP
+    { id: "d5", data: { title: "Old Phone", mrp: 1000, sellingPrice: 600 } },                // exactly 40% off
+  ];
+  const results = (q: string, minDiscount: number) =>
+    searchCatalog(D, q)
+      .map(({ id, data }) => toLegacyProduct(id, data))
+      .filter((item) => minDiscount <= 0 || meetsMinimumDiscount(item, minDiscount))
+      .map((p) => p.id);
+  const set = (a: string[]) => [...a].sort().join(",");
+
+  record("S1 no query + minDiscount=40 returns every qualifying product (44%, 50%, exactly 40%)",
+    results("", 40).join(",") === "d1,d3,d5" && results("   ", 40).join(",") === "d1,d3,d5", results("", 40).join(","));
+  record("S2 no query + minDiscount above every discount returns nothing",
+    results("", 60).length === 0 && results("", 100).length === 0, results("", 60).join(","));
+  record("S3 text query + minDiscount=40 still returns the matching qualifying products",
+    set(results("phone", 40)) === "d1,d3,d5" && results("redmi", 40).join(",") === "d1" &&
+    results("bottle", 40).length === 0 && results("lamp", 40).length === 0, results("phone", 40).join(","));
+  record("S4 no query and no filter keeps the whole visible list in its given order",
+    results("", 0).join(",") === "d1,d2,d3,d4,d5");
+  const same = ["red shirt", "shirt", "red", "cafe creme!!", "acme", "summer", "zzzz"].every(
+    (q) => JSON.stringify(searchCatalog(P, q).map((p) => p.id)) === JSON.stringify(rankProducts(P, q).map((p) => p.id)));
+  record("S5 text search with words is unchanged (searchCatalog === rankProducts); rankProducts('') still empty",
+    same && rankProducts(P, "").length === 0);
+  record("S6 the minDiscount maths is the page's: (mrp - price) / mrp >= N, no MRP never matches",
+    meetsMinimumDiscount({ mrp: 26999, price: 14999 }, 40) && !meetsMinimumDiscount({ mrp: 26999, price: 14999 }, 45) &&
+    meetsMinimumDiscount({ mrp: 1000, price: 600 }, 40) && !meetsMinimumDiscount({ price: 1 }, 1) &&
+    !meetsMinimumDiscount({ mrp: 0, price: 0 }, 1) &&
+    read("app/search/page.jsx").includes("meetsMinimumDiscount(item, minimumDiscount)"));
+}
 
 // ---------------- L10 delivery estimate ----------------
 {

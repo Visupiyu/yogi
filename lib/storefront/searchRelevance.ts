@@ -139,3 +139,19 @@ export function rankProducts<T extends SearchableProduct>(
   );
   return scored.map((s) => s.product);
 }
+
+/**
+ * The search page's result list before its filters run. A query with no words
+ * is not a text search (e.g. /search?minDiscount=40 from the Best Deals links):
+ * every product passes through, in the order given, so the page's filters
+ * (discount, price, rating, …) decide what shows. A query with words is ranked
+ * by rankProducts exactly as before. rankProducts itself still returns nothing
+ * for an empty query — the Navbar suggestions rely on that.
+ */
+export function searchCatalog<T extends SearchableProduct>(
+  products: readonly T[],
+  query: string,
+  options: RelevanceOptions = {}
+): T[] {
+  return searchTokens(query).length === 0 ? [...products] : rankProducts(products, query, options);
+}
