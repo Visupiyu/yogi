@@ -442,15 +442,15 @@ setOrders(items);
           return;
         }
       } else {
-        // The 72h delivery clock is measured against deliveredAt, so the
-        // admin path stamps it too — previously only the delivery-partner
-        // screen did.
-        await updateDoc(doc(db, "orders", orderId), {
-          status,
-          ...(status === "Delivered" && previousStatus !== "Delivered"
-            ? { deliveredAt: serverTimestamp() }
-            : {}),
-        });
+        // No direct status writes from this page. Packed, Shipped, Out For
+        // Delivery and Delivered are recorded by the seller
+        // (app/api/seller/advance-item) and the delivery partner / Delivery
+        // Engine, which keep item fulfilment, delivery jobs, deliveredAt,
+        // payout timing and customer emails in step. A write from here skipped
+        // all of that, so firestore.rules now refuses an admin browser write
+        // to status / deliveredAt as well.
+        alert("Packing, shipping and delivery are recorded by the seller and the delivery partner, not from this screen.");
+        return;
       }
 
       await logAdminAction("order_status_change", orderId, {
@@ -1371,33 +1371,43 @@ const filtered = orders.filter(
                           />
                         </div>
 
-                       <select
-  value={order.status}
-  onChange={(e) => {const value = e.target.value;
-    if (value === "Cancelled" && !confirm("Are you sure you want to cancel this order?")
-    ) {return;}
-    updateStatus(order.id, value);
-  }}
-                          className="border p-2 rounded-lg mt-2"
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="Confirmed">
-                            {fulfilmentStageLabel("Confirmed")}
-                          </option>
-                          <option value="Packed">
-                            {fulfilmentStageLabel("Packed")}
-                          </option>
-                          <option value="Shipped">
-                            {fulfilmentStageLabel("Shipped")}
-                          </option>
-                          <option value="Out For Delivery">
-                            {fulfilmentStageLabel("Out For Delivery")}
-                          </option>
-                          <option value="Delivered">
-                            {fulfilmentStageLabel("Delivered")}
-                          </option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
+                        {/* Read-only status. The only actions here are the
+                            two server-side ones: confirm (/api/confirm-order)
+                            and cancel (/api/cancel-order, which decides
+                            whether the order can still be cancelled).
+                            Packing, shipping and delivery come from the
+                            seller and the delivery partner. */}
+                        <p className="mt-2 text-sm font-semibold" data-testid="admin-order-status">
+                          {fulfilmentStageLabel(order.status)}
+                        </p>
+                        {(order.status === "Pending" ||
+                          order.status === "Confirmed" ||
+                          order.status === "Packed") && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {order.status === "Pending" && (
+                              <button
+                                type="button"
+                                onClick={() => updateStatus(order.id, "Confirmed")}
+                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg text-sm"
+                              >
+                                Confirm order
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!confirm("Are you sure you want to cancel this order?")) return;
+                                updateStatus(order.id, "Cancelled");
+                              }}
+                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm"
+                            >
+                              Cancel order
+                            </button>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Packing, shipping and delivery are updated by the seller and the delivery partner.
+                        </p>
                       </td>
                       <td>{order.createdAt ? order.createdAt.toDate().toLocaleDateString("en-IN"): "-"}</td>
                       <td>

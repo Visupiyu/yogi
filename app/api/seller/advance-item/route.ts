@@ -217,12 +217,24 @@ export async function POST(request: Request) {
             "Out for delivery and delivered are recorded by the delivery partner or YOMICO, not by the seller.",
         };
       }
-      if (!requester.isAdmin && next === "Shipped" && hasDeliveryJob) {
+      // A Delivery Engine job owns handover and out-for-delivery (the
+      // company's pickup and dispatch scans) for sellers AND admins: an admin
+      // advance here would move the item without the job, its events or its
+      // OTP. Without a job, the admin manual path below is unchanged.
+      if (next === "Shipped" && hasDeliveryJob) {
         return {
           kind: "error",
           status: 409,
           error:
             "This shipment is handed over when the delivery company scans the pickup. Mark it packed and wait for collection.",
+        };
+      }
+      if (next === "Out For Delivery" && hasDeliveryJob) {
+        return {
+          kind: "error",
+          status: 409,
+          error:
+            "Out for delivery for this order is recorded by the Delivery Engine and cannot be set manually.",
         };
       }
 

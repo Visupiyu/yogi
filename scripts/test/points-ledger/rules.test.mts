@@ -210,8 +210,8 @@ await check("OK3 admin can still Block/Unblock a customer and read balances and 
   await assertSucceeds(getDoc(doc(ADb, "users", A)));
   await assertSucceeds(getDoc(doc(ADb, "rewardTransactions", "redeem_o_alice")));
 });
-await check("OK4 admin order screen writes still work (status, review, refund, shipping fields)", async () => {
-  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_mal"), { status: "Confirmed" }));
+await check("OK4 admin order screen writes still work (review, refund, shipping fields); a direct status write is refused (H1)", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_mal"), { status: "Confirmed" }));
   await assertSucceeds(updateDoc(doc(ADb, "orders", "o_mal"), { needsReview: false, reviewedAt: serverTimestamp(), reviewedBy: "adminUid" }));
   await assertSucceeds(updateDoc(doc(ADb, "orders", "o_mal"), { refundStatus: "Processing" }));
   await assertSucceeds(updateDoc(doc(ADb, "orders", "o_mal"), { courierName: "Blue", trackingNumber: "T1", expectedDelivery: "2026-10-01" }));

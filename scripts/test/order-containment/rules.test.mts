@@ -58,6 +58,12 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   const order = { userId: C, vendorIds: [V], status: "Confirmed", finalTotal: 900, rewardValue: 0, items: [{ id: "p1", vendorId: V, price: 900, quantity: 1 }] };
   await setDoc(doc(f, "orders", "o_live"), order);
   await setDoc(doc(f, "orders", "o_arch"), { ...order, archived: true, archivedAt: new Date(), archivedBy: "adminUid", archiveReason: "test" });
+  // H1 fixtures: one order per operational stage, plus a rider-assigned one.
+  for (const st of ["Pending", "Packed", "Shipped", "Out For Delivery", "Delivered"]) {
+    await setDoc(doc(f, "orders", `o_h1_${st.replace(/ /g, "_")}`), { ...order, status: st, ...(st === "Delivered" ? { deliveredAt: new Date() } : {}) });
+  }
+  await setDoc(doc(f, "deliveryPartners", "dp_h1"), { uid: "rider_h1", name: "Rider" });
+  await setDoc(doc(f, "orders", "o_h1_rider"), { ...order, status: "Out For Delivery", deliveryPartnerId: "dp_h1" });
 });
 
 const Cdb = as(C);
@@ -117,10 +123,48 @@ await check("L1 the owner and admin can still read the live and the archived ord
   await assertSucceeds(getDoc(doc(ADb, "orders", "o_arch")));
   await assertFails(getDoc(doc(Sdb, "orders", "o_arch")));
 });
-await check("L2 admin browser status updates still work, on archived orders too (marker untouched)", async () => {
-  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_live"), { status: "Packed" }));
-  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_arch"), { status: "Packed" }));
+await check("L2 admin browser non-status edits still work, on archived orders too (marker untouched)", async () => {
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_live"), { needsReview: false, courierName: "Blue" }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_arch"), { needsReview: false, courierName: "Blue" }));
 });
+
+// ================= H1: no admin status shortcut =================
+// Packing, shipping and delivery are recorded by app/api/seller/advance-item
+// and the Delivery Engine; confirm / cancel by their API routes (all Admin
+// SDK). An admin browser write to status or deliveredAt is refused.
+const h1 = (st: string) => doc(ADb, "orders", `o_h1_${st.replace(/ /g, "_")}`);
+await check("H1-1 admin browser cannot force Packed / Shipped / Out For Delivery / Delivered (one step or skipping ahead)", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_live"), { status: "Packed" }));
+  await assertFails(updateDoc(h1("Packed"), { status: "Shipped" }));
+  await assertFails(updateDoc(h1("Shipped"), { status: "Out For Delivery" }));
+  await assertFails(updateDoc(h1("Out For Delivery"), { status: "Delivered", deliveredAt: serverTimestamp() }));
+  await assertFails(updateDoc(h1("Out For Delivery"), { status: "Delivered" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_live"), { status: "Delivered", deliveredAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_arch"), { status: "Packed" }));
+});
+await check("H1-2 admin browser cannot move an order backwards, confirm or cancel it directly, or touch deliveredAt", async () => {
+  await assertFails(updateDoc(h1("Delivered"), { status: "Pending" }));
+  await assertFails(updateDoc(h1("Shipped"), { status: "Confirmed" }));
+  await assertFails(updateDoc(h1("Pending"), { status: "Confirmed" }));
+  await assertFails(updateDoc(h1("Pending"), { status: "Cancelled" }));
+  await assertFails(updateDoc(h1("Delivered"), { deliveredAt: serverTimestamp() }));
+  await assertFails(updateDoc(h1("Delivered"), { deliveredAt: deleteField() }));
+});
+await check("H1-3 the assigned delivery partner's own status update still works (rider branch unchanged)", async () => {
+  await assertSucceeds(updateDoc(doc(as("rider_h1"), "orders", "o_h1_rider"), {
+    status: "Delivered", deliveredAt: serverTimestamp(), updatedAt: serverTimestamp(), deliveryNotes: "Handed over",
+  }));
+});
+{
+  const page = fs.readFileSync(path.join(REPO, "app/admin/orders/page.tsx"), "utf8");
+  const dashboard = fs.readFileSync(path.join(REPO, "app/admin/page.tsx"), "utf8");
+  await check("H1-4 the Admin Orders page has no status dropdown and no direct status write; dashboard shortcut removed", async () => {
+    if (/<option value="(Packed|Shipped|Out For Delivery|Delivered)"/.test(page)) throw new Error("status dropdown option still present");
+    if (/updateDoc\(doc\(db, "orders", [^)]*\), \{\s*status\b/.test(page)) throw new Error("direct status write still present");
+    if (!page.includes("/api/confirm-order") || !page.includes("/api/cancel-order")) throw new Error("confirm / cancel routes no longer used");
+    if (/updateOrderStatus|doc\(db, "orders"/.test(dashboard)) throw new Error("dashboard still writes orders");
+  });
+}
 
 console.log(`\n${pass}/${pass + fail} order-containment rules checks passed`);
 await env.cleanup();

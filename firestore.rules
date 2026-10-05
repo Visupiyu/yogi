@@ -511,6 +511,19 @@ service cloud.firestore {
         && unchanged('archiveReason');
     }
 
+    // An admin BROWSER never writes an order's status or deliveredAt.
+    // Confirming and cancelling go through app/api/confirm-order and
+    // app/api/cancel-order; packing, shipping and delivery through
+    // app/api/seller/advance-item and the Delivery Engine — all Admin SDK, so
+    // unaffected here. A direct write (the old Admin Orders dropdown) moved the
+    // order without its item fulfilment, delivery job, deliveredAt rules,
+    // payout timing or customer emails, and could even move it backwards.
+    // Every other admin order field (review flag, refund, shipping details,
+    // payment verification) is unchanged.
+    function adminOrderStatusUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'deliveredAt']);
+    }
+
     match /orders/{orderId} {
       // isAssignedDeliveryPartner() added here as a genuine bug fix, not
       // scope creep: app/delivery/[id]/page.tsx's loadOrder() has always
@@ -564,7 +577,7 @@ service cloud.firestore {
       // unchanged; only creation moves server-side.
       allow create: if false;
 
-      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged())
+      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged())
         // No customer branch. Cancelling goes through app/api/cancel-order
         // (web and Customer App), which restores stock/sales, reverses reward
         // points and coupons and notifies the seller in one place. A direct
@@ -741,12 +754,40 @@ service cloud.firestore {
         && zeroIfPresent(d, 'pendingPayout');
     }
 
+    // A seller's KYC state as lib/sellerKyc.ts#kycStatusOf reads it, for a
+    // vendor whose account status is not 'Approved' (i.e. Blocked).
+    function storedVendorKycStatus() {
+      let k = resource.data.get('kycStatus', resource.data.get('kycstatus', 'Pending'));
+      return k in ['Approved', 'Rejected', 'Pending'] ? k : 'Pending';
+    }
+
+    // An admin BROWSER may block and unblock a seller, but never decides KYC.
+    // Approve / reject (kycStatus, the reviewer, the rejection reason the
+    // seller sees and resubmits against) is written only by
+    // app/api/admin/kyc/decision and seller resubmission only by
+    // app/api/seller/kyc (Admin SDK, unaffected here). Status may change only
+    // to Blocked, or from Blocked back to the status that matches the seller's
+    // KYC state — so unblocking can never approve an unapproved seller. Every
+    // other admin vendor field (identity, bank, documents, commission, …) is
+    // unchanged.
+    function adminVendorKycUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'kycStatus', 'kycstatus', 'kycReviewedAt', 'kycReviewedBy', 'kycRejectionReason',
+          'kycRejectedAt', 'kycResubmittedAt', 'kycResubmissionCount', 'kycPreviousRejectionReason'
+        ])
+        && (
+          unchanged('status')
+          || request.resource.data.status == 'Blocked'
+          || (resource.data.status == 'Blocked' && request.resource.data.status == storedVendorKycStatus())
+        );
+    }
+
     match /vendors/{vendorDocId} {
       allow read: if isAdmin() || isOwnerUid(resource.data.uid);
 
       allow create: if isSignedIn() && isValidVendorApplication();
 
-      allow update: if isAdmin()
+      allow update: if (isAdmin() && adminVendorKycUnchanged())
         || (
           isOwnerUid(resource.data.uid)
           && unchanged('uid')

@@ -6,6 +6,7 @@ import { collection, getDocs, updateDoc, doc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { logAdminAction } from "@/lib/auditLog";
+import { kycStatusOf } from "@/lib/sellerKyc";
 
 type Vendor = {
   id: string;
@@ -18,6 +19,7 @@ type Vendor = {
   city: string;
   state: string;
   status: string;
+  kycStatus: string;
 };
 
 export default function AdminVendorsPage() {
@@ -47,6 +49,7 @@ export default function AdminVendorsPage() {
           city: data.city || "-",
           state: data.state || "-",
           status: data.status || "Pending",
+          kycStatus: kycStatusOf(data),
         });
       });
       setVendors(items);
@@ -65,18 +68,16 @@ export default function AdminVendorsPage() {
       vendor.email.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Block / Unblock only. Approving or rejecting a seller is a KYC decision
+  // and goes through Admin -> Vendor KYC (app/api/admin/kyc/decision), which
+  // records the reviewer and the rejection reason the seller then sees and
+  // can resubmit against. This page never writes kycStatus. Unblocking
+  // restores the status that matches the seller's KYC state (the same
+  // pairing lib/sellerKyc.ts#accountStatusFor uses), so it can never approve a
+  // seller whose KYC was not approved. firestore.rules enforces both.
   const updateVendorStatus = async (vendor: Vendor, status: string) => {
     try {
-      // Login (vendor-login/page.tsx) gates on kycStatus before status, and
-      // a vendor's kycStatus defaults to "Pending" at registration. Approving
-      // or rejecting here without also syncing kycStatus left vendors
-      // permanently unable to log in even after being "Approved" on this
-      // page — mirrors the sync admin/kyc/page.tsx's updateKYC already does.
-      const updates: Record<string, string> =
-        status === "Approved" || status === "Rejected"
-          ? { status, kycStatus: status }
-          : { status };
-      await updateDoc(doc(db, "vendors", vendor.id), updates);
+      await updateDoc(doc(db, "vendors", vendor.id), { status });
       if (vendor.uid) {
         await setDoc(
           doc(db, "vendors_public", vendor.uid),
@@ -279,31 +280,24 @@ export default function AdminVendorsPage() {
                         >
                           {vendor.status}
                         </span>
+                        <div className="text-xs text-gray-500 mt-1">
+                          KYC: {vendor.kycStatus}
+                        </div>
                       </td>
                       <td>
                         <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={() =>
-                              updateVendorStatus(vendor, "Approved")
-                            }
-                            className="bg-green-600 hover:bg-green-700 transition text-white px-3 py-1 rounded-lg"
+                          <Link
+                            href="/admin/kyc"
+                            className="bg-blue-600 hover:bg-blue-700 transition text-white px-3 py-1 rounded-lg"
                           >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() =>
-                              updateVendorStatus(vendor, "Rejected")
-                            }
-                            className="bg-red-600 hover:bg-red-700 transition text-white px-3 py-1 rounded-lg"
-                          >
-                            Reject
-                          </button>
+                            Review KYC
+                          </Link>
                           <button
                             onClick={() =>
                               updateVendorStatus(
                                 vendor,
                                 vendor.status === "Blocked"
-                                  ? "Approved"
+                                  ? vendor.kycStatus
                                   : "Blocked"
                               )
                             }

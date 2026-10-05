@@ -223,6 +223,20 @@ try {
     s2Pack.status === 200 && s2Ship.status === 409 && (await rec(S2, A)).itemFulfilment[kS2].status === "Packed",
     `pack=${s2Pack.status} ship=${s2Ship.status}`);
 
+  // 6b (H1): the Delivery Engine job owns handover and out-for-delivery for
+  // admins too — an admin advance would move the item without the job, its
+  // events or its OTP. (Orders with no job keep the admin path, test 5.)
+  const s2Rec = `${S2}_${A}`;
+  const adminShipJob = await adminAdvance({ recordId: s2Rec, itemKey: kS2, fromStatus: "Packed" });
+  const afterAdminShip = (await rec(S2, A)).itemFulfilment[kS2].status;
+  await db.collection("sellerOrders").doc(s2Rec).update({ [`itemFulfilment.${kS2}.status`]: "Shipped" });
+  const adminOfdJob = await adminAdvance({ recordId: s2Rec, itemKey: kS2, fromStatus: "Shipped" });
+  const afterAdminOfd = (await rec(S2, A)).itemFulfilment[kS2].status;
+  await db.collection("sellerOrders").doc(s2Rec).update({ [`itemFulfilment.${kS2}.status`]: "Packed" });
+  record("6b shipment covered by a delivery job: admin may NOT force Shipped or Out For Delivery either (409, item unchanged)",
+    adminShipJob.status === 409 && afterAdminShip === "Packed" && adminOfdJob.status === 409 && afterAdminOfd === "Shipped",
+    `ship=${adminShipJob.status}/${afterAdminShip} ofd=${adminOfdJob.status}/${afterAdminOfd}`);
+
   // ============ 7. Seller cannot reach settlement by themselves ============
   const payable = await json(await sellerPayable(new Request("http://x/api/seller/payable", { headers: { authorization: `Bearer test:${A}:${A}@example.com:true` } })));
   record("7  after everything a seller can do, none of A's orders is settlement-eligible (payable 0; Pay on Delivery orders stay unpaid until admin verification)",

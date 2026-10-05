@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   collection,
   getDocs,
-  updateDoc,
   deleteDoc,
   doc,
   query,
@@ -223,33 +222,6 @@ export default function AdminPage() {
     setNotifications(alerts);
   }
 
-  const approveVendor = async (id: string) => {
-    await updateDoc(doc(db, "vendors", id), {
-      status: "Approved",
-      kycStatus: "Approved",
-    });
-    loadVendors();
-  };
-
-  const rejectVendor = async (id: string) => {
-    await updateDoc(doc(db, "vendors", id), {
-      status: "Rejected",
-      kycStatus: "Rejected",
-    });
-    loadVendors();
-  };
-
-  const updateKYC = async (id: string, status: string) => {
-    try {
-      await updateDoc(doc(db, "vendors", id), { kycStatus: status });
-      alert("KYC Updated");
-      await loadVendors();
-    } catch (error) {
-      console.error(error);
-      alert("KYC Update Failed");
-    }
-  };
-
   useEffect(() => {
     // Admin identity is already gated by app/admin/layout.tsx (which this
     // page always renders inside) — this listener is just here to trigger
@@ -273,16 +245,6 @@ export default function AdminPage() {
     } catch (error) {
       console.error(error);
       alert("Couldn't delete the product. Please try again.");
-    }
-  };
-
-  const updateOrderStatus = async (id: string, status: string) => {
-    try {
-      await updateDoc(doc(db, "orders", id), { status });
-      await loadProducts(vendors);
-    } catch (error) {
-      console.error(error);
-      alert("Couldn't update the order status. Please try again.");
     }
   };
 

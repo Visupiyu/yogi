@@ -186,8 +186,8 @@ await check("23 vendor doc: owner CANNOT change kycStatus (unchanged)", () =>
   assertFails(updateDoc(vendorDoc(), { kycStatus: "Pending" })));
 await check("23b vendor doc: another user CANNOT update the vendor doc", () =>
   assertFails(updateDoc(doc(firestoreAs("bob"), "vendors", "v_doc1"), { aboutStore: "x" })));
-await check("24 vendor doc: admin KYC moderation (kycStatus + status) still allowed", () =>
-  assertSucceeds(updateDoc(doc(firestoreAs("adminUid", ADMIN_EMAIL), "vendors", "v_doc1"), { kycStatus: "Rejected", status: "Rejected" })));
+await check("24 vendor doc: admin browser can NOT decide KYC (kycStatus + status) — only app/api/admin/kyc/decision can", () =>
+  assertFails(updateDoc(doc(firestoreAs("adminUid", ADMIN_EMAIL), "vendors", "v_doc1"), { kycStatus: "Rejected", status: "Rejected" })));
 await check("24b vendor doc: admin may still update KYC URL fields (admin access unchanged)", () =>
   assertSucceeds(updateDoc(doc(firestoreAs("adminUid", ADMIN_EMAIL), "vendors", "v_doc1"), { gstDocUrl: "https://example.invalid/admin-set" })));
 await check("24c vendor doc: new vendor application with KYC URLs still allowed (create unchanged)", () =>
@@ -251,6 +251,58 @@ await check("V22 new vendor application with identity and bank fields still allo
     gstNumber: "TESTGSTIN33333Z", panNumber: "TESTP3333Q", aadhaarNumber: "333333333333",
     accountHolder: "New Holder", bankName: "New Bank", accountNumber: "3333333333", ifsc: "NEWB0000003",
   })));
+
+// ============ H2: the legacy Admin Vendors shortcut ============
+// Approve / reject is a KYC decision made only by app/api/admin/kyc/decision
+// (Admin SDK). An admin browser may still block and unblock, and unblocking
+// restores only the status that matches the seller's KYC state.
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const f = ctx.firestore();
+  await setDoc(doc(f, "vendors", "h2_pending"), { ...APPROVED_VENDOR, uid: "h2p", status: "Pending", kycStatus: "Pending" });
+  await setDoc(doc(f, "vendors", "h2_rejected"), { ...APPROVED_VENDOR, uid: "h2r", status: "Rejected", kycStatus: "Rejected", kycRejectionReason: "Blurry PAN" });
+  await setDoc(doc(f, "vendors", "h2_approved"), { ...APPROVED_VENDOR, uid: "h2a" });
+  await setDoc(doc(f, "vendors", "h2_blocked_pending"), { ...APPROVED_VENDOR, uid: "h2bp", status: "Blocked", kycStatus: "Pending" });
+  await setDoc(doc(f, "vendors", "h2_blocked_approved"), { ...APPROVED_VENDOR, uid: "h2ba", status: "Blocked", kycStatus: "Approved" });
+});
+const adminVendor = (id: string) => doc(firestoreAs("adminUid", ADMIN_EMAIL), "vendors", id);
+await check("H2-1 admin browser cannot APPROVE a pending seller (status + kycStatus Approved)", () =>
+  assertFails(updateDoc(adminVendor("h2_pending"), { status: "Approved", kycStatus: "Approved" })));
+await check("H2-2 admin browser cannot approve by status alone (status Approved, kycStatus untouched)", () =>
+  assertFails(updateDoc(adminVendor("h2_pending"), { status: "Approved" })));
+await check("H2-3 admin browser cannot REJECT, nor write a rejection reason, nor reopen a rejected KYC", async () => {
+  await assertFails(updateDoc(adminVendor("h2_pending"), { status: "Rejected", kycStatus: "Rejected" }));
+  await assertFails(updateDoc(adminVendor("h2_pending"), { kycRejectionReason: "x" }));
+  await assertFails(updateDoc(adminVendor("h2_rejected"), { kycStatus: "Pending" }));
+  await assertFails(updateDoc(adminVendor("h2_rejected"), { kycRejectionReason: deleteField() }));
+});
+await check("H2-4 Unblock can never approve an unapproved seller (Blocked + KYC Pending -> Approved refused)", () =>
+  assertFails(updateDoc(adminVendor("h2_blocked_pending"), { status: "Approved" })));
+await check("H2-5 admin can still Block any seller and Unblock to the KYC-matching status", async () => {
+  await assertSucceeds(updateDoc(adminVendor("h2_approved"), { status: "Blocked" }));
+  await assertSucceeds(updateDoc(adminVendor("h2_pending"), { status: "Blocked" }));
+  await assertSucceeds(updateDoc(adminVendor("h2_blocked_pending"), { status: "Pending" }));
+  await assertSucceeds(updateDoc(adminVendor("h2_blocked_approved"), { status: "Approved" }));
+});
+await check("H2-6 the owner still cannot touch status / kycStatus (seller branch unchanged)", async () => {
+  await assertFails(updateDoc(doc(firestoreAs("h2p"), "vendors", "h2_pending"), { kycStatus: "Approved" }));
+  await assertFails(updateDoc(doc(firestoreAs("h2p"), "vendors", "h2_pending"), { status: "Approved" }));
+});
+await check("H2-7 other admin vendor edits still work (identity, commission, documents)", async () => {
+  await assertSucceeds(updateDoc(adminVendor("h2_rejected"), { businessName: "Fixed by admin", commissionRate: 5 }));
+  await assertSucceeds(updateDoc(adminVendor("h2_rejected"), { gstDocUrl: "https://example.invalid/admin-fixed" }));
+});
+{
+  const vendorsPage = fs.readFileSync(path.join(REPO, "app/admin/vendors/page.tsx"), "utf8");
+  const dashboard = fs.readFileSync(path.join(REPO, "app/admin/page.tsx"), "utf8");
+  await check("H2-8 the Admin Vendors page has no Approve / Reject shortcut, never writes kycStatus, and links to Vendor KYC", async () => {
+    if (/>\s*Approve\s*</.test(vendorsPage) || />\s*Reject\s*</.test(vendorsPage)) throw new Error("Approve/Reject button still present");
+    if (/kycStatus\s*:\s*status/.test(vendorsPage) || /updateDoc\([^)]*\)\s*,\s*\{[^}]*kycStatus/.test(vendorsPage)) throw new Error("vendors page writes kycStatus");
+    if (!vendorsPage.includes('href="/admin/kyc"')) throw new Error("no link to /admin/kyc");
+  });
+  await check("H2-9 the admin dashboard has no vendor approve / reject / KYC write left", async () => {
+    if (/approveVendor|rejectVendor|updateKYC|kycStatus\s*:/.test(dashboard)) throw new Error("dashboard still has a KYC shortcut");
+  });
+}
 
 await env.cleanup();
 console.log(`\n${pass}/${pass + fail} KYC rules checks passed`);
