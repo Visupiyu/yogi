@@ -64,6 +64,15 @@ export default function SellerOrderStatement({ orderId }: { orderId: string }) {
   const rows: { label: string; value: string; note?: string }[] = [
     { label: "Gross item sales (your items)", value: rupees(f.grossSales) },
     { label: "Seller-funded discount / coupon share", value: `− ${rupees(f.discountShare)}` },
+    // H3: a coupon on this order paid for by YOMICO. Shown for transparency
+    // only — it is not deducted from what you earn.
+    ...(Number(f.yomicoCouponShare) > 0
+      ? [{
+          label: "Coupon funded by YOMICO",
+          value: rupees(f.yomicoCouponShare),
+          note: "Paid by YOMICO — not deducted from your earnings",
+        }]
+      : []),
     { label: "YOMICO commission", value: rupees(f.commission), note: "YOMICO charges 0% commission" },
     {
       label: "Seller delivery charge",

@@ -41,6 +41,20 @@
 
 export const MAX_COUPON_CODE_LENGTH = 50;
 
+// WHO PAYS FOR A COUPON (H3). Every coupon is a YOMICO promotion: the customer
+// pays the discounted price, and YOMICO — not the seller — absorbs the
+// discount. Each order writer stamps `couponFundedBy: "yomico"` on an order
+// whose coupon took money off, and lib/vendorEarnings#computeVendorShare then
+// leaves that discount out of the seller's earning (the same pattern as
+// rewardFundedBy for reward points). Orders placed before H3 carry no stamp
+// and keep their original, seller-borne coupon treatment — no history changes.
+export const COUPON_FUNDED_BY_YOMICO = "yomico" as const;
+
+/** The order fields that record a YOMICO-funded coupon, or nothing when no coupon applied. */
+export function couponFundingStamp(couponDiscount: number): { couponFundedBy?: typeof COUPON_FUNDED_BY_YOMICO } {
+  return Number.isFinite(couponDiscount) && couponDiscount > 0 ? { couponFundedBy: COUPON_FUNDED_BY_YOMICO } : {};
+}
+
 export type CouponRejectReason =
   | "invalid-code"
   | "not-found"

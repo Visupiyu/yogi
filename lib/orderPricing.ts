@@ -530,8 +530,11 @@ export async function computeOrderPricing(
   const commission = YOMICO_COMMISSION_AMOUNT;
   // Points are funded by YOMICO (REWARD_FUNDED_BY_YOMICO), so the whole-order
   // figure adds the points value back: the seller is paid as if the customer
-  // had paid it all in cash.
-  const sellerEarning = finalTotal + rewardValue - commission;
+  // had paid it all in cash. The coupon is YOMICO-funded too (H3: every order
+  // with a coupon is stamped couponFundedBy "yomico" by its writer), so it is
+  // added back the same way. Display figure only — payouts read
+  // computeVendorShare.
+  const sellerEarning = finalTotal + rewardValue + couponDiscount - commission;
 
   // applyPostOrderEffects()'s formula, unchanged.
   const earnedPoints = Math.floor(finalTotal / 100);

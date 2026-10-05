@@ -1,4 +1,5 @@
 import { YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
+import { COUPON_FUNDED_BY_YOMICO } from "@/lib/coupons/couponRules";
 
 type OrderItem = {
   vendorId?: string;
@@ -15,6 +16,8 @@ type Order = {
   rewardValue?: number;
   /** "yomico" when YOMICO absorbed rewardValue (lib/rewards/redemption). */
   rewardFundedBy?: string;
+  /** "yomico" when YOMICO absorbed the coupon `discount` (H3, lib/coupons/couponRules). */
+  couponFundedBy?: string;
   commissionRate?: number;
 };
 
@@ -28,6 +31,13 @@ export type VendorShare = {
   vendorNetSubtotal: number;
   vendorCommission: number;
   vendorEarning: number;
+  /**
+   * This seller's share of a YOMICO-funded coupon (orders stamped
+   * couponFundedBy "yomico"): the promotion cost YOMICO absorbed on this
+   * seller's items. Reporting only — it is NOT deducted from the seller.
+   * 0 on legacy orders, whose coupon stays inside the seller's discount share.
+   */
+  yomicoCouponShare: number;
 };
 
 /**
@@ -104,12 +114,22 @@ export function computeVendorShare(
   // earning and payout basis equal what a full cash payment would give. Older
   // orders carry no stamp and keep subtracting rewardValue exactly as before.
   const sellerBorneReward = order.rewardFundedBy === "yomico" ? 0 : order.rewardValue || 0;
-  const totalDiscount = (order.discount || 0) + sellerBorneReward;
+  // H3: a coupon on an order stamped couponFundedBy "yomico" is YOMICO's
+  // promotion cost, so — like YOMICO-funded points — it is left out of what
+  // the seller bears: their earning is their full pre-coupon item value.
+  // Orders without the stamp (placed before H3) keep subtracting the coupon
+  // exactly as before, so no historical payout or balance changes.
+  const yomicoFundedCoupon = order.couponFundedBy === COUPON_FUNDED_BY_YOMICO;
+  const coupon = order.discount || 0;
+  const sellerBorneCoupon = yomicoFundedCoupon ? 0 : coupon;
+  const totalDiscount = sellerBorneCoupon + sellerBorneReward;
 
-  const vendorDiscountShare =
-    orderRawSubtotal > 0
-      ? totalDiscount * (vendorRawSubtotal / orderRawSubtotal)
-      : 0;
+  // Both shares split by the same rule: this seller's items as a fraction of
+  // the order's items subtotal, so every seller's shares add up to the whole.
+  const vendorFraction =
+    orderRawSubtotal > 0 ? vendorRawSubtotal / orderRawSubtotal : 0;
+  const vendorDiscountShare = totalDiscount * vendorFraction;
+  const yomicoCouponShare = yomicoFundedCoupon ? coupon * vendorFraction : 0;
 
   const vendorNetSubtotal = Math.max(
     0,
@@ -154,5 +174,6 @@ export function computeVendorShare(
     vendorNetSubtotal,
     vendorCommission,
     vendorEarning,
+    yomicoCouponShare,
   };
 }

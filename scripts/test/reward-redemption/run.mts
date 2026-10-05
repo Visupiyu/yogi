@@ -476,9 +476,16 @@ async function main() {
     const cn = await orderDoc(cpts.json.orderId);
     const cs = computeVendorShare(co, VENDOR);
     const ns = computeVendorShare(cn, VENDOR);
-    record("R6b coupon + points: the seller still bears only the COUPON (net ₹900, earning ₹900) — identical with and without points; customer pays ₹600 vs ₹900",
-      JSON.stringify(cs) === JSON.stringify(ns) && ns?.vendorNetSubtotal === 900 && ns?.vendorEarning === 900 && cn.finalTotal === 600 && co.finalTotal === 900 && cn.rewardValue === 300,
-      JSON.stringify({ cs, ns, cn: cn.finalTotal }));
+    // H3: the coupon is YOMICO's cost as well, so with a coupon AND points the
+    // seller bears neither — earning ₹1000, YOMICO coupon share ₹100 recorded.
+    const legacyCoupon = { ...co }; delete (legacyCoupon as any).couponFundedBy;
+    const legacyCouponShare = computeVendorShare(legacyCoupon, VENDOR);
+    record("R6b coupon + points: the seller bears NEITHER (H3: coupon YOMICO-funded; net ₹1000, earning ₹1000, YOMICO coupon share ₹100) — identical with and without points; customer pays ₹600 vs ₹900; the same order without the H3 stamp keeps the legacy ₹900",
+      JSON.stringify(cs) === JSON.stringify(ns) && ns?.vendorNetSubtotal === 1000 && ns?.vendorEarning === 1000 && ns?.yomicoCouponShare === 100 &&
+        co.couponFundedBy === "yomico" && cn.couponFundedBy === "yomico" &&
+        cn.finalTotal === 600 && co.finalTotal === 900 && cn.rewardValue === 300 &&
+        legacyCouponShare?.vendorEarning === 900 && legacyCouponShare?.yomicoCouponShare === 0,
+      JSON.stringify({ cs, ns, cn: cn.finalTotal, legacy: legacyCouponShare }));
 
     const legacy = { ...lo }; delete (legacy as any).rewardFundedBy;
     const legacyShare = computeVendorShare(legacy, VENDOR);

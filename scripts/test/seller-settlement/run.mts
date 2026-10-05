@@ -90,6 +90,9 @@ const { sellerTools } = await import("../../../lib/ai/tools/sellerTools.ts");
 const { adminTools } = await import("../../../lib/ai/tools/adminTools.ts");
 const { computeEarningsBreakdownByVendor } = await import("../../../lib/vendorPayable.ts");
 const { Timestamp } = await import("firebase-admin/firestore");
+const { POST: cancelOrder } = await import("../../../app/api/cancel-order/route.ts");
+const { refundableForOrderIndex } = await import("../../../lib/itemRequests.ts");
+const { COUPON_FUNDED_BY_YOMICO } = await import("../../../lib/coupons/couponRules.ts");
 
 const db = getAdminDb();
 
@@ -362,7 +365,7 @@ async function main() {
       JSON.stringify(charges));
   }
 
-  // ================= 10. Coupon (existing seller-funded split preserved) =================
+  // ================= 10. Coupon (H3: YOMICO-funded — the seller keeps the pre-coupon value) =================
   {
     await clearAll(); await seed();
     const r = await webOnline("buyer_s10", twoSellerLines, { couponCode: "SAVE10" });
@@ -371,10 +374,15 @@ async function main() {
     await deliverAndPay(r.orderId);
     const bA = await adminBreakdown(SELLER_A);
     const bB = await adminBreakdown(SELLER_B);
-    record("10 coupon SAVE10 on the two-seller order: customer 495; existing coupon split (30 / 25) unchanged; commission ₹0; payables 243 / 203",
-      o.finalTotal === 495 && zeroCommission(o) && bA.discountShare === 30 && bB.discountShare === 25 &&
-      bA.commission === 0 && bB.commission === 0 && bA.adjustedEarnings === 243 && bB.adjustedEarnings === 203,
-      `finalTotal=${o?.finalTotal} discountShare=${bA.discountShare}/${bB.discountShare} payable=${bA.adjustedEarnings}/${bB.adjustedEarnings}`);
+    // A 300 + B 250 = 550; 10% coupon = 55, paid by YOMICO. Each seller keeps
+    // their full item value; YOMICO's cost is recorded per seller by value
+    // (30 / 25, summing to the whole 55) but is NOT deducted.
+    const nearly = (a: unknown, b: number) => typeof a === "number" && Math.abs(a - b) < 1e-9;
+    record("10 coupon SAVE10 on the two-seller order (H3): customer 495; order stamped couponFundedBy yomico; sellers bear no coupon (discountShare 0 / 0); YOMICO coupon share 30 / 25 (= 55); commission ₹0; payables 273 / 228",
+      o.finalTotal === 495 && o.couponFundedBy === "yomico" && zeroCommission(o) && bA.discountShare === 0 && bB.discountShare === 0 &&
+      nearly(bA.yomicoCouponShare, 30) && nearly(bB.yomicoCouponShare, 25) && nearly(bA.yomicoCouponShare + bB.yomicoCouponShare, o.discount) &&
+      bA.commission === 0 && bB.commission === 0 && bA.adjustedEarnings === 273 && bB.adjustedEarnings === 228,
+      `finalTotal=${o?.finalTotal} couponFundedBy=${o?.couponFundedBy} discountShare=${bA.discountShare}/${bB.discountShare} yomico=${bA.yomicoCouponShare}/${bB.yomicoCouponShare} payable=${bA.adjustedEarnings}/${bB.adjustedEarnings}`);
   }
 
   // ================= 11/12/13. Wallet, payout report and admin payout agree =================
@@ -389,11 +397,12 @@ async function main() {
       apiA.breakdown.grossSales - apiA.breakdown.discountShare - apiA.breakdown.commission -
       apiA.breakdown.sellerDeliveryCharges - apiA.breakdown.returnDeductions - apiA.breakdown.returnLogisticsCharges -
       apiA.breakdown.adjustedEarnings) < 1e-9;
-    record("11 wallet: /api/seller/payable payable == available == breakdown.adjustedEarnings (443 = 243 + 200), no commitments yet",
-      apiA.status === 200 && apiA.payable === 443 && apiA.available === 443 && apiA.breakdown?.adjustedEarnings === 443,
+    record("11 wallet: /api/seller/payable payable == available == breakdown.adjustedEarnings (473 = 273 + 200), no commitments yet",
+      apiA.status === 200 && apiA.payable === 473 && apiA.available === 473 && apiA.breakdown?.adjustedEarnings === 473,
       `payable=${apiA.payable} available=${apiA.available}`);
-    record("12 payout report figures (API breakdown): gross 500, discount 30, commission 0, delivery 27, net 443 — and they reconcile",
-      apiA.breakdown?.grossSales === 500 && apiA.breakdown?.discountShare === 30 && apiA.breakdown?.commission === 0 &&
+    record("12 payout report figures (API breakdown): gross 500, seller discount 0, YOMICO coupon share 30 (not deducted), commission 0, delivery 27, net 473 — and they reconcile",
+      apiA.breakdown?.grossSales === 500 && apiA.breakdown?.discountShare === 0 &&
+      Math.abs(Number(apiA.breakdown?.yomicoCouponShare) - 30) < 1e-9 && apiA.breakdown?.commission === 0 &&
       apiA.breakdown?.sellerDeliveryCharges === 27 && recon === true,
       JSON.stringify(apiA.breakdown));
     record("13 admin payouts (same shared function over ALL collections, as the admin screen loads them) == seller API, for both sellers",
@@ -403,8 +412,8 @@ async function main() {
       `admin=${adminA.adjustedEarnings} api=${apiA.breakdown?.adjustedEarnings}`);
 
     // Withdrawal uses the same payable: above -> refused, exactly -> accepted, then 0 left.
-    const over = await requestWithdrawal(req("http://x/api/request-withdrawal", { amount: 444, idempotencyKey: key() }, SELLER_A));
-    const exact = await requestWithdrawal(req("http://x/api/request-withdrawal", { amount: 443, idempotencyKey: key() }, SELLER_A));
+    const over = await requestWithdrawal(req("http://x/api/request-withdrawal", { amount: 474, idempotencyKey: key() }, SELLER_A));
+    const exact = await requestWithdrawal(req("http://x/api/request-withdrawal", { amount: 473, idempotencyKey: key() }, SELLER_A));
     const after = await api(SELLER_A);
     const adminAfter = computeVendorPayableBreakdown({
       vendorUid: SELLER_A,
@@ -412,16 +421,16 @@ async function main() {
       payouts: [], withdrawals: (await db.collection("withdrawals").get()).docs.map((d) => ({ id: d.id, ...d.data() })),
       sellerOrders: (await db.collection("sellerOrders").get()).docs.map((d) => d.data()),
     });
-    record("11b withdrawal: ₹444 refused (409), ₹443 accepted; afterwards API payable 0 / reserved 443, admin calc identical",
-      over.status === 409 && exact.status === 200 && after.payable === 0 && after.breakdown?.reserved === 443 &&
-      adminAfter.payable === after.payable && adminAfter.reserved === 443,
+    record("11b withdrawal: ₹474 refused (409), ₹473 accepted; afterwards API payable 0 / reserved 473, admin calc identical",
+      over.status === 409 && exact.status === 200 && after.payable === 0 && after.breakdown?.reserved === 473 &&
+      adminAfter.payable === after.payable && adminAfter.reserved === 473,
       `over=${over.status} exact=${exact.status} after=${after.payable} reserved=${after.breakdown?.reserved}`);
   }
 
   // ================= 15–18. AI tools + admin dashboard use the SAME breakdown =================
   {
     // State from 11/12/13: seller A has the coupon order + a paid-delivery COD
-    // order and a ₹443 reserved withdrawal; seller B has the coupon order.
+    // order and a ₹473 reserved withdrawal; seller B has the coupon order.
     const apiA = await api(SELLER_A);
     const apiB = await api(SELLER_B);
     const sellerCtx = { uid: SELLER_A, email: `${SELLER_A}@example.com`, isAdmin: false };
@@ -430,8 +439,9 @@ async function main() {
 
     const s = (await tool(sellerTools, "getSellerSales").execute({}, sellerCtx)) as any;
     const sWin = (await tool(sellerTools, "getSellerSales").execute({ days: 30 }, sellerCtx)) as any;
-    record("15 AI getSellerSales == seller API breakdown (gross 500, discount 30, commission 0, delivery 27, net 443, withdrawable 0); 30-day window same money, no balance",
+    record("15 AI getSellerSales == seller API breakdown (gross 500, seller discount 0, YOMICO coupon share 30, commission 0, delivery 27, net 473, withdrawable 0); 30-day window same money, no balance",
       s.commission === 0 && s.grossSales === apiA.breakdown.grossSales && s.sellerDiscountShare === apiA.breakdown.discountShare &&
+      s.yomicoCouponShare === apiA.breakdown.yomicoCouponShare &&
       s.sellerDeliveryCharges === apiA.breakdown.sellerDeliveryCharges && s.sellerDeliveryCharges === 27 &&
       s.netEarnings === apiA.breakdown.adjustedEarnings && s.withdrawableNow === apiA.available &&
       s.reserved === apiA.breakdown.reserved && s.settledOrders === 2 && s.totalOrders === 2 &&
@@ -551,6 +561,111 @@ async function main() {
       docs.every(zeroCommission) && docs.every((d) => d.finalTotal === 600) &&
       recs.every((s) => s?.vendorCommission === 0 && s?.sellerDeliveryCharge === 49),
       docs.map((d) => `${d?.finalTotal}:${d?.commissionRate}/${d?.commissionAmount}`).join(" ") + " | " + recs.map((s) => s?.sellerDeliveryCharge).join(","));
+  }
+
+  // ================= H3. YOMICO-funded coupons =================
+  // The customer pays the discounted price; YOMICO absorbs the coupon; the
+  // seller is paid on the full pre-coupon value of their own items.
+  {
+    await clearAll(); await seed();
+    const near = (a: unknown, b: number) => typeof a === "number" && Math.abs(a - b) < 1e-9;
+    const coupon = { couponCode: "SAVE10" };
+
+    // ---- H3-1: every order writer stamps a coupon order, and only a coupon order ----
+    const stamped = [
+      { label: "web COD", r: await webCod("h3_w1", [{ id: "p_a300", qty: 1 }], coupon) },
+      { label: "web online", r: await webOnline("h3_w2", [{ id: "p_a300", qty: 1 }], coupon) },
+      { label: "mobile COD", r: await mobileCod("h3_m1", [{ id: "p_a300", qty: 1 }], coupon) },
+      { label: "mobile online", r: await mobileOnline("h3_m2", [{ id: "p_a300", qty: 1 }], coupon) },
+    ];
+    const plain = [
+      await webCod("h3_w3", [{ id: "p_a300", qty: 1 }]),
+      await webOnline("h3_w4", [{ id: "p_a300", qty: 1 }]),
+      await mobileCod("h3_m3", [{ id: "p_a300", qty: 1 }]),
+      await mobileOnline("h3_m4", [{ id: "p_a300", qty: 1 }]),
+    ];
+    const sDocs = await Promise.all(stamped.map((x) => order(x.r.orderId)));
+    const pDocs = await Promise.all(plain.map((x) => order(x.orderId)));
+    record("H3-1 all four order writers (web COD, web online, mobile COD, mobile online) stamp couponFundedBy \"yomico\" on a coupon order; no coupon -> no stamp",
+      COUPON_FUNDED_BY_YOMICO === "yomico" &&
+      sDocs.every((d) => d?.couponFundedBy === "yomico" && near(d?.discount, 30)) &&
+      pDocs.every((d) => d && !("couponFundedBy" in d)),
+      stamped.map((x, i) => `${x.label}:${sDocs[i]?.couponFundedBy}/${sDocs[i]?.discount}`).join(" ") + " | plain:" + pDocs.map((d) => String(d?.couponFundedBy)).join(","));
+
+    // ---- H3-2: one seller, coupon + customer-paid shipping, tax snapshot untouched ----
+    const one = stamped[0].r.orderId; // web COD: 1 x ₹300, coupon ₹30
+    const oneDoc = sDocs[0];
+    await confirm(one);
+    const oneRec = await sellerRecord(one, SELLER_A);
+    const oneAfter = await order(one);
+    const shareOne = computeVendorShare(oneAfter, SELLER_A);
+    const snapLine = oneAfter?.taxSnapshot?.items?.[0];
+    record("H3-2 one seller, ₹300 item, ₹30 coupon: customer pays 300 + shipping − 30 (unchanged maths); seller earning 300 (record + live), YOMICO share 30; tax snapshot still on the pre-coupon ₹300 line",
+      oneDoc.finalTotal === Math.max(1, Math.round(300 + Number(oneDoc.shippingCharge || 0) - 30)) &&
+      oneDoc.sellerEarning === oneDoc.finalTotal + 30 &&
+      oneRec?.vendorSubtotal === 300 && oneRec?.vendorEarning === 300 &&
+      shareOne?.vendorEarning === 300 && near(shareOne?.yomicoCouponShare, 30) &&
+      snapLine?.grossValue === 300,
+      `finalTotal=${oneDoc.finalTotal} shipping=${oneDoc.shippingCharge} sellerEarning=${oneDoc.sellerEarning} record=${oneRec?.vendorEarning} share=${JSON.stringify(shareOne)} snapGross=${snapLine?.grossValue}`);
+
+    // ---- H3-3: three sellers, different prices and quantities, Razorpay amount vs payout ----
+    await clearAll(); await seed();
+    const multi = await webOnline("h3_multi", [{ id: "p_a100", qty: 3 }, { id: "p_b100", qty: 1 }, { id: "p_c100", qty: 2 }], coupon);
+    const intentSnap = await db.collection("paymentIntents").where("uid", "==", "h3_multi").limit(1).get();
+    const intentPaise = Number(intentSnap.docs[0]?.data()?.expectedAmountPaise);
+    const m = await order(multi.orderId);
+    await confirm(multi.orderId);
+    const recs = await Promise.all([SELLER_A, SELLER_B, SELLER_C].map((v) => sellerRecord(multi.orderId, v)));
+    await deliverAndPay(multi.orderId);
+    const [bA, bB, bC] = await Promise.all([SELLER_A, SELLER_B, SELLER_C].map((v) => adminBreakdown(v)));
+    const yomicoTotal = bA.yomicoCouponShare + bB.yomicoCouponShare + bC.yomicoCouponShare;
+    record("H3-3 three sellers (₹300 / ₹100 / ₹200 from qty 3 / 1 / 2), ₹60 coupon: Razorpay charged the post-coupon ₹540; sellers earn 300 / 100 / 200 (records + payout engine), bear no discount; YOMICO share 30 / 10 / 20 = 60",
+      m.couponFundedBy === "yomico" && near(m.discount, 60) && m.finalTotal === 540 && intentPaise === 54000 &&
+      recs.map((x) => x?.vendorEarning).join(",") === "300,100,200" &&
+      [bA, bB, bC].every((b) => b.discountShare === 0) &&
+      bA.grossSales === 300 && bB.grossSales === 100 && bC.grossSales === 200 &&
+      bA.adjustedEarnings === 300 - bA.sellerDeliveryCharges && bB.adjustedEarnings === 100 - bB.sellerDeliveryCharges &&
+      bC.adjustedEarnings === 200 - bC.sellerDeliveryCharges &&
+      near(bA.yomicoCouponShare, 30) && near(bB.yomicoCouponShare, 10) && near(bC.yomicoCouponShare, 20) && near(yomicoTotal, m.discount),
+      `finalTotal=${m.finalTotal} paise=${intentPaise} records=${recs.map((x) => x?.vendorEarning)} payable=${bA.adjustedEarnings}/${bB.adjustedEarnings}/${bC.adjustedEarnings} yomico=${bA.yomicoCouponShare}/${bB.yomicoCouponShare}/${bC.yomicoCouponShare}`);
+
+    // ---- H3-4: full and partial returns never turn the coupon into a seller loss ----
+    const delivered = { id: multi.orderId, ...(await order(multi.orderId)) } as any;
+    const sellerOrders = (await db.collection("sellerOrders").get()).docs.map((d) => d.data());
+    const ret = (vendorId: string, unitPrice: number, qty: number) => ({ orderId: multi.orderId, vendorId, type: "return", status: "REQUESTED", item: { unitPrice, qty } });
+    const cRet = computeVendorEarningsBreakdown({ vendorUid: SELLER_C, orders: [delivered], itemRequests: [ret(SELLER_C, 100, 2)], sellerOrders });
+    const aAfterC = computeVendorEarningsBreakdown({ vendorUid: SELLER_A, orders: [delivered], itemRequests: [ret(SELLER_C, 100, 2)], sellerOrders });
+    // Customer refund for C's returned line (points): its share of what was actually paid — unchanged by H3.
+    const cIndex = (delivered.items as any[]).findIndex((it) => it.vendorId === SELLER_C);
+    const refundStamped = refundableForOrderIndex(delivered, cIndex);
+    const legacyOrder = { ...delivered }; delete legacyOrder.couponFundedBy;
+    const refundLegacy = refundableForOrderIndex(legacyOrder, cIndex);
+    record("H3-4 return of C's ₹200 line: C loses exactly the ₹200 it was credited (net = −delivery only, as with no coupon); A and B untouched; customer refund = the line's share of what was paid (₹180), identical with or without the H3 stamp",
+      cRet.returnDeductions === 200 && cRet.adjustedEarnings === -cRet.sellerDeliveryCharges &&
+      aAfterC.returnDeductions === 0 && aAfterC.adjustedEarnings === bA.adjustedEarnings &&
+      refundStamped === Math.round(540 * (200 / 600)) && refundStamped === refundLegacy,
+      `C deduction=${cRet.returnDeductions} C net=${cRet.adjustedEarnings} A net=${aAfterC.adjustedEarnings} refund=${refundStamped}/${refundLegacy}`);
+
+    // ---- H3-5: legacy orders (no stamp) keep the seller-borne coupon exactly as before ----
+    const legacyA = computeVendorEarningsBreakdown({ vendorUid: SELLER_A, orders: [legacyOrder], sellerOrders });
+    const legacyShare = computeVendorShare(legacyOrder, SELLER_A);
+    record("H3-5 the same order WITHOUT the stamp (a pre-H3 order) keeps the legacy rule: A bears its ₹30 coupon share (earning 270), no YOMICO share",
+      near(legacyShare?.vendorEarning, 270) && legacyShare?.yomicoCouponShare === 0 && near(legacyA.discountShare, 30) && legacyA.yomicoCouponShare === 0,
+      JSON.stringify(legacyShare));
+
+    // ---- H3-6: cancellation is unchanged: refund = what the customer paid, coupon released, seller untouched ----
+    await clearAll(); await seed();
+    const toCancel = await webOnline("h3_cancel", [{ id: "p_a300", qty: 2 }], coupon);
+    const before = await order(toCancel.orderId);
+    const cancelRes = await cancelOrder(req("http://x/api/cancel-order", { orderId: toCancel.orderId }, "h3_cancel"));
+    const cancelled = await order(toCancel.orderId);
+    const claim = await db.collection("couponRedemptions").doc("h3_cancel_SAVE10").get();
+    const bCancel = await adminBreakdown(SELLER_A);
+    record("H3-6 cancelling a YOMICO-coupon order: refund due = the post-coupon amount paid (₹540), coupon claim released, stamp kept, seller earns nothing from it",
+      before.couponFundedBy === "yomico" && cancelRes.status === 200 && cancelled.status === "Cancelled" &&
+      cancelled.refundAmountDue === before.finalTotal && before.finalTotal === 540 && cancelled.couponFundedBy === "yomico" &&
+      !claim.exists && bCancel.eligibleOrders === 0 && bCancel.adjustedEarnings === 0,
+      `status=${cancelRes.status} refundDue=${cancelled.refundAmountDue} claim=${claim.exists} eligible=${bCancel.eligibleOrders}`);
   }
 
   await clearAll();

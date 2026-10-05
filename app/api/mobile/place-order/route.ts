@@ -14,7 +14,7 @@ import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
 import { isProductVisible } from "@/lib/products/visibility";
 import { resolveCommissionRate } from "@/lib/orderPricing";
-import { evaluateCoupon, normalizeCouponCode, couponRedemptionId } from "@/lib/coupons/couponRules";
+import { evaluateCoupon, normalizeCouponCode, couponRedemptionId, couponFundingStamp } from "@/lib/coupons/couponRules";
 import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
 import { productBasePrice, payableTotal } from "@/lib/pricing/priceRules";
 import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestore";
@@ -679,6 +679,8 @@ export async function POST(request: Request) {
         // engine's names, alongside the commission rate stamped above.
         itemsSubtotal: subtotal,
         discount: discountAmount,
+        // The coupon is YOMICO's cost, not the seller's (H3).
+        ...couponFundingStamp(discountAmount),
         commissionRate,
         commissionAmount: 0,
       });

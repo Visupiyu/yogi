@@ -175,7 +175,7 @@ async function engine(uid: string, orderId: string, projected = false) {
   const order = projected ? { ...o, status: "Delivered", paymentStatus: "Paid", needsReview: false } : o;
   return computeVendorEarningsBreakdown({ vendorUid: uid, orders: [order], itemRequests: irs, legacyReturns: rets, sellerOrders: so ? [so] : [] });
 }
-const FIELDS = ["grossSales", "discountShare", "commission", "sellerDeliveryCharges", "returnDeductions", "returnLogisticsCharges", "adjustedEarnings"] as const;
+const FIELDS = ["grossSales", "discountShare", "yomicoCouponShare", "commission", "sellerDeliveryCharges", "returnDeductions", "returnLogisticsCharges", "adjustedEarnings"] as const;
 function sameAsEngine(figures: any, b: any) { return FIELDS.every((k) => figures?.[k] === b?.[k]); }
 const brief = (s: any) => s?.statement ? `${s.statement.settlementStatus}/${s.statement.basis} ${JSON.stringify(s.statement.figures)}` : `status=${s.status} ${s.error ?? ""}`;
 
@@ -245,9 +245,11 @@ async function main() {
     await confirm(couponOrder); await deliverAndPay(couponOrder);
     const sa = await statement(A, couponOrder);
     const sb = await statement(B, couponOrder);
-    record("5  coupon SAVE10: customer paid 495; A = 300 − 30 − 0 − 27 = 243, B = 250 − 25 − 0 − 22 = 203 (existing split); == engine",
-      sa.statement.customerOrderTotal === 495 && sa.statement.figures.discountShare === 30 && sb.statement.figures.discountShare === 25 &&
-      sa.statement.figures.adjustedEarnings === 243 && sb.statement.figures.adjustedEarnings === 203 &&
+    // H3: the ₹55 coupon is YOMICO-funded — shown per seller (30 / 25) but not deducted.
+    record("5  coupon SAVE10 (H3, YOMICO-funded): customer paid 495; A = 300 − 0 − 0 − 27 = 273, B = 250 − 0 − 0 − 22 = 228; YOMICO coupon share shown 30 / 25, not deducted; == engine",
+      sa.statement.customerOrderTotal === 495 && sa.statement.figures.discountShare === 0 && sb.statement.figures.discountShare === 0 &&
+      Math.abs(sa.statement.figures.yomicoCouponShare - 30) < 1e-9 && Math.abs(sb.statement.figures.yomicoCouponShare - 25) < 1e-9 &&
+      sa.statement.figures.adjustedEarnings === 273 && sb.statement.figures.adjustedEarnings === 228 &&
       sameAsEngine(sa.statement.figures, await engine(A, couponOrder)) && sameAsEngine(sb.statement.figures, await engine(B, couponOrder)),
       `${brief(sa)} | ${brief(sb)}`);
   }
@@ -257,11 +259,14 @@ async function main() {
     await db.collection("itemRequests").add({ orderId: couponOrder, vendorId: A, type: "return", status: "REFUNDED", item: { unitPrice: 300, qty: 1 } });
     const sa = await statement(A, couponOrder);
     const sb = await statement(B, couponOrder);
-    record("6  return of A's item: return deduction 270 (A's net merchandise) shown; A net −27; == engine",
-      sa.statement.figures.returnDeductions === 270 && sa.statement.figures.adjustedEarnings === -27 && sameAsEngine(sa.statement.figures, await engine(A, couponOrder)),
+    // The returned item comes off at the value A was credited (300, pre-coupon),
+    // so A ends exactly where a coupon-free order would: only the delivery
+    // charge (−27). The coupon never turns into a seller loss on a return.
+    record("6  return of A's item (H3): return deduction 300 (A's full credited merchandise) shown; A net −27, same as without a coupon; == engine",
+      sa.statement.figures.returnDeductions === 300 && sa.statement.figures.adjustedEarnings === -27 && sameAsEngine(sa.statement.figures, await engine(A, couponOrder)),
       brief(sa));
-    record("7  delivery charge stays as currently defined after the return (A 27), and B's statement is untouched (203)",
-      sa.statement.figures.sellerDeliveryCharges === 27 && sb.statement.figures.adjustedEarnings === 203 && sb.statement.figures.returnDeductions === 0,
+    record("7  delivery charge stays as currently defined after the return (A 27), and B's statement is untouched (228)",
+      sa.statement.figures.sellerDeliveryCharges === 27 && sb.statement.figures.adjustedEarnings === 228 && sb.statement.figures.returnDeductions === 0,
       `${brief(sa)} | ${brief(sb)}`);
   }
 

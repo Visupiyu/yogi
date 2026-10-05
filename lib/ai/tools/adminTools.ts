@@ -90,6 +90,8 @@ const getVendorPerformance: ToolDefinition = {
       settledOrders: b.eligibleOrders,
       grossSales: b.grossSales,
       sellerDiscountShare: b.discountShare,
+      // H3: YOMICO-funded coupon cost on this seller's items (not deducted).
+      yomicoCouponShare: b.yomicoCouponShare,
       commission: b.commission,
       sellerDeliveryCharges: b.sellerDeliveryCharges,
       returnDeductions: b.returnDeductions,

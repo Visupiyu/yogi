@@ -208,8 +208,18 @@ export type VendorEarningsBreakdown = {
   eligibleOrders: number;
   /** Σ this seller's line price × qty on eligible orders. */
   grossSales: number;
-  /** This seller's proportional share of coupon/reward discounts (existing rule). */
+  /**
+   * The discount this seller BEARS: their proportional share of a coupon on
+   * orders placed before H3 (no couponFundedBy stamp) and of any seller-borne
+   * reward value. 0 for YOMICO-funded coupons and points.
+   */
   discountShare: number;
+  /**
+   * Reporting only, NOT deducted: this seller's share of YOMICO-funded coupons
+   * (orders stamped couponFundedBy "yomico", H3) — the promotion cost YOMICO
+   * absorbed on this seller's items.
+   */
+  yomicoCouponShare: number;
   /** Always 0 — YOMICO charges no commission (lib/commissionPolicy.ts). */
   commission: number;
   /** Forward delivery: this seller's share of each free-delivery order's ONE delivery cost. */
@@ -266,6 +276,7 @@ export function computeVendorEarningsBreakdown(params: {
     eligibleOrders: 0,
     grossSales: 0,
     discountShare: 0,
+    yomicoCouponShare: 0,
     commission: 0,
     sellerDeliveryCharges: 0,
     returnDeductions: 0,
@@ -314,6 +325,7 @@ export function computeVendorEarningsBreakdown(params: {
     b.eligibleOrders += 1;
     b.grossSales += share.vendorRawSubtotal;
     b.discountShare += share.vendorRawSubtotal - share.vendorNetSubtotal;
+    b.yomicoCouponShare += share.yomicoCouponShare;
     b.commission += share.vendorCommission;
 
     const oid = String(order?.id || "");

@@ -101,6 +101,8 @@ const getSellerSales: ToolDefinition = {
       settledOrders: earnings.eligibleOrders,
       grossSales: earnings.grossSales,
       sellerDiscountShare: earnings.discountShare,
+      // H3: YOMICO-funded coupon cost on this seller's items (not deducted).
+      yomicoCouponShare: earnings.yomicoCouponShare,
       commission: earnings.commission,
       sellerDeliveryCharges: earnings.sellerDeliveryCharges,
       returnDeductions: earnings.returnDeductions,

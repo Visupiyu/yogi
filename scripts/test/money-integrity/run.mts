@@ -442,10 +442,12 @@ async function main() {
     await db.collection("orders").doc("pay_money_1").delete();
     await db.collection("orders").doc("pay_money_legacy").delete();
     await codRef.update({ status: "Delivered", paymentStatus: "Paid" });
-    // Hand calc: raw 2000; coupon share 200 x 2000/2000 = 200 -> net 1800;
-    // commission is ₹0 (YOMICO's fixed 0% policy) -> earning 1800; seller bears
-    // the forward delivery cost on a free-delivery order: round(60 x 2000/2000) = 60.
-    const EXPECTED_PAYABLE = 1800 - 0 - 60; // 1740
+    // Hand calc: raw 2000; the ₹200 coupon is YOMICO-funded (H3: the order is
+    // stamped couponFundedBy "yomico"), so it is NOT deducted -> earning 2000,
+    // with a YOMICO coupon share of 200 x 2000/2000 = 200 recorded alongside;
+    // commission is ₹0 (YOMICO's fixed 0% policy); seller bears the forward
+    // delivery cost on a free-delivery order: round(60 x 2000/2000) = 60.
+    const EXPECTED_PAYABLE = 2000 - 0 - 60; // 1940
     const res = await sellerPayable(req("http://x/api/seller/payable", null, SELLER, "GET"));
     const pj = await json(res);
     const share = computeVendorShare({ ...(await codRef.get()).data() } as any, SELLER);
@@ -454,8 +456,9 @@ async function main() {
     old.items = old.items.map(({ qty, ...rest }: any) => rest);
     delete old.itemsSubtotal; delete old.discount; delete old.commissionRate;
     const oldShare = computeVendorShare(old, SELLER);
-    record("T11 seller payable for new mobile order is non-zero and exact (1740 = 1800 - ₹0 commission - 60 delivery); pre-fix shape still 0",
-      res.status === 200 && pj.payable === EXPECTED_PAYABLE && share?.vendorEarning === 1800 && share?.vendorCommission === 0 && oldShare?.vendorEarning === 0,
+    record("T11 seller payable for new mobile order is non-zero and exact (1940 = 2000 - ₹0 commission - 60 delivery; the ₹200 coupon is YOMICO's); pre-fix shape still 0",
+      res.status === 200 && pj.payable === EXPECTED_PAYABLE && share?.vendorEarning === 2000 && share?.yomicoCouponShare === 200 &&
+        share?.vendorCommission === 0 && oldShare?.vendorEarning === 0,
       `route payable=${pj.payable} vendorEarning=${share?.vendorEarning} preFixShapeEarning=${oldShare?.vendorEarning}`);
   }
 
@@ -469,7 +472,7 @@ async function main() {
     let sameShare = true;
     try { assert.deepEqual(adminDashboardShare, sellerShare); } catch { sameShare = false; }
     record("T12 admin dashboard share == seller share; admin payouts earned == seller payable (no commitments)",
-      sameShare && adminPayoutsEarned === sellerPayableCalc && sellerPayableCalc === 1740,
+      sameShare && adminPayoutsEarned === sellerPayableCalc && sellerPayableCalc === 1940,
       `sellerShare=${JSON.stringify(sellerShare)} adminShare=${JSON.stringify(adminDashboardShare)} adminEarned=${adminPayoutsEarned} sellerPayable=${sellerPayableCalc}`);
   }
 

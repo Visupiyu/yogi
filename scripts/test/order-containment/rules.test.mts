@@ -64,6 +64,9 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   }
   await setDoc(doc(f, "deliveryPartners", "dp_h1"), { uid: "rider_h1", name: "Rider" });
   await setDoc(doc(f, "orders", "o_h1_rider"), { ...order, status: "Out For Delivery", deliveryPartnerId: "dp_h1" });
+  // H3 fixtures: a YOMICO-funded coupon order and a legacy (unstamped) coupon order.
+  await setDoc(doc(f, "orders", "o_h3_yomico"), { ...order, discount: 90, couponCode: "SAVE10", couponFundedBy: "yomico" });
+  await setDoc(doc(f, "orders", "o_h3_legacy"), { ...order, discount: 90, couponCode: "SAVE10" });
 });
 
 const Cdb = as(C);
@@ -154,6 +157,17 @@ await check("H1-3 the assigned delivery partner's own status update still works 
   await assertSucceeds(updateDoc(doc(as("rider_h1"), "orders", "o_h1_rider"), {
     status: "Delivered", deliveredAt: serverTimestamp(), updatedAt: serverTimestamp(), deliveryNotes: "Handed over",
   }));
+});
+// ================= H3: who funds the coupon is server-only =================
+await check("H3-R1 admin browser cannot remove, change or add couponFundedBy (it decides the seller's payout)", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_h3_yomico"), { couponFundedBy: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_h3_yomico"), { couponFundedBy: "seller" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_h3_legacy"), { couponFundedBy: "yomico" }));
+});
+await check("H3-R2 other admin edits on a coupon order still work; customer and seller still cannot write the order", async () => {
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_h3_yomico"), { needsReview: false, courierName: "Blue" }));
+  await assertFails(updateDoc(doc(Cdb, "orders", "o_h3_legacy"), { couponFundedBy: "yomico" }));
+  await assertFails(updateDoc(doc(Vdb, "orders", "o_h3_legacy"), { couponFundedBy: "yomico" }));
 });
 {
   const page = fs.readFileSync(path.join(REPO, "app/admin/orders/page.tsx"), "utf8");

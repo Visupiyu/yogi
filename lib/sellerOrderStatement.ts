@@ -30,7 +30,10 @@ export type SellerSettlementStatus =
 
 export type SellerOrderStatementFigures = {
   grossSales: number;
+  /** The discount this seller bears (pre-H3 coupons, seller-borne rewards). */
   discountShare: number;
+  /** Reporting only: this seller's share of a YOMICO-funded coupon — NOT deducted. */
+  yomicoCouponShare: number;
   commission: number;
   sellerDeliveryCharges: number;
   returnDeductions: number;
@@ -148,6 +151,7 @@ export function buildSellerOrderStatement(params: {
     figures: {
       grossSales: b.grossSales,
       discountShare: b.discountShare,
+      yomicoCouponShare: b.yomicoCouponShare,
       commission: b.commission,
       sellerDeliveryCharges: b.sellerDeliveryCharges,
       returnDeductions: b.returnDeductions,

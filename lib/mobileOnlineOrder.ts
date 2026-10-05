@@ -10,7 +10,7 @@ import {
   type FinalizeResult,
 } from "@/lib/onlineOrder";
 import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
-import { couponRedemptionId } from "@/lib/coupons/couponRules";
+import { couponRedemptionId, couponFundingStamp } from "@/lib/coupons/couponRules";
 import {
   planVariantDecrements,
   sumVariantStock,
@@ -384,6 +384,8 @@ export async function finalizeMobileOnlineOrder(params: {
         // nothing to collect on delivery.
         itemsSubtotal: intent.subtotal,
         discount: intent.discountAmount,
+        // The coupon is YOMICO's cost, not the seller's (H3).
+        ...couponFundingStamp(Number(intent.discountAmount) || 0),
         commissionRate,
         commissionAmount: YOMICO_COMMISSION_AMOUNT,
 

@@ -9,6 +9,7 @@ import { isProductVisible } from "@/lib/products/visibility";
 import { mintNumbers } from "@/lib/humanIds";
 import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
 import { isRewardsEligible } from "@/lib/rewards/eligibility";
+import { couponFundingStamp } from "@/lib/coupons/couponRules";
 import {
   REWARD_BALANCE_CHANGED_MESSAGE,
   REWARD_FUNDED_BY_YOMICO,
@@ -481,6 +482,8 @@ export async function POST(request: Request) {
         rewardValue: pricing.rewardValue,
         // Points are YOMICO's cost, not the seller's (computeVendorShare).
         ...(pricing.rewardValue > 0 ? { rewardFundedBy: REWARD_FUNDED_BY_YOMICO } : {}),
+        // The coupon is YOMICO's cost too (H3, lib/coupons/couponRules.ts).
+        ...couponFundingStamp(pricing.couponDiscount),
         createdAt: Timestamp.now(),
         paymentAmount: pricing.finalTotal,
 

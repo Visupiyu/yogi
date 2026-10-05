@@ -524,6 +524,14 @@ service cloud.firestore {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'deliveredAt']);
     }
 
+    // H3: couponFundedBy ("yomico") decides whether a coupon is YOMICO's cost
+    // or the seller's (lib/vendorEarnings#computeVendorShare), so it is written
+    // only by the server order writers (Admin SDK). No browser — admin
+    // included — may set, change or remove it, or move a seller's payout.
+    function orderCouponFundingUnchanged() {
+      return unchanged('couponFundedBy');
+    }
+
     match /orders/{orderId} {
       // isAssignedDeliveryPartner() added here as a genuine bug fix, not
       // scope creep: app/delivery/[id]/page.tsx's loadOrder() has always
@@ -577,7 +585,7 @@ service cloud.firestore {
       // unchanged; only creation moves server-side.
       allow create: if false;
 
-      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged())
+      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged() && orderCouponFundingUnchanged())
         // No customer branch. Cancelling goes through app/api/cancel-order
         // (web and Customer App), which restores stock/sales, reverses reward
         // points and coupons and notifies the seller in one place. A direct

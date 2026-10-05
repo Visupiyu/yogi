@@ -342,9 +342,10 @@ async function main() {
   {
     const o = frac.cod.order;
     const share = computeVendorShare(o, SELLER);
-    record("E14 seller basis stays unrounded: itemsSubtotal 999, discount 99.90, vendor net/earning 899.10 (not 899)",
-      o?.itemsSubtotal === 999 && near(o?.discount, 99.9) && near(share?.vendorNetSubtotal, 899.1) && near(share?.vendorEarning, 899.1),
-      `itemsSubtotal=${o?.itemsSubtotal} discount=${o?.discount} net=${share?.vendorNetSubtotal} earning=${share?.vendorEarning}`);
+    record("E14 seller basis stays unrounded: itemsSubtotal 999, discount 99.90 YOMICO-funded (H3) -> vendor net/earning 999 (not the rounded customer 899), YOMICO coupon share 99.90",
+      o?.itemsSubtotal === 999 && near(o?.discount, 99.9) && o?.couponFundedBy === "yomico" &&
+        near(share?.vendorNetSubtotal, 999) && near(share?.vendorEarning, 999) && near(share?.yomicoCouponShare, 99.9),
+      `itemsSubtotal=${o?.itemsSubtotal} discount=${o?.discount} couponFundedBy=${o?.couponFundedBy} net=${share?.vendorNetSubtotal} earning=${share?.vendorEarning} yomico=${share?.yomicoCouponShare}`);
   }
 
   // ============ F. Cross-path parity ============

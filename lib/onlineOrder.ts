@@ -7,6 +7,7 @@ import { FieldValue, Timestamp, type Transaction } from "firebase-admin/firestor
 import type { OrderPricing } from "@/lib/orderPricing";
 import { pointsHoldRef } from "@/lib/rewards/pointsHold";
 import { REWARD_FUNDED_BY_YOMICO } from "@/lib/rewards/redemption";
+import { couponFundingStamp } from "@/lib/coupons/couponRules";
 import {
   planVariantDecrements,
   sumVariantStock,
@@ -515,9 +516,10 @@ export async function finalizeOnlineOrder(params: {
       // from the constant, never from the intent, so an intent priced under an
       // old setting cannot carry a commission onto the order.
       commission: YOMICO_COMMISSION_AMOUNT,
-      // Whole-order legacy figure; YOMICO funds redeemed points, so they are
-      // added back (computeVendorShare is what payouts actually read).
-      sellerEarning: capturedRupees + pricing.rewardValue,
+      // Whole-order legacy figure; YOMICO funds redeemed points and (H3) the
+      // coupon, so both are added back (computeVendorShare is what payouts
+      // actually read).
+      sellerEarning: capturedRupees + pricing.rewardValue + pricing.couponDiscount,
       commissionRate: YOMICO_COMMISSION_RATE,
       commissionAmount: YOMICO_COMMISSION_AMOUNT,
       couponCode: intent.couponCode || "",
@@ -538,6 +540,8 @@ export async function finalizeOnlineOrder(params: {
       // as rewardShortfall below plus needsReview, not hidden in this field.
       rewardValue: pricing.rewardValue,
       ...(pricing.rewardValue > 0 ? { rewardFundedBy: REWARD_FUNDED_BY_YOMICO } : {}),
+      // The coupon is YOMICO's cost too (H3, lib/coupons/couponRules.ts).
+      ...couponFundingStamp(pricing.couponDiscount),
       createdAt: Timestamp.now(),
 
       // Opts this order into deferred reward crediting, exactly as
