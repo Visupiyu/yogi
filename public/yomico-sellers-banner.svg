@@ -1,0 +1,57 @@
+<svg width="600" height="500" viewBox="0 0 600 500" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Row of independent seller storefronts">
+  <defs>
+    <radialGradient id="sellGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft glow behind the storefronts -->
+  <ellipse cx="300" cy="270" rx="260" ry="190" fill="url(#sellGlow)"/>
+
+  <!-- ground line -->
+  <rect x="40" y="400" width="520" height="10" rx="5" fill="#FFFFFF" opacity="0.6"/>
+
+  <!-- left store (teal awning) -->
+  <g transform="translate(60,230)">
+    <rect x="0" y="40" width="150" height="130" rx="8" fill="#FFFFFF"/>
+    <path d="M-6 40 L156 40 L146 0 L4 0 Z" fill="#0D9488"/>
+    <path d="M-6 40 Q11 62 28 40 Q45 62 62 40 Q79 62 96 40 Q113 62 130 40 Q147 62 156 40 Z" fill="#0F766E"/>
+    <rect x="18" y="80" width="54" height="44" rx="4" fill="#CCFBF1"/>
+    <rect x="90" y="86" width="42" height="84" rx="4" fill="#0D9488" opacity="0.85"/>
+    <circle cx="124" cy="130" r="3" fill="#FFFFFF"/>
+  </g>
+
+  <!-- centre store (orange awning), slightly taller -->
+  <g transform="translate(220,180)">
+    <rect x="0" y="50" width="160" height="170" rx="8" fill="#FFFFFF"/>
+    <path d="M-8 50 L168 50 L156 0 L4 0 Z" fill="#F97316"/>
+    <path d="M-8 50 Q14 76 36 50 Q58 76 80 50 Q102 76 124 50 Q146 76 168 50 Z" fill="#EA580C"/>
+    <rect x="20" y="96" width="120" height="50" rx="4" fill="#FFEDD5"/>
+    <rect x="58" y="156" width="44" height="64" rx="4" fill="#F97316" opacity="0.85"/>
+    <circle cx="94" cy="190" r="3" fill="#FFFFFF"/>
+  </g>
+
+  <!-- right store (yellow awning) -->
+  <g transform="translate(390,230)">
+    <rect x="0" y="40" width="150" height="130" rx="8" fill="#FFFFFF"/>
+    <path d="M-6 40 L156 40 L146 0 L4 0 Z" fill="#FBBF24"/>
+    <path d="M-6 40 Q11 62 28 40 Q45 62 62 40 Q79 62 96 40 Q113 62 130 40 Q147 62 156 40 Z" fill="#F59E0B"/>
+    <rect x="78" y="80" width="54" height="44" rx="4" fill="#FEF3C7"/>
+    <rect x="18" y="86" width="42" height="84" rx="4" fill="#F59E0B" opacity="0.85"/>
+    <circle cx="52" cy="130" r="3" fill="#FFFFFF"/>
+  </g>
+
+  <!-- floating shopping bag -->
+  <g transform="translate(262,58)">
+    <path d="M8 30 L68 30 L74 100 Q74 106 68 106 L8 106 Q2 106 2 100 Z" fill="#FFFFFF"/>
+    <path d="M22 30 C22 12 30 4 38 4 C46 4 54 12 54 30" stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <rect x="22" y="56" width="32" height="6" rx="3" fill="#0D9488"/>
+  </g>
+
+  <!-- small scattered accents -->
+  <circle cx="120" cy="150" r="7" fill="#FBBF24" opacity="0.8"/>
+  <circle cx="480" cy="140" r="6" fill="#FFFFFF" opacity="0.7"/>
+  <circle cx="190" cy="100" r="4" fill="#FFFFFF" opacity="0.6"/>
+  <circle cx="420" cy="90" r="5" fill="#FBBF24" opacity="0.7"/>
+</svg>

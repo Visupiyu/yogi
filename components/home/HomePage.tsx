@@ -97,27 +97,35 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-100 pb-16 md:pb-0">
       <CategoryStrip />
-      <FeatureStrip />
 
       <section className="max-w-7xl mx-auto px-2 py-2">
   <HeroSlider />
 </section>
 
-      {/* Navratri festive banner — reuses the existing reusable PromoBanner
-          component (same one used for the Electronics deals banner further down)
-          instead of a new bespoke banner. Replaces the former 15 August /
-          Independence Day launch banner in this slot. */}
+      {/* After the hero, not before it: on mobile its five cards stack into
+          a ~350px column that pushed the hero's Shop Now below the fold. */}
+      <FeatureStrip />
+
+      {/* Evergreen marketplace banner in the seasonal slot — reuses the
+          existing PromoBanner component (same one used for the Electronics
+          banner further down). Replaced the Navratri banner once that festival
+          ended; /navratri-banner.svg is kept for reuse next season. No offers,
+          discounts or delivery promises: there is no campaign behind this
+          slot, only real destinations — /store (seller directory) and /search
+          with no query (every visible product). */}
       <PromoBanner
-        badge="NAVRATRI SPECIAL"
-        title="Celebrate Navratri with YOMICO"
-        subtitle="Shop festive favourites across the store."
-        image="/navratri-banner.svg"
-        button1="Explore Offers"
+        badge="ONE MARKETPLACE, MANY SELLERS"
+        title="Discover Independent Sellers"
+        subtitle="Browse stores from sellers on YOMICO and shop across categories in one place."
+        image="/yomico-sellers-banner.svg"
+        button1="Browse Stores"
         link1="/store"
+        button2="Shop All Products"
+        link2="/search"
       />
 
-      {/* Coded (no image asset) customer-facing trust/launch banner —
-          reinforces the same 0% commission launch, framed for shoppers. */}
+      {/* Coded (no image asset) customer-facing trust banner — 0% seller
+          commission and seller approval, framed for shoppers. */}
       <LaunchTrustBanner />
 
 <section className="max-w-7xl mx-auto px-2 pb-4">

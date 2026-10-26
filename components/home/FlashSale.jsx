@@ -2,6 +2,12 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import {
+  DEALS_HREF,
+  DEALS_MIN_DISCOUNT,
+  fetchHasQualifyingDeals,
+} from "@/lib/storefront/homeSections";
 
 // The countdown that used to live here was removed, not rebuilt.
 //
@@ -22,11 +28,23 @@ import { motion } from "framer-motion";
 // them and server-side enforcement so the price actually changes at expiry —
 // a feature, not a correction.
 
-// Keep this in step with the seeded filter in app/search/page.jsx. 40% is
-// used because it is the deepest band the catalogue currently fills well.
-const DEALS_HREF = "/search?minDiscount=40";
+// DEALS_HREF / DEALS_MIN_DISCOUNT live in lib/storefront/homeSections.ts. The
+// banner promises "40% or more off MRP", so it only renders when at least one
+// visible product qualifies under the same rule app/search/page.jsx applies
+// for ?minDiscount= (fetchHasQualifyingDeals reads the shared catalog scan
+// HomePage already runs).
 
 export default function FlashSale() {
+  const { data: hasDeals } = useQuery({
+    queryKey: ["best-deals-available", DEALS_MIN_DISCOUNT],
+    queryFn: fetchHasQualifyingDeals,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Hidden while loading, on error and when nothing qualifies — never
+  // advertise deals the linked page cannot show.
+  if (!hasDeals) return null;
+
 return (
     <section className="py-3 px-2">
       <motion.div

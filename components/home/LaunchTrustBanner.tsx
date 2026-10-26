@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { SUPPORT_HOURS_SHORT } from "@/lib/siteConfig";
 
+// Each point is backed by the implementation: Razorpay checkout, the
+// /track-order page, admin vendor approval before listing
+// (app/api/seller/create-product). No delivery speed is promised — there is
+// no delivery-time SLA, only a per-order estimate.
 const TRUST_POINTS = [
-  { icon: "🔒", label: "100% Secure Payments" },
-  { icon: "🚚", label: "Fast Delivery" },
+  { icon: "🔒", label: "Secure Payments" },
+  { icon: "📦", label: "Order Tracking" },
   { icon: "✅", label: "Verified Sellers" },
   // Real availability (lib/siteConfig.ts) — no 24/7 staffed support exists.
   { icon: "🎧", label: SUPPORT_HOURS_SHORT },
@@ -17,7 +21,7 @@ export default function LaunchTrustBanner() {
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-500 via-white to-green-600 shadow-2xl">
         <div className="bg-black/0 px-6 py-8 sm:px-10 sm:py-10">
           <span className="inline-block rounded-full bg-black/80 px-4 py-2 text-sm font-bold text-white shadow-lg">
-            🚀 YOMICO Launch Offer
+            🤝 0% Seller Commission
           </span>
 
           <h2 className="mt-5 max-w-2xl text-3xl font-extrabold leading-tight text-gray-900 md:text-4xl">
@@ -25,8 +29,10 @@ export default function LaunchTrustBanner() {
           </h2>
 
           <p className="mt-4 max-w-xl text-base text-gray-800 md:text-lg">
-            Sellers pay 0% commission during our launch — bringing more
-            sellers and more choices to YOMICO.
+            {/* lib/commissionPolicy.ts: the rate is a fixed 0%, not a
+                time-limited launch offer. */}
+            Sellers pay 0% commission on YOMICO, and every seller is approved
+            by YOMICO before they can list products.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-gray-900">

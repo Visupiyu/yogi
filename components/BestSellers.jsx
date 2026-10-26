@@ -1,36 +1,9 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { isProductVisible } from "@/lib/products/visibility";
+import { fetchBestSellers } from "@/lib/storefront/homeSections";
 import ProductCard from "./ProductCard";
 import { motion } from "framer-motion";
-
-// Was sorting by createdAt (making this a second "New Arrivals" row
-// under a "Best Sellers" heading) even though `sales` is a real,
-// live-tracked field — checkout increments it on every purchase.
-const BEST_SELLERS_LIMIT = 12;
-
-async function fetchBestSellers() {
-  // Over-fetch, then drop products customers must not see (pending review,
-  // rejected, blocked — lib/products/visibility.ts) BEFORE slicing, so the
-  // row still fills when some top sellers are hidden.
-  const q = query(
-    collection(db, "products"),
-    orderBy("sales", "desc"),
-    limit(BEST_SELLERS_LIMIT * 4)
-  );
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs
-    .filter((doc) => isProductVisible(doc.data()))
-    .slice(0, BEST_SELLERS_LIMIT)
-    .map((doc) => ({
-      ...doc.data(),
-      id: doc.id,
-    }));
-}
 
 function ProductSkeleton() {
   return (
@@ -50,6 +23,12 @@ queryFn: fetchBestSellers,
     staleTime: 1000 * 60 * 5,
     retry: 2,
   });
+
+  // Empty (successful) result: hide the section rather than show an empty
+  // "Best Sellers" heading. Loading and error/Retry states are unchanged.
+  if (!isLoading && !error && (!products || products.length === 0)) {
+    return null;
+  }
 
   return (
     <section className="max-w-7xl mx-auto px-2 py-2">
@@ -113,25 +92,7 @@ queryFn: fetchBestSellers,
 ))}
     
         </motion.div>
-      ) : (
-        !error && (
-          <div className="text-center py-10 md:py-16">
-
-  <div className="text-6xl mb-4">
-    🏆
-  </div>
-
-  <h3 className="text-2xl font-bold text-gray-800">
-   No Best Sellers Yet
-  </h3>
-
-  <p className="text-gray-500 mt-2">
-    Top-selling products will appear here as orders come in.
-  </p>
-
-</div>
-        )
-      )}
+      ) : null}
     </section>
   );
 }
