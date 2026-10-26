@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 
 export default function PromoBanner({
 
@@ -30,6 +30,11 @@ export default function PromoBanner({
   link2 = "/store",
 
 }) {
+
+  // prefers-reduced-motion: the image stays still. framer-motion drives this
+  // animation from JavaScript, so a CSS motion-reduce: class cannot stop it;
+  // its own hook reads the same media query. Unchanged for everyone else.
+  const reduceMotion = useReducedMotion();
 
   return (
     <section className="max-w-7xl mx-auto px-2 py-4">
@@ -192,8 +197,8 @@ lg:py-10
   />
 
   <motion.div
-    animate={{ y: [0, -10, 0] }}
-    transition={{
+    animate={reduceMotion ? undefined : { y: [0, -10, 0] }}
+    transition={reduceMotion ? undefined : {
       repeat: Infinity,
       duration: 3,
     }}

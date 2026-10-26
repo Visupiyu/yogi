@@ -4,44 +4,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
-} from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
-import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
-import { toLegacyProduct } from "@/lib/products/legacyDisplay";
-import { isProductVisible } from "@/lib/products/visibility";
+import { fetchCategoryProducts } from "@/lib/storefront/homeSections";
 import ProductImage from "@/components/ProductImage";
-
-async function getProducts(category) {
-
-  const node = findNodeByName(category);
-  if (!node) return [];
-
-  const q = query(
-    collection(db, "products"),
-    isTopLevelCategory(node)
-      ? where("categoryId", "==", node.id)
-      : where("subCategoryId", "==", node.id),
-    orderBy("createdAt", "desc"),
-    // Over-fetch; hidden products (pending/rejected/blocked) are dropped
-    // below BEFORE slicing to the 12 shown.
-    limit(48)
-  );
-
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs
-    .filter((doc) => isProductVisible(doc.data()))
-    .slice(0, 12)
-    .map((doc) => toLegacyProduct(doc.id, doc.data()));
-}
 
 export default function CollectionStrip({
 
@@ -65,7 +29,7 @@ export default function CollectionStrip({
 
     queryKey: ["collection-strip", category],
 
-    queryFn: () => getProducts(category),
+    queryFn: () => fetchCategoryProducts(category, 12),
 
     staleTime: 1000 * 60 * 5,
 

@@ -15,6 +15,12 @@
 //     share one in-flight read, so typing in the Navbar, searching, and the
 //     homepage share one scan instead of repeating it;
 //   * a failed read is never cached and is rethrown so callers can show an error.
+//     Pages are read with getDocsFromServer, not getDocs: with the default memory
+//     cache, getDocs RESOLVES with an empty cached snapshot when the backend is
+//     unreachable or misconfigured, so an outage was cached here for CACHE_MS as
+//     an empty catalogue (search, the Navbar and the homepage all showed "no
+//     products"). getDocsFromServer rejects ("unavailable") instead; every
+//     caller already catches. Tested in scripts/test/home-sections/run.mts.
 //
 // A proper fix at larger catalog sizes is a dedicated search index (Algolia /
 // Typesense / a keyword-token field queried with array-contains) — a separate
@@ -22,7 +28,7 @@
 import {
   collection,
   documentId,
-  getDocs,
+  getDocsFromServer,
   limit,
   orderBy,
   query,
@@ -50,7 +56,7 @@ async function readCatalog(): Promise<CatalogScan> {
   let truncated = false;
 
   for (;;) {
-    const page: QuerySnapshot = await getDocs(
+    const page: QuerySnapshot = await getDocsFromServer(
       cursor
         ? query(collection(db, "products"), orderBy(documentId()), startAfter(cursor), limit(CATALOG_PAGE_SIZE))
         : query(collection(db, "products"), orderBy(documentId()), limit(CATALOG_PAGE_SIZE))

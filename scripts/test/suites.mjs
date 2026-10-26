@@ -23,6 +23,9 @@ export const suites = [
   { name: "observability", file: "scripts/test/observability/run.test.mts", emulators: "" },
   { name: "product-approval-surfaces", file: "scripts/test/product-approval/surfaces.test.mts", ...fs("firestore") },
   { name: "phase6-storefront", file: "scripts/test/phase6/storefront.test.mts", emulators: "" },
+  // Starts and stops its own Firestore emulator (demo-yomico-home): it must see
+  // Firestore go from unreachable to reachable under one client.
+  { name: "home-sections", file: "scripts/test/home-sections/run.mts", emulators: "" },
 
   { name: "admin-access-rules", file: "scripts/test/admin-access/rules.test.mts", ...fs("firestore,storage") },
   { name: "admin-access", file: "scripts/test/admin-access/run.mts", ...fs("firestore"), harness: true },

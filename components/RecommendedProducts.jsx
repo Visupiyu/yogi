@@ -2,19 +2,7 @@
 
 import Link from "next/link";
 import { useQueries } from "@tanstack/react-query";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  orderBy,
-  limit,
-} from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
-import { findNodeByName, isTopLevelCategory } from "@/lib/catalog";
-import { toLegacyProduct } from "@/lib/products/legacyDisplay";
-import { isProductVisible } from "@/lib/products/visibility";
+import { fetchCategoryProducts } from "@/lib/storefront/homeSections";
 import ProductImage from "@/components/ProductImage";
 
 const collections = [
@@ -40,31 +28,6 @@ const collections = [
   },
 ];
 
-async function getCategoryProducts(category) {
-
-  const node = findNodeByName(category);
-  if (!node) return [];
-
-  const q = query(
-    collection(db, "products"),
-    isTopLevelCategory(node)
-      ? where("categoryId", "==", node.id)
-      : where("subCategoryId", "==", node.id),
-    orderBy("createdAt", "desc"),
-    // Over-fetch; hidden products (pending/rejected/blocked) are dropped
-    // below BEFORE slicing to the 4 shown.
-    limit(16)
-  );
-
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs
-    .filter((doc) => isProductVisible(doc.data()))
-    .slice(0, 4)
-    .map((doc) => toLegacyProduct(doc.id, doc.data()));
-
-}
-
 export default function RecommendedProducts() {
 
   const queries = useQueries({
@@ -73,7 +36,7 @@ export default function RecommendedProducts() {
 
       queryKey: ["recommended", item.category],
 
-      queryFn: () => getCategoryProducts(item.category),
+      queryFn: () => fetchCategoryProducts(item.category, 4),
 
       staleTime: 1000 * 60 * 5,
 
@@ -171,6 +134,10 @@ export default function RecommendedProducts() {
 
   }
 
+  // Nothing to recommend in any category: hide the section instead of four
+  // empty cards under "Recommended For You".
+  if (queries.every((q) => (q.data || []).length === 0)) return null;
+
   return (
     <section className="max-w-7xl mx-auto px-2 py-4">
 
@@ -183,6 +150,7 @@ export default function RecommendedProducts() {
     {collections.map((item, index) => {
 
       const products = queries[index].data || [];
+      if (products.length === 0) return null;
 
       return (
 

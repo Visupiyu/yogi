@@ -4,50 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import {
-  collection,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { isProductVisible } from "@/lib/products/visibility";
-
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  stock: number;
-  vendorId?: string;
-};
-
-const FEATURED_LIMIT = 8;
-// Candidate pool for the fallback ranking below — bounded regardless of
-// catalog size, and large enough to have real active/in-stock products
-// left after filtering.
-const FALLBACK_CANDIDATE_LIMIT = 30;
-
-function toProduct(doc: any): Product {
-  const data = doc.data();
-  return {
-    id: doc.id,
-    name: data.shortTitle || data.title || data.name || "",
-    price: Number(
-      data.sellingPrice ??
-      data.price ??
-      0
-    ),
-    image:
-      data.thumbnail ||
-      data.images?.[0] ||
-      data.image ||
-      "",
-    stock: Number(data.stock || 0),
-    vendorId: data.vendorId,
-  };
-}
+  fetchFeaturedProducts,
+  type FeaturedProduct as Product,
+} from "@/lib/storefront/homeSections";
 
 export default function FeaturedProducts() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -62,60 +21,10 @@ export default function FeaturedProducts() {
     setLoading(true);
     setError(false);
     try {
-      // Admin-curated Featured products always take priority — set via
-      // the real ★ Featured toggle in app/admin/products, untouched here.
-      const featuredQuery = query(
-        collection(db, "products"),
-        where("featured", "==", true),
-        limit(FEATURED_LIMIT * 4)
-      );
-      const featuredSnapshot = await getDocs(featuredQuery);
-
-      // A featured product that is pending review, rejected or blocked is
-      // never shown (lib/products/visibility.ts); filtered before slicing.
-      const featuredVisible = featuredSnapshot.docs
-        .filter((doc) => isProductVisible(doc.data()))
-        .slice(0, FEATURED_LIMIT);
-
-      if (featuredVisible.length > 0) {
-        setProducts(featuredVisible.map(toProduct));
-        return;
-      }
-
-      // No product has ever been marked Featured yet — rather than show
-      // an empty section, fall back to the best-performing active,
-      // in-stock products. Single-field orderBy (same shape as
-      // BestSellers.jsx's orderBy("sales","desc")) needs no new composite
-      // index; the active/in-stock filter and the views/rating blend into
-      // the ranking both happen client-side after the fetch instead, so
-      // this stays compatible with the indexes already deployed. The
-      // moment an admin marks a real product Featured, this whole branch
-      // stops running.
-      const fallbackQuery = query(
-        collection(db, "products"),
-        orderBy("sales", "desc"),
-        limit(FALLBACK_CANDIDATE_LIMIT)
-      );
-      const fallbackSnapshot = await getDocs(fallbackQuery);
-
-      const ranked = fallbackSnapshot.docs
-        .filter((doc) => {
-          const data = doc.data();
-          return isProductVisible(data) && Number(data.stock || 0) > 0;
-        })
-        .map((doc) => {
-          const data = doc.data();
-          const score =
-            Number(data.sales || 0) * 3 +
-            Number(data.views || 0) +
-            Number(data.rating || 0) * 10;
-          return { doc, score };
-        })
-        .sort((a, b) => b.score - a.score)
-        .slice(0, FEATURED_LIMIT)
-        .map(({ doc }) => toProduct(doc));
-
-      setProducts(ranked);
+      // Featured first, else a best-performing fallback; reads the server, so
+      // an unreachable backend lands in the error/Retry state below
+      // (lib/storefront/homeSections.ts).
+      setProducts(await fetchFeaturedProducts());
     } catch (err) {
       console.error(err);
       setError(true);
@@ -127,6 +36,10 @@ export default function FeaturedProducts() {
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  // Empty (successful) result: hide the section rather than a "Featured
+  // Products" heading over "No Featured Products Found".
+  if (!loading && !error && products.length === 0) return null;
 
   return (
     <section className="py-2 px-2">
@@ -169,10 +82,6 @@ export default function FeaturedProducts() {
             >
               Retry
             </button>
-          </div>
-        ) : products.length === 0 ? (
-          <div className="text-center py-6 text-gray-500">
-            No Featured Products Found
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">

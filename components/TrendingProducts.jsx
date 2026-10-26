@@ -3,39 +3,8 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import {
-  collection,
-  getDocs,
-  query,
-  orderBy,
-  limit,
-} from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
-import { isProductVisible } from "@/lib/products/visibility";
+import { fetchTrendingProducts } from "@/lib/storefront/homeSections";
 import ProductImage from "@/components/ProductImage";
-
-const TRENDING_LIMIT = 8;
-
-async function fetchTrendingProducts() {
-  // Over-fetch and filter hidden products (lib/products/visibility.ts)
-  // BEFORE slicing to the display size.
-  const q = query(
-    collection(db, "products"),
-    orderBy("views", "desc"),
-    limit(TRENDING_LIMIT * 4)
-  );
-
-  const snapshot = await getDocs(q);
-
-  return snapshot.docs
-    .filter((doc) => isProductVisible(doc.data()))
-    .slice(0, TRENDING_LIMIT)
-    .map((doc) => ({
-      ...doc.data(),
-      id: doc.id,
-    }));
-}
 
 function ProductSkeleton() {
   return (
@@ -60,6 +29,13 @@ export default function TrendingProducts() {
     staleTime: 1000 * 60 * 5,
     retry: 2,
   });
+
+  // A successful but empty result hides the whole section (as CollectionStrip
+  // does) rather than showing an empty "Trending" shelf; loading skeletons and
+  // the error/Retry state below are unchanged.
+  if (!isLoading && !error && (!products || products.length === 0)) {
+    return null;
+  }
 
   return (
     <section className="max-w-7xl mx-auto px-2 py-5">
@@ -222,23 +198,6 @@ export default function TrendingProducts() {
               </Link>
             ))}
           </motion.div>
-        )}
-
-      {/* EMPTY */}
-      {!isLoading &&
-        !error &&
-        (!products || products.length === 0) && (
-          <div className="text-center py-10 bg-gray-50 rounded-3xl">
-            <div className="text-4xl mb-2">🔥</div>
-
-            <h3 className="font-semibold text-gray-800">
-              No Trending Products Yet
-            </h3>
-
-            <p className="text-sm text-gray-500 mt-1">
-              Products will appear here as customers explore them.
-            </p>
-          </div>
         )}
 
       {/* MOBILE VIEW ALL */}
