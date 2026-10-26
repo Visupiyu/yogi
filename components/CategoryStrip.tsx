@@ -24,7 +24,11 @@ const categories = [
 export default function CategoryStrip() {
   return (
     <section className="bg-gradient-to-r from-green-50 via-white to-blue-50 border-b border-gray-200">
-      <div className="flex items-center justify-center gap-4 py-4 overflow-x-auto scrollbar-hide">
+      {/* justify-center-safe, not justify-center: a centred row that is wider
+          than the screen overflows on BOTH sides, and the left overflow can't
+          be scrolled to — on mobile the first categories were unreachable.
+          "safe" centres only when the row fits, otherwise starts at the left. */}
+      <div className="flex items-center justify-center-safe gap-4 px-4 py-4 overflow-x-auto scrollbar-hide">
         {categories.map((cat) => (
           <motion.div
             key={cat.name}

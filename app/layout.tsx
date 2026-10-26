@@ -24,7 +24,9 @@ export const metadata: Metadata = {
     template: "%s | YOMICO",
   },
   description:
-"Shop groceries, electronics, fashion, beauty, furniture, home essentials and more from trusted sellers across India with fast delivery and secure payments.",
+// No delivery-speed promise: orders carry an estimated delivery window, not a
+// guaranteed fast delivery. Category-neutral so it stays true as the catalogue changes.
+"Shop products across categories from independent, YOMICO-approved sellers in one online marketplace, with secure payments and order tracking.",
   keywords: [
     "YOMICO",
     "Yomico",

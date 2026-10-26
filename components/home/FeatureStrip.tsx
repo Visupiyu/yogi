@@ -8,17 +8,25 @@ import {
   Headphones,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { FREE_SHIPPING_THRESHOLD, getShippingSettings } from "@/lib/shipping";
 
-const features = [
+// Each line here must match what the code actually does — see the comment on
+// each entry for where it is enforced.
+const buildFeatures = (freeShippingThreshold: number) => [
   {
+    // The configured threshold (settings/global, the same cached read
+    // TopStrip, cart and checkout use) — never a hard-coded amount.
     title: "🚚 FREE DELIVERY",
-    subtitle: "Above ₹499",
+    subtitle: `Above ₹${freeShippingThreshold}`,
     icon: Truck,
     bg: "bg-gradient-to-r from-green-500 to-emerald-700",
   },
   {
+    // Online payments run through Razorpay's checkout; YOMICO never handles
+    // card details. No "100%" guarantee is implied.
     title: "💳 SECURE PAYMENT",
-    subtitle: "100% Protected",
+    subtitle: "Online payments by Razorpay",
     icon: ShieldCheck,
     bg: "bg-gradient-to-r from-blue-500 to-indigo-700",
   },
@@ -33,8 +41,11 @@ const features = [
     bg: "bg-gradient-to-r from-orange-500 to-red-600",
   },
   {
-    title: "⭐ PREMIUM QUALITY",
-    subtitle: "Top Brands",
+    // Only admin-Approved vendors may list (enforced server-side in
+    // app/api/seller/create-product). There is no brand verification, so
+    // this no longer claims "Premium Quality / Top Brands".
+    title: "✅ VERIFIED SELLERS",
+    subtitle: "Approved by YOMICO",
     icon: BadgeCheck,
     bg: "bg-gradient-to-r from-purple-500 to-pink-600",
   },
@@ -48,6 +59,18 @@ const features = [
 ];
 
 export default function FeatureStrip() {
+  const [freeShippingThreshold, setFreeShippingThreshold] = useState(
+    FREE_SHIPPING_THRESHOLD
+  );
+
+  useEffect(() => {
+    getShippingSettings().then((settings) =>
+      setFreeShippingThreshold(settings.freeShippingThreshold)
+    );
+  }, []);
+
+  const features = buildFeatures(freeShippingThreshold);
+
   return (
     <section className="bg-white py-3 border-b">
       

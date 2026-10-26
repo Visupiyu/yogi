@@ -3,19 +3,26 @@
 import Link from "next/link";
 import { PRODUCT_IMAGE_PLACEHOLDER } from "@/lib/productImage";
 
+// Category shortcuts, not promotions. There is no sale, deal or time-limited
+// offer data model behind these cards (see FlashSale.jsx), and nothing
+// guarantees any Mobiles product is discounted, so they carry no "% OFF",
+// "HOT DEAL", "LIMITED OFFER" or "SAVE BIG" claims. The real discount
+// filter lives in the Best Deals banner (/search?minDiscount=…).
 const offers = [
   {
-    title: "Latest Smartphones",
-    subtitle: "Up to 40% OFF",
-    badge: "🔥 HOT DEAL",
+    title: "Mobiles",
+    subtitle: "Browse phones from sellers on YOMICO",
+    badge: "📱 MOBILES",
     image: "/offers/mobiles.jpg",
     link: "/category/Mobiles",
   },
   {
-    title: "Smart Home Appliances",
+    title: "Home Appliances",
     subtitle: "Modern Living Starts Here",
-    badge: "⚡ LIMITED OFFER",
-    image: "/offers/appliances.jpg",
+    badge: "🏠 APPLIANCES",
+    // Not /offers/appliances.jpg: that artwork has an "UP TO 30% OFF" badge
+    // baked into the image. This existing asset carries no text.
+    image: "/banners/electronics-banner1.png.jpg",
     link: "/category/Appliances",
   },
 ];
@@ -52,9 +59,6 @@ export default function OfferCards() {
               <span className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-500 hover:to-blue-500 text-white px-5 py-3 rounded-xl font-semibold w-fit shadow-lg transition">
   Shop Now →
 </span>
-<div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-  SAVE BIG
-</div>
             </div>
           </div>
         </Link>

@@ -31,7 +31,7 @@ export default function Footer() {
   className="h-24 sm:h-28 md:h-28 w-auto object-contain"
 />
           <p className="text-gray-600 leading-7 mt-3">
-  India's Trusted Multi-Vendor Marketplace.
+  A multi-vendor marketplace connecting customers with independent sellers.
   <br />
   Shop groceries, fashion, electronics,
   beauty and much more from trusted sellers.
@@ -115,7 +115,8 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-gray-700">
           <div className="flex items-center justify-center gap-2">
   <Truck size={18} className="text-green-600" />
-  Fast Delivery
+  {/* No delivery-time SLA exists, so no speed is promised; /track-order is real. */}
+  Order Tracking
 </div>
 
 <div className="flex items-center justify-center gap-2">

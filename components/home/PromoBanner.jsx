@@ -10,28 +10,29 @@ export default function PromoBanner({
   // behind this banner, so it must not promise a % off or a time limit.
   badge = "⚡ ELECTRONICS",
 
-  title = "Electronics Deals",
+  // No electronics discount data exists either, so no "deals" wording.
+  title = "Shop Electronics",
 
   subtitle =
-    "Shop great deals on smartphones, laptops, accessories & more.",
+    "Browse electronics from sellers on YOMICO.",
 
   image = "/banners/electronics-banner.png",
 
   button1 = "Shop Collection",
 
-  button2 = "View Offers",
+  button2 = "Browse Stores",
 
   link1 = "/category/Electronics",
 
   // No dedicated offers/deals page exists anywhere in the app — /offers
-  // 404'd. /store is the same general "browse everything" destination
-  // already used for "View All" elsewhere on the homepage.
+  // 404'd — so the second button is labelled for what /store actually is:
+  // the directory of approved seller stores.
   link2 = "/store",
 
 }) {
 
   return (
-    <section className="max-w-7xl mx-auto px-4 py-8">
+    <section className="max-w-7xl mx-auto px-2 py-4">
 
   <div
     className="
@@ -60,10 +61,13 @@ export default function PromoBanner({
 relative
 grid
 grid-cols-1
-lg:grid-cols-2
+md:grid-cols-2
+md:gap-6
 items-center
-px-8
-py-8
+px-5
+py-6
+sm:px-8
+sm:py-8
 lg:px-12
 lg:py-10
 "
@@ -78,10 +82,13 @@ lg:py-10
           inline-block
           bg-yellow-400
           text-black
-          px-4
-          py-2
+          px-3
+          py-1.5
+          sm:px-4
+          sm:py-2
           rounded-full
-          text-sm
+          text-xs
+          sm:text-sm
           font-bold
           shadow-lg
           "
@@ -91,9 +98,11 @@ lg:py-10
 
         <h2
           className="
-          mt-5
-          text-4xl md:text-5xl xl:text-6xl
+          mt-4
+          sm:mt-5
+          text-3xl sm:text-4xl lg:text-5xl
           font-extrabold
+          text-balance
           text-white
           leading-tight
           "
@@ -103,22 +112,28 @@ lg:py-10
 
         <p
           className="
-          mt-5
+          mt-3
+          sm:mt-4
           text-white/90
-          text-lg
+          text-base
+          sm:text-lg
           max-w-xl
           "
         >
           {subtitle}
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-4">
+        <div className="mt-6 sm:mt-8 flex flex-wrap gap-3 sm:gap-4">
 
           <Link
             href={link1}
             className="
-            px-7
-            py-3
+            inline-flex
+            min-h-11
+            items-center
+            px-5
+            sm:px-7
+            py-2.5
             rounded-2xl
             bg-white
             text-blue-700
@@ -133,8 +148,12 @@ lg:py-10
           <Link
             href={link2}
             className="
-            px-7
-            py-3
+            inline-flex
+            min-h-11
+            items-center
+            px-5
+            sm:px-7
+            py-2.5
             rounded-2xl
             border-2
             border-white
@@ -151,22 +170,21 @@ lg:py-10
         </div>
 
       </div>
-      <div className="mt-8 flex flex-wrap gap-5 text-white text-sm font-medium">
-
-  </div>
 </div>
 
       {/* RIGHT */}
 
-<div className="relative flex justify-center items-center">
+<div className="relative mt-6 md:mt-0 flex justify-center items-center">
 
   {/* Glow */}
 
   <div
     className="
     absolute
-    w-72
-    h-72
+    w-48
+    h-48
+    sm:w-72
+    sm:h-72
     rounded-full
     bg-white/20
     blur-3xl
@@ -179,14 +197,14 @@ lg:py-10
       repeat: Infinity,
       duration: 3,
     }}
-    className="relative w-full h-[280px] lg:h-[320px]"
+    className="relative w-full h-[170px] sm:h-[220px] md:h-[260px] lg:h-[300px]"
   >
 
     <Image
       src={image}
       alt={title}
       fill
-      sizes="(max-width:1024px) 100vw, 50vw"
+      sizes="(max-width:768px) 100vw, 50vw"
       className="object-contain object-center"
       priority
     />
