@@ -107,11 +107,12 @@ export default function Home() {
           component (same one used for the Electronics deals banner further down)
           instead of a new bespoke banner. Replaces the former 15 August /
           Independence Day launch banner in this slot. */}
+      {/* Diwali festive banner */}
       <PromoBanner
-        badge="NAVRATRI SPECIAL"
-        title="Celebrate Navratri with YOMICO"
+        badge="DIWALI SPECIAL"
+        title="Celebrate Diwali with YOMICO"
         subtitle="Shop festive favourites across the store."
-        image="/navratri-banner.svg"
+        image="/diwali-artwork.png"
         button1="Explore Offers"
         link1="/store"
       />
