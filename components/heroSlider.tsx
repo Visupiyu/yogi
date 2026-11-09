@@ -6,14 +6,14 @@ import { motion } from "framer-motion";
 
 export default function HeroSlider() {
   return (
-    <div className="relative w-full aspect-[2/1] min-h-[220px] max-h-[420px] overflow-hidden rounded-2xl bg-[#fff8e9]">
+    <div className="relative w-full aspect-[3/1] min-h-[220px] max-h-[420px] overflow-hidden rounded-2xl bg-[#fff8e9]">
       <Image
         src="/gujarati-new-year-2083.png"
-        alt="Nutan Varshabhinandan! Sal Mubarak 2083"
+        alt="Nutan Varshabhinandan 2083 – YOMICO"
         fill
         priority
-        sizes="(max-width: 768px) 100vw, 1152px"
-        className="object-contain"
+        sizes="100vw"
+        className="object-cover object-center"
       />
 
       <motion.div
