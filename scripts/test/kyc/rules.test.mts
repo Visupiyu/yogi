@@ -135,6 +135,8 @@ await check("7  vendor KYC: another user CANNOT write into the owner's folder", 
   assertFails(storageAs("bob").ref("vendor-kyc/vendorV/evil.pdf").put(tiny, PDF)));
 await check("8  vendor KYC: invalid file type still refused", () =>
   assertFails(vendor().ref("vendor-kyc/vendorV/x.txt").put(tiny, { contentType: "text/plain" })));
+await check("8b vendor KYC: SVG uploads refused", () =>
+  assertFails(vendor().ref("vendor-kyc/vendorV/x.svg").put(tiny, { contentType: "image/svg+xml" })));
 await check("9  vendor KYC: file of 10MB or more still refused", () =>
   assertFails(vendor().ref("vendor-kyc/vendorV/big.pdf").put(OVER_10MB, PDF)));
 await check("9b vendor KYC: admin write access not broadened (cannot overwrite or delete)", async () => {
@@ -161,6 +163,8 @@ await check("16 delivery KYC: unrelated user CANNOT write into the owner's folde
   assertFails(storageAs("bob").ref("delivery-kyc/riderK/evil.pdf").put(tiny, PDF)));
 await check("17 delivery KYC: invalid file type still refused", () =>
   assertFails(rider().ref("delivery-kyc/riderK/x.txt").put(tiny, { contentType: "text/plain" })));
+await check("17b delivery KYC: SVG uploads refused", () =>
+  assertFails(rider().ref("delivery-kyc/riderK/x.svg").put(tiny, { contentType: "image/svg+xml" })));
 await check("18 delivery KYC: file of 10MB or more still refused", () =>
   assertFails(rider().ref("delivery-kyc/riderK/big.pdf").put(OVER_10MB, PDF)));
 

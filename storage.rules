@@ -77,7 +77,8 @@ service firebase.storage {
 
     // KYC legitimately includes PDFs, unlike the image-only paths below.
     function isKycDocument() {
-      return request.resource.contentType.matches('image/.*')
+      return request.resource.contentType == 'image/jpeg'
+        || request.resource.contentType == 'image/png'
         || request.resource.contentType == 'application/pdf';
     }
 

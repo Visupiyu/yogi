@@ -90,8 +90,9 @@ export default function SellerKycPage() {
     setFormError(null);
     for (const [key, file] of Object.entries(files) as [KycDocument, File][]) {
       if (file.size >= MAX_DOC_BYTES) { setFormError(`${DOC_LABELS[key]}: the file must be smaller than 10 MB.`); return; }
-      if (!(file.type.startsWith("image/") || file.type === "application/pdf")) {
-        setFormError(`${DOC_LABELS[key]}: upload an image or a PDF.`);
+      if (!["image/jpeg", "image/png", "application/pdf"].includes(file.type)
+        || !/\.(jpe?g|png|pdf)$/i.test(file.name)) {
+        setFormError(`${DOC_LABELS[key]}: upload a JPEG, PNG or PDF.`);
         return;
       }
     }
@@ -191,7 +192,7 @@ export default function SellerKycPage() {
               </span>
               <input
                 type="file"
-                accept="image/*,application/pdf"
+                accept="image/jpeg,image/png,application/pdf"
                 className="mt-2 block w-full text-sm"
                 onChange={(e) => {
                   const file = e.target.files?.[0];

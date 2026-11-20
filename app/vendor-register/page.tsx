@@ -312,6 +312,25 @@ export default function VendorRegisterPage() {
       return;
     }
 
+    const allowedKycTypes = new Set(["image/jpeg", "image/png", "application/pdf"]);
+    const allowedKycExtensions = /\.(jpe?g|png|pdf)$/i;
+    const maxKycBytes = 10 * 1024 * 1024;
+    for (const [label, file] of [
+      ["GST certificate", gstDoc],
+      ["Aadhaar Card", aadhaarDoc],
+      ["Cancelled Cheque", chequeDoc],
+    ] as const) {
+      if (!file) continue;
+      if (!allowedKycTypes.has(file.type) || !allowedKycExtensions.test(file.name)) {
+        alert(label + ": only JPEG, PNG or PDF files are allowed.");
+        return;
+      }
+      if (file.size >= maxKycBytes) {
+        alert(label + ": the file must be smaller than 10 MB.");
+        return;
+      }
+    }
+
     if (!aadhaarDoc || !chequeDoc) {
       alert(
         "Please upload your Aadhaar Card and Cancelled Cheque for KYC verification."
@@ -1734,7 +1753,7 @@ function FileUploadCard({
 
         <input
           type="file"
-          accept="image/*,application/pdf"
+          accept="image/jpeg,image/png,application/pdf"
           className="hidden"
           onChange={(e) =>
             onChange(
