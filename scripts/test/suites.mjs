@@ -77,6 +77,7 @@ export const suites = [
   { name: "withdrawals-rules", file: "scripts/test/withdrawals/rules.test.mts", ...fs("firestore") },
   { name: "withdrawals", file: "scripts/test/withdrawals/run.mts", ...fs("firestore"), harness: true },
   { name: "security-audit", file: "scripts/test/security-audit/run.mts", ...fs("firestore") },
+  { name: "ops-suppress-profile", file: "scripts/test/ops-suppress-profile/run.mts", ...fs("firestore") },
 ];
 
 /** Suites deliberately not run. Each must say why. */
@@ -90,6 +91,11 @@ export const excluded = [
     name: "security-audit/data-health-report",
     file: "scripts/test/security-audit/data-health-report.ts",
     reason: "Operator tool, not a test: the read-only D1–D7 data-health audit (ALLOW_PRODUCTION=yes + a Datastore Viewer key). Never run in CI; tested by security-audit.",
+  },
+  {
+    name: "ops/suppress-orphan-public-profile",
+    file: "scripts/ops/suppress-orphan-public-profile.ts",
+    reason: "Operator tool, not a test: suppresses ONE orphan vendors_public profile (emulator-only in this build; production disabled). Never run in CI; tested by ops-suppress-profile.",
   },
 ];
 
