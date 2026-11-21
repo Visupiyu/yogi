@@ -76,6 +76,7 @@ export const suites = [
   { name: "vendor-payout", file: "scripts/test/vendor-payout/run.mts", ...fs("firestore"), harness: true },
   { name: "withdrawals-rules", file: "scripts/test/withdrawals/rules.test.mts", ...fs("firestore") },
   { name: "withdrawals", file: "scripts/test/withdrawals/run.mts", ...fs("firestore"), harness: true },
+  { name: "security-audit", file: "scripts/test/security-audit/run.mts", ...fs("firestore") },
 ];
 
 /** Suites deliberately not run. Each must say why. */
@@ -84,6 +85,11 @@ export const excluded = [
     name: "reconciliation/orphan-orders-report",
     file: "scripts/test/reconciliation/orphan-orders-report.ts",
     reason: "Operator tool, not a test: a read-only report against a real project (ALLOW_PRODUCTION=yes). Never run in CI.",
+  },
+  {
+    name: "security-audit/data-health-report",
+    file: "scripts/test/security-audit/data-health-report.ts",
+    reason: "Operator tool, not a test: the read-only D1–D7 data-health audit (ALLOW_PRODUCTION=yes + a Datastore Viewer key). Never run in CI; tested by security-audit.",
   },
 ];
 
