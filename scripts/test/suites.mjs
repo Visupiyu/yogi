@@ -78,6 +78,7 @@ export const suites = [
   { name: "withdrawals", file: "scripts/test/withdrawals/run.mts", ...fs("firestore"), harness: true },
   { name: "security-audit", file: "scripts/test/security-audit/run.mts", ...fs("firestore") },
   { name: "ops-suppress-profile", file: "scripts/test/ops-suppress-profile/run.mts", ...fs("firestore") },
+  { name: "moderation-notice", file: "scripts/test/moderation-notice/run.mts", ...fs("firestore") },
 ];
 
 /** Suites deliberately not run. Each must say why. */

@@ -1,9 +1,11 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { getAdminDb } from "@/lib/firebaseAdmin";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { planModeration, type ModerationAction } from "@/lib/products/moderation";
 import { productModerationStatus } from "@/lib/products/visibility";
+import { findUnapprovedSellers } from "@/lib/sellerApproval";
+import { rejectionNoticeFor } from "@/lib/products/rejectionNotice";
 
 // ---------------------------------------------------------------------------
 // ADMIN product moderation: approve / reject / block / unblock.
@@ -20,7 +22,10 @@ import { productModerationStatus } from "@/lib/products/visibility";
 // moderatedAt, moderatedBy (and archived:false when an admin rejects or
 // blocks a product the seller had archived). Inside a transaction, so the
 // transition is validated against the product's current state. The same
-// transaction appends an audit_logs entry and notifies the seller.
+// transaction appends an audit_logs entry and notifies the seller. A
+// rejection notice offers "edit and resubmit" only to a seller who can
+// actually resubmit (sellerCanResubmit below); everyone else is told the
+// listing is hidden pending seller verification.
 //
 // A product the seller resubmitted after rejection (app/api/seller/
 // product-status) is simply "pending" again, so approve/reject apply to it
@@ -34,15 +39,33 @@ type Outcome =
   | { kind: "ok"; from: string; to: string }
   | { kind: "error"; status: number; error: string };
 
-function sellerNotice(action: ModerationAction, title: string, reason: string | null) {
+/**
+ * Whether the rejected product's seller can actually resubmit it — i.e. passes
+ * the shared seller-approval model (lib/sellerApproval) AND has the uid-keyed
+ * vendors record with status "Approved" that app/api/seller/product-status
+ * requires. Read inside the moderation transaction, before any write. Any
+ * failure or ambiguity answers false, so the notice never promises a
+ * resubmission the seller cannot make.
+ */
+async function sellerCanResubmit(db: Firestore, tx: Transaction, vendorId: unknown): Promise<boolean> {
+  if (typeof vendorId !== "string" || !vendorId) return false;
+  try {
+    const [unapproved, byUid] = await Promise.all([
+      findUnapprovedSellers(db, [vendorId], tx),
+      tx.get(db.collection("vendors").where("uid", "==", vendorId).limit(1)),
+    ]);
+    return unapproved.length === 0 && !byUid.empty && byUid.docs[0].data()?.status === "Approved";
+  } catch {
+    return false;
+  }
+}
+
+function sellerNotice(action: ModerationAction, title: string, reason: string | null, canResubmit: boolean) {
   switch (action) {
     case "approve":
       return { title: "Product approved", message: `"${title}" was approved and is now live.` };
     case "reject":
-      return {
-        title: "Product rejected",
-        message: `"${title}" was not approved.${reason ? ` Reason: ${reason}` : ""} You can edit it and resubmit it for review.`,
-      };
+      return rejectionNoticeFor({ title, reason, sellerCanResubmit: canResubmit });
     case "block":
       return { title: "Product blocked", message: `"${title}" has been taken off sale by YOMICO.` };
     case "unblock":
@@ -109,6 +132,8 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         return { kind: "error", status: plan.status, error: plan.error };
       }
       const action = body.action as ModerationAction;
+      // Notification wording only (reject): still a READ, still before any write.
+      const canResubmit = action === "reject" ? await sellerCanResubmit(db, tx, product.vendorId) : false;
       const now = Timestamp.now();
 
       tx.update(ref, {
@@ -140,7 +165,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       // app/seller/notifications and NotificationsPanel query).
       if (typeof product.vendorId === "string" && product.vendorId) {
         tx.set(db.collection("notifications").doc(), {
-          ...sellerNotice(action, title, plan.changes.rejectionReason),
+          ...sellerNotice(action, title, plan.changes.rejectionReason, canResubmit),
           userId: product.vendorId,
           role: "seller",
           type: "vendor",
