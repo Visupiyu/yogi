@@ -26,7 +26,100 @@ type Product = {
   moderation: ModerationStatus;
   rejectionReason?: string | null;
   featured?: boolean;
+  /** Display only — never an identifier. The document id is the identity. */
+  productNumber?: string | null;
 };
+
+// ---------------------------------------------------------------------------
+// Exact-identity safety. The Firestore document id is the ONLY identity an
+// admin confirms against: names, vendor names and product numbers are
+// seller-written or optional and can collide. Risky actions require typing
+// the last characters of the exact id of the card the button belongs to.
+// ---------------------------------------------------------------------------
+
+/** Suggested wording for unverified legacy listings — shown as help text, never pre-filled. */
+const NEUTRAL_REJECTION_REASON =
+  "This listing could not be linked to an approved seller account and is hidden pending verification.";
+
+const CONFIRM_CODE_LENGTH = 6;
+
+/** The confirmation code for a document id: its last 6 characters (the whole id if shorter). */
+function confirmationCodeFor(id: string): string {
+  return id.length <= CONFIRM_CODE_LENGTH ? id : id.slice(-CONFIRM_CODE_LENGTH);
+}
+
+/**
+ * Untrusted text (a product name) shown inside a confirmation dialog: control
+ * characters and line breaks are flattened so a crafted name cannot fake an
+ * extra "Document ID:" line, and it is length-capped.
+ */
+function dialogSafe(text: string): string {
+  const flat = String(text).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ").trim();
+  return flat.length > 80 ? `${flat.slice(0, 80)}…` : flat;
+}
+
+/** Document ids normally use only these characters. */
+const ORDINARY_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function hasUnusualIdChars(id: string): boolean {
+  return !ORDINARY_ID_PATTERN.test(id);
+}
+
+/**
+ * DISPLAY ONLY: every character outside [A-Za-z0-9_-] as \u{hex}, so
+ * invisible, look-alike or direction-control characters become visible.
+ * Never used for targeting, requests or confirmation checks — those always
+ * use the raw product.id.
+ */
+function visibleIdForm(id: string): string {
+  return Array.from(id)
+    .map((ch) => (/^[A-Za-z0-9_-]$/.test(ch) ? ch : `\\u{${ch.codePointAt(0)!.toString(16)}}`))
+    .join("");
+}
+
+/** A search term that should be treated as a document id, never as name/vendor text. */
+function looksLikeDocumentId(term: string): boolean {
+  return term.length >= 15 && !/\s/.test(term);
+}
+
+function identityBlock(product: Product, actionLabel: string, note?: string): string {
+  return [
+    `ACTION: ${actionLabel}`,
+    "",
+    `Document ID: ${product.id}`,
+    ...(hasUnusualIdChars(product.id)
+      ? [
+          "⚠ WARNING: this document ID contains unusual characters (outside A–Z a–z 0–9 _ -).",
+          `Escaped form: ${visibleIdForm(product.id)}`,
+        ]
+      : []),
+    `Current status: ${product.status ?? product.moderation}`,
+    `Name (for reference only — not an identifier): ${dialogSafe(product.name)}`,
+    ...(note ? ["", note] : []),
+  ].join("\n");
+}
+
+/**
+ * Typed-code confirmation: the admin must type the last 6 characters of THIS
+ * card's exact document id (case-sensitive). Anything else aborts.
+ */
+function confirmWithIdCode(product: Product, actionLabel: string, note?: string): boolean {
+  const code = confirmationCodeFor(product.id);
+  const typed = window.prompt(
+    `${identityBlock(product, actionLabel, note)}\n\nType the last ${code.length} characters of the document ID to confirm:`
+  );
+  if (typed === null) return false;
+  if (typed.trim() !== code) {
+    toast.error("Confirmation code does not match this product's document ID. Nothing was changed.");
+    return false;
+  }
+  return true;
+}
+
+/** Simple confirmation that still shows the exact document id. */
+function confirmWithId(product: Product, actionLabel: string): boolean {
+  return window.confirm(`${identityBlock(product, actionLabel)}\n\nProceed?`);
+}
 
 // Labels for the moderation state from lib/products/visibility.ts. "Active"
 // is kept as the label for live products so the existing stats/CSV read the
@@ -95,6 +188,7 @@ export default function AdminProductsPage() {
           rejectionReason:
             typeof data.rejectionReason === "string" ? data.rejectionReason : null,
           featured: data.featured === true,
+          productNumber: typeof data.productNumber === "string" && data.productNumber ? data.productNumber : null,
         });
       });
       setProducts(items);
@@ -111,10 +205,31 @@ export default function AdminProductsPage() {
   // validates the transition and stamps moderatedAt/moderatedBy. The browser
   // no longer writes approval or visibility fields directly.
   const moderate = async (product: Product, action: ModerationAction) => {
+    // Exact-identity confirmation first, tied to THIS card's document id.
+    if (action === "reject") {
+      if (!confirmWithIdCode(product, "REJECT")) return;
+    } else if (action === "block") {
+      if (
+        !confirmWithIdCode(
+          product,
+          "BLOCK",
+          "Block takes the product off sale and records it as approved-but-blocked. To hide an unverified listing, use REJECT instead."
+        )
+      ) {
+        return;
+      }
+    } else if (action === "approve") {
+      if (!confirmWithId(product, "APPROVE (product goes live)")) return;
+    } else if (action === "unblock") {
+      if (!confirmWithId(product, "UNBLOCK (product goes back on sale)")) return;
+    }
+
     let reason: string | undefined;
     if (action === "reject") {
+      // Empty by default: the admin must type the reason. The neutral wording
+      // is only a suggestion for unverified legacy listings (M2).
       const input = window.prompt(
-        `Reason for rejecting "${product.name}" (shown to the seller):`
+        `Rejection reason for document ID ${product.id} (stored on the product and shown to the seller). Type a reason:\n\nSuggested wording ONLY for an unverified legacy listing:\n"${NEUTRAL_REJECTION_REASON}"`
       );
       if (input === null) return;
       reason = input.trim();
@@ -201,14 +316,43 @@ export default function AdminProductsPage() {
     manage(product, product.featured ? "unfeature" : "feature");
 
   const deleteProduct = (product: Product) => {
-    if (!confirm("Delete this product permanently?")) return;
+    if (
+      !confirmWithIdCode(
+        product,
+        "DELETE PERMANENTLY",
+        "This permanently deletes the product document and cannot be undone. (The server still refuses to delete a product with sales history.)"
+      )
+    ) {
+      return;
+    }
     void manage(product, "delete");
   };
 
+  const copyId = async (product: Product) => {
+    try {
+      await navigator.clipboard.writeText(product.id);
+      toast.success("Document ID copied.");
+    } catch {
+      toast.error("Couldn't copy — select the ID text and copy it manually.");
+    }
+  };
+
+  // Exact document-id search: when the trimmed search text IS a document id,
+  // only that product matches (names / vendor names are not consulted). An
+  // id-LIKE term (no whitespace, 15+ chars) that matches no id never falls
+  // back to name/vendor matching (L1), so a product NAMED like an id cannot
+  // stand in for it.
+  const searchTerm = search.trim();
+  const exactIdMatch = searchTerm !== "" && products.some((p) => p.id === searchTerm);
+  const idLikeWithoutMatch = !exactIdMatch && looksLikeDocumentId(searchTerm);
+
   const filtered = products.filter((item) => {
-    const searchMatch =
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.vendorName.toLowerCase().includes(search.toLowerCase());
+    const searchMatch = exactIdMatch
+      ? item.id === searchTerm
+      : idLikeWithoutMatch
+      ? false
+      : item.name.toLowerCase().includes(search.toLowerCase()) ||
+        item.vendorName.toLowerCase().includes(search.toLowerCase());
     const categoryMatch =
       categoryFilter === "All" || item.category === categoryFilter;
     const vendorMatch =
@@ -217,6 +361,25 @@ export default function AdminProductsPage() {
       statusFilter === "All" || item.status === statusFilter;
     return searchMatch && categoryMatch && vendorMatch && statusMatch;
   });
+
+  // M1: the exact-match message must agree with what is actually listed.
+  const exactIdShown = exactIdMatch && filtered.some((p) => p.id === searchTerm);
+  const exactIdHiddenByFilters = exactIdMatch && !exactIdShown;
+  const searchNotice: { tone: "ok" | "warn"; text: string } | null = exactIdShown
+    ? { tone: "ok", text: "Exact document-ID match — showing only that product." }
+    : exactIdHiddenByFilters
+    ? {
+        tone: "warn",
+        text: "A product with this exact document ID exists but is hidden by the active category / vendor / status filters. Reset the filters to All to see it.",
+      }
+    : idLikeWithoutMatch
+    ? { tone: "warn", text: "No product with this document ID." }
+    : null;
+  const emptyMessage = exactIdHiddenByFilters
+    ? "The exact document-ID match is hidden by the active filters."
+    : idLikeWithoutMatch
+    ? "No product with this document ID."
+    : "No products found.";
 
   const totalProducts = products.length;
   const activeProducts = products.filter((p) => p.status === "Active").length;
@@ -301,12 +464,24 @@ export default function AdminProductsPage() {
 
         {/* FILTERS */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <input
-            placeholder="Search product or vendor..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="border rounded-xl p-4"
-          />
+          <div>
+            <input
+              placeholder="Search product, vendor or exact document ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border rounded-xl p-4 w-full"
+            />
+            {searchNotice ? (
+              <p
+                role="status"
+                className={`mt-1 text-xs font-semibold ${
+                  searchNotice.tone === "ok" ? "text-indigo-700" : "text-amber-700"
+                }`}
+              >
+                {searchNotice.text}
+              </p>
+            ) : null}
+          </div>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
@@ -348,7 +523,7 @@ export default function AdminProductsPage() {
           <div className="bg-white rounded-2xl p-10 text-center">Loading...</div>
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-2xl p-10 text-center text-gray-500">
-            No products found.
+            {emptyMessage}
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -363,6 +538,37 @@ export default function AdminProductsPage() {
                     alt={product.name}
                     className="w-full h-full object-cover rounded-xl"
                   />
+                </div>
+
+                {/* Exact identity: the document id is what every action targets. */}
+                <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50 p-1.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+                    Document ID
+                  </p>
+                  <code className="block select-all break-all font-mono text-[11px] text-gray-900">
+                    {product.id}
+                  </code>
+                  {hasUnusualIdChars(product.id) ? (
+                    <div className="mt-1 rounded border border-amber-300 bg-amber-50 p-1 text-[10px] text-amber-800">
+                      <p className="font-semibold">⚠ Unusual characters in this document ID</p>
+                      <p>Escaped (display only):</p>
+                      <code className="block break-all font-mono">{visibleIdForm(product.id)}</code>
+                    </div>
+                  ) : null}
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void copyId(product)}
+                      className="rounded border border-indigo-300 bg-white px-2 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100"
+                    >
+                      Copy ID
+                    </button>
+                    {product.productNumber ? (
+                      <span className="font-mono text-[10px] text-gray-600" title="Product number (display only)">
+                        No. {product.productNumber}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <h2 className="text-sm font-bold mt-2 line-clamp-1">
@@ -400,6 +606,7 @@ export default function AdminProductsPage() {
                   </p>
                 ) : null}
 
+                {/* Primary moderation row: Approve / Reject / Unblock (+ Feature). */}
                 <div className="flex flex-wrap gap-2 mt-3">
                   {(product.moderation === "pending" ||
                     product.moderation === "rejected") && (
@@ -417,15 +624,6 @@ export default function AdminProductsPage() {
                       className="flex-1 py-1.5 text-sm rounded-lg text-white transition bg-orange-600 hover:bg-orange-700"
                     >
                       Reject
-                    </button>
-                  )}
-
-                  {(product.moderation === "live" || product.moderation === "archived") && (
-                    <button
-                      onClick={() => moderate(product, "block")}
-                      className="flex-1 py-1.5 text-sm rounded-lg text-white transition bg-yellow-600 hover:bg-yellow-700"
-                    >
-                      Block
                     </button>
                   )}
 
@@ -448,13 +646,32 @@ export default function AdminProductsPage() {
                   >
                     {product.featured ? "★ Featured" : "☆ Feature"}
                   </button>
+                </div>
 
-                  <button
-                    onClick={() => deleteProduct(product)}
-                    className="flex-1 bg-red-600 hover:bg-red-700 transition text-white py-1.5 text-sm rounded-lg"
-                  >
-                    Delete
-                  </button>
+                {/* Secondary risk row: Block and Delete, set apart and outlined
+                    so they cannot be mistaken for Reject. Both require typing
+                    the last 6 characters of this card's document ID. */}
+                <div className="mt-2 border-t border-dashed border-gray-300 pt-2">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                    Risk actions
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(product.moderation === "live" || product.moderation === "archived") && (
+                      <button
+                        onClick={() => moderate(product, "block")}
+                        className="flex-1 py-1.5 text-sm rounded-lg border-2 border-gray-700 bg-white text-gray-800 font-semibold transition hover:bg-gray-100"
+                      >
+                        ⛔ Block
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => deleteProduct(product)}
+                      className="flex-1 py-1.5 text-sm rounded-lg border-2 border-red-700 bg-white text-red-700 font-semibold transition hover:bg-red-50"
+                    >
+                      🗑 Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
