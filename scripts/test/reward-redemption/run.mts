@@ -196,6 +196,7 @@ const referral = async (uid: string, verified = true) => {
 async function main() {
   await clearAll();
   await seed();
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
   const stockOf = async (id = PRODUCT) => ((await db.collection("products").doc(id).get()).data() as any).stock;
 
   // ============ R0. the pure rules ============

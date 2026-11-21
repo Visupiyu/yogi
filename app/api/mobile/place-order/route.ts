@@ -13,6 +13,11 @@ import {
 import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib/products/variantSelection";
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
 import { isProductVisible } from "@/lib/products/visibility";
+import {
+  SELLER_NOT_APPROVED_MESSAGE,
+  findUnapprovedSellers,
+  sellerIdOf,
+} from "@/lib/sellerApproval";
 import { resolveCommissionRate } from "@/lib/orderPricing";
 import { evaluateCoupon, normalizeCouponCode, couponRedemptionId, couponFundingStamp } from "@/lib/coupons/couponRules";
 import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
@@ -438,6 +443,18 @@ export async function POST(request: Request) {
         }
 
         liveProducts.set(productId, product);
+      }
+
+      // Every seller in the cart must be Approved (lib/sellerApproval), read
+      // from the product snapshots above and inside this transaction so a
+      // concurrent block cannot slip through. Before every write below.
+      const unapprovedSellers = await findUnapprovedSellers(
+        db,
+        productSnaps.map((snap) => sellerIdOf(snap.data())),
+        tx
+      );
+      if (unapprovedSellers.length > 0) {
+        return { kind: "error", status: 409, error: SELLER_NOT_APPROVED_MESSAGE };
       }
 
       // ---- Pricing — every rupee derived here, from live product data,

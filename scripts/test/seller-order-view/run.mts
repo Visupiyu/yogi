@@ -177,7 +177,7 @@ const PRIVATE = {
 
 async function seed() {
   await db.collection("settings").doc("global").set({ freeShippingThreshold: 499, standardShippingCharge: 49, deliveryCost: 49 });
-  for (const [uid, status] of [[A, "Approved"], [B, "Approved"], [X, "Blocked"]] as const) {
+  for (const [uid, status] of [[A, "Approved"], [B, "Approved"], [X, "Approved"]] as const) {
     await db.collection("vendors").add({ uid, email: `${uid}@example.com`, businessName: `Shop ${uid}`, status, kycStatus: status, taxProfile: { gstStatus: "UNREGISTERED" } });
   }
   for (const [id, vendorId, price] of [["pa", A, 300], ["pb", B, 250], ["px", X, 100]] as const) {
@@ -197,6 +197,8 @@ try {
   const D = await place([{ id: "pa", qty: 1 }]);                       // A only, will be delivered
   const P = await place([{ id: "pa", qty: 1 }], false);                // still Pending
   const XO = await place([{ id: "px", qty: 1 }]);                      // blocked seller's order
+  // X is blocked AFTER its order exists — ordering from a blocked seller is refused (B1).
+  await (await import("../seller-blocked-orders/sellers.mts")).setSellerStatus(db, X, "Blocked");
   for (const id of [M, S, C, D, P, XO]) {
     await db.collection("orders").doc(id).update({ ...PRIVATE, deliveryCompanyName: "SwiftShip Co", deliveryPartnerName: "Ravi Rider" });
   }

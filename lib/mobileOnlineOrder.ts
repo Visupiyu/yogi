@@ -11,6 +11,7 @@ import {
 } from "@/lib/onlineOrder";
 import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 import { couponRedemptionId, couponFundingStamp } from "@/lib/coupons/couponRules";
+import { findUnapprovedSellers } from "@/lib/sellerApproval";
 import {
   planVariantDecrements,
   sumVariantStock,
@@ -239,6 +240,15 @@ export async function finalizeMobileOnlineOrder(params: {
       const couponSnap = couponRef ? await tx.get(couponRef) : null;
       const couponConflict = !!couponSnap?.exists;
 
+      // A seller blocked after create-payment-order priced this payment: the
+      // money is captured, so the order is still created but flagged for admin
+      // resolution — same rule as lib/onlineOrder.ts.
+      const unapprovedSellers = await findUnapprovedSellers(
+        db,
+        intent.items.map((i) => i.vendorId),
+        tx
+      );
+
       // ---- Assess, but never reject: the money is already taken ----
       // A product-level decrement (non-variant lines). A variant-path product
       // records its full decremented variants[] plan instead, applied at write
@@ -392,7 +402,10 @@ export async function finalizeMobileOnlineOrder(params: {
         ...(shortfalls.length > 0 ? { stockShortfall: shortfalls } : {}),
         ...(Object.keys(stockDeductedQty).length > 0 ? { stockDeductedQty } : {}),
         ...(couponConflict ? { couponConflict: true } : {}),
-        ...(shortfalls.length > 0 || couponConflict ? { needsReview: true } : {}),
+        ...(unapprovedSellers.length > 0 ? { sellerNotApproved: unapprovedSellers } : {}),
+        ...(shortfalls.length > 0 || couponConflict || unapprovedSellers.length > 0
+          ? { needsReview: true }
+          : {}),
       });
 
       if (couponRef && intent.couponCode && !couponConflict) {

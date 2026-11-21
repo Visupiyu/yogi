@@ -6,6 +6,11 @@ import { computeOrderPricing, type PricedItemInput } from "@/lib/orderPricing";
 import { YOMICO_COMMISSION_AMOUNT, YOMICO_COMMISSION_RATE } from "@/lib/commissionPolicy";
 import { PAY_ON_DELIVERY_UPI } from "@/lib/upiPayment";
 import { isProductVisible } from "@/lib/products/visibility";
+import {
+  SELLER_NOT_APPROVED_MESSAGE,
+  findUnapprovedSellers,
+  sellerIdOf,
+} from "@/lib/sellerApproval";
 import { mintNumbers } from "@/lib/humanIds";
 import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
 import { isRewardsEligible } from "@/lib/rewards/eligibility";
@@ -383,6 +388,20 @@ export async function POST(request: Request) {
             };
           }
         }
+      }
+
+      // Seller approval, re-checked inside the transaction from the sellers of
+      // the product snapshots just read (lib/sellerApproval). The pricing pass
+      // above already checked once; this read locks the seller records, so a
+      // block that lands between the two cannot slip an order through. Runs
+      // before every stock/order/coupon/points write below.
+      const unapprovedSellers = await findUnapprovedSellers(
+        db,
+        productSnaps.map((snap) => sellerIdOf(snap.data())),
+        tx
+      );
+      if (unapprovedSellers.length > 0) {
+        return { kind: "error", status: 409, error: SELLER_NOT_APPROVED_MESSAGE };
       }
 
       if (couponSnap?.exists) {

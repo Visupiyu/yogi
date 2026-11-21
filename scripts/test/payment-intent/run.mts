@@ -198,6 +198,7 @@ const mobileFinalize = (i: { razorpayOrderId: string; intent: any }, paymentId: 
 async function main() {
   await clearAll();
   await seed();
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
 
   for (const platform of ["web", "mobile"] as const) {
     const P = platform === "web" ? "W" : "M";

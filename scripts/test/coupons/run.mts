@@ -136,6 +136,7 @@ async function mobileOnlineStart(uid: string, extra: Record<string, unknown> = {
 async function main() {
   await clearAll();
   await seed();
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
 
   // ============ A. Shared evaluator (pure) ============
   const now = new Date("2026-09-26T12:00:00Z");

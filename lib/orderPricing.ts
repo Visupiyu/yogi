@@ -52,6 +52,7 @@ import {
 } from "@/lib/products/inventory";
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
 import { isProductVisible } from "@/lib/products/visibility";
+import { findUnapprovedSellers, SELLER_NOT_APPROVED_MESSAGE } from "@/lib/sellerApproval";
 import { evaluateCoupon, normalizeCouponCode } from "@/lib/coupons/couponRules";
 import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
 import { productBasePrice } from "@/lib/pricing/priceRules";
@@ -436,6 +437,14 @@ export async function computeOrderPricing(
           }
         : {}),
     });
+  }
+
+  // Every seller in the cart must be Approved right now (lib/sellerApproval).
+  // Checked from the live product vendorId — a line with none is refused too.
+  // Runs before the coupon/points evaluation and before any caller reserves
+  // points or creates a Razorpay order, so a refusal here mutates nothing.
+  if ((await findUnapprovedSellers(db, pricedItems.map((i) => i.vendorId))).length > 0) {
+    return { ok: false, error: SELLER_NOT_APPROVED_MESSAGE, status: 409 };
   }
 
   const settings = await readGlobalSettings();

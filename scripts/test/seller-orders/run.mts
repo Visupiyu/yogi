@@ -137,7 +137,7 @@ async function orderOf(id: string) { return (await db.collection("orders").doc(i
 
 async function seed() {
   await db.collection("settings").doc("global").set({ freeShippingThreshold: 499, standardShippingCharge: 49, deliveryCost: 49 });
-  for (const [uid, status] of [[A, "Approved"], [B, "Approved"], [X, "Blocked"]] as const) {
+  for (const [uid, status] of [[A, "Approved"], [B, "Approved"], [X, "Approved"]] as const) {
     await db.collection("vendors").add({ uid, email: `${uid}@example.com`, businessName: `Shop ${uid}`, status, kycStatus: status, taxProfile: { gstStatus: "UNREGISTERED" } });
   }
   for (const [id, vendorId, price] of [["p_a", A, 300], ["p_a2", A, 200], ["p_b", B, 250], ["p_x", X, 100]] as const) {
@@ -158,6 +158,8 @@ try {
   const S2 = await placeAndConfirm([{ id: "p_a2", qty: 1 }]);
   const S3 = await placeAndConfirm([{ id: "p_a2", qty: 1 }]);
   const XO = await placeAndConfirm([{ id: "p_x", qty: 1 }]);
+  // X is blocked AFTER its order exists — ordering from a blocked seller is refused (B1).
+  await (await import("../seller-blocked-orders/sellers.mts")).setSellerStatus(db, X, "Blocked");
   const mA = `${M}_${A}`, mB = `${M}_${B}`;
   const kA = firstKey(await rec(M, A)), kB = firstKey(await rec(M, B));
 

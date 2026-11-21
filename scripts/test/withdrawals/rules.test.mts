@@ -1,11 +1,14 @@
 /*
- * LOCAL-ONLY Firestore RULES test (emulator) — seller withdrawals.
- * A Paid withdrawal is final: its status can never move again, what was paid
- * and to whom (amount, vendorId, vendorEmail) is frozen, and it cannot be
- * deleted — any of those would drop it out of lib/vendorPayable.ts's
- * committed total and make the same money payable twice. The existing admin
- * transitions between Pending, Approved and Rejected are unchanged, sellers
- * still cannot create or update withdrawals, and reads are unchanged.
+ * LOCAL-ONLY Firestore RULES test (emulator) — seller withdrawals (B2).
+ *
+ * Withdrawals are SERVER-WRITTEN ONLY. No browser — admin included — may
+ * create, update or delete one: Paid is reached only through
+ * app/api/settle-withdrawal and the review transitions only through
+ * app/api/review-withdrawal (both Admin SDK, covered by
+ * scripts/test/withdrawals/run.mts). Covers direct Pending/Approved -> Paid,
+ * amount / vendor identity / payoutNumber tampering, paidAt / paidBy /
+ * settlementAuditId forgery, unsafe transitions (Rejected -> Pending, Paid ->
+ * anything), deletes, sellers, and that reads are unchanged.
  *
  * Run:
  *   npx firebase emulators:exec --only firestore --project demo-yomico-test \
@@ -15,7 +18,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, deleteField, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 
 const hostPort = process.env.FIRESTORE_EMULATOR_HOST;
 if (!hostPort || !/^(127\.0\.0\.1|localhost):\d+$/.test(hostPort)) {
@@ -44,66 +47,98 @@ const base = (status: string) => ({
   amount: 500, status, createdAt: new Date("2026-09-01T00:00:00Z"),
 });
 
-async function seed(id: string, status: string) {
+async function seed(id: string, status: string, extra: Record<string, unknown> = {}) {
   await env.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(doc(ctx.firestore(), "withdrawals", id), base(status));
+    await setDoc(doc(ctx.firestore(), "withdrawals", id), { ...base(status), ...extra });
   });
 }
 const adminDb = () => env.authenticatedContext("adminUid", { email: "adminyogimart@gmail.com", email_verified: true }).firestore();
 const sellerDb = () => env.authenticatedContext(SELLER, { email: SELLER_EMAIL, email_verified: true }).firestore();
 const asAdmin = (id: string) => doc(adminDb(), "withdrawals", id);
 const asSeller = (id: string) => doc(sellerDb(), "withdrawals", id);
-async function statusOf(id: string) {
-  let s: unknown;
-  await env.withSecurityRulesDisabled(async (ctx) => { s = (await getDoc(doc(ctx.firestore(), "withdrawals", id))).data()?.status; });
-  return s;
+async function stored(id: string) {
+  let d: Record<string, unknown> | undefined;
+  await env.withSecurityRulesDisabled(async (ctx) => { d = (await getDoc(doc(ctx.firestore(), "withdrawals", id))).data(); });
+  return d;
 }
+const PAID_FIELDS = { status: "Paid", paidAt: new Date(), paidBy: "adminUid" };
 
 await env.clearFirestore();
 
-// ---------- existing transitions still work ----------
-await seed("w_p1", "Pending");
-await check("W1  admin Pending -> Approved allowed", () => assertSucceeds(updateDoc(asAdmin("w_p1"), { status: "Approved" })));
-await seed("w_p2", "Pending");
-await check("W2  admin Pending -> Rejected allowed", () => assertSucceeds(updateDoc(asAdmin("w_p2"), { status: "Rejected" })));
-await seed("w_a1", "Approved");
-await check("W3  admin Approved -> Rejected allowed", () => assertSucceeds(updateDoc(asAdmin("w_a1"), { status: "Rejected" })));
-await seed("w_a2", "Approved");
-await check("W4  admin Approved -> Pending allowed", () => assertSucceeds(updateDoc(asAdmin("w_a2"), { status: "Pending" })));
-await seed("w_r1", "Rejected");
-await check("W5  admin Rejected -> Pending allowed (unchanged behaviour)", () => assertSucceeds(updateDoc(asAdmin("w_r1"), { status: "Pending" })));
-await seed("w_del", "Rejected");
-await check("W6  admin can still delete a non-Paid withdrawal", () => assertSucceeds(deleteDoc(asAdmin("w_del"))));
+// ---------- direct Paid transitions denied ----------
+await seed("w_p", "Pending");
+await seed("w_a", "Approved");
+await check("W1  admin direct Pending -> Paid DENIED", () => assertFails(updateDoc(asAdmin("w_p"), { status: "Paid" })));
+await check("W2  admin direct Pending -> Paid with paidAt/paidBy DENIED", () => assertFails(updateDoc(asAdmin("w_p"), PAID_FIELDS)));
+await check("W3  admin direct Approved -> Paid DENIED", () => assertFails(updateDoc(asAdmin("w_a"), { status: "Paid" })));
+await check("W4  admin direct Approved -> Paid with paidAt/paidBy DENIED", () => assertFails(updateDoc(asAdmin("w_a"), PAID_FIELDS)));
+await check("W5  admin set(merge) Paid DENIED", () => assertFails(setDoc(asAdmin("w_a"), { status: "Paid" }, { merge: true })));
+await check("W6  seller direct Pending -> Paid DENIED", () => assertFails(updateDoc(asSeller("w_p"), { status: "Paid" })));
 
-// ---------- Paid is final ----------
-await seed("w_paid", "Paid");
-await check("W7  admin Paid -> Rejected DENIED", () => assertFails(updateDoc(asAdmin("w_paid"), { status: "Rejected" })));
-await check("W8  admin Paid -> Pending DENIED", () => assertFails(updateDoc(asAdmin("w_paid"), { status: "Pending" })));
-await check("W9  admin Paid -> Approved DENIED", () => assertFails(updateDoc(asAdmin("w_paid"), { status: "Approved" })));
-await check("W10 admin removing status from a Paid withdrawal DENIED", async () => {
-  const { deleteField } = await import("firebase/firestore");
-  await assertFails(updateDoc(asAdmin("w_paid"), { status: deleteField() }));
+// ---------- identity / financial / idempotency field tampering denied ----------
+for (const [label, patch] of [
+  ["amount", { amount: 1 }],
+  ["amount (as string)", { amount: "500" }],
+  ["vendorId", { vendorId: "someone_else" }],
+  ["vendorEmail", { vendorEmail: "other@example.com" }],
+  ["vendorName", { vendorName: "Other Traders" }],
+  ["payoutNumber", { payoutNumber: "PO-OTHER" }],
+  ["createdAt", { createdAt: new Date() }],
+] as const) {
+  await check(`W7  admin changing ${label} on a Pending withdrawal DENIED`, () => assertFails(updateDoc(asAdmin("w_p"), patch)));
+  await check(`W8  seller changing ${label} on their own withdrawal DENIED`, () => assertFails(updateDoc(asSeller("w_p"), patch)));
+}
+
+// ---------- paidAt / paidBy / audit-link forgery denied ----------
+await seed("w_paid", "Paid", { paidAt: new Date("2026-09-02T00:00:00Z"), paidBy: "realAdmin", settlementAuditId: "audit_1" });
+for (const [label, patch] of [
+  ["paidAt", { paidAt: new Date() }],
+  ["paidBy", { paidBy: "attacker" }],
+  ["settlementAuditId", { settlementAuditId: "forged" }],
+  ["paidAt removal", { paidAt: deleteField() }],
+] as const) {
+  await check(`W9  admin changing ${label} on a Paid withdrawal DENIED`, () => assertFails(updateDoc(asAdmin("w_paid"), patch)));
+}
+await check("W10 admin pre-stamping paidAt/paidBy on a Pending withdrawal DENIED", () =>
+  assertFails(updateDoc(asAdmin("w_p"), { paidAt: new Date(), paidBy: "adminUid" })));
+await check("W10b admin adding a non-money note to a Paid withdrawal DENIED (server-only now)", () =>
+  assertFails(updateDoc(asAdmin("w_paid"), { adminNote: "bank ref checked" })));
+
+// ---------- unsafe / any direct status transitions denied ----------
+await seed("w_r", "Rejected");
+await check("W11 admin Rejected -> Pending DENIED (would re-reserve without balance validation)", () =>
+  assertFails(updateDoc(asAdmin("w_r"), { status: "Pending" })));
+await check("W12 admin Rejected -> Approved DENIED", () => assertFails(updateDoc(asAdmin("w_r"), { status: "Approved" })));
+await check("W13 admin Rejected -> Paid DENIED", () => assertFails(updateDoc(asAdmin("w_r"), { status: "Paid" })));
+await check("W14 admin Paid -> Rejected / Pending / Approved DENIED", async () => {
+  for (const s of ["Rejected", "Pending", "Approved"]) await assertFails(updateDoc(asAdmin("w_paid"), { status: s }));
 });
-await check("W11 admin changing a Paid withdrawal's amount DENIED", () => assertFails(updateDoc(asAdmin("w_paid"), { amount: 1 })));
-await check("W12 admin changing a Paid withdrawal's vendorId / vendorEmail DENIED", async () => {
-  await assertFails(updateDoc(asAdmin("w_paid"), { vendorId: "someone_else" }));
-  await assertFails(updateDoc(asAdmin("w_paid"), { vendorEmail: "other@example.com" }));
-});
-await check("W13 admin deleting a Paid withdrawal DENIED", () => assertFails(deleteDoc(asAdmin("w_paid"))));
-await check("W14 Paid stays Paid: re-writing status Paid with a non-money note is allowed", () =>
-  assertSucceeds(updateDoc(asAdmin("w_paid"), { status: "Paid", adminNote: "bank ref checked" })));
-await check("W15 after all of the above the withdrawal is still Paid", async () => {
-  const s = await statusOf("w_paid");
-  if (s !== "Paid") throw new Error(`status is ${String(s)}`);
+await check("W15 admin removing status DENIED", () => assertFails(updateDoc(asAdmin("w_p"), { status: deleteField() })));
+await check("W16 admin direct Pending -> Approved / Rejected DENIED (moved to app/api/review-withdrawal)", async () => {
+  await assertFails(updateDoc(asAdmin("w_p"), { status: "Approved" }));
+  await assertFails(updateDoc(asAdmin("w_p"), { status: "Rejected" }));
 });
 
-// ---------- sellers unchanged ----------
-await seed("w_s1", "Pending");
-await check("W16 seller cannot update their own withdrawal (status)", () => assertFails(updateDoc(asSeller("w_s1"), { status: "Paid" })));
-await check("W17 seller cannot create a withdrawal (server route only)", () =>
-  assertFails(setDoc(doc(sellerDb(), "withdrawals", "w_new"), base("Pending"))));
-await check("W18 seller can still read their own withdrawal (by vendorEmail)", () => assertSucceeds(getDoc(asSeller("w_paid"))));
-await check("W19 admin can still read a Paid withdrawal", () => assertSucceeds(getDoc(asAdmin("w_paid"))));
+// ---------- create / delete denied ----------
+await check("W17 seller cannot create a withdrawal", () => assertFails(setDoc(doc(sellerDb(), "withdrawals", "w_new"), base("Pending"))));
+await check("W18 admin cannot create a withdrawal (e.g. a pre-Paid one)", () =>
+  assertFails(setDoc(doc(adminDb(), "withdrawals", "w_new2"), { ...base("Paid"), ...PAID_FIELDS })));
+await check("W19 admin cannot overwrite a withdrawal with set()", () => assertFails(setDoc(asAdmin("w_p"), base("Paid"))));
+await check("W20 admin cannot delete a Pending / Rejected / Paid withdrawal", async () => {
+  for (const id of ["w_p", "w_r", "w_paid"]) await assertFails(deleteDoc(asAdmin(id)));
+});
+
+// ---------- nothing changed; reads unchanged ----------
+await check("W21 after all of the above every withdrawal is exactly as seeded", async () => {
+  const p = await stored("w_p"), a = await stored("w_a"), r = await stored("w_r"), paid = await stored("w_paid");
+  if (p?.status !== "Pending" || p?.amount !== 500 || p?.vendorId !== SELLER || "paidAt" in (p || {})) throw new Error(`w_p ${JSON.stringify(p)}`);
+  if (a?.status !== "Approved" || r?.status !== "Rejected") throw new Error(`a=${a?.status} r=${r?.status}`);
+  if (paid?.status !== "Paid" || paid?.paidBy !== "realAdmin" || paid?.settlementAuditId !== "audit_1") throw new Error(`paid ${JSON.stringify(paid)}`);
+});
+await check("W22 seller can still read their own withdrawal (by vendorEmail)", () => assertSucceeds(getDoc(asSeller("w_paid"))));
+await check("W23 admin can still read a withdrawal", () => assertSucceeds(getDoc(asAdmin("w_paid"))));
+await check("W24 another seller cannot read it", () =>
+  assertFails(getDoc(doc(env.authenticatedContext("other_seller", { email: "other@example.com", email_verified: true }).firestore(), "withdrawals", "w_p"))));
 
 await env.cleanup();
 console.log(`\n${pass}/${pass + fail} withdrawal rules checks passed`);

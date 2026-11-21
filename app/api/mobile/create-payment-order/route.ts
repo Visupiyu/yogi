@@ -12,6 +12,11 @@ import {
 import { findVariantById, variantAttributes, effectiveVariantPrice } from "@/lib/products/variantSelection";
 import { isValidOrderQuantity, INVALID_QUANTITY_MESSAGE } from "@/lib/orderQuantity";
 import { isProductVisible } from "@/lib/products/visibility";
+import {
+  SELLER_NOT_APPROVED_MESSAGE,
+  findUnapprovedSellers,
+  sellerIdOf,
+} from "@/lib/sellerApproval";
 import { resolveCommissionRate } from "@/lib/orderPricing";
 import { evaluateCoupon, normalizeCouponCode } from "@/lib/coupons/couponRules";
 import { loadCouponByCode, hasPriorCouponRedemption } from "@/lib/coupons/couponServer";
@@ -281,6 +286,17 @@ export async function POST(request: Request) {
       }
 
       liveProducts.set(productId, product);
+    }
+
+    // Every seller in the cart must be Approved (lib/sellerApproval) — refused
+    // before any points, Razorpay order or paymentIntent exists. A seller
+    // blocked after this point is caught at finalisation, where the paid order
+    // is kept and flagged for admin review (lib/mobileOnlineOrder).
+    if (
+      (await findUnapprovedSellers(db, productSnaps.map((snap) => sellerIdOf(snap.data()))))
+        .length > 0
+    ) {
+      return Response.json({ error: SELLER_NOT_APPROVED_MESSAGE }, { status: 409 });
     }
 
     const items: MobilePricedItem[] = cartDocs.map((cartDoc) => {

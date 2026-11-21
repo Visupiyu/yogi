@@ -164,6 +164,7 @@ function sig(orderId: string, paymentId: string) {
 async function main() {
   await clearAll();
   await seedProducts();
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
 
   // ---------- PHASE 4 — create-payment-order ----------
   // A. Missing variantId on a stock-bearing variant product

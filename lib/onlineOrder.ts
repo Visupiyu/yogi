@@ -14,6 +14,7 @@ import {
   type VariantStockEntry,
 } from "@/lib/products/inventory";
 import { sendOrderConfirmationEmail } from "@/lib/orderConfirmationEmail";
+import { findUnapprovedSellers } from "@/lib/sellerApproval";
 
 // SERVER-ONLY.
 //
@@ -366,6 +367,16 @@ export async function finalizeOnlineOrder(params: {
     const holdRef = pointsHoldRef(db, intent.uid);
     const holdSnap = pricing.rewardValue > 0 ? await tx.get(holdRef) : null;
 
+    // A seller blocked after /api/create-order priced this payment. The money
+    // is captured, so the order is still created (MONEY-SAFETY RULE) — but it
+    // carries the sellers that are no longer Approved and needsReview, so an
+    // admin resolves it (refund or fulfil) instead of it flowing on silently.
+    const unapprovedSellers = await findUnapprovedSellers(
+      db,
+      pricing.items.map((i) => i.vendorId),
+      tx
+    );
+
     // ---- Assess, but never reject: the money is already taken ----
     // A product-level decrement (legacy shape). A variant-path product records
     // its full decremented variants[] plan instead, applied at write time.
@@ -561,7 +572,8 @@ export async function finalizeOnlineOrder(params: {
       ...(Object.keys(stockDeductedQty).length > 0 ? { stockDeductedQty } : {}),
       ...(couponConflict ? { couponConflict: true } : {}),
       ...(rewardShort > 0 ? { rewardShortfall: rewardShort } : {}),
-      ...(shortfalls.length > 0 || couponConflict || rewardShort > 0
+      ...(unapprovedSellers.length > 0 ? { sellerNotApproved: unapprovedSellers } : {}),
+      ...(shortfalls.length > 0 || couponConflict || rewardShort > 0 || unapprovedSellers.length > 0
         ? { needsReview: true }
         : {}),
     });

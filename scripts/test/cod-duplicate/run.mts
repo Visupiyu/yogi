@@ -127,6 +127,7 @@ async function main() {
     stock: 1_000_000, sales: 0, active: true, vendorId: "vendor_cod_dup", vendorName: "Dup Traders",
   });
   await db.collection("coupons").add({ code: "SAVE10", discount: 10, active: true, createdAt: Timestamp.now() });
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
 
   // ---------- 1. same key, concurrent (double-tap) ----------
   {

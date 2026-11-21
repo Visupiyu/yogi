@@ -207,6 +207,7 @@ async function onlineAs(uid: string, extra: Record<string, unknown> = {}, email?
 async function main() {
   await clearAll();
   await seed();
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
 
   // ---------- 1/3/4 blocked -> 403 from mobile/place-order, nothing mutated ----------
   {

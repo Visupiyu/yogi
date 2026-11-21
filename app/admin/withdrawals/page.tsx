@@ -2,7 +2,7 @@
 
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 export default function AdminWithdrawalsPage() {
@@ -33,44 +33,41 @@ export default function AdminWithdrawalsPage() {
   };
 
   const updateStatus = async (id: string, status: string) => {
-    // A Paid withdrawal is final (firestore.rules refuses any status change);
-    // never offer or attempt one from here.
-    if (withdrawals.find((item) => item.id === id)?.status === "Paid") return;
+    // Paid and Rejected are final (app/api/review-withdrawal and
+    // settle-withdrawal refuse any change); never offer or attempt one here.
+    const current = withdrawals.find((item) => item.id === id)?.status;
+    if (current === "Paid" || current === "Rejected") return;
 
     try {
-      // The money-moving transition is SERVER-AUTHORITATIVE: the API verifies
-      // the caller is an admin, recomputes the refund-adjusted payable from
-      // source, and marks Paid atomically (blocking duplicate/overpayment).
-      // The browser no longer decides whether a payout is affordable.
-      if (status === "Paid") {
-        const user = auth.currentUser;
-        if (!user) {
-          alert("Please sign in again.");
-          return;
-        }
-        const token = await user.getIdToken();
-        const res = await fetch("/api/settle-withdrawal", {
+      // Every transition is SERVER-AUTHORITATIVE — firestore.rules deny all
+      // client writes to withdrawals. Paid goes through settle-withdrawal,
+      // which re-verifies the request and recomputes the refund-adjusted
+      // payable before marking Paid atomically with its audit entry; the
+      // non-money transitions go through review-withdrawal.
+      const user = auth.currentUser;
+      if (!user) {
+        alert("Please sign in again.");
+        return;
+      }
+      const token = await user.getIdToken();
+      const res = await fetch(
+        status === "Paid" ? "/api/settle-withdrawal" : "/api/review-withdrawal",
+        {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ withdrawalId: id }),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          alert(data?.error || "Could not mark this withdrawal paid.");
-          return;
+          body: JSON.stringify(
+            status === "Paid" ? { withdrawalId: id } : { withdrawalId: id, status }
+          ),
         }
-        setWithdrawals((prev) =>
-          prev.map((item) => (item.id === id ? { ...item, status: "Paid" } : item))
-        );
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data?.error || "Couldn't update the withdrawal.");
         return;
       }
-
-      // Non-money transitions (Approved / Rejected / back to Pending) stay a
-      // direct admin write, still gated by firestore.rules (update: isAdmin()).
-      await updateDoc(doc(db, "withdrawals", id), { status });
       setWithdrawals((prev) =>
         prev.map((item) => (item.id === id ? { ...item, status } : item))
       );
@@ -138,7 +135,7 @@ export default function AdminWithdrawalsPage() {
                         >
                           {item.status || "Pending"}
                         </span>
-                        {item.status !== "Paid" && (
+                        {item.status !== "Paid" && item.status !== "Rejected" && (
                           <select
                             value={item.status || "Pending"}
                             onChange={(e) =>

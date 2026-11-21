@@ -186,7 +186,7 @@ const ist = (y: number, m: number, d: number, hh: number, mm: number) =>
 
 async function seed() {
   await db.collection("settings").doc("global").set({ freeShippingThreshold: 499, standardShippingCharge: 49, deliveryCost: 49 });
-  for (const [uid, status] of [[A, "Approved"], [B, "Approved"], [X, "Blocked"], [R, "Rejected"], [E, "Approved"], [DUP, "Approved"], [DUP, "Approved"]] as const) {
+  for (const [uid, status] of [[A, "Approved"], [B, "Approved"], [X, "Approved"], [R, "Rejected"], [E, "Approved"], [DUP, "Approved"], [DUP, "Approved"]] as const) {
     await db.collection("vendors").add({ uid, email: `${uid}@example.com`, businessName: `Shop ${uid}`, status, kycStatus: status, taxProfile: { gstStatus: "UNREGISTERED" } });
   }
   const product = (vendorId: string, price: number, extra: Record<string, unknown> = {}) => ({
@@ -220,6 +220,8 @@ try {
   const D = await place([{ id: "pa", qty: 1 }]);                       // A only → delivered + paid
   const P = await place([{ id: "pa", qty: 5 }], false);                // still Pending — never counted
   const XO = await place([{ id: "px", qty: 1 }]);                      // blocked seller's order
+  // X is blocked AFTER its order exists — ordering from a blocked seller is refused (B1).
+  await (await import("../seller-blocked-orders/sellers.mts")).setSellerStatus(db, X, "Blocked");
   await cancelOrder(post("http://x/api/cancel-order", { orderId: C }, ADMIN_UID, ADMIN_EMAIL));
   const kD = firstKey(await rec(D, A));
   for (const from of ["Confirmed", "Packed", "Shipped", "Out For Delivery"]) {

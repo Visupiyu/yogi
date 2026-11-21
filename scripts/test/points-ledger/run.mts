@@ -199,6 +199,7 @@ const referral = async (uid: string, verified = true) => {
 async function main() {
   await clearAll();
   await seed();
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
 
   // ============ 0. the pure calculation ============
   {

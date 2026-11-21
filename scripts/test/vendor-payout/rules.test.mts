@@ -116,8 +116,10 @@ await env.withSecurityRulesDisabled(async (ctx) => {
     sellerDeliveryCharge: 27, itemFulfilment: {}, items: [],
   });
 });
-await check("V16 withdrawals unchanged: admin Pending -> Approved allowed; Paid stays final", async () => {
-  await assertSucceeds(updateDoc(doc(adminDb(), "withdrawals", "w_pending"), { status: "Approved" }));
+// B2: withdrawals are server-written only (app/api/review-withdrawal and
+// app/api/settle-withdrawal); scripts/test/withdrawals covers them in full.
+await check("V16 withdrawals: admin direct Pending -> Approved now DENIED (server route); Paid stays final", async () => {
+  await assertFails(updateDoc(doc(adminDb(), "withdrawals", "w_pending"), { status: "Approved" }));
   await assertFails(updateDoc(doc(adminDb(), "withdrawals", "w_paid"), { status: "Rejected" }));
 });
 await check("V17 sellerOrders settlement freeze unchanged: admin cannot rewrite sellerDeliveryCharge / vendorEarning", async () => {

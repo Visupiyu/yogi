@@ -1490,28 +1490,26 @@ service cloud.firestore {
       // Admin SDK (lib/vendorPayable.ts, the same calculation the admin
       // settlement screen performs with its own copy) and refuses anything
       // larger, so the amount
-      // that reaches this collection is server-decided. Reads, admin updates
-      // and admin deletes below are unchanged.
+      // that reaches this collection is server-decided. Reads are unchanged;
+      // updates and deletes are server-only too (below).
       allow create: if false;
-      // A Paid withdrawal is final. Its status can never move again (a Paid ->
-      // Rejected/Pending/Approved flip would drop it out of the committed
-      // total in lib/vendorPayable.ts and make the same money payable twice),
-      // and the fields that define WHAT was paid and TO WHOM are frozen too.
-      // Deleting a Paid withdrawal would reopen the same money, so it is
-      // refused as well. Pending/Approved/Rejected keep their existing admin
-      // transitions; Paid is reached only through app/api/settle-withdrawal
-      // (Admin SDK), which is unaffected by these rules.
-      allow update: if isAdmin()
-        && (
-          resource.data.get('status', 'Pending') != 'Paid'
-          || (
-            unchanged('status')
-            && unchanged('amount')
-            && unchanged('vendorId')
-            && unchanged('vendorEmail')
-          )
-        );
-      allow delete: if isAdmin() && resource.data.get('status', 'Pending') != 'Paid';
+      // Every update and delete is SERVER-ONLY too (B2). The previous rule let
+      // an admin browser write anything to a non-Paid withdrawal — status
+      // straight to 'Paid' (skipping app/api/settle-withdrawal's payable check
+      // and its audit record), a different amount / vendorId / vendorEmail,
+      // forged paidAt / paidBy, or Rejected -> Pending, which re-reserves an
+      // amount that was never re-validated against the balance. Rules cannot
+      // recompute the payable, so none of that can be bounded here.
+      //
+      // The legitimate transitions now go through Admin SDK routes:
+      //   app/api/review-withdrawal  Pending <-> Approved, Pending/Approved ->
+      //                              Rejected (Rejected and Paid are final)
+      //   app/api/settle-withdrawal  Pending/Approved -> Paid, re-verifying
+      //                              identity, amount and payable in one
+      //                              transaction with its audit_logs entry
+      // Deleting would silently drop a reservation or a payment, so it is
+      // refused as well. Reads are unchanged.
+      allow update, delete: if false;
     }
 
     // ---------------------------------------------------------

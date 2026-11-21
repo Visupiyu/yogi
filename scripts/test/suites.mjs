@@ -40,6 +40,7 @@ export const suites = [
   { name: "kyc-rules", file: "scripts/test/kyc/rules.test.mts", ...fs("firestore,storage", "demo-yomico-kyc") },
   { name: "kyc-flow", file: "scripts/test/kyc/flow.mts", ...fs("firestore,storage"), harness: true },
   { name: "mobile-blocked-orders", file: "scripts/test/mobile-blocked-orders/run.mts", ...fs("firestore"), harness: true },
+  { name: "seller-blocked-orders", file: "scripts/test/seller-blocked-orders/run.mts", ...fs("firestore"), harness: true },
   { name: "mobile-variant", file: "scripts/test/mobile-variant/run.mts", ...fs("firestore"), harness: true },
   { name: "money-integrity-rules", file: "scripts/test/money-integrity/rules.test.mts", ...fs("firestore") },
   { name: "money-integrity", file: "scripts/test/money-integrity/run.mts", ...fs("firestore"), harness: true },
@@ -74,6 +75,7 @@ export const suites = [
   { name: "vendor-payout-rules", file: "scripts/test/vendor-payout/rules.test.mts", ...fs("firestore") },
   { name: "vendor-payout", file: "scripts/test/vendor-payout/run.mts", ...fs("firestore"), harness: true },
   { name: "withdrawals-rules", file: "scripts/test/withdrawals/rules.test.mts", ...fs("firestore") },
+  { name: "withdrawals", file: "scripts/test/withdrawals/run.mts", ...fs("firestore"), harness: true },
 ];
 
 /** Suites deliberately not run. Each must say why. */

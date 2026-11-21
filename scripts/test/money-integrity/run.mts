@@ -130,12 +130,14 @@ async function seedWebProduct(stock = 5) {
     title: "Web Kettle", sellingPrice: 599, mrp: 999, stock, sales: 0, active: true,
     vendorId: SELLER, vendorName: "Money Traders", gstRate: 18,
   });
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
 }
 async function seedMobileProduct(stock = 10) {
   await db.collection("products").doc(P_MOB).set({
     name: "Mobile Kettle", price: 1000, sellingPrice: 1000, mrp: 1500, gstPercent: 5,
     stock, sales: 0, active: true, vendorId: SELLER, vendorName: "Money Traders",
   });
+  await (await import("../seller-blocked-orders/sellers.mts")).ensureApprovedSellers(db);
 }
 async function seedMobileCoupon() {
   // Canonical admin coupon format (lib/coupons/couponRules.ts) — 10% off.

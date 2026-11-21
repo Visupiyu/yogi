@@ -1,7 +1,7 @@
 import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
-import { computeVendorPayable } from "@/lib/vendorPayable";
+import { computeVendorPayable, evaluateWithdrawalRequest } from "@/lib/vendorPayable";
 
 // ---------------------------------------------------------------------------
 // Server-authoritative "mark a withdrawal Paid" — the money-moving transition.
@@ -16,7 +16,12 @@ import { computeVendorPayable } from "@/lib/vendorPayable";
 //
 // A seller can never reach this: verifyRequestUser().isAdmin is the admin email
 // AND a verified email (lib/serverAuth), matching firestore.rules' isAdmin().
-// Firestore rules are unchanged — withdrawals stay create:false / update:admin.
+// firestore.rules deny every client write to withdrawals (B2), so this route
+// (and app/api/review-withdrawal for the non-money transitions) is the only
+// way a withdrawal changes. Inside the one transaction it re-verifies the
+// original request's seller identity and stored amount, re-derives payable,
+// marks Paid and writes the audit_logs entry — so a settlement can never exist
+// without its audit record, and a repeat or concurrent settle sees "Paid".
 // ---------------------------------------------------------------------------
 
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -82,6 +87,9 @@ export async function POST(request: Request) {
       | { kind: "already-paid"; amount: number }
       | { kind: "bad-state"; status: string }
       | { kind: "no-vendor" }
+      | { kind: "missing-vendor-id" }
+      | { kind: "identity-mismatch" }
+      | { kind: "invalid-amount" }
       | { kind: "insufficient"; amount: number; payable: number }
       | { kind: "paid"; amount: number };
 
@@ -95,6 +103,7 @@ export async function POST(request: Request) {
         vendorEmail?: unknown;
         amount?: unknown;
         status?: unknown;
+        payoutNumber?: unknown;
       };
       const status = String(w?.status || "Pending");
 
@@ -107,17 +116,32 @@ export async function POST(request: Request) {
         return { kind: "bad-state", status };
       }
 
-      let vendorUid = typeof w?.vendorId === "string" ? w.vendorId : "";
-      if (!vendorUid && typeof w?.vendorEmail === "string" && w.vendorEmail) {
-        const vs = await tx.get(
-          db.collection("vendors").where("email", "==", w.vendorEmail).limit(1)
-        );
-        if (!vs.empty) vendorUid = String(vs.docs[0].data()?.uid || "");
-      }
-      if (!vendorUid) return { kind: "no-vendor" };
+      // Settlement identity is the stored vendorId ONLY — never a vendorEmail
+      // lookup. lib/vendorPayable.ts counts a Paid withdrawal against a seller
+      // by vendorId alone, so a legacy row paid without one would never reduce
+      // that seller's payable and the same money could be paid out again. Such
+      // a row is refused (fail closed) until an admin corrects it; nothing is
+      // assigned from the email here. The stored value must also be EXACTLY
+      // the seller uid: a padded "seller_a " would be settled against
+      // seller_a here but never matched by vendorPayable's exact comparison,
+      // so it is refused rather than silently normalised.
+      const vendorUid = typeof w?.vendorId === "string" ? w.vendorId : "";
+      if (!vendorUid || vendorUid !== vendorUid.trim()) return { kind: "missing-vendor-id" };
 
-      const [orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap, sellerOrderSnap] =
+      // Identity of the ORIGINAL request. app/api/request-withdrawal creates
+      // every withdrawal at the deterministic id `${vendorUid}_${key}` and
+      // stamps a payoutNumber, so a server-created request whose vendorId no
+      // longer matches its own id has been re-pointed at another seller and is
+      // never paid. (Legacy client-created rows have random ids and no
+      // payoutNumber; they still need a real seller record below.)
+      const serverCreated = typeof w?.payoutNumber === "string" && w.payoutNumber !== "";
+      if (serverCreated && !withdrawalId.startsWith(`${vendorUid}_`)) {
+        return { kind: "identity-mismatch" };
+      }
+
+      const [vendorSnap, orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap, sellerOrderSnap] =
         await Promise.all([
+          tx.get(db.collection("vendors").where("uid", "==", vendorUid).limit(1)),
           tx.get(db.collection("orders").where("vendorIds", "array-contains", vendorUid)),
           tx.get(db.collection("vendor_payouts").where("vendorId", "==", vendorUid)),
           tx.get(db.collection("withdrawals").where("vendorId", "==", vendorUid)),
@@ -125,6 +149,8 @@ export async function POST(request: Request) {
           tx.get(db.collection("returns").where("status", "==", "Refunded")),
           tx.get(db.collection("sellerOrders").where("vendorId", "==", vendorUid)),
         ]);
+
+      if (vendorSnap.empty) return { kind: "no-vendor" };
 
       const orders = orderSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const orderIds = new Set(orders.map((o) => o.id));
@@ -145,15 +171,41 @@ export async function POST(request: Request) {
         excludeWithdrawalId: withdrawalId,
       });
 
-      const amount = Number(w?.amount || 0);
-      if (!Number.isFinite(amount) || amount <= 0 || amount > payable) {
-        return { kind: "insufficient", amount, payable };
+      // The stored amount, held to the same rule it was created under: a
+      // whole-rupee number (never a coerced string), within what is payable.
+      const verdict = evaluateWithdrawalRequest({ amount: w?.amount, payable });
+      if (!verdict.ok) {
+        if (verdict.reason === "invalid-amount") return { kind: "invalid-amount" };
+        return { kind: "insufficient", amount: Number(w?.amount || 0), payable };
       }
+      const amount = verdict.amount;
 
+      // ---- WRITES: the Paid transition and its audit entry, atomically ----
+      const now = Timestamp.now();
+      const auditRef = db.collection("audit_logs").doc();
       tx.update(withdrawalRef, {
         status: "Paid",
-        paidAt: Timestamp.now(),
+        paidAt: now,
         paidBy: requester.uid,
+        paidByEmail: requester.email || "",
+        settlementAuditId: auditRef.id,
+      });
+      tx.set(auditRef, {
+        actorUid: requester.uid,
+        actorEmail: requester.email || "",
+        action: "withdrawal_settlement",
+        targetId: withdrawalId,
+        details: {
+          withdrawalId,
+          vendorId: vendorUid,
+          vendorEmail: typeof w?.vendorEmail === "string" ? w.vendorEmail : "",
+          amount,
+          payoutNumber: serverCreated ? w.payoutNumber : "",
+          fromStatus: status,
+          payableBefore: payable,
+          payableAfter: payable - amount,
+        },
+        createdAt: now,
       });
       return { kind: "paid", amount };
     });
@@ -177,6 +229,24 @@ export async function POST(request: Request) {
       case "no-vendor":
         return Response.json(
           { error: "Cannot identify the vendor for this withdrawal." },
+          { status: 409 }
+        );
+      case "missing-vendor-id":
+        return Response.json(
+          {
+            error:
+              "This is a legacy withdrawal with no seller id. It needs administrative correction before it can be settled.",
+          },
+          { status: 409 }
+        );
+      case "identity-mismatch":
+        return Response.json(
+          { error: "This withdrawal's seller does not match its original request. It needs review." },
+          { status: 409 }
+        );
+      case "invalid-amount":
+        return Response.json(
+          { error: "This withdrawal's amount is not a valid whole-rupee figure. It needs review." },
           { status: 409 }
         );
       case "insufficient":
