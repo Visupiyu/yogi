@@ -21,7 +21,8 @@ import type {
 //   - a product with no vendorId                       -> not approved
 //   - no vendors document whose `uid` is that vendorId -> not approved
 //     (vendors doc ids are auto-ids, NOT the uid — see firestore.rules)
-//   - several vendors documents for one uid: ALL must be Approved
+//   - several vendors documents for one uid: ALL must be Approved (and more
+//     than MAX_SELLER_RECORDS of them is refused outright, never sampled)
 //   - a legacy vendors/{uid} document (doc id == uid) is also consulted
 //   - the vendors_public/{uid} mirror, when it carries a status, must agree.
 //     app/admin/vendors writes vendors then vendors_public as two separate
@@ -58,14 +59,22 @@ export function sellerIdOf(product: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+// Real sellers have one vendors record (occasionally a duplicate from a
+// retried registration). The query reads one past this bound so that a uid
+// with MORE records than can be checked is refused rather than judged on a
+// subset — a Blocked record must never be skipped because it sorted late.
+const MAX_SELLER_RECORDS = 25;
+
 async function isSellerApproved(db: Firestore, read: Reader, uid: string): Promise<boolean> {
   if (!uid) return false;
 
   const [byUid, byDocId, mirror] = await Promise.all([
-    read.query(db.collection("vendors").where("uid", "==", uid).limit(10)),
+    read.query(db.collection("vendors").where("uid", "==", uid).limit(MAX_SELLER_RECORDS + 1)),
     read.doc(db.collection("vendors").doc(uid)),
     read.doc(db.collection("vendors_public").doc(uid)),
   ]);
+
+  if (byUid.size > MAX_SELLER_RECORDS) return false;
 
   const records = byUid.docs.map((d) => d.data());
   if (byDocId.exists && !byUid.docs.some((d) => d.id === byDocId.id)) {

@@ -320,6 +320,22 @@ async function main() {
         await setSeller(BAD, "Approved");
         await db.collection("vendors").doc(BAD).set({ status: "Blocked" });
       }],
+      // The previous check read only limit(10) records: with 11 Approved
+      // records sorting first, a Blocked 12th was never seen (fail-open).
+      ["11 Approved records + a Blocked one sorting last (beyond the old limit(10))", async () => {
+        await setSeller(BAD, "Approved");
+        for (let i = 0; i < 11; i++) {
+          await db.collection("vendors").doc(`b1dup_${String(i).padStart(2, "0")}`).set({ uid: BAD, status: "Approved" });
+        }
+        await db.collection("vendors").doc("b1dup_zz_blocked").set({ uid: BAD, status: "Blocked" });
+      }],
+      // More records than the check reads is refused outright, never sampled.
+      ["26 Approved records (over the 25-record bound) -> refused, not sampled", async () => {
+        await setSeller(BAD, "Approved");
+        for (let i = 0; i < 25; i++) {
+          await db.collection("vendors").doc(`b1many_${String(i).padStart(2, "0")}`).set({ uid: BAD, status: "Approved" });
+        }
+      }],
       ["Pending seller", async () => { await db.collection("vendors").doc(BAD).delete(); await setSeller(BAD, "Pending"); }],
       ["Rejected seller", async () => { await setSeller(BAD, "Rejected"); }],
     ];
@@ -328,6 +344,14 @@ async function main() {
       await expectRefused(`7  ${label}, web COD`, webCod, [P_BAD]);
       await expectRefused(`7  ${label}, mobile online`, mobileOnline, [P_BAD]);
     }
+    // At the bound (25 records, all Approved) the seller still sells.
+    await setSeller(BAD, "Approved");
+    for (let i = 0; i < 24; i++) {
+      await db.collection("vendors").doc(`b1bound_${String(i).padStart(2, "0")}`).set({ uid: BAD, status: "Approved" });
+    }
+    await expectAllowed("7  exactly 25 Approved records (at the bound), web COD", webCod, [P_BAD]);
+    await resetBuyer(); // that order legitimately spent the one-use coupon
+
     // A product carrying no vendorId belongs to no Approved seller.
     await setSeller(BAD, "Approved");
     await db.collection("products").doc(P_BAD).update({ vendorId: "" });

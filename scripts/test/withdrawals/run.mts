@@ -22,6 +22,10 @@
  *      and Paid are final; review can never set Paid
  *  11  a legacy withdrawal without a valid vendorId is refused (no email
  *      fallback): unchanged, unpaid, no audit; valid settlements still work
+ *  12  the seller must be Approved at settlement (blocked / half-blocked /
+ *      Pending / Rejected refused; re-approved and legacy vendors/{uid}
+ *      sellers settle)
+ *  13  malformed withdrawal ids -> 400 before any Firestore access
  *
  * Firestore EMULATOR only. Never touches production, never reads the real
  * service account (throwaway RSA key), auth faked via the Identity Toolkit
@@ -364,6 +368,95 @@ try {
       w.status === 200 && s.status === 200 && s.body.status === "Paid" &&
         (await audits("withdrawal_settlement", w.body.withdrawalId)).length === 1,
       `request=${w.status} settle=${s.status} amount=${payableBefore}`);
+  }
+
+  // ============ 12. seller must be Approved at settlement ============
+  {
+    const { setSellerStatus } = await import("../seller-blocked-orders/sellers.mts");
+    const audited = async (id: string) => (await audits("withdrawal_settlement", id)).length;
+
+    // Requested while Approved, seller blocked before the admin pays.
+    const w = await requestAs(B, 10);
+    const id = w.body.withdrawalId as string;
+    await setSellerStatus(db, B, "Blocked");
+    const before = JSON.stringify(await wd(id));
+    const blocked = await settle(id);
+    record("12a seller blocked after requesting -> settle 409 'not currently approved'; withdrawal unchanged, not Paid, no audit",
+      w.status === 200 && blocked.status === 409 && /not currently approved/i.test(String(blocked.body.error)) &&
+        JSON.stringify(await wd(id)) === before && (await audited(id)) === 0,
+      `request=${w.status} settle=${blocked.status} "${blocked.body.error ?? ""}"`);
+
+    // Half-applied block: vendors Approved, storefront mirror still Blocked.
+    await setSellerStatus(db, B, "Approved");
+    await db.collection("vendors_public").doc(B).set({ uid: B, status: "Blocked" });
+    const mirror = await settle(id);
+    record("12b vendors Approved but vendors_public mirror Blocked -> 409, not Paid",
+      mirror.status === 409 && (await wd(id))?.status === "Pending" && (await audited(id)) === 0, `settle=${mirror.status}`);
+
+    // Pending / Rejected sellers are not Approved either.
+    await db.collection("vendors_public").doc(B).delete();
+    const notApproved: string[] = [];
+    for (const status of ["Pending", "Rejected"]) {
+      await setSellerStatus(db, B, status);
+      notApproved.push(`${status}=${(await settle(id)).status}`);
+    }
+    record("12c Pending / Rejected seller -> 409, not Paid",
+      notApproved.every((s) => s.endsWith("=409")) && (await wd(id))?.status === "Pending" && (await audited(id)) === 0,
+      notApproved.join(" "));
+
+    // Re-approved: the same withdrawal now settles normally.
+    await setSellerStatus(db, B, "Approved");
+    const ok = await settle(id);
+    record("12d seller re-approved -> the same withdrawal settles (200 Paid, one audit record)",
+      ok.status === 200 && ok.body.status === "Paid" && (await audited(id)) === 1, `settle=${ok.status}`);
+
+    // A legitimate legacy seller whose only record is vendors/{uid} (no uid
+    // field) — accepted by the order paths — is accepted here too.
+    const C = "seller_wd_legacy_c";
+    await db.collection("vendors").doc(C).set({ email: `${C}@example.com`, businessName: "Legacy C", status: "Approved" });
+    await db.collection("orders").doc("wd_o3").set({
+      userId: CUSTOMER, vendorIds: [C], items: [{ id: "p_wd_o3", vendorId: C, price: 100, qty: 1 }],
+      total: 100, shippingCharge: 49, finalTotal: 149, deliveryCost: 49, freeDeliveryApplied: false,
+      status: "Delivered", paymentStatus: "Paid", paymentMethod: "ONLINE",
+    });
+    await db.collection("sellerOrders").doc(`wd_o3_${C}`).set({ orderId: "wd_o3", vendorId: C, vendorSubtotal: 100, vendorCommission: 0, vendorEarning: 100, sellerDeliveryCharge: 0 });
+    await db.collection("withdrawals").doc(`${C}_legacy1`).set({ vendorId: C, vendorEmail: `${C}@example.com`, payoutNumber: "PO-C", amount: 20, status: "Pending" });
+    const legacy = await settle(`${C}_legacy1`);
+    record("12e legacy vendors/{uid}-only Approved seller -> settles (200), same seller identity as the order paths",
+      legacy.status === 200 && (await wd(`${C}_legacy1`))?.status === "Paid" && (await audited(`${C}_legacy1`)) === 1,
+      `settle=${legacy.status} "${legacy.body.error ?? ""}"`);
+    // ...and blocking that legacy record stops it.
+    await db.collection("vendors").doc(C).update({ status: "Blocked" });
+    await db.collection("withdrawals").doc(`${C}_legacy2`).set({ vendorId: C, vendorEmail: `${C}@example.com`, payoutNumber: "PO-C2", amount: 20, status: "Pending" });
+    const legacyBlocked = await settle(`${C}_legacy2`);
+    record("12f the same legacy seller once Blocked -> 409, not Paid",
+      legacyBlocked.status === 409 && (await wd(`${C}_legacy2`))?.status === "Pending" && (await audited(`${C}_legacy2`)) === 0,
+      `settle=${legacyBlocked.status}`);
+  }
+
+  // ============ 13. malformed withdrawal ids ============
+  {
+    const auditsBefore = (await db.collection("audit_logs").get()).size;
+    const withdrawalsBefore = (await db.collection("withdrawals").get()).size;
+    const cases: [string, unknown][] = [
+      ["a/b", "a/b"], ["a/b/c", "a/b/c"], [`${A}/../x`, `${A}/../x`], ["/", "/"], ["trailing/", "x/"],
+      [".", "."], ["..", ".."], ["__reserved__", "__x__"], ["600 chars", "w".repeat(600)],
+      ["empty", ""], ["spaces", "   "], ["number", 123], ["null", null], ["object", { id: "x" }],
+    ];
+    const statuses: string[] = [];
+    let allBadRequest = true;
+    for (const [label, withdrawalId] of cases) {
+      const res = await settleWithdrawal(post("http://localhost/api/settle-withdrawal", { withdrawalId }, ADMIN));
+      statuses.push(`${label}=${res.status}`);
+      if (res.status !== 400) allBadRequest = false;
+    }
+    const nullBody = await settleWithdrawal(post("http://localhost/api/settle-withdrawal", null, ADMIN));
+    statuses.push(`nullBody=${nullBody.status}`);
+    record("13 malformed withdrawal ids ('/', '.', '..', __x__, >512 chars, empty, non-string, null body) -> 400, never 500; nothing written",
+      allBadRequest && nullBody.status === 400 &&
+        (await db.collection("audit_logs").get()).size === auditsBefore &&
+        (await db.collection("withdrawals").get()).size === withdrawalsBefore,
+      statuses.join(" "));
   }
 } catch (e) {
   record("HARNESS ERROR", false, (e as Error).stack || String(e));

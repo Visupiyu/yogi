@@ -2,6 +2,7 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
 import { computeVendorPayable, evaluateWithdrawalRequest } from "@/lib/vendorPayable";
+import { findUnapprovedSellers } from "@/lib/sellerApproval";
 
 // ---------------------------------------------------------------------------
 // Server-authoritative "mark a withdrawal Paid" — the money-moving transition.
@@ -45,6 +46,17 @@ async function isWithinRateLimit(uid: string): Promise<boolean> {
   });
 }
 
+/** A single Firestore document id: no path separator, no reserved id. */
+function isValidWithdrawalId(id: string): boolean {
+  return (
+    id.length <= 512 &&
+    !id.includes("/") &&
+    id !== "." &&
+    id !== ".." &&
+    !/^__.*__$/.test(id)
+  );
+}
+
 // Only a request that has NOT yet moved money may be settled.
 const SETTLEABLE_FROM = new Set(["Pending", "Approved"]);
 
@@ -74,9 +86,15 @@ export async function POST(request: Request) {
     }
 
     const withdrawalId =
-      typeof body.withdrawalId === "string" ? body.withdrawalId.trim() : "";
+      typeof body?.withdrawalId === "string" ? body.withdrawalId.trim() : "";
     if (!withdrawalId) {
       return Response.json({ error: "Missing withdrawal id." }, { status: 400 });
+    }
+    // Validated BEFORE any document reference is built: a '/' would make
+    // doc() address a collection (throws -> 500) or a nested subcollection
+    // document, and Firestore reserves '.', '..' and __name__ ids.
+    if (!isValidWithdrawalId(withdrawalId)) {
+      return Response.json({ error: "Invalid withdrawal id." }, { status: 400 });
     }
 
     const db = getAdminDb();
@@ -86,7 +104,7 @@ export async function POST(request: Request) {
       | { kind: "not-found" }
       | { kind: "already-paid"; amount: number }
       | { kind: "bad-state"; status: string }
-      | { kind: "no-vendor" }
+      | { kind: "seller-not-approved" }
       | { kind: "missing-vendor-id" }
       | { kind: "identity-mismatch" }
       | { kind: "invalid-amount" }
@@ -133,15 +151,24 @@ export async function POST(request: Request) {
       // stamps a payoutNumber, so a server-created request whose vendorId no
       // longer matches its own id has been re-pointed at another seller and is
       // never paid. (Legacy client-created rows have random ids and no
-      // payoutNumber; they still need a real seller record below.)
+      // payoutNumber; they still need an Approved seller below.)
       const serverCreated = typeof w?.payoutNumber === "string" && w.payoutNumber !== "";
       if (serverCreated && !withdrawalId.startsWith(`${vendorUid}_`)) {
         return { kind: "identity-mismatch" };
       }
 
-      const [vendorSnap, orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap, sellerOrderSnap] =
+      // The seller must be Approved RIGHT NOW — the same rule (and the same
+      // seller records: vendors by uid, a legacy vendors/{uid}, the
+      // vendors_public mirror) that request-withdrawal and every order path
+      // apply, read inside this transaction so a block committed concurrently
+      // is seen. A missing record fails closed exactly like a Blocked one. An
+      // admin can still Reject the request through review-withdrawal.
+      if ((await findUnapprovedSellers(db, [vendorUid], tx)).length > 0) {
+        return { kind: "seller-not-approved" };
+      }
+
+      const [orderSnap, payoutSnap, withdrawalSnap, itemReqSnap, legacyReturnSnap, sellerOrderSnap] =
         await Promise.all([
-          tx.get(db.collection("vendors").where("uid", "==", vendorUid).limit(1)),
           tx.get(db.collection("orders").where("vendorIds", "array-contains", vendorUid)),
           tx.get(db.collection("vendor_payouts").where("vendorId", "==", vendorUid)),
           tx.get(db.collection("withdrawals").where("vendorId", "==", vendorUid)),
@@ -149,8 +176,6 @@ export async function POST(request: Request) {
           tx.get(db.collection("returns").where("status", "==", "Refunded")),
           tx.get(db.collection("sellerOrders").where("vendorId", "==", vendorUid)),
         ]);
-
-      if (vendorSnap.empty) return { kind: "no-vendor" };
 
       const orders = orderSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const orderIds = new Set(orders.map((o) => o.id));
@@ -226,9 +251,12 @@ export async function POST(request: Request) {
           },
           { status: 409 }
         );
-      case "no-vendor":
+      case "seller-not-approved":
         return Response.json(
-          { error: "Cannot identify the vendor for this withdrawal." },
+          {
+            error:
+              "This seller is not currently approved (blocked, pending, rejected or no seller record). The withdrawal cannot be paid; reject it or resolve the seller's status first.",
+          },
           { status: 409 }
         );
       case "missing-vendor-id":
