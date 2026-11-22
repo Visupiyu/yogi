@@ -138,8 +138,13 @@ await check("D2 itemRequests: seller cannot write (refunds / stages server-only)
 // Customer Account hardening: cancelling goes through app/api/cancel-order only.
 await check("U1 customer can no longer cancel their Pending order by a direct write (app/api/cancel-order only)", () =>
   assertFails(updateDoc(order(BUYER, "o_sole_pending", "buyer1@example.com"), { status: "Cancelled", updatedAt: serverTimestamp() })));
-await check("U2 admin may still update an order (admin access unchanged)", () =>
-  assertSucceeds(updateDoc(order("adminUid", "o_sole_delivered", ADMIN_EMAIL), { paymentStatus: "Paid" })));
+// Admin order editing is unchanged for ordinary fields; paymentStatus itself
+// moves in a browser only through delivery-payment verification
+// (scripts/test/order-containment/rules.test.mts M-*), never Pending -> Paid.
+await check("U2 admin may still update an order (admin access unchanged); a direct Pending -> Paid is refused", async () => {
+  await assertSucceeds(updateDoc(order("adminUid", "o_sole_delivered", ADMIN_EMAIL), { needsReview: false, reviewedBy: "adminUid" }));
+  await assertFails(updateDoc(order("adminUid", "o_sole_delivered", ADMIN_EMAIL), { paymentStatus: "Paid" }));
+});
 await check("U3 seller can no longer READ the shared order document (served by app/api/seller/orders instead)", () =>
   assertFails(getDoc(order(A, "o_multi"))));
 

@@ -11,7 +11,10 @@
  *     admin status updates) still works, on archived orders too;
  *   - C1: the inventory evidence app/api/cancel-order trusts (items,
  *     stockShortfall, stockDeductedQty, inventoryRestore) is server-only —
- *     no browser, admin included, can set, change or remove it.
+ *     no browser, admin included, can set, change or remove it;
+ *   - MF: finalTotal and paymentMethod never change in a browser, and
+ *     paymentStatus moves only AwaitingVerification -> Paid, stamped with the
+ *     verifying admin's own uid.
  * The archive route itself is exercised by scripts/test/order-containment/run.mts.
  *
  * Run:
@@ -83,6 +86,15 @@ await env.withSecurityRulesDisabled(async (ctx) => {
     paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "AwaitingVerification", paymentTransactionId: "UTR123" });
   await setDoc(doc(f, "orders", "o_c1_rider"), { ...order, ...evidence, status: "Out For Delivery", deliveryPartnerId: "dp_h1",
     paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending", inventoryRestore: restored });
+  // Money-field fixtures (finalTotal / paymentMethod / paymentStatus).
+  await setDoc(doc(f, "orders", "o_m_online"), { ...order, paymentMethod: "ONLINE", paymentStatus: "Paid", razorpayPaymentId: "pay_x" });
+  await setDoc(doc(f, "orders", "o_m_cod"), { ...order, status: "Delivered", deliveredAt: new Date(), paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
+  await setDoc(doc(f, "orders", "o_m_await"), { ...order, status: "Delivered", deliveredAt: new Date(),
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "AwaitingVerification", paymentTransactionId: "UTR555" });
+  const { finalTotal: _ft, ...noTotal } = order;
+  await setDoc(doc(f, "orders", "o_m_bare"), noTotal); // no finalTotal, paymentMethod or paymentStatus
+  await setDoc(doc(f, "orders", "o_m_rider"), { ...order, status: "Out For Delivery", deliveryPartnerId: "dp_h1",
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
 });
 
 const Cdb = as(C);
@@ -250,6 +262,73 @@ await check("C1-8 the assigned delivery partner cannot touch any protected field
 await check("C1-9 customer, vendor and stranger still cannot write any protected field", async () => {
   for (const db of [Cdb, Vdb, Sdb]) {
     for (const field of C1_PROTECTED) await assertFails(updateDoc(doc(db, "orders", "o_c1_ev"), { [field]: deleteField() }));
+  }
+});
+
+// ================= MF: order money fields are server-owned =================
+// finalTotal and paymentMethod never change in a browser; paymentStatus moves
+// only AwaitingVerification -> Paid, by the verifying admin (paymentVerifiedBy).
+const verifyFields = (uid: string) => ({
+  paymentStatus: "Paid", paymentVerifiedAt: serverTimestamp(), paymentVerifiedBy: uid, paymentVerifiedByName: "Admin", updatedAt: serverTimestamp(),
+});
+await check("MF-1 admin browser cannot modify, delete or add finalTotal", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { finalTotal: 90000 }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { finalTotal: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_bare"), { finalTotal: 100 }));
+});
+await check("MF-2 admin browser cannot modify, delete or add paymentMethod", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_cod"), { paymentMethod: "ONLINE" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { paymentMethod: "PAY_ON_DELIVERY_UPI" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { paymentMethod: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_bare"), { paymentMethod: "ONLINE" }));
+});
+await check("MF-3 admin browser cannot set Pending -> Paid, Paid -> Pending / Refunded / AwaitingVerification, delete or add paymentStatus", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_cod"), { paymentStatus: "Paid" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_cod"), verifyFields("adminUid"))); // Pending, not AwaitingVerification
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { paymentStatus: "Pending" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { paymentStatus: "Refunded" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { paymentStatus: "AwaitingVerification" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { paymentStatus: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_bare"), { paymentStatus: "Paid" }));
+});
+await check("MF-4 AwaitingVerification -> Paid is refused when paymentVerifiedBy is another uid or missing; other targets refused", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_await"), verifyFields("someoneElse")));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_await"), { paymentStatus: "Paid", paymentVerifiedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_await"), { paymentStatus: "Refunded", paymentVerifiedBy: "adminUid" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_await"), { paymentStatus: "Pending" }));
+});
+await check("MF-5 a legitimate admin edit bundled with a money-field change is refused as a whole", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_online"), { needsReview: false, finalTotal: 1 }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_cod"), { courierName: "Blue", paymentStatus: "Paid" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_await"), { ...verifyFields("adminUid"), finalTotal: 1 }));
+});
+await check("MF-6 the real verification (AwaitingVerification -> Paid, paymentVerifiedBy = acting admin) succeeds", async () => {
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_m_await"), verifyFields("adminUid")));
+  const after = (await getDoc(doc(ADb, "orders", "o_m_await"))).data();
+  if (after?.paymentStatus !== "Paid" || after?.paymentVerifiedBy !== "adminUid") throw new Error("verification not recorded");
+  // Once Paid, the admin browser cannot move it again.
+  await assertFails(updateDoc(doc(ADb, "orders", "o_m_await"), { paymentStatus: "AwaitingVerification" }));
+});
+await check("MF-7 ordinary admin edits still work on money orders (review, refund recording, shipping)", async () => {
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_m_online"), { needsReview: false, reviewedAt: serverTimestamp(), reviewedBy: "adminUid" }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_m_online"), { refundStatus: "Processing", recordedByEmail: ADMIN_EMAIL }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_m_cod"), { courierName: "Blue Dart", trackingNumber: "BD9" }));
+});
+await check("MF-8 rider Pending -> AwaitingVerification still works; rider cannot touch finalTotal / paymentMethod or set Paid", async () => {
+  const rider = as("rider_h1");
+  await assertFails(updateDoc(doc(rider, "orders", "o_m_rider"), { finalTotal: 1 }));
+  await assertFails(updateDoc(doc(rider, "orders", "o_m_rider"), { paymentMethod: "ONLINE" }));
+  await assertFails(updateDoc(doc(rider, "orders", "o_m_rider"), { paymentStatus: "Paid" }));
+  await assertSucceeds(updateDoc(doc(rider, "orders", "o_m_rider"), {
+    paymentStatus: "AwaitingVerification", paymentTransactionId: "UTR777", paymentSubmittedAt: serverTimestamp(),
+    paymentConfirmedBy: "rider_h1", paymentConfirmedByName: "Rider", updatedAt: serverTimestamp(),
+  }));
+});
+await check("MF-9 customer, vendor and stranger cannot modify any money field", async () => {
+  for (const db of [Cdb, Vdb, Sdb]) {
+    await assertFails(updateDoc(doc(db, "orders", "o_m_cod"), { paymentStatus: "Paid" }));
+    await assertFails(updateDoc(doc(db, "orders", "o_m_online"), { finalTotal: 1 }));
+    await assertFails(updateDoc(doc(db, "orders", "o_m_online"), { paymentMethod: deleteField() }));
   }
 });
 {

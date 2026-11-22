@@ -545,6 +545,27 @@ service cloud.firestore {
         && unchanged('inventoryRestore');
     }
 
+    // Server-owned order money. finalTotal (what was charged) and
+    // paymentMethod (how) are set when the order is created and never change
+    // in a browser: cancel-order derives the refund owed and the points
+    // reversal from them, the reward credit run pays floor(finalTotal / 100)
+    // points, and lib/vendorPayable treats paymentStatus "Paid" as money
+    // collected. The one admin-browser paymentStatus change is the
+    // delivery-payment verification (lib/deliveryPayment verifyDeliveryPayment):
+    // AwaitingVerification -> Paid, stamped with the acting admin's own uid.
+    function orderMoneyFieldsUnchanged() {
+      return unchanged('finalTotal')
+        && unchanged('paymentMethod')
+        && (
+          unchanged('paymentStatus')
+          || (
+            resource.data.get('paymentStatus', null) == 'AwaitingVerification'
+            && request.resource.data.get('paymentStatus', null) == 'Paid'
+            && request.resource.data.get('paymentVerifiedBy', null) == request.auth.uid
+          )
+        );
+    }
+
     match /orders/{orderId} {
       // isAssignedDeliveryPartner() added here as a genuine bug fix, not
       // scope creep: app/delivery/[id]/page.tsx's loadOrder() has always
@@ -598,7 +619,7 @@ service cloud.firestore {
       // unchanged; only creation moves server-side.
       allow create: if false;
 
-      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged() && orderCouponFundingUnchanged() && orderInventoryEvidenceUnchanged())
+      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged() && orderCouponFundingUnchanged() && orderInventoryEvidenceUnchanged() && orderMoneyFieldsUnchanged())
         // No customer branch. Cancelling goes through app/api/cancel-order
         // (web and Customer App), which restores stock/sales, reverses reward
         // points and coupons and notifies the seller in one place. A direct
