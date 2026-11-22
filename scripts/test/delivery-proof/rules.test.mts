@@ -5,7 +5,9 @@
  * (Delivery Failed -> Out For Delivery -> Delivered), but can no longer
  * change or remove it once the order is already Delivered — while admin,
  * buyer and seller permissions and every other delivery-partner write are
- * unchanged. Loads the repository's firestore.rules into the emulator and
+ * unchanged — and (RT) that the partner's status moves are the delivery leg
+ * only: Shipped -> Out For Delivery -> Delivered / Delivery Failed -> Out For
+ * Delivery, never confirm, pack, ship or cancel. Loads the repository's firestore.rules into the emulator and
  * uses synthetic documents only.
  *
  * Run:
@@ -143,6 +145,50 @@ await check("8c seller: tracking update on a Delivered order — now DENIED (ord
 // only (stock, rewards, coupons and the seller's notice are handled there).
 await check("8d buyer: direct cancel of own Pending order — now DENIED (app/api/cancel-order only)", () =>
   assertFails(updateDoc(order("buyer1", "o_pending"), { status: "Cancelled", updatedAt: serverTimestamp() })));
+
+// ---- RT: the rider's status moves are the delivery leg only ----
+// Exactly app/delivery/[id]/page.tsx NEXT_STATUSES. Confirming, packing,
+// shipping and cancelling stay with the server routes (confirm-order,
+// advance-item, cancel-order).
+await reseed();
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  for (const [id, status] of [["o_rt_shipped", "Shipped"], ["o_rt_ofd", "Out For Delivery"], ["o_rt_failed", "Delivery Failed"],
+    ["o_rt_pending", "Pending"], ["o_rt_confirmed", "Confirmed"], ["o_rt_packed", "Packed"], ["o_rt8_failed", "Delivery Failed"]] as const) {
+    await setDoc(doc(db, "orders", id), { ...base, status, proofImage: "", deliveredAt: null });
+  }
+});
+const move = (uid: string, id: string, status: string, extra: Record<string, unknown> = {}) =>
+  updateDoc(order(uid, id), { status, updatedAt: serverTimestamp(), ...extra });
+await check("RT1 partner: Shipped -> Out For Delivery — ALLOWED", () => assertSucceeds(move("rider1", "o_rt_shipped", "Out For Delivery")));
+await check("RT2 partner: Out For Delivery -> Delivery Failed — ALLOWED", () => assertSucceeds(move("rider1", "o_rt_ofd", "Delivery Failed")));
+await check("RT3 partner: Delivery Failed -> Out For Delivery — ALLOWED", () => assertSucceeds(move("rider1", "o_rt_failed", "Out For Delivery")));
+await check("RT4 partner: Out For Delivery -> Delivered (trusted deliveredAt) — ALLOWED", () =>
+  assertSucceeds(move("rider1", "o_rt_shipped", "Delivered", { deliveredAt: serverTimestamp(), proofImage: "https://example.invalid/rt.jpg" })));
+await check("RT5 partner: Pending -> Confirmed and Pending -> Cancelled — DENIED (confirm-order / cancel-order only)", async () => {
+  await assertFails(move("rider1", "o_rt_pending", "Confirmed"));
+  await assertFails(move("rider1", "o_rt_pending", "Cancelled"));
+});
+await check("RT6 partner: Confirmed -> Packed and Confirmed -> Cancelled — DENIED", async () => {
+  await assertFails(move("rider1", "o_rt_confirmed", "Packed"));
+  await assertFails(move("rider1", "o_rt_confirmed", "Cancelled"));
+});
+await check("RT7 partner: Packed -> Shipped and Packed -> Cancelled — DENIED", async () => {
+  await assertFails(move("rider1", "o_rt_packed", "Shipped"));
+  await assertFails(move("rider1", "o_rt_packed", "Cancelled"));
+});
+await check("RT8 partner: no other moves (skip ahead, backwards, out of Delivered) — DENIED", async () => {
+  await assertFails(move("rider1", "o_rt8_failed", "Delivered", { deliveredAt: serverTimestamp() })); // Delivery Failed -> Delivered skips the re-attempt
+  await assertFails(move("rider1", "o_rt8_failed", "Shipped"));
+  await assertFails(move("rider1", "o_rt8_failed", "Cancelled"));
+  await assertFails(move("rider1", "o_rt_shipped", "Out For Delivery")); // now Delivered (RT4)
+  await assertFails(move("rider1", "o_delivered", "Out For Delivery"));
+  await assertFails(move("rider1", "o_rt_pending", "Delivered", { deliveredAt: serverTimestamp() }));
+});
+await check("RT9 unrelated partner cannot make even a permitted move on someone else's order — DENIED", async () => {
+  await assertFails(move("rider2", "o_rt_ofd", "Out For Delivery")); // o_rt_ofd is now Delivery Failed (RT2)
+  await assertFails(move("rider2", "o_rt_failed", "Delivery Failed"));
+});
 
 await env.cleanup();
 console.log(`\n${pass}/${pass + fail} delivery-proof rules checks passed`);

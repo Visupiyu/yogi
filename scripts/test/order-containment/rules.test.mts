@@ -14,7 +14,10 @@
  *     no browser, admin included, can set, change or remove it;
  *   - MF: finalTotal and paymentMethod never change in a browser, and
  *     paymentStatus moves only AwaitingVerification -> Paid, stamped with the
- *     verifying admin's own uid.
+ *     verifying admin's own uid;
+ *   - DA / DP / CH: no browser can assign an order to a delivery partner, no
+ *     admin browser can give a partner record their own uid or re-point one,
+ *     and the admin self-assignment chain is refused at every boundary.
  * The archive route itself is exercised by scripts/test/order-containment/run.mts.
  *
  * Run:
@@ -94,6 +97,21 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   const { finalTotal: _ft, ...noTotal } = order;
   await setDoc(doc(f, "orders", "o_m_bare"), noTotal); // no finalTotal, paymentMethod or paymentStatus
   await setDoc(doc(f, "orders", "o_m_rider"), { ...order, status: "Out For Delivery", deliveryPartnerId: "dp_h1",
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
+  // Delivery-assignment / partner-identity fixtures (DA, DP, CH).
+  await setDoc(doc(f, "orders", "o_da"), { ...order, status: "Shipped", deliveryPartnerId: "dp_h1", deliveryPartnerName: "Rider",
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
+  await setDoc(doc(f, "orders", "o_ch"), { ...order, status: "Out For Delivery", deliveredAt: null,
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" }); // unassigned, unpaid pay-on-delivery order
+  await setDoc(doc(f, "deliveryPartners", "dp_edit"), { uid: "rider_edit", name: "Edit Me", status: "Active" });
+  await setDoc(doc(f, "deliveryPartners", "dp_nouid"), { name: "Legacy, no login yet", status: "Active" });
+  await setDoc(doc(f, "deliveryPartners", "dp_delete"), { uid: "rider_gone", name: "Leaving" });
+  // A pre-existing BAD record (legacy data): a partner doc already carrying the admin's uid, and an order assigned to it.
+  await setDoc(doc(f, "deliveryPartners", "dp_badlegacy"), { uid: "adminUid", name: "Legacy bad record" });
+  await setDoc(doc(f, "orders", "o_badlegacy"), { ...order, status: "Packed", deliveryPartnerId: "dp_badlegacy",
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
+  // Same bad legacy assignment on an order already at Shipped (CH-5 accepted residual risk).
+  await setDoc(doc(f, "orders", "o_badlegacy_shipped"), { ...order, status: "Shipped", deliveredAt: null, deliveryPartnerId: "dp_badlegacy",
     paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
 });
 
@@ -330,6 +348,125 @@ await check("MF-9 customer, vendor and stranger cannot modify any money field", 
     await assertFails(updateDoc(doc(db, "orders", "o_m_online"), { finalTotal: 1 }));
     await assertFails(updateDoc(doc(db, "orders", "o_m_online"), { paymentMethod: deleteField() }));
   }
+});
+
+// ================= DA: delivery assignment is server-only =================
+// deliveryPartnerId decides who passes isAssignedDeliveryPartner(); assignment
+// runs through the Delivery Engine server routes, never a browser write.
+await check("DA-1 admin browser cannot change, delete or add deliveryPartnerId", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_da"), { deliveryPartnerId: "dp_edit" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_da"), { deliveryPartnerId: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_da"), { deliveryPartnerId: "" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_live"), { deliveryPartnerId: "dp_h1" }));
+});
+await check("DA-2 admin browser cannot change, delete or add deliveryPartnerName", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_da"), { deliveryPartnerName: "Someone Else" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_da"), { deliveryPartnerName: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_live"), { deliveryPartnerName: "Rider" }));
+});
+await check("DA-3 ordinary admin edits still work on assigned and unassigned orders (review, refund recording, shipping)", async () => {
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_da"), { needsReview: false, reviewedAt: serverTimestamp(), reviewedBy: "adminUid" }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_da"), { refundStatus: "Processing", recordedByEmail: ADMIN_EMAIL }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_da"), { courierName: "Blue Dart", trackingNumber: "BD10" }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_live"), { courierName: "Blue Dart" }));
+});
+
+// ================= DP: delivery-partner identity =================
+await check("DP-1 admin browser cannot create a partner carrying their own uid", async () => {
+  await assertFails(setDoc(doc(ADb, "deliveryPartners", "dp_self"), { uid: "adminUid", name: "Me", status: "Active" }));
+  await assertFails(addDoc(collection(ADb, "deliveryPartners"), { uid: "adminUid", name: "Me" }));
+});
+await check("DP-2 admin browser cannot re-point an existing partner's uid (to their own, to another uid, or by removing it)", async () => {
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_edit"), { uid: "adminUid" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_edit"), { uid: "rider_other" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_edit"), { uid: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_h1"), { uid: "adminUid" }));
+});
+await check("DP-3 malformed or missing uid is refused on create; a legacy partner cannot be given the admin's own uid", async () => {
+  await assertFails(setDoc(doc(ADb, "deliveryPartners", "dp_m1"), { name: "No uid" }));
+  await assertFails(setDoc(doc(ADb, "deliveryPartners", "dp_m2"), { uid: "", name: "Empty uid" }));
+  await assertFails(setDoc(doc(ADb, "deliveryPartners", "dp_m3"), { uid: 12345, name: "Numeric uid" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid"), { uid: "adminUid" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid"), { uid: "" }));
+});
+await check("DP-4 legitimate partner management still works (app/admin/delivery-partners create / edit / add login / toggle / delete)", async () => {
+  // create (:178) — uid from a NEW Auth account, never the admin's
+  await assertSucceeds(addDoc(collection(ADb, "deliveryPartners"), {
+    name: "New Rider", phone: "999", email: "new.rider@example.com", vehicleNumber: "KA01", vehicleType: "Bike",
+    dailyCapacity: 20, serviceArea: "North", companyId: "", companyName: "", uid: "rider_new", status: "Active", createdAt: serverTimestamp(),
+  }));
+  // edit (:161) — same fields, same uid re-sent
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_edit"), { name: "Edited", phone: "888", uid: "rider_edit" }));
+  // edit a legacy partner that has no login yet — the page adds the new account's uid once
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid"), { name: "Now with login", uid: "rider_fresh" }));
+  // ...and once set it is fixed like any other
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid"), { uid: "rider_fresh2" }));
+  // status toggle (:255) and delete (:245)
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_edit"), { status: "Inactive" }));
+  await assertSucceeds(deleteDoc(doc(ADb, "deliveryPartners", "dp_delete")));
+});
+await check("DP-5 non-admins still cannot write partner records; a partner still reads only their own", async () => {
+  for (const db of [Cdb, Vdb, Sdb, as("rider_h1")]) {
+    await assertFails(setDoc(doc(db, "deliveryPartners", "dp_x"), { uid: "rider_x", name: "X" }));
+    await assertFails(updateDoc(doc(db, "deliveryPartners", "dp_h1"), { name: "Renamed" }));
+  }
+  await assertSucceeds(getDoc(doc(as("rider_h1"), "deliveryPartners", "dp_h1")));
+  await assertFails(getDoc(doc(as("rider_h1"), "deliveryPartners", "dp_edit")));
+});
+
+// ================= CH: the admin self-assignment chain is blocked =================
+// 1 own-uid partner identity -> 2 assign the order -> 3 move status as "rider"
+// -> 4 submit payment as "rider" -> 5 verify as admin. Each boundary refuses.
+await check("CH-1 step 1 refused: the admin cannot mint or re-point a partner identity to their own uid", async () => {
+  await assertFails(setDoc(doc(ADb, "deliveryPartners", "dp_chain"), { uid: "adminUid", name: "Self" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_h1"), { uid: "adminUid" }));
+});
+await check("CH-2 step 2 refused: the admin cannot point the order at any partner (own or a real rider's)", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_ch"), { deliveryPartnerId: "dp_chain" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_ch"), { deliveryPartnerId: "dp_h1", deliveryPartnerName: "Rider" }));
+});
+await check("CH-3 steps 3-5 refused on the unassigned order: no rider status move, no payment submission, no verification", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_ch"), { status: "Delivered", deliveredAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_ch"), {
+    paymentStatus: "AwaitingVerification", paymentTransactionId: "UTR-FAKE", paymentSubmittedAt: serverTimestamp(),
+    paymentConfirmedBy: "adminUid", paymentConfirmedByName: "Admin", updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_ch"), {
+    paymentStatus: "Paid", paymentVerifiedAt: serverTimestamp(), paymentVerifiedBy: "adminUid", paymentVerifiedByName: "Admin", updatedAt: serverTimestamp(),
+  }));
+  const after = (await getDoc(doc(ADb, "orders", "o_ch"))).data();
+  if (after?.status !== "Out For Delivery" || after?.paymentStatus !== "Pending" || "deliveryPartnerId" in (after || {})) {
+    throw new Error("order changed");
+  }
+});
+await check("CH-4 legacy bad record (partner doc already holding the admin's uid), order at Packed: Packed -> Cancelled, Packed -> Shipped and re-assignment are refused", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy"), { status: "Cancelled", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy"), { status: "Shipped", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy"), { deliveryPartnerId: "dp_h1" }));
+});
+// ACCEPTED RESIDUAL RISK — legacy DATA, not introduced by and not fixed by these
+// rules. If a deliveryPartners record ALREADY carries an admin's uid (created
+// before the identity rules) and an order is ALREADY assigned to it, that admin
+// still passes isAssignedDeliveryPartner() on that order, so the legitimate
+// rider delivery leg and the delivery-payment submission remain open to them,
+// and the admin verification after it. Only cleaning such records (a separate,
+// authorized data task) closes this. This check PINS today's behaviour so any
+// change to it is noticed; it is not a protection.
+await check("CH-5 ACCEPTED RESIDUAL RISK (legacy data, not fixed by rules): on an order already assigned to a partner record holding the admin's uid, the rider delivery leg, payment submission and verification still succeed", async () => {
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), { status: "Out For Delivery", updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), {
+    status: "Delivered", deliveredAt: serverTimestamp(), proofImage: "https://example.invalid/residual.jpg", updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), {
+    paymentStatus: "AwaitingVerification", paymentTransactionId: "UTR-RESIDUAL", paymentSubmittedAt: serverTimestamp(),
+    paymentConfirmedBy: "adminUid", paymentConfirmedByName: "Admin", updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), {
+    paymentStatus: "Paid", paymentVerifiedAt: serverTimestamp(), paymentVerifiedBy: "adminUid", paymentVerifiedByName: "Admin", updatedAt: serverTimestamp(),
+  }));
+  // The new protections still hold on this order: no cancel from Delivered, no re-assignment.
+  await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), { status: "Cancelled", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), { deliveryPartnerId: "dp_h1" }));
 });
 {
   const page = fs.readFileSync(path.join(REPO, "app/admin/orders/page.tsx"), "utf8");

@@ -411,6 +411,18 @@ service cloud.firestore {
         || (from == 'Delivery Failed' && to == 'Out For Delivery');
     }
 
+    // What the assigned delivery partner may do to an order's status: the
+    // delivery leg only — exactly the moves app/delivery/[id]/page.tsx offers
+    // (NEXT_STATUSES). Confirming, packing, shipping and cancelling belong to
+    // the server routes (confirm-order, advance-item, cancel-order), which
+    // also create seller records, restore stock and record refunds; a rider
+    // write must never stand in for them.
+    function isRiderStatusTransition(from, to) {
+      return (from == 'Shipped' && to == 'Out For Delivery')
+        || (from == 'Out For Delivery' && to in ['Delivered', 'Delivery Failed'])
+        || (from == 'Delivery Failed' && to == 'Out For Delivery');
+    }
+
     function isAssignedDeliveryPartner() {
       // deliveryPartnerId stores the deliveryPartners doc id (not a uid) —
       // look up that doc and confirm its uid is the caller's own.
@@ -553,6 +565,16 @@ service cloud.firestore {
     // collected. The one admin-browser paymentStatus change is the
     // delivery-payment verification (lib/deliveryPayment verifyDeliveryPayment):
     // AwaitingVerification -> Paid, stamped with the acting admin's own uid.
+    // Which delivery partner holds an order decides who passes
+    // isAssignedDeliveryPartner(). Assignment is server-side only (Delivery
+    // Engine /api/delivery/jobs/*, Admin SDK) since the legacy browser
+    // assignment was removed, so no browser — admin included — may point an
+    // order at a partner (e.g. at a partner record carrying the admin's own uid).
+    function orderDeliveryAssignmentUnchanged() {
+      return unchanged('deliveryPartnerId')
+        && unchanged('deliveryPartnerName');
+    }
+
     function orderMoneyFieldsUnchanged() {
       return unchanged('finalTotal')
         && unchanged('paymentMethod')
@@ -619,7 +641,7 @@ service cloud.firestore {
       // unchanged; only creation moves server-side.
       allow create: if false;
 
-      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged() && orderCouponFundingUnchanged() && orderInventoryEvidenceUnchanged() && orderMoneyFieldsUnchanged())
+      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged() && orderCouponFundingUnchanged() && orderInventoryEvidenceUnchanged() && orderMoneyFieldsUnchanged() && orderDeliveryAssignmentUnchanged())
         // No customer branch. Cancelling goes through app/api/cancel-order
         // (web and Customer App), which restores stock/sales, reverses reward
         // points and coupons and notifies the seller in one place. A direct
@@ -645,7 +667,7 @@ service cloud.firestore {
           && (resource.data.status != 'Delivered' || unchanged('proofImage'))
           && (
             unchanged('status')
-            || isLegalOrderStatusTransition(resource.data.status, request.resource.data.status)
+            || isRiderStatusTransition(resource.data.status, request.resource.data.status)
           )
         )
         || isValidDeliveryPaymentSubmission();
@@ -1819,7 +1841,27 @@ service cloud.firestore {
       // the caller) and so admin/delivery/isAssignedDeliveryPartner()'s
       // get() lookup succeeds when it's the partner themselves reading.
       allow read: if isAdmin() || isOwnerUid(resource.data.uid);
-      allow write: if isAdmin();
+
+      // uid is the partner's login identity (isAssignedDeliveryPartner()
+      // compares it with the caller). app/admin/delivery-partners creates it
+      // from a NEW Auth account, so a browser write may never make it the
+      // acting admin's own uid, and once set it is never re-pointed. A legacy
+      // partner with no uid may have one added once (the page's "create login"
+      // edit). Malformed values are refused.
+      function isAcceptablePartnerUid(value) {
+        return value is string && value.size() > 0 && value != request.auth.uid;
+      }
+      allow create: if isAdmin()
+        && isAcceptablePartnerUid(request.resource.data.get('uid', null));
+      allow update: if isAdmin()
+        && (
+          unchanged('uid')
+          || (
+            !('uid' in resource.data)
+            && isAcceptablePartnerUid(request.resource.data.get('uid', null))
+          )
+        );
+      allow delete: if isAdmin();
     }
 
     // =========================================================
