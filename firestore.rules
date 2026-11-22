@@ -532,6 +532,19 @@ service cloud.firestore {
       return unchanged('couponFundedBy');
     }
 
+    // C1: server-owned inventory evidence on an order — what was bought
+    // (items), what could not be taken at finalize (stockShortfall /
+    // stockDeductedQty, lib/onlineOrder + lib/mobileOnlineOrder) and what a
+    // cancellation restored (inventoryRestore). app/api/cancel-order trusts
+    // them to decide how much stock to put back, so no browser — admin
+    // included — may set, change or remove them. Written only by the Admin SDK.
+    function orderInventoryEvidenceUnchanged() {
+      return unchanged('items')
+        && unchanged('stockShortfall')
+        && unchanged('stockDeductedQty')
+        && unchanged('inventoryRestore');
+    }
+
     match /orders/{orderId} {
       // isAssignedDeliveryPartner() added here as a genuine bug fix, not
       // scope creep: app/delivery/[id]/page.tsx's loadOrder() has always
@@ -585,7 +598,7 @@ service cloud.firestore {
       // unchanged; only creation moves server-side.
       allow create: if false;
 
-      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged() && orderCouponFundingUnchanged())
+      allow update: if (isAdmin() && orderRewardStateUnchanged() && orderArchiveStateUnchanged() && adminOrderStatusUnchanged() && orderCouponFundingUnchanged() && orderInventoryEvidenceUnchanged())
         // No customer branch. Cancelling goes through app/api/cancel-order
         // (web and Customer App), which restores stock/sales, reverses reward
         // points and coupons and notifies the seller in one place. A direct

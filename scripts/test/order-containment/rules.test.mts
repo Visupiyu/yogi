@@ -8,7 +8,10 @@
  *   - no customer, vendor, stranger or admin browser can delete an order;
  *   - no client, admin browser included, can set, change or clear the marker;
  *   - the legitimate client order access that remains (owner/admin reads,
- *     admin status updates) still works, on archived orders too.
+ *     admin status updates) still works, on archived orders too;
+ *   - C1: the inventory evidence app/api/cancel-order trusts (items,
+ *     stockShortfall, stockDeductedQty, inventoryRestore) is server-only —
+ *     no browser, admin included, can set, change or remove it.
  * The archive route itself is exercised by scripts/test/order-containment/run.mts.
  *
  * Run:
@@ -67,6 +70,19 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   // H3 fixtures: a YOMICO-funded coupon order and a legacy (unstamped) coupon order.
   await setDoc(doc(f, "orders", "o_h3_yomico"), { ...order, discount: 90, couponCode: "SAVE10", couponFundedBy: "yomico" });
   await setDoc(doc(f, "orders", "o_h3_legacy"), { ...order, discount: 90, couponCode: "SAVE10" });
+  // C1 fixtures: orders carrying the server-owned inventory evidence.
+  const evidence = {
+    items: [{ id: "p1", vendorId: V, price: 450, qty: 2, variantId: "v1" }, { id: "p2", vendorId: V, price: 0, qty: 1 }],
+    stockShortfall: [{ id: "p1", name: "P1", wanted: 2, available: 1 }],
+    stockDeductedQty: { p1: 1, p2: 1 },
+  };
+  const restored = { status: "restored", evidence: "server-atomic", products: { p2: { stockRestored: 1, salesDecrement: 1, salesFloorApplied: false } } };
+  await setDoc(doc(f, "orders", "o_c1_ev"), { ...order, ...evidence, paymentMethod: "ONLINE", paymentStatus: "Paid", needsReview: true });
+  await setDoc(doc(f, "orders", "o_c1_cancelled"), { ...order, ...evidence, status: "Cancelled", inventoryRestore: restored });
+  await setDoc(doc(f, "orders", "o_c1_verify"), { ...order, ...evidence, status: "Delivered", deliveredAt: new Date(),
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "AwaitingVerification", paymentTransactionId: "UTR123" });
+  await setDoc(doc(f, "orders", "o_c1_rider"), { ...order, ...evidence, status: "Out For Delivery", deliveryPartnerId: "dp_h1",
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending", inventoryRestore: restored });
 });
 
 const Cdb = as(C);
@@ -168,6 +184,73 @@ await check("H3-R2 other admin edits on a coupon order still work; customer and 
   await assertSucceeds(updateDoc(doc(ADb, "orders", "o_h3_yomico"), { needsReview: false, courierName: "Blue" }));
   await assertFails(updateDoc(doc(Cdb, "orders", "o_h3_legacy"), { couponFundedBy: "yomico" }));
   await assertFails(updateDoc(doc(Vdb, "orders", "o_h3_legacy"), { couponFundedBy: "yomico" }));
+});
+
+// ================= C1: inventory evidence is server-only =================
+// app/api/cancel-order decides how much stock to restore from items,
+// stockShortfall, stockDeductedQty (and records inventoryRestore). No browser,
+// admin included, may set, change or remove them.
+const C1_PROTECTED = ["items", "stockShortfall", "stockDeductedQty", "inventoryRestore"];
+await check("C1-1 admin browser cannot change, add or delete stockShortfall", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { stockShortfall: [{ id: "p1", name: "P1", wanted: 2, available: 2 }] }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { stockShortfall: [] }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { stockShortfall: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_live"), { stockShortfall: [{ id: "p1", wanted: 1, available: 0 }] }));
+});
+await check("C1-2 admin browser cannot change, add or delete stockDeductedQty", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { stockDeductedQty: { p1: 2, p2: 1 } }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { "stockDeductedQty.p1": 5 }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { stockDeductedQty: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_live"), { stockDeductedQty: { p1: 1 } }));
+});
+await check("C1-3 admin browser cannot change item quantity or variant, add or remove a line, or delete items", async () => {
+  const items = [{ id: "p1", vendorId: V, price: 450, qty: 2, variantId: "v1" }, { id: "p2", vendorId: V, price: 0, qty: 1 }];
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { items: [{ ...items[0], qty: 9 }, items[1]] }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { items: [{ ...items[0], variantId: "v2" }, items[1]] }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { items: [...items, { id: "p3", vendorId: V, price: 10, qty: 4 }] }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { items: [items[0]] }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { items: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_live"), { items: [] }));
+});
+await check("C1-4 admin browser cannot change, add or delete inventoryRestore", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_cancelled"), { inventoryRestore: { status: "skipped-unverified", evidence: "unverified", products: {} } }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_cancelled"), { "inventoryRestore.status": "partially-restored" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_cancelled"), { inventoryRestore: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { inventoryRestore: { status: "restored", evidence: "server-atomic", products: {} } }));
+});
+await check("C1-5 a legitimate admin edit bundled with a protected field is refused as a whole", async () => {
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { needsReview: false, stockShortfall: deleteField() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_c1_ev"), { courierName: "Blue", items: deleteField() }));
+});
+await check("C1-6 admin review, refund recording and shipping edits still work on an order carrying the evidence", async () => {
+  // Same field sets app/admin/orders/page.tsx writes (review :537, refund :644 / :719, shipping :758).
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_c1_ev"), { needsReview: false, reviewedAt: serverTimestamp(), reviewedBy: "adminUid" }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_c1_ev"), { refundStatus: "Processing", recordedByEmail: ADMIN_EMAIL }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_c1_cancelled"), { refundStatus: "Refunded", refundedAmount: 900, refundedAt: serverTimestamp(), refundedBy: "adminUid" }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_c1_ev"), { courierName: "Blue Dart" }));
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_c1_ev"), { trackingNumber: "BD123" }));
+});
+await check("C1-7 admin delivery-payment verification still works (lib/deliveryPayment verifyDeliveryPayment field set)", async () => {
+  await assertSucceeds(updateDoc(doc(ADb, "orders", "o_c1_verify"), {
+    paymentStatus: "Paid", paymentVerifiedAt: serverTimestamp(), paymentVerifiedBy: "adminUid", paymentVerifiedByName: "Admin", updatedAt: serverTimestamp(),
+  }));
+});
+await check("C1-8 the assigned delivery partner cannot touch any protected field; their payment submission still works", async () => {
+  const rider = as("rider_h1");
+  for (const field of C1_PROTECTED) {
+    await assertFails(updateDoc(doc(rider, "orders", "o_c1_rider"), { [field]: deleteField() }));
+    await assertFails(updateDoc(doc(rider, "orders", "o_c1_rider"), { [field]: { tampered: true } }));
+  }
+  await assertFails(updateDoc(doc(rider, "orders", "o_c1_rider"), { deliveryNotes: "left at door", stockDeductedQty: { p1: 2 } }));
+  await assertSucceeds(updateDoc(doc(rider, "orders", "o_c1_rider"), {
+    paymentStatus: "AwaitingVerification", paymentTransactionId: "UTR999", paymentSubmittedAt: serverTimestamp(),
+    paymentConfirmedBy: "rider_h1", paymentConfirmedByName: "Rider", updatedAt: serverTimestamp(),
+  }));
+});
+await check("C1-9 customer, vendor and stranger still cannot write any protected field", async () => {
+  for (const db of [Cdb, Vdb, Sdb]) {
+    for (const field of C1_PROTECTED) await assertFails(updateDoc(doc(db, "orders", "o_c1_ev"), { [field]: deleteField() }));
+  }
 });
 {
   const page = fs.readFileSync(path.join(REPO, "app/admin/orders/page.tsx"), "utf8");
