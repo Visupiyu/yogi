@@ -92,6 +92,9 @@ export default function DeliveryPartnersPage() {
         items.push({
           id: docSnap.id,
           ...(data as Omit<DeliveryPartner, "id">),
+          // No status field = Active — the same default firestore.rules uses
+          // (isActivePartnerRecordFor), so the badge and toggle tell the truth.
+          status: typeof data.status === "string" ? data.status : "Active",
           assignedOrders: data.assignedOrders || 0,
         });
       });
@@ -213,6 +216,14 @@ export default function DeliveryPartnersPage() {
   };
 
   const deletePartner = async (id: string) => {
+    // A partner with a login (uid) is never deleted — firestore.rules refuses
+    // it, because re-creating the same id could hand that partner's orders to
+    // another account. Deactivate instead: it keeps the record and revokes
+    // their access. Only a legacy partner that never had a login is removable.
+    if (partners.find((p) => p.id === id)?.uid) {
+      alert("This partner has a login, so they can't be deleted. Use Deactivate instead — it removes their access to orders.");
+      return;
+    }
     // isAssignedDeliveryPartner() in firestore.rules authorizes a
     // partner's own order updates by looking up this exact doc — once
     // it's gone, any order still carrying this partner's id can no
@@ -407,9 +418,11 @@ export default function DeliveryPartnersPage() {
                   >
                     {partner.status === "Active" ? "Deactivate" : "Activate"}
                   </button>
-                  <button onClick={() => deletePartner(partner.id)} className="bg-red-600 hover:bg-red-700 transition text-white px-5 py-2 rounded-xl">
-                    Delete
-                  </button>
+                  {!partner.uid && (
+                    <button onClick={() => deletePartner(partner.id)} className="bg-red-600 hover:bg-red-700 transition text-white px-5 py-2 rounded-xl">
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

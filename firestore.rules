@@ -425,11 +425,22 @@ service cloud.firestore {
 
     function isAssignedDeliveryPartner() {
       // deliveryPartnerId stores the deliveryPartners doc id (not a uid) —
-      // look up that doc and confirm its uid is the caller's own.
+      // look up that doc (ONE read) and confirm its uid is the caller's own
+      // and that the partner is still active.
       return isSignedIn()
         && resource.data.deliveryPartnerId is string
         && resource.data.deliveryPartnerId != ''
-        && get(/databases/$(database)/documents/deliveryPartners/$(resource.data.deliveryPartnerId)).data.uid == request.auth.uid;
+        && isActivePartnerRecordFor(get(/databases/$(database)/documents/deliveryPartners/$(resource.data.deliveryPartnerId)).data);
+    }
+
+    // A partner record authorizes its own rider only while Active. Deactivating
+    // a partner (app/admin/delivery-partners, status "Inactive") therefore
+    // revokes their order reads, rider updates and payment submissions at once —
+    // partner records cannot be hard-deleted once they carry a uid. A record with
+    // no status field is Active, the admin page's own default.
+    function isActivePartnerRecordFor(partner) {
+      return partner.uid == request.auth.uid
+        && partner.get('status', 'Active') == 'Active';
     }
 
     // Pay on Delivery (UPI Only) payment state machine:
@@ -1861,7 +1872,13 @@ service cloud.firestore {
             && isAcceptablePartnerUid(request.resource.data.get('uid', null))
           )
         );
-      allow delete: if isAdmin();
+      // A uid-bearing partner is never hard-deleted from a browser: deleting
+      // and re-creating the same document id would re-point every order that
+      // still carries that deliveryPartnerId to whatever uid the new record
+      // holds. Deactivate instead (status "Inactive"), which keeps the uid and
+      // revokes access (isActivePartnerRecordFor). Only a legacy record that
+      // never had a login (no uid field) can be removed.
+      allow delete: if isAdmin() && !('uid' in resource.data);
     }
 
     // =========================================================

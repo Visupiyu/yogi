@@ -105,10 +105,25 @@ await env.withSecurityRulesDisabled(async (ctx) => {
     paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" }); // unassigned, unpaid pay-on-delivery order
   await setDoc(doc(f, "deliveryPartners", "dp_edit"), { uid: "rider_edit", name: "Edit Me", status: "Active" });
   await setDoc(doc(f, "deliveryPartners", "dp_nouid"), { name: "Legacy, no login yet", status: "Active" });
-  await setDoc(doc(f, "deliveryPartners", "dp_delete"), { uid: "rider_gone", name: "Leaving" });
+  await setDoc(doc(f, "deliveryPartners", "dp_delete"), { name: "Legacy, never had a login" }); // no uid: still deletable
+  // Partner-status fixtures (PS): identical records and orders except for the partner's status.
+  await setDoc(doc(f, "deliveryPartners", "dp_ps_active"), { uid: "rider_ps", name: "Active Rider", status: "Active" });
+  await setDoc(doc(f, "deliveryPartners", "dp_ps_inactive"), { uid: "rider_psi", name: "Inactive Rider", status: "Inactive" });
+  await setDoc(doc(f, "deliveryPartners", "dp_ps_nostatus"), { uid: "rider_psn", name: "Legacy Rider (no status field)" });
+  await setDoc(doc(f, "deliveryPartners", "dp_ps_toggle"), { uid: "rider_pst", name: "Toggle Rider", status: "Active" });
+  await setDoc(doc(f, "deliveryPartners", "dp_ps_uidkeep"), { uid: "rider_keep", name: "Keeps uid", status: "Active" });
+  for (const [suffix, dp] of [["a", "dp_ps_active"], ["i", "dp_ps_inactive"], ["n", "dp_ps_nostatus"], ["t", "dp_ps_toggle"]] as const) {
+    await setDoc(doc(f, "orders", `o_ps_${suffix}_ship`), { ...order, status: "Shipped", deliveredAt: null, deliveryPartnerId: dp,
+      paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
+    await setDoc(doc(f, "orders", `o_ps_${suffix}_ofd`), { ...order, status: "Out For Delivery", deliveredAt: null, deliveryPartnerId: dp,
+      paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
+  }
   // A pre-existing BAD record (legacy data): a partner doc already carrying the admin's uid, and an order assigned to it.
   await setDoc(doc(f, "deliveryPartners", "dp_badlegacy"), { uid: "adminUid", name: "Legacy bad record" });
   await setDoc(doc(f, "orders", "o_badlegacy"), { ...order, status: "Packed", deliveryPartnerId: "dp_badlegacy",
+    paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
+  // Same bad legacy assignment on an Out For Delivery order (CH-6: deactivating the record closes the path).
+  await setDoc(doc(f, "orders", "o_badlegacy_ofd"), { ...order, status: "Out For Delivery", deliveredAt: null, deliveryPartnerId: "dp_badlegacy",
     paymentMethod: "PAY_ON_DELIVERY_UPI", paymentStatus: "Pending" });
   // Same bad legacy assignment on an order already at Shipped (CH-5 accepted residual risk).
   await setDoc(doc(f, "orders", "o_badlegacy_shipped"), { ...order, status: "Shipped", deliveredAt: null, deliveryPartnerId: "dp_badlegacy",
@@ -401,7 +416,7 @@ await check("DP-4 legitimate partner management still works (app/admin/delivery-
   await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid"), { name: "Now with login", uid: "rider_fresh" }));
   // ...and once set it is fixed like any other
   await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid"), { uid: "rider_fresh2" }));
-  // status toggle (:255) and delete (:245)
+  // status toggle (:255), and delete (:245) of a legacy record that never had a login
   await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_edit"), { status: "Inactive" }));
   await assertSucceeds(deleteDoc(doc(ADb, "deliveryPartners", "dp_delete")));
 });
@@ -445,13 +460,14 @@ await check("CH-4 legacy bad record (partner doc already holding the admin's uid
   await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy"), { deliveryPartnerId: "dp_h1" }));
 });
 // ACCEPTED RESIDUAL RISK — legacy DATA, not introduced by and not fixed by these
-// rules. If a deliveryPartners record ALREADY carries an admin's uid (created
-// before the identity rules) and an order is ALREADY assigned to it, that admin
-// still passes isAssignedDeliveryPartner() on that order, so the legitimate
-// rider delivery leg and the delivery-payment submission remain open to them,
-// and the admin verification after it. Only cleaning such records (a separate,
-// authorized data task) closes this. This check PINS today's behaviour so any
-// change to it is noticed; it is not a protection.
+// rules. If an ACTIVE deliveryPartners record ALREADY carries an admin's uid
+// (created before the identity rules) and an order is ALREADY assigned to it,
+// that admin still passes isAssignedDeliveryPartner() on that order, so the
+// legitimate rider delivery leg and the delivery-payment submission remain open
+// to them, and the admin verification after it. Finding such records (a
+// separate, authorized read-only data task) and DEACTIVATING them closes it —
+// CH-6 shows that. This check PINS today's behaviour for a still-active record
+// so any change to it is noticed; it is not a protection.
 await check("CH-5 ACCEPTED RESIDUAL RISK (legacy data, not fixed by rules): on an order already assigned to a partner record holding the admin's uid, the rider delivery leg, payment submission and verification still succeed", async () => {
   await assertSucceeds(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), { status: "Out For Delivery", updatedAt: serverTimestamp() }));
   await assertSucceeds(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), {
@@ -467,6 +483,98 @@ await check("CH-5 ACCEPTED RESIDUAL RISK (legacy data, not fixed by rules): on a
   // The new protections still hold on this order: no cancel from Delivered, no re-assignment.
   await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), { status: "Cancelled", updatedAt: serverTimestamp() }));
   await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy_shipped"), { deliveryPartnerId: "dp_h1" }));
+});
+await check("CH-6 the residual risk is closed by deactivating the bad legacy record (uid kept, record not deletable): no rider move or payment submission afterwards", async () => {
+  await assertFails(deleteDoc(doc(ADb, "deliveryPartners", "dp_badlegacy"))); // uid-bearing: deactivate, never delete
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_badlegacy"), { status: "Inactive" }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy_ofd"), { status: "Delivered", deliveredAt: serverTimestamp(), updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(ADb, "orders", "o_badlegacy_ofd"), {
+    paymentStatus: "AwaitingVerification", paymentTransactionId: "UTR-AFTER", paymentSubmittedAt: serverTimestamp(),
+    paymentConfirmedBy: "adminUid", paymentConfirmedByName: "Admin", updatedAt: serverTimestamp(),
+  }));
+  // Reactivating it would reopen the path — the record's uid cannot be changed, only its status.
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_badlegacy"), { status: "Active", uid: "rider_h1" }));
+});
+
+// ================= PD: partner records are deactivated, never deleted once they have a login =================
+await check("PD-1 a uid-bearing partner cannot be hard-deleted (active, inactive or missing-status record)", async () => {
+  await assertFails(deleteDoc(doc(ADb, "deliveryPartners", "dp_ps_active")));
+  await assertFails(deleteDoc(doc(ADb, "deliveryPartners", "dp_ps_inactive")));
+  await assertFails(deleteDoc(doc(ADb, "deliveryPartners", "dp_ps_nostatus")));
+});
+await check("PD-2 delete-and-recreate under the same id is stopped at the delete; writing the id again is an update and cannot re-point the uid", async () => {
+  await assertFails(deleteDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep")));
+  await assertFails(setDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep"), { uid: "rider_other", name: "Recreated", status: "Active" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep"), { uid: deleteField() }));
+  const after = (await getDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep"))).data();
+  if (after?.uid !== "rider_keep") throw new Error("uid changed");
+});
+await check("PD-3 a legacy record with no uid can still be deleted, or given an acceptable uid once (and then is no longer deletable)", async () => {
+  // Fresh no-uid legacy records (dp_nouid already received a uid in DP-4).
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "deliveryPartners", "dp_nouid2"), { name: "Legacy, no login", status: "Active" });
+    await setDoc(doc(ctx.firestore(), "deliveryPartners", "dp_nouid3"), { name: "Legacy, no login, to delete" });
+  });
+  await assertSucceeds(deleteDoc(doc(ADb, "deliveryPartners", "dp_nouid3")));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid2"), { uid: "adminUid" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid2"), { uid: "" }));
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_nouid2"), { uid: "rider_legacy_new" }));
+  await assertFails(deleteDoc(doc(ADb, "deliveryPartners", "dp_nouid2"))); // now uid-bearing
+});
+await check("PD-4 deactivation and reactivation succeed and never move the uid; a deactivated record cannot be re-pointed or self-assigned", async () => {
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep"), { status: "Inactive" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep"), { uid: "rider_other" }));
+  await assertFails(updateDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep"), { status: "Active", uid: "adminUid" }));
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep"), { status: "Active" }));
+  const after = (await getDoc(doc(ADb, "deliveryPartners", "dp_ps_uidkeep"))).data();
+  if (after?.uid !== "rider_keep" || after?.status !== "Active") throw new Error("uid or status wrong after toggle");
+});
+
+// ================= PS: an assigned partner acts only while Active =================
+// Each pair is identical except the partner record's status, so every refusal
+// below is the status rule (isActivePartnerRecordFor), not something else.
+const submitPayment = (uid: string) => ({
+  paymentStatus: "AwaitingVerification", paymentTransactionId: `UTR-${uid}`, paymentSubmittedAt: serverTimestamp(),
+  paymentConfirmedBy: uid, paymentConfirmedByName: "Rider", updatedAt: serverTimestamp(),
+});
+await check("PS-1 Active assigned partner: reads the order, makes rider moves, edits notes/proof, submits payment", async () => {
+  const r = as("rider_ps");
+  await assertSucceeds(getDoc(doc(r, "orders", "o_ps_a_ship")));
+  await assertSucceeds(updateDoc(doc(r, "orders", "o_ps_a_ship"), { status: "Out For Delivery", updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(r, "orders", "o_ps_a_ship"), { deliveryNotes: "Gate 2", proofImage: "https://example.invalid/a.jpg", updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(r, "orders", "o_ps_a_ofd"), submitPayment("rider_ps")));
+});
+await check("PS-2 Deactivated assigned partner: cannot read the order, move it, edit notes/proof or submit payment", async () => {
+  const r = as("rider_psi");
+  await assertFails(getDoc(doc(r, "orders", "o_ps_i_ship")));
+  await assertFails(updateDoc(doc(r, "orders", "o_ps_i_ship"), { status: "Out For Delivery", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(r, "orders", "o_ps_i_ship"), { deliveryNotes: "Gate 2", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(r, "orders", "o_ps_i_ship"), { proofImage: "https://example.invalid/i.jpg", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(r, "orders", "o_ps_i_ofd"), submitPayment("rider_psi")));
+});
+await check("PS-3 legacy partner record with NO status field is treated as Active (read, move, payment)", async () => {
+  const r = as("rider_psn");
+  await assertSucceeds(getDoc(doc(r, "orders", "o_ps_n_ship")));
+  await assertSucceeds(updateDoc(doc(r, "orders", "o_ps_n_ship"), { status: "Out For Delivery", updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(doc(r, "orders", "o_ps_n_ofd"), submitPayment("rider_psn")));
+});
+await check("PS-4 deactivating a partner revokes access at once; reactivating restores it (same uid, same record)", async () => {
+  const r = as("rider_pst");
+  await assertSucceeds(getDoc(doc(r, "orders", "o_ps_t_ship")));
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_ps_toggle"), { status: "Inactive" }));
+  await assertFails(getDoc(doc(r, "orders", "o_ps_t_ship")));
+  await assertFails(updateDoc(doc(r, "orders", "o_ps_t_ship"), { status: "Out For Delivery", updatedAt: serverTimestamp() }));
+  await assertFails(updateDoc(doc(r, "orders", "o_ps_t_ofd"), submitPayment("rider_pst")));
+  await assertSucceeds(updateDoc(doc(ADb, "deliveryPartners", "dp_ps_toggle"), { status: "Active" }));
+  await assertSucceeds(getDoc(doc(r, "orders", "o_ps_t_ship")));
+  await assertSucceeds(updateDoc(doc(r, "orders", "o_ps_t_ship"), { status: "Out For Delivery", updatedAt: serverTimestamp() }));
+});
+await check("PS-5 a partner (active or not) assigned to nothing on the order stays denied; admin and owner reads unchanged", async () => {
+  await assertFails(getDoc(doc(as("rider_ps"), "orders", "o_ps_i_ship")));
+  await assertFails(updateDoc(doc(as("rider_ps"), "orders", "o_ps_n_ofd"), { deliveryNotes: "not mine", updatedAt: serverTimestamp() }));
+  await assertFails(getDoc(doc(as("rider_psi"), "orders", "o_ps_a_ofd")));
+  await assertSucceeds(getDoc(doc(ADb, "orders", "o_ps_i_ship")));
+  await assertSucceeds(getDoc(doc(Cdb, "orders", "o_ps_i_ship")));
 });
 {
   const page = fs.readFileSync(path.join(REPO, "app/admin/orders/page.tsx"), "utf8");
