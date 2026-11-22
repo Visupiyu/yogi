@@ -441,6 +441,22 @@ setOrders(items);
           alert(data?.error || "Couldn't cancel this order.");
           return;
         }
+
+        // The route restores stock only with proof the order took it at
+        // creation (lib/orderInventory). A legacy order without that proof is
+        // cancelled with its inventory left exactly as it was — say so, so no
+        // one assumes the stock was put back.
+        if (data?.inventoryRestored === false) {
+          alert(
+            data?.inventoryRestore?.status === "partially-restored"
+              ? "Order cancelled — but stock and sales were only PARTLY restored.\n\n" +
+                  "Some variant stock on this order was short when it was placed, and the record cannot show which variant it came from, so that product's stock was not put back. " +
+                  "Check its variant stock and sales counts and reconcile them manually if needed."
+              : "Order cancelled — but stock and sales were NOT restored.\n\n" +
+                  "This legacy order has no record that it ever deducted stock, so nothing was put back. " +
+                  "Check the product's stock and sales counts and reconcile them manually if needed."
+          );
+        }
       } else {
         // No direct status writes from this page. Packed, Shipped, Out For
         // Delivery and Delivered are recorded by the seller

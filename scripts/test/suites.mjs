@@ -48,6 +48,7 @@ export const suites = [
   { name: "order-containment", file: "scripts/test/order-containment/run.mts", ...fs("firestore"), harness: true },
   { name: "order-emails", file: "scripts/test/order-emails/run.mts", ...fs("firestore"), harness: true },
   { name: "order-refund", file: "scripts/test/order-refund/run.mts", ...fs("firestore"), harness: true },
+  { name: "order-cancel-inventory", file: "scripts/test/order-cancel-inventory/run.mts", ...fs("firestore"), harness: true },
   { name: "payment-intent", file: "scripts/test/payment-intent/run.mts", ...fs("firestore"), harness: true },
   { name: "points-ledger-rules", file: "scripts/test/points-ledger/rules.test.mts", ...fs("firestore") },
   { name: "points-ledger", file: "scripts/test/points-ledger/run.mts", ...fs("firestore"), harness: true },

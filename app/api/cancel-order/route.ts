@@ -1,6 +1,11 @@
 import { sendOrderStatusEmail } from "@/lib/orderStatusEmail";
 import { verifyRequestUser, type VerifiedUser } from "@/lib/serverAuth";
 import { shouldReverseEarnedPoints } from "@/lib/rewardCredit";
+import {
+  flooredSalesDecrement,
+  inventoryDeductionEvidence,
+  type InventoryDeductionEvidence,
+} from "@/lib/orderInventory";
 import { vendorsOnOrder } from "@/lib/sellerOrderRecord";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { applyPointsMovements, pointsLedgerId } from "@/lib/points/pointsLedger";
@@ -113,6 +118,8 @@ type OrderRecord = {
   // captured): the ACTUAL total decremented per product, which can be less
   // than the sum of items[].qty for that product.
   stockDeductedQty?: unknown;
+  // Present when a shortfall happened: the short products, as { id, ... }.
+  stockShortfall?: unknown;
 };
 
 // Mirrors isLegalOrderStatusTransition() in firestore.rules: Cancelled is
@@ -177,6 +184,20 @@ function authorize(order: OrderRecord, requester: VerifiedUser): AuthzResult {
   return { ok: false, status: 404, error: "Order not found." };
 }
 
+// What the cancellation did to inventory, recorded on the order (and, when it
+// is not a clean restore, in audit_logs). "skipped-unverified": the order has
+// no proof it took stock at creation (lib/orderInventory), so nothing was put
+// back — restoring it would create stock that was never removed.
+type InventoryRestoreStatus = "restored" | "partially-restored" | "skipped-unverified";
+type InventoryRestoreEntry =
+  | {
+      stockRestored: number;
+      variants?: Record<string, number>;
+      salesDecrement: number;
+      salesFloorApplied: boolean;
+    }
+  | { skippedQty: number; variants?: Record<string, number>; reason?: "variant-shortfall-ambiguous" };
+
 // Discriminated union rather than an outer mutable flag: the transaction may
 // be retried by Firestore, so every attempt must produce its own complete
 // result instead of mutating shared state a retry could leave stale.
@@ -186,6 +207,7 @@ type CancelOutcome =
   | {
       kind: "cancelled";
       restockedItems: number;
+      inventoryRestore: { status: InventoryRestoreStatus; evidence: InventoryDeductionEvidence };
       earnedPoints: number;
       redeemedValue: number;
       orderUserId: string | null;
@@ -315,8 +337,10 @@ export async function POST(request: Request) {
           variants: VariantStockEntry[] | null;
           productLevelQty: number; // restored via product.stock increment
           variantRestore: Map<string, number>; // variantId -> qty (variant path)
+          currentSales: unknown; // this transaction's read, for the sales floor
         };
         const restockByProduct = new Map<string, RestockPlan>();
+        const missingProducts: string[] = [];
 
         for (const item of items) {
           // Prefer `productId` (mobile's real product reference) over `id`
@@ -337,10 +361,13 @@ export async function POST(request: Request) {
             const snap = await tx.get(ref);
             // Skip products that no longer exist rather than aborting the whole
             // cancellation — matches the previous best-effort tolerance.
-            if (!snap.exists) continue;
-            const data = snap.data() as { variants?: VariantStockEntry[] };
+            if (!snap.exists) {
+              if (!missingProducts.includes(id)) missingProducts.push(id);
+              continue;
+            }
+            const data = snap.data() as { variants?: VariantStockEntry[]; sales?: unknown };
             const variants = Array.isArray(data.variants) ? data.variants : null;
-            plan = { ref, variants, productLevelQty: 0, variantRestore: new Map() };
+            plan = { ref, variants, productLevelQty: 0, variantRestore: new Map(), currentSales: data.sales };
             restockByProduct.set(id, plan);
           }
 
@@ -363,30 +390,98 @@ export async function POST(request: Request) {
           }
         }
 
+        // Inventory is restored ONLY with positive evidence the order took it
+        // at creation (lib/orderInventory: rewardPointsStatus, written by the
+        // server creation paths in the same transaction as the decrement). A
+        // legacy order without it is still cancelled, but its stock and sales
+        // are left exactly as they are — the pre-2026-08-20 browser checkout
+        // wrote them separately and swallowed failures, so restoring here
+        // could mint stock that was never removed and drive sales negative.
+        const inventoryEvidence = inventoryDeductionEvidence(order);
+
         // Inventory + Order Consistency V1 — if this order had a stock
-        // shortfall at creation (lib/onlineOrder.ts's stockDeductedQty),
-        // items[].qty summed above is the customer's ORIGINAL request, which
-        // can exceed what was actually taken from inventory. Restoring the
-        // requested amount would create phantom stock that was never
-        // removed. Trust the recorded actual figure instead — but ONLY for
-        // the plain product-level bucket (variantRestore empty): a per-
-        // variant shortfall is not attributable back to one variant from
-        // this aggregate total alone, so that rarer combination is left as
-        // the existing (pre-this-fix) behavior rather than risking a wrong
-        // per-variant split.
+        // shortfall at creation, items[].qty summed above is the customer's
+        // ORIGINAL request, which can exceed what was actually taken from
+        // inventory. Restoring the requested amount would create phantom
+        // stock that was never removed, so a short product restores only the
+        // recorded actual figure (below). Applied to proven orders only — an
+        // unverified order restores nothing and records its full request.
         const stockDeductedQty =
           order.stockDeductedQty && typeof order.stockDeductedQty === "object"
             ? (order.stockDeductedQty as Record<string, unknown>)
             : null;
-        if (stockDeductedQty) {
-          for (const [productId, plan] of restockByProduct) {
-            if (plan.variantRestore.size > 0) continue;
-            const actual = Number(stockDeductedQty[productId]);
-            if (Number.isFinite(actual) && actual >= 0 && actual !== plan.productLevelQty) {
-              plan.productLevelQty = actual;
+        // stockShortfall (written by lib/onlineOrder and lib/mobileOnlineOrder
+        // whenever ANY unit could not be taken) lists the short products as
+        // { id: productId, ... }. stockDeductedQty only holds products that had
+        // something taken — a product short to ZERO is absent, and when nothing
+        // at all was taken the map is not stored. So for a listed product the
+        // restore is exactly stockDeductedQty[id] ?? 0, never the requested
+        // quantity. An unreadable shortfall record fails safe: every product
+        // is treated as listed.
+        const rawShortfall = order.stockShortfall;
+        const hasShortfall =
+          rawShortfall !== undefined && rawShortfall !== null &&
+          !(Array.isArray(rawShortfall) && rawShortfall.length === 0);
+        const shortfallIds =
+          hasShortfall && Array.isArray(rawShortfall) &&
+          rawShortfall.every((e) => typeof (e as { id?: unknown })?.id === "string" && (e as { id: string }).id)
+            ? new Set(rawShortfall.map((e) => (e as { id: string }).id))
+            : null;
+        const isShortfallProduct = (productId: string) =>
+          hasShortfall && (shortfallIds === null || shortfallIds.has(productId));
+        const deductedFor = (productId: string) => {
+          const n = Number(stockDeductedQty?.[productId]);
+          return Number.isFinite(n) && n > 0 ? n : 0;
+        };
+        // Variant products whose per-variant deduction cannot be known: the
+        // shortfall record names only the product, so with two or more
+        // requested variants the taken total cannot be split. Nothing is
+        // restored for them; the skip is recorded and audited.
+        const ambiguousVariantProducts = new Map<string, { skippedQty: number; variants: Record<string, number> }>();
+        // Short products whose restore was limited to the recorded deduction.
+        const shortfallLimited: Record<string, { requested: number; restorable: number }> = {};
+        for (const [productId, plan] of restockByProduct) {
+          if (inventoryEvidence !== "server-atomic") break;
+          if (isShortfallProduct(productId)) {
+            const requested =
+              plan.productLevelQty + [...plan.variantRestore.values()].reduce((s, q) => s + q, 0);
+            const deducted = Math.min(deductedFor(productId), requested);
+            if (plan.variantRestore.size === 0 || (plan.variantRestore.size === 1 && plan.productLevelQty === 0)) {
+              shortfallLimited[productId] = { requested, restorable: deducted };
             }
+            if (plan.variantRestore.size === 0) {
+              plan.productLevelQty = deducted;
+            } else if (plan.variantRestore.size === 1 && plan.productLevelQty === 0) {
+              // One requested variant: everything taken came from it — exact.
+              const [variantId] = [...plan.variantRestore.keys()];
+              if (deducted > 0) plan.variantRestore.set(variantId, deducted);
+              else plan.variantRestore.clear();
+            } else {
+              ambiguousVariantProducts.set(productId, {
+                skippedQty: requested,
+                variants: Object.fromEntries(plan.variantRestore),
+              });
+              plan.variantRestore.clear();
+              plan.productLevelQty = 0;
+            }
+            continue;
+          }
+          // Not short: the existing proven-deduction behavior, unchanged.
+          if (!stockDeductedQty || plan.variantRestore.size > 0) continue;
+          const actual = Number(stockDeductedQty[productId]);
+          if (Number.isFinite(actual) && actual >= 0 && actual !== plan.productLevelQty) {
+            plan.productLevelQty = actual;
           }
         }
+
+        // A proven restore that had to skip an ambiguous variant product is
+        // only partial — reported as such so no caller implies full restock.
+        const inventoryStatus: InventoryRestoreStatus =
+          inventoryEvidence !== "server-atomic"
+            ? "skipped-unverified"
+            : ambiguousVariantProducts.size > 0
+            ? "partially-restored"
+            : "restored";
 
         const orderUserId =
           typeof order.userId === "string" ? order.userId : null;
@@ -621,7 +716,20 @@ export async function POST(request: Request) {
           }
         }
 
-        for (const plan of restockByProduct.values()) {
+        const inventoryProducts: Record<string, InventoryRestoreEntry> = {};
+        const salesFloorAnomalies: { productId: string; wanted: number; applied: number; salesBefore: unknown }[] = [];
+        for (const [productId, plan] of restockByProduct) {
+          const variantAmounts =
+            plan.variantRestore.size > 0 ? Object.fromEntries(plan.variantRestore) : undefined;
+          if (inventoryStatus === "skipped-unverified") {
+            // No product write at all — only a record of what was NOT restored.
+            const skippedQty =
+              plan.productLevelQty + [...plan.variantRestore.values()].reduce((s, q) => s + q, 0);
+            if (skippedQty > 0) {
+              inventoryProducts[productId] = { skippedQty, ...(variantAmounts ? { variants: variantAmounts } : {}) };
+            }
+            continue;
+          }
           if (plan.variants && plan.variantRestore.size > 0) {
             // Variant path: add each unit back to its own variant and DERIVE
             // product.stock from the new variant totals. Any product-level
@@ -632,20 +740,71 @@ export async function POST(request: Request) {
               plan.variantRestore
             );
             const totalRestored = restoredToVariants + plan.productLevelQty;
+            // Sales never go below zero; the stock restored is unchanged by it.
+            const sales = flooredSalesDecrement(plan.currentSales, totalRestored);
             tx.update(plan.ref, {
               variants: newVariants,
               stock: sumVariantStock(newVariants) + plan.productLevelQty,
-              sales: FieldValue.increment(-totalRestored),
+              ...(sales.decrement > 0 ? { sales: FieldValue.increment(-sales.decrement) } : {}),
             });
+            inventoryProducts[productId] = {
+              stockRestored: totalRestored,
+              ...(variantAmounts ? { variants: variantAmounts } : {}),
+              salesDecrement: sales.decrement,
+              salesFloorApplied: sales.floorApplied,
+            };
+            if (sales.floorApplied) {
+              salesFloorAnomalies.push({ productId, wanted: totalRestored, applied: sales.decrement, salesBefore: plan.currentSales ?? null });
+            }
           } else if (plan.productLevelQty > 0) {
             // Product-level path (no variants, or historical line without a
-            // variantId): unchanged — stock and sales move in equal and
-            // opposite directions, conserving stock + sales as before.
+            // variantId): stock and sales move in equal and opposite
+            // directions — except that sales stop at zero (anomaly recorded).
+            const sales = flooredSalesDecrement(plan.currentSales, plan.productLevelQty);
             tx.update(plan.ref, {
               stock: FieldValue.increment(plan.productLevelQty),
-              sales: FieldValue.increment(-plan.productLevelQty),
+              ...(sales.decrement > 0 ? { sales: FieldValue.increment(-sales.decrement) } : {}),
             });
+            inventoryProducts[productId] = {
+              stockRestored: plan.productLevelQty,
+              salesDecrement: sales.decrement,
+              salesFloorApplied: sales.floorApplied,
+            };
+            if (sales.floorApplied) {
+              salesFloorAnomalies.push({ productId, wanted: plan.productLevelQty, applied: sales.decrement, salesBefore: plan.currentSales ?? null });
+            }
           }
+        }
+
+        for (const [productId, skipped] of ambiguousVariantProducts) {
+          inventoryProducts[productId] = { ...skipped, reason: "variant-shortfall-ambiguous" };
+        }
+
+        const inventoryRestore = {
+          status: inventoryStatus,
+          evidence: inventoryEvidence,
+          products: inventoryProducts,
+          ...(Object.keys(shortfallLimited).length > 0 ? { shortfallLimited } : {}),
+          ...(missingProducts.length > 0 ? { missingProducts } : {}),
+        };
+        tx.update(orderRef, { inventoryRestore });
+
+        // Anything other than a clean, proven restore is audit-logged in the
+        // same transaction: a skipped (unverified) or partial (ambiguous
+        // variant shortfall) restore, or a sales floor that had to engage.
+        if (inventoryStatus !== "restored" || salesFloorAnomalies.length > 0) {
+          tx.set(db.collection("audit_logs").doc(), {
+            actorUid: requester.uid,
+            actorEmail: requester.email || "",
+            actorRole: authz.role,
+            action: "order_cancel_inventory",
+            targetId: orderId,
+            details: {
+              ...inventoryRestore,
+              ...(salesFloorAnomalies.length > 0 ? { salesFloorAnomalies } : {}),
+            },
+            createdAt: Timestamp.now(),
+          });
         }
 
         if (adjustsPoints && userRef && userSnap && orderUserId) {
@@ -693,7 +852,9 @@ export async function POST(request: Request) {
 
         return {
           kind: "cancelled",
-          restockedItems: restockByProduct.size,
+          restockedItems:
+            inventoryStatus === "skipped-unverified" ? 0 : restockByProduct.size - ambiguousVariantProducts.size,
+          inventoryRestore: { status: inventoryStatus, evidence: inventoryEvidence },
           earnedPoints,
           redeemedValue,
           orderUserId,
@@ -762,6 +923,11 @@ export async function POST(request: Request) {
     return Response.json({
       success: true,
       restockedItems: outcome.restockedItems,
+      // false = cancelled, but stock/sales were deliberately left untouched
+      // (no proof this order ever deducted them) or only partly restored (an
+      // ambiguous variant shortfall) — callers must not imply a full restock.
+      inventoryRestored: outcome.inventoryRestore.status === "restored",
+      inventoryRestore: outcome.inventoryRestore,
     });
   } catch (error) {
     console.error("cancel-order: unexpected failure:", error);
