@@ -1,6 +1,7 @@
 "use client";
 
 import type { Product } from "@/lib/products/product";
+import { deriveDiscountPercent } from "@/lib/products/sellerProductValidation";
 
 interface ProductPreviewProps {
   product: Product;
@@ -12,14 +13,9 @@ export default function ProductPreview({
   previewImages = [],
 }: ProductPreviewProps) {
 
-  const discount =
-    product.mrp > 0
-      ? Math.round(
-          ((product.mrp - product.sellingPrice) /
-            product.mrp) *
-            100
-        )
-      : 0;
+  // Same derivation the server stores (0 when MRP does not exceed the price),
+  // so the preview never shows a badge the live listing would not.
+  const discount = deriveDiscountPercent(product.mrp, product.sellingPrice);
 
   /*
    * Use currently selected images first.
@@ -97,8 +93,7 @@ export default function ProductPreview({
             ₹{product.sellingPrice || 0}
           </span>
 
-          {product.mrp > 0 &&
-            product.mrp !== product.sellingPrice && (
+          {product.mrp > product.sellingPrice && (
               <span className="text-sm text-gray-400 line-through">
                 ₹{product.mrp}
               </span>

@@ -105,10 +105,15 @@ await check("C7  approved: seller adding a missing category field DENIED", () =>
 // check on p_pending).
 await check("C8  approved: seller reviewed-field edit (title, description) DENIED (server route only)", () =>
   assertFails(updateDoc(sellerP("c_approved"), { title: "Live Lamp v2", description: "new copy" })));
-await check("C8b approved: seller non-reviewed listing field (mrp) still ALLOWED", () =>
-  assertSucceeds(updateDoc(sellerP("c_approved"), { mrp: 850 })));
+// mrp used to be the example here; it is a money field now frozen for direct
+// seller writes (F-14), so the non-reviewed listing field is warranty and the
+// mrp write is asserted DENIED.
+await check("C8b approved: seller non-reviewed listing field (warranty) still ALLOWED", () =>
+  assertSucceeds(updateDoc(sellerP("c_approved"), { warranty: "1 year" })));
+await check("C8c approved: seller direct mrp write DENIED (server route only, F-14)", () =>
+  assertFails(updateDoc(sellerP("c_approved"), { mrp: 850 })));
 await check("C9  approved: whole-document save with the SAME categories and NO reviewed field changed still ALLOWED", () =>
-  assertSucceeds(setDoc(sellerP("c_approved"), { ...LIVE, mrp: 820, approvalStatus: "approved", approved: true, active: true, featured: false })));
+  assertSucceeds(setDoc(sellerP("c_approved"), { ...LIVE, warranty: "2 years", approvalStatus: "approved", approved: true, active: true, featured: false })));
 await check("C9b approved: whole-document save that changes a reviewed field (title) DENIED", () =>
   assertFails(setDoc(sellerP("c_approved"), { ...LIVE, title: "Live Lamp v3", approvalStatus: "approved", approved: true, active: true, featured: false })));
 await check("C10 blocked (approved + inactive): seller change category DENIED", () => assertFails(updateDoc(sellerP("c_blocked"), { categoryId: "FASHION" })));

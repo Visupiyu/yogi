@@ -338,7 +338,7 @@ async function main() {
 
     const forged = await updateProduct(req("http://x/api/seller/update-product", {
       productId: P_SELL,
-      product: { ...VALID_PRODUCT, sellingPrice: 450, sales: 999, approved: true, vendorId: OTHER_SELLER },
+      product: { ...VALID_PRODUCT, sellingPrice: 599, sales: 999, approved: true, vendorId: OTHER_SELLER },
     }, SELLER));
     const fj = await json(forged);
     const afterForged = (await db.collection("products").doc(P_SELL).get()).data() as any;
@@ -346,8 +346,9 @@ async function main() {
       ["sales", "approved", "vendorId"].every((f) => (fj.fields || []).includes(f)) &&
       afterForged.sellingPrice === 499 && afterForged.sales === 3 && afterForged.vendorId === SELLER;
 
+    // 599, not the former 450: a valid edit must be within [MIN_SELLING_PRICE ₹499, MRP] (F-10).
     const u = await updateProduct(req("http://x/api/seller/update-product", {
-      productId: P_SELL, product: { ...VALID_PRODUCT, sellingPrice: 450 },
+      productId: P_SELL, product: { ...VALID_PRODUCT, sellingPrice: 599 },
     }, SELLER));
     const stored = (await db.collection("products").doc(P_SELL).get()).data() as any;
 
@@ -356,8 +357,8 @@ async function main() {
     record("T8 valid product -> accepted (create 200, update 200); an update carrying sales/approved/vendorId is refused 400 with nothing applied (not even the price); other seller 403",
       c.status === 200 && createdDoc?.sellingPrice === 499 && createdDoc?.vendorId === SELLER &&
       forgedRefused &&
-      u.status === 200 && stored.sellingPrice === 450 && stored.sales === 3 && stored.approved === false && stored.vendorId === SELLER &&
-      other.status === 403 && afterOther.sellingPrice === 450,
+      u.status === 200 && stored.sellingPrice === 599 && stored.sales === 3 && stored.approved === false && stored.vendorId === SELLER &&
+      other.status === 403 && afterOther.sellingPrice === 599,
       `create=${c.status} forged=${forged.status} fields=${JSON.stringify(fj.fields)} priceAfterForged=${afterForged.sellingPrice} update=${u.status} price=${stored.sellingPrice} sales=${stored.sales} approved=${stored.approved} other=${other.status}`);
   }
 

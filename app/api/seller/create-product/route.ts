@@ -4,7 +4,11 @@ import { isWithinRateLimit } from "@/lib/rateLimit";
 import { Timestamp } from "firebase-admin/firestore";
 import { mintSequential } from "@/lib/humanIds";
 import { canSellerList, sellerListingBlockReason } from "@/lib/sellerTax";
-import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
+import {
+  deriveDiscountPercent,
+  validateSellerProductMoney,
+  validateSellerProductPricing,
+} from "@/lib/products/sellerProductValidation";
 import { NEW_PRODUCT_MODERATION } from "@/lib/products/visibility";
 import { unknownSellerProductFields } from "@/lib/products/sellerProductFields";
 
@@ -91,6 +95,18 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    // MRP / selling-price policy (F-10): MRP mandatory, every price within
+    // [₹499, MRP]. Always on create.
+    const pricingCheck = validateSellerProductPricing(productFields, { checkLegacyPrice: true });
+    if (!pricingCheck.ok) {
+      return Response.json(
+        { error: pricingCheck.errors.join("\n"), errors: pricingCheck.errors },
+        { status: 400 }
+      );
+    }
+    // The discount figure is the server's, derived from MRP and sellingPrice;
+    // whatever the browser sent is never stored.
+    const discount = deriveDiscountPercent(productFields.mrp, productFields.sellingPrice);
 
     const db = getAdminDb();
 
@@ -156,6 +172,7 @@ export async function POST(request: Request) {
       const number = await mintSequential(tx, db, "product");
       tx.set(ref, {
         ...productFields,
+        discount,
         // Every new product starts pending admin review and hidden:
         // approvalStatus "pending", approved/active/featured false. Only
         // app/api/admin/products/[id]/moderation can publish it. This also

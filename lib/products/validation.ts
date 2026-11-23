@@ -22,7 +22,12 @@ export interface ValidationResult {
 // ------------------------------------------
 
 export function validateProduct(
-  product: Product
+  product: Product,
+  // false only when an EDIT does not touch a price field
+  // (lib/products/sellerProductEdit.ts editTouchesPricing): a stock/content
+  // save of a legacy product without an MRP is then not refused here — the
+  // same scope app/api/seller/update-product applies the MRP policy to.
+  options: { checkPricing?: boolean } = {}
 ): ValidationResult {
 
   const errors: string[] = [];
@@ -50,14 +55,18 @@ export function validateProduct(
   // Pricing
   // -------------------------
 
-  if (product.sellingPrice <= 0)
-    errors.push("Selling price must be greater than zero.");
+  if (options.checkPricing !== false) {
 
-  if (product.mrp <= 0)
-    errors.push("MRP must be greater than zero.");
+    if (product.sellingPrice <= 0)
+      errors.push("Selling price must be greater than zero.");
 
-  if (product.sellingPrice > product.mrp)
-    errors.push("Selling price cannot be greater than MRP.");
+    if (product.mrp <= 0)
+      errors.push("MRP must be greater than zero.");
+
+    if (product.sellingPrice > product.mrp)
+      errors.push("Selling price cannot be greater than MRP.");
+
+  }
 
   // -------------------------
   // Inventory

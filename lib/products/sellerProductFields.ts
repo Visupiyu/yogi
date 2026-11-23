@@ -83,9 +83,10 @@ export function pickSellerProductFields(input: Record<string, unknown>): Record<
 /**
  * Fields whose change alters what an admin approved: the listing's content
  * and media. Editing any of them on an approved (or pre-approval legacy)
- * product sends it back to "pending" review. Price, stock, tax, dimensions,
- * warranty, returns and SEO fields do not — they are validated server-side
- * and are operational, not a different product. Category is already locked
+ * product sends it back to "pending" review. Selling price, stock, tax,
+ * dimensions, warranty, returns and SEO fields do not — they are validated
+ * server-side and are operational, not a different product. (An MRP change is
+ * re-reviewed too; see reReviewFieldsChanged.) Category is already locked
  * once approved (categoryLock.ts).
  */
 export const REREVIEW_FIELDS = [
@@ -140,5 +141,12 @@ export function reReviewFieldsChanged(
   };
   const changed: string[] = REREVIEW_FIELDS.filter((f) => norm(before[f]) !== norm(after[f]));
   if (variantDefinitions(before.variants) !== variantDefinitions(after.variants)) changed.push("variants");
+  // MRP is the basis of the discount claim shown to customers (strike-through
+  // price and "% off" badge), so changing it — including adding one to a
+  // legacy product that had none — is re-reviewed too (F-10). Selling price,
+  // stock and tax edits are not. Kept out of REREVIEW_FIELDS because that list
+  // is the content set firestore.rules mirrors; sellers cannot write mrp
+  // directly at all.
+  if (norm(before.mrp) !== norm(after.mrp)) changed.push("mrp");
   return changed;
 }

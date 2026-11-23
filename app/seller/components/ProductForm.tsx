@@ -16,7 +16,17 @@ import SpecificationForm from "./SpecificationForm";
 import ProductPreview from "./ProductPreview";
 import {validateProduct} from "@/lib/products/validation";
 import { findDuplicateVariantGroups } from "@/lib/products/variantSelection";
-import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
+import {
+  MIN_SELLING_PRICE,
+  deriveDiscountPercent,
+  validateSellerProductMoney,
+  validateSellerProductPricing,
+} from "@/lib/products/sellerProductValidation";
+import {
+  PRODUCT_FORM_MONEY_DEFAULTS,
+  editTouchesPricing,
+  sellerEditPayload,
+} from "@/lib/products/sellerProductEdit";
 import { auth, storage } from "@/lib/firebase";
 import { productImagePath } from "@/lib/storagePaths";
 import { pickSellerProductFields } from "@/lib/products/sellerProductFields";
@@ -72,15 +82,10 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
 
     model: "",
 
-    // Pricing
+    // Pricing (mrp, sellingPrice, costPrice, discount, and variants below —
+    // lib/products/sellerProductEdit.ts, which an edit compares against)
 
-    mrp: 0,
-
-    sellingPrice: 0,
-
-    costPrice: 0,
-
-    discount: 0,
+    ...PRODUCT_FORM_MONEY_DEFAULTS,
 
     currency: "INR",
 
@@ -109,7 +114,7 @@ const [imagePreviews, setImagePreviews] = useState<string[]>(
 
     // Variants
 
-    variants: [],
+    variants: [...PRODUCT_FORM_MONEY_DEFAULTS.variants] as Product["variants"],
 
     // Shipping
 
@@ -469,6 +474,22 @@ const handleSubmit = async (
   const hasExistingImages =
     isEditing && (product.thumbnail || (product.images?.length ?? 0) > 0);
 
+  // Whether this save edits pricing — exactly what update-product will see:
+  // always for a new product; on an edit, a price field that is sent (an
+  // untouched legacy default is left out, lib/products/sellerProductEdit.ts)
+  // and differs from what is stored. Only then do the MRP/price checks run,
+  // so a stock/content save of a legacy product without an MRP still works.
+  const priceFieldsEdited =
+    !isEditing ||
+    !existingProduct ||
+    editTouchesPricing(
+      existingProduct as unknown as Record<string, unknown>,
+      sellerEditPayload(
+        existingProduct as unknown as Record<string, unknown>,
+        product as unknown as Record<string, unknown>
+      )
+    );
+
   // Basic validation first
   const result = validateProduct({
     ...product,
@@ -481,7 +502,7 @@ const handleSubmit = async (
         : hasExistingImages
         ? product.images
         : [],
-  });
+  }, { checkPricing: priceFieldsEdited });
 
   if (!result.valid) {
     setError(result.errors.join("\n"));
@@ -503,6 +524,17 @@ const handleSubmit = async (
   if (!moneyCheck.ok) {
     setError(moneyCheck.errors.join("\n"));
     return;
+  }
+  // The MRP / selling-price policy, exactly as the server applies it.
+  if (priceFieldsEdited) {
+    const pricingCheck = validateSellerProductPricing(
+      product as unknown as Record<string, unknown>,
+      { checkLegacyPrice: false }
+    );
+    if (!pricingCheck.ok) {
+      setError(pricingCheck.errors.join("\n"));
+      return;
+    }
   }
 
   // Two variants with identical values on every dimension cannot be told
@@ -593,14 +625,9 @@ const handleSubmit = async (
       images:
         uploadedImages.length > 0 ? uploadedImages : product.images || [],
 
-      discount:
-        product.mrp > 0
-          ? Math.round(
-              ((product.mrp - product.sellingPrice) /
-                product.mrp) *
-                100
-            )
-          : 0,
+      // Preview only: the server derives and stores the discount itself
+      // (lib/products/sellerProductValidation.ts deriveDiscountPercent).
+      discount: deriveDiscountPercent(product.mrp, product.sellingPrice),
 
       updatedAt:
         serverTimestamp(),
@@ -628,7 +655,12 @@ const handleSubmit = async (
       // Only the seller product fields are sent (lib/products/
       // sellerProductFields.ts); the server refuses anything else, including
       // vendorName, which it takes from the seller's own record.
-      const updatePayload = pickSellerProductFields(
+      // A legacy product's money fields the seller left untouched (form
+      // defaults for values it never had, e.g. mrp 0 / variants []) are not
+      // sent — update-product would otherwise treat them as edits and refuse
+      // them. Anything the seller did enter is sent and validated strictly.
+      const updatePayload = sellerEditPayload(
+        existingProduct as unknown as Record<string, unknown>,
         finalProduct as unknown as Record<string, unknown>
       );
       const editUser = auth.currentUser;
@@ -1232,6 +1264,10 @@ className="w-full rounded-lg border p-3"
 
 Selling Price *
 
+<span className="ml-1 font-normal text-gray-500">
+(₹{MIN_SELLING_PRICE} minimum, not above MRP)
+</span>
+
 </label>
 
 <input
@@ -1306,25 +1342,7 @@ className="w-full rounded-lg border p-3"
 
 Discount :
 
-{
-
-product.mrp>0
-
-?
-
-Math.round(
-
-((product.mrp-product.sellingPrice)
-
-/product.mrp)
-
-*100
-
-)
-
-:0
-
-} %
+{deriveDiscountPercent(product.mrp, product.sellingPrice)} %
 
 </p>
 

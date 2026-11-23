@@ -113,8 +113,9 @@ const PRODUCTS: Record<string, Record<string, unknown>> = {
   p_price_only: { ...base, name: "Price Only", price: 300, gstRate: 5 },
   // Non-positive sellingPrice with a valid legacy price.
   p_bad_selling: { ...base, name: "Bad Selling", price: 350, sellingPrice: 0, gstRate: 5 },
-  // Stale-price scenario: listed at 500 (both fields), then the seller edits sellingPrice to 450.
-  p_stale: { ...base, name: "Stale Kettle", title: "Stale Kettle", price: 500, sellingPrice: 500, gstRate: 5 },
+  // Stale-price scenario: listed at 600 (both fields), then the seller edits sellingPrice to 550.
+  // (Was 500 -> 450; a seller edit must now be within [MIN_SELLING_PRICE ₹499, MRP], F-10.)
+  p_stale: { ...base, name: "Stale Kettle", title: "Stale Kettle", price: 600, sellingPrice: 600, gstRate: 5 },
   // Variants on a both-fields product: own price, and a 0 (= use base) price.
   p_var: {
     ...base, name: "Variant Shirt", price: 500, sellingPrice: 450, gstRate: 5,
@@ -260,11 +261,11 @@ async function main() {
 
   // ============ B. Stale price after a seller edit ============
   {
-    const upd = await updateProduct(req("http://x/api/seller/update-product", { productId: "p_stale", product: { sellingPrice: 450 } }, SELLER));
+    const upd = await updateProduct(req("http://x/api/seller/update-product", { productId: "p_stale", product: { sellingPrice: 550 } }, SELLER));
     const stored = (await db.collection("products").doc("p_stale").get()).data() as any;
     const r = await allPaths({ productId: "p_stale", qty: 2 });
-    record("B4 seller edits sellingPrice 500 -> 450 (legacy price 500 stays stored); every order path charges 450",
-      upd.status === 200 && stored.price === 500 && stored.sellingPrice === 450 && allUnits(r, 450) && allPayable(r, 900),
+    record("B4 seller edits sellingPrice 600 -> 550 (legacy price 600 stays stored); every order path charges 550",
+      upd.status === 200 && stored.price === 600 && stored.sellingPrice === 550 && allUnits(r, 550) && allPayable(r, 1100),
       `update=${upd.status} stored price=${stored.price} sellingPrice=${stored.sellingPrice} | ${fmt(r)}`);
   }
 
@@ -353,7 +354,7 @@ async function main() {
     const scenarios: [string, Line, Opts, number][] = [
       ["995 + 10% (raw 895.50)", { productId: "p_995", qty: 1 }, { coupon: "SAVE10" }, 896],
       ["333 + 10% + ₹49 shipping (raw 348.70)", { productId: "p_333", qty: 1 }, { coupon: "SAVE10" }, 349],
-      ["stale product x3 + 10% (1350 - 135)", { productId: "p_stale", qty: 3 }, { coupon: "SAVE10" }, 1215],
+      ["stale product x3 + 10% (1650 - 165)", { productId: "p_stale", qty: 3 }, { coupon: "SAVE10" }, 1485],
       ["gstPercent product x1 + 10%", { productId: "p_gst_percent", qty: 1 }, { coupon: "SAVE10" }, 900],
       ["variant base-price x3", { productId: "p_var", qty: 3, variantId: "v_base" }, {}, 1350],
     ];

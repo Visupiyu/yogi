@@ -109,8 +109,12 @@ for (const [field, value] of [
     assertFails(updateDoc(owner("p_live"), { [field]: value })));
 }
 await check("L2  LEGACY live product: seller direct title write DENIED", () => assertFails(updateDoc(owner("p_legacy"), { title: "x" })));
-await check("L3  approved product: non-content fields (warranty, returnDays, sku, mrp) still ALLOWED", () =>
-  assertSucceeds(updateDoc(owner("p_live"), { warranty: "1 year", returnDays: 10, sku: "LMP-2", mrp: 899 })));
+await check("L3  approved product: non-content fields (warranty, returnDays, sku) still ALLOWED", () =>
+  assertSucceeds(updateDoc(owner("p_live"), { warranty: "1 year", returnDays: 10, sku: "LMP-2" })));
+// mrp used to be in this list; it is a money field now frozen for direct
+// seller writes (F-14 — see scripts/test/product-mrp/rules.test.mts).
+await check("L3b approved product: direct mrp write DENIED (server route only, F-14)", () =>
+  assertFails(updateDoc(owner("p_live"), { mrp: 899 })));
 await check("L4  approved product: whole-document save with unchanged content still ALLOWED", async () => {
   const d = await stored("p_live");
   await assertSucceeds(setDoc(owner("p_live"), d));

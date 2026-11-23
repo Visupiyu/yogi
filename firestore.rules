@@ -328,6 +328,17 @@ service cloud.firestore {
           && unchanged('stock')
           && unchanged('gstRate')
           && unchanged('gstPercent')
+          // MRP, discount and cost price are frozen the same way (F-14). They
+          // were in the direct-write list below and isValidProduct() never
+          // checked them, so a seller's SDK write could set an MRP below the
+          // price, an inflated MRP (a fake "% off" badge), a negative or
+          // non-numeric MRP, any discount figure or a negative cost price on a
+          // LIVE product, with no re-review. update-product now enforces the
+          // MRP policy (lib/products/sellerProductValidation.ts), derives
+          // discount itself and re-reviews an MRP change on a live product.
+          && unchanged('mrp')
+          && unchanged('discount')
+          && unchanged('costPrice')
           // Category is fixed once the product is approved (future category
           // commission must not be escapable by recategorising a live product).
           // Only an explicitly pending or rejected product may still change
@@ -352,14 +363,14 @@ service cloud.firestore {
           ])
           // Beyond that, a direct write may touch ONLY the seller-editable
           // listing fields (lib/products/sellerProductFields.ts, less the
-          // price/stock/tax fields frozen above, which go through
-          // app/api/seller/update-product). Lifecycle and moderation fields
-          // (archived*, lastRejectionReason, resubmit/re-review stamps, …)
-          // are outside this list, so they stay server-only.
+          // price/MRP/discount/cost/stock/tax fields frozen above, which go
+          // through app/api/seller/update-product). Lifecycle and moderation
+          // fields (archived*, lastRejectionReason, resubmit/re-review stamps,
+          // …) are outside this list, so they stay server-only.
           && affectedKeysOnly([
             'sku', 'slug', 'categoryId', 'subCategoryId', 'leafCategoryId',
             'title', 'shortTitle', 'description', 'brand', 'model',
-            'mrp', 'costPrice', 'discount', 'currency', 'hsn',
+            'currency', 'hsn',
             'minStock', 'maxStock', 'thumbnail', 'images', 'video',
             'specifications', 'weight', 'length', 'width', 'height',
             'warranty', 'returnDays', 'metaTitle', 'metaDescription',

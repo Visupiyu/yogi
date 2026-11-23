@@ -2,7 +2,12 @@ import { verifyRequestUser } from "@/lib/serverAuth";
 import { getAdminDb } from "@/lib/firebaseAdmin";
 import { isWithinRateLimit } from "@/lib/rateLimit";
 import { Timestamp } from "firebase-admin/firestore";
-import { validateSellerProductMoney } from "@/lib/products/sellerProductValidation";
+import {
+  deriveDiscountPercent,
+  pricePolicyFieldsChanged,
+  validateSellerProductMoney,
+  validateSellerProductPricing,
+} from "@/lib/products/sellerProductValidation";
 import {
   reReviewFieldsChanged,
   unknownSellerProductFields,
@@ -183,8 +188,13 @@ export async function POST(request: Request) {
         for (const field of PRODUCT_CATEGORY_FIELDS) delete changes[field];
       }
 
+      // The discount figure is never the browser's: it is re-derived below
+      // from the resulting MRP and sellingPrice.
+      delete changes.discount;
+
       // Validate the document as it will be AFTER this write.
-      const validation = validateSellerProductMoney({ ...existing, ...changes });
+      const after = { ...existing, ...changes };
+      const validation = validateSellerProductMoney(after);
       if (!validation.ok) {
         return {
           kind: "error",
@@ -193,11 +203,37 @@ export async function POST(request: Request) {
           errors: validation.errors,
         };
       }
+      // MRP / selling-price policy (F-10) whenever the edit touches a price
+      // field (mrp, sellingPrice, price, variants). "Touches" is the exact
+      // diff above — a price field that is SENT and differs from what is
+      // stored is an intentional edit and is validated strictly (mrp 0,
+      // negative, null or non-numeric is refused; nothing is normalized). A
+      // stock- or content-only edit that does not send changed price fields
+      // (ProductForm omits a legacy product's untouched ones —
+      // lib/products/sellerProductEdit.ts) is not forced to reprice first.
+      if (pricePolicyFieldsChanged(changes)) {
+        const pricing = validateSellerProductPricing(after, {
+          checkLegacyPrice: Object.prototype.hasOwnProperty.call(changes, "price"),
+        });
+        if (!pricing.ok) {
+          return {
+            kind: "error",
+            status: 400,
+            error: pricing.errors.join("\n"),
+            errors: pricing.errors,
+          };
+        }
+      }
+      // Keep the stored discount equal to what MRP and price actually support
+      // (0 when there is no valid MRP or no genuine discount).
+      const discount = deriveDiscountPercent(after.mrp, after.sellingPrice);
+      if (existing.discount !== discount) changes.discount = discount;
 
       // RE-REVIEW through the existing moderation model: changing content an
       // admin approved on an approved (or pre-approval legacy) product returns
-      // it to "pending" — hidden until approved again. Price/stock/tax edits
-      // do not. A pending or rejected product keeps its state (a rejected one
+      // it to "pending" — hidden until approved again. So does an MRP change
+      // (the discount claim). Selling-price/stock/tax edits do not. A
+      // pending or rejected product keeps its state (a rejected one
       // is resubmitted explicitly: app/api/seller/product-status).
       const now = Timestamp.now();
       const reReview = isApprovedForSale(existing)

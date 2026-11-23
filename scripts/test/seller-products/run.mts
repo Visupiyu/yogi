@@ -250,11 +250,13 @@ try {
     `approve=${approve.status} audits=${await auditCount("product_approve", P)} notes=${notes6.length}`);
 
   // ============ 7. Live edits and re-review ============
-  const priceEdit = await update(A, P, { sellingPrice: 599, stock: 30, mrp: 999, warranty: "1 year" });
+  // MRP is no longer in this edit: an MRP change on a live product now goes
+  // back to review (F-10), proven in scripts/test/product-mrp/run.mts U4.
+  const priceEdit = await update(A, P, { sellingPrice: 599, stock: 30, warranty: "1 year" });
   const p3 = await getP(P);
   const specReorder = await update(A, P, { specifications: { Height: "30cm", Material: "Brass" } });
   const p3b = await getP(P);
-  record("7  approved product: price/stock/MRP/warranty edit and a key-reordered (identical) specifications save stay LIVE — no re-review",
+  record("7  approved product: price/stock/warranty edit and a key-reordered (identical) specifications save stay LIVE — no re-review",
     priceEdit.status === 200 && priceEdit.body.reReview === false && p3.sellingPrice === 599 && isProductVisible(p3) &&
     specReorder.status === 200 && specReorder.body.reReview === false && isProductVisible(p3b),
     `price=${priceEdit.body.reReview} spec=${specReorder.body.reReview}`);
