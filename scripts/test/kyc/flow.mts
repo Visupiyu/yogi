@@ -246,6 +246,64 @@ await seedVendor("v_pending", "seller_pending");
   record("28 unknown vendor 404, unknown action 400", missing.status === 404 && badAction.status === 400);
 }
 
+// ---- F-4: registration-shaped records and admin document access ------------
+{
+  await clearAll();
+  const bucket = getAdminBucket();
+  const PDF_BYTES = Buffer.from("%PDF-1.4 f4");
+  // A record exactly as app/vendor-register now writes it: object paths.
+  const regPath = "vendor-kyc/seller_f4/aadhaar-1800000000000-abcd1234-card.pdf";
+  await bucket.file(regPath).save(PDF_BYTES, { contentType: "application/pdf" });
+  await seedVendor("v_f4", "seller_f4", { aadhaarDocUrl: regPath, chequeDocUrl: "" });
+  // A legacy record still holding a tokenized download URL (no migration).
+  const legacyPath = "vendor-kyc/seller_legacy/aadhaar-1-a.pdf";
+  await bucket.file(legacyPath).save(PDF_BYTES, { contentType: "application/pdf" });
+  await seedVendor("v_legacy", "seller_legacy");
+  // A record whose pointer names ANOTHER seller's folder.
+  await seedVendor("v_cross", "seller_cross", { aadhaarDocUrl: regPath });
+
+  const open = (token: string | null, vendorId: string, type = "aadhaar", mode = "view") =>
+    documentRoute(new Request(`http://localhost/api/admin/kyc/document?vendorId=${vendorId}&type=${type}&mode=${mode}`, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    }));
+
+  const ok = await open(ADMIN, "v_f4");
+  const okBody = await ok.text();
+  record("F4-1 admin opens a registration document stored as an object path (200, the file's bytes)",
+    ok.status === 200 && okBody.startsWith("%PDF") && ok.headers.get("content-type") === "application/pdf", `${ok.status}`);
+  record("F4-2 the response is private, never cached, and carries no Storage URL or token",
+    ok.headers.get("cache-control") === "private, no-store" &&
+    !/firebasestorage|token=|googleapis/i.test(okBody + JSON.stringify([...ok.headers.entries()])));
+  const legacy = await open(ADMIN, "v_legacy");
+  record("F4-3 a legacy record holding a tokenized URL still opens for admin (resolved to its path; the URL is never fetched)",
+    legacy.status === 200 && (await legacy.text()).startsWith("%PDF"), `${legacy.status}`);
+
+  const denied = await Promise.all([
+    open(null, "v_f4"),
+    open(tokenFor("seller_f4"), "v_f4"),
+    open(tokenFor("seller_other"), "v_f4"),
+    open(tokenFor("admin_kyc_1", ADMIN_EMAIL, false), "v_f4"),
+  ]);
+  record("F4-4 no document for: signed out (401), the owning seller (403), another seller (403), an unverified admin email (403)",
+    denied[0].status === 401 && denied.slice(1).every((r) => r.status === 403), denied.map((r) => r.status).join(","));
+  const deniedBodies = await Promise.all(denied.map((r) => r.text()));
+  record("F4-5 refusals contain no document bytes or storage path",
+    deniedBodies.every((b) => !b.includes("%PDF") && !b.includes("vendor-kyc/")));
+
+  const cross = await open(ADMIN, "v_cross");
+  record("F4-6 a record pointing at another seller's folder is refused, even for admin (not served)",
+    cross.status === 500 && !(await cross.text()).includes("%PDF"), `${cross.status}`);
+  const none = await open(ADMIN, "v_f4", "cheque");
+  const badType = await open(ADMIN, "v_f4", "passport");
+  record("F4-7 an empty pointer is 'not uploaded' (404); an unknown document type is refused (400)",
+    none.status === 404 && badType.status === 400, `${none.status}/${badType.status}`);
+
+  const view = await status("seller_f4");
+  record("F4-8 the seller's own KYC status view reports documents as booleans only — no path, no URL",
+    view.status === 200 && view.body?.documents?.aadhaar === true && view.body?.documents?.cheque === false &&
+    !JSON.stringify(view.body).includes("vendor-kyc/") && !/token=|firebasestorage/.test(JSON.stringify(view.body)));
+}
+
 await clearAll();
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

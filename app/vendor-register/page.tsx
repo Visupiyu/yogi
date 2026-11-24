@@ -21,12 +21,12 @@ import {
 } from "firebase/firestore";
 
 import {
-  getDownloadURL,
   ref,
   uploadBytes,
 } from "firebase/storage";
 
 import { auth, db, storage } from "@/lib/firebase";
+import { vendorKycPath } from "@/lib/storagePaths";
 import { sendVerificationEmail } from "@/lib/sendVerificationEmail";
 
 const citiesByState = {
@@ -108,6 +108,11 @@ export default function VendorRegisterPage() {
     }));
   };
 
+  // Uploads one KYC document and returns its Storage OBJECT PATH
+  // (vendor-kyc/{uid}/{label}-{unique-name}) — the same pointer the KYC
+  // resubmission flow stores. Never a getDownloadURL(): a tokenized link works
+  // for anyone who holds it and bypasses storage.rules, so it is not persisted.
+  // Admin review streams the file through app/api/admin/kyc/document.
   const uploadKyc = async (
     uid: string,
     file: File | null,
@@ -115,14 +120,11 @@ export default function VendorRegisterPage() {
   ): Promise<string> => {
     if (!file) return "";
 
-    const storageRef = ref(
-      storage,
-      `vendor-kyc/${uid}/${label}-${Date.now()}-${file.name}`
-    );
+    const path = vendorKycPath(uid, label, file);
 
-    await uploadBytes(storageRef, file);
+    await uploadBytes(ref(storage, path), file, { contentType: file.type });
 
-    return await getDownloadURL(storageRef);
+    return path;
   };
 
   const progress = useMemo(() => {
@@ -448,6 +450,8 @@ export default function VendorRegisterPage() {
           aadhaarNumber:
             formData.aadhaarNumber,
 
+          // Storage object paths despite the historical *DocUrl names
+          // (firestore.rules accept only this seller's own vendor-kyc/ path).
           gstDocUrl,
           aadhaarDocUrl,
           chequeDocUrl,

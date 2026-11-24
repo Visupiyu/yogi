@@ -194,10 +194,13 @@ await check("24 vendor doc: admin browser can NOT decide KYC (kycStatus + status
   assertFails(updateDoc(doc(firestoreAs("adminUid", ADMIN_EMAIL), "vendors", "v_doc1"), { kycStatus: "Rejected", status: "Rejected" })));
 await check("24b vendor doc: admin may still update KYC URL fields (admin access unchanged)", () =>
   assertSucceeds(updateDoc(doc(firestoreAs("adminUid", ADMIN_EMAIL), "vendors", "v_doc1"), { gstDocUrl: "https://example.invalid/admin-set" })));
-await check("24c vendor doc: new vendor application with KYC URLs still allowed (create unchanged)", () =>
+// F-4: a new application stores Storage object paths, never download URLs.
+// (24c used to assert that KYC URLs were accepted here; that is now refused —
+// see the F-4 section at the end for the full set of cases.)
+await check("24c vendor doc: new vendor application with its OWN KYC object paths allowed", () =>
   assertSucceeds(setDoc(doc(firestoreAs("newVendor"), "vendors", "v_new"), {
     uid: "newVendor", businessName: "New", status: "Pending", kycStatus: "Pending",
-    gstDocUrl: "https://example.invalid/g", aadhaarDocUrl: "https://example.invalid/a", chequeDocUrl: "https://example.invalid/c",
+    gstDocUrl: "vendor-kyc/newVendor/gst-1-g.pdf", aadhaarDocUrl: "vendor-kyc/newVendor/aadhaar-1-a.pdf", chequeDocUrl: "vendor-kyc/newVendor/cheque-1-c.jpg",
   })));
 
 // ============ FIRESTORE: identity + bank details frozen once KYC Approved ============
@@ -306,6 +309,68 @@ await check("H2-7 other admin vendor edits still work (identity, commission, doc
   await check("H2-9 the admin dashboard has no vendor approve / reject / KYC write left", async () => {
     if (/approveVendor|rejectVendor|updateKYC|kycStatus\s*:/.test(dashboard)) throw new Error("dashboard still has a KYC shortcut");
   });
+}
+
+// ============ F-4: KYC document pointers on a new application ============
+// Registration (app/vendor-register) now stores the object path produced by
+// lib/storagePaths vendorKycPath; firestore.rules refuse anything else.
+{
+  const { vendorKycPath } = await import("../../../lib/storagePaths.ts");
+  const app = (uid: string, docs: Record<string, unknown>) => ({
+    uid, businessName: "F4", status: "Pending", kycStatus: "Pending", ...docs,
+  });
+  const create = (uid: string, id: string, docs: Record<string, unknown>) =>
+    setDoc(doc(firestoreAs(uid), "vendors", id), app(uid, docs));
+  const realPath = (uid: string, label: string, name: string) =>
+    vendorKycPath(uid, label, new File([tiny], name, { type: "application/pdf" }));
+
+  await check("F4-1 registration: the exact paths vendorKycPath produces are accepted", () =>
+    assertSucceeds(create("f4ok", "f4_ok", {
+      gstDocUrl: realPath("f4ok", "gst", "GST Cert (final).pdf"),
+      aadhaarDocUrl: realPath("f4ok", "aadhaar", "aadhaar.pdf"),
+      chequeDocUrl: realPath("f4ok", "cheque", "cheque.pdf"),
+    })));
+  await check("F4-1b registration: a sanitized upload name with consecutive dots (scan..pdf) is accepted", () =>
+    assertSucceeds(create("f4dots", "f4_dots", {
+      gstDocUrl: "", aadhaarDocUrl: realPath("f4dots", "aadhaar", "scan..pdf"), chequeDocUrl: realPath("f4dots", "cheque", "c.pdf"),
+    })));
+  await check("F4-2 registration: GST optional — empty gstDocUrl accepted, as before", () =>
+    assertSucceeds(create("f4gst", "f4_gst", {
+      gstDocUrl: "", aadhaarDocUrl: "vendor-kyc/f4gst/aadhaar-1-a.pdf", chequeDocUrl: "vendor-kyc/f4gst/cheque-1-c.pdf",
+    })));
+
+  const own = { aadhaarDocUrl: "vendor-kyc/f4bad/aadhaar-1-a.pdf", chequeDocUrl: "vendor-kyc/f4bad/cheque-1-c.pdf" };
+  const tokenUrl = (p: string) =>
+    `https://firebasestorage.googleapis.com/v0/b/demo.appspot.com/o/${encodeURIComponent(p)}?alt=media&token=00000000-1111-2222-3333-444444444444`;
+  const bad: [string, Record<string, unknown>][] = [
+    ["a tokenized download URL to the applicant's OWN file (aadhaar)", { aadhaarDocUrl: tokenUrl("vendor-kyc/f4bad/aadhaar-1-a.pdf") }],
+    ["a tokenized download URL (cheque)", { chequeDocUrl: tokenUrl("vendor-kyc/f4bad/cheque-1-c.pdf") }],
+    ["a tokenized download URL (gst)", { gstDocUrl: tokenUrl("vendor-kyc/f4bad/gst-1-g.pdf") }],
+    ["another seller's KYC path", { aadhaarDocUrl: "vendor-kyc/victimSeller/aadhaar-1-a.pdf" }],
+    ["a path outside vendor-kyc/", { chequeDocUrl: "products/f4bad/cheque.pdf" }],
+    ["a delivery-kyc path", { chequeDocUrl: "delivery-kyc/f4bad/cheque-1-c.pdf" }],
+    ["a nested sub-folder", { aadhaarDocUrl: "vendor-kyc/f4bad/x/aadhaar.pdf" }],
+    ["path traversal", { aadhaarDocUrl: "vendor-kyc/f4bad/../victimSeller/aadhaar.pdf" }],
+    ["a literal '..' name", { aadhaarDocUrl: "vendor-kyc/f4bad/.." }],
+    ["a literal '.' name", { aadhaarDocUrl: "vendor-kyc/f4bad/." }],
+    ["the bare folder (no file)", { aadhaarDocUrl: "vendor-kyc/f4bad/" }],
+    ["a leading slash", { aadhaarDocUrl: "/vendor-kyc/f4bad/aadhaar.pdf" }],
+    ["an over-long path (>300 chars)", { aadhaarDocUrl: `vendor-kyc/f4bad/${"a".repeat(300)}` }],
+    ["a non-string pointer", { aadhaarDocUrl: { path: "vendor-kyc/f4bad/a.pdf" } }],
+  ];
+  let i = 0;
+  for (const [label, override] of bad) {
+    await check(`F4-3.${++i} registration REFUSED: ${label}`, () =>
+      assertFails(create("f4bad", `f4_bad_${i}`, { gstDocUrl: "", ...own, ...override })));
+  }
+  await check("F4-4 control: the same application with only its own paths is accepted (the refusals above are the pointer, nothing else)", () =>
+    assertSucceeds(create("f4bad", "f4_bad_control", { gstDocUrl: "", ...own })));
+
+  // The stored path is only usable through the rules: no sign-in, no file.
+  await check("F4-5 vendor KYC: a signed-out caller CANNOT read a document by its path", () =>
+    assertFails(env.unauthenticatedContext().storage().ref(VENDOR_DOC).getDownloadURL()));
+  await check("F4-6 vendor KYC: another signed-in seller CANNOT read it either", () =>
+    assertFails(storageAs("victimSeller").ref(VENDOR_DOC).getDownloadURL()));
 }
 
 await env.cleanup();
