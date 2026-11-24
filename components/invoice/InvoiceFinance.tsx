@@ -83,7 +83,7 @@ export default function InvoiceFinance({
             </td>
 
             <td className="border border-black p-1 text-right text-gray-700">
-              See Seller Order Settlement Statement (not part of this tax invoice)
+              See Seller Order Settlement Statement (not part of this document)
             </td>
 
           </tr>

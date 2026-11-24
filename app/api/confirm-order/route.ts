@@ -210,13 +210,19 @@ export async function POST(request: Request) {
           tx.get(db.collection("vendors").where("uid", "==", vid).limit(1))
         )
       );
+      // taxVerificationStatus is read from the vendor record (Admin SDK) — it
+      // is written only by the admin GST review route (and reset to PENDING by
+      // the seller's own profile edit), and firestore.rules pins it against
+      // every client. Recorded as-is so an invoice never treats an unverified
+      // GSTIN as verified (lib/invoiceTax).
       const sellerTaxByVendor: Record<
         string,
-        { gstStatus: string; gstin: string }
+        { gstStatus: string; gstin: string; taxVerificationStatus: string }
       > = {};
       vendorQuerySnaps.forEach((qs, i) => {
         const d = (qs.docs[0]?.data() || {}) as {
           taxProfile?: { gstStatus?: unknown; gstin?: unknown };
+          taxVerificationStatus?: unknown;
         };
         sellerTaxByVendor[vendorIds[i]] = {
           gstStatus:
@@ -225,6 +231,10 @@ export async function POST(request: Request) {
               : "UNKNOWN",
           gstin:
             typeof d.taxProfile?.gstin === "string" ? d.taxProfile.gstin : "",
+          taxVerificationStatus:
+            typeof d.taxVerificationStatus === "string"
+              ? d.taxVerificationStatus
+              : "UNKNOWN",
         };
       });
 

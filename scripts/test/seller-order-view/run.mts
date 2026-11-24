@@ -178,7 +178,10 @@ const PRIVATE = {
 async function seed() {
   await db.collection("settings").doc("global").set({ freeShippingThreshold: 499, standardShippingCharge: 49, deliveryCost: 49 });
   for (const [uid, status] of [[A, "Approved"], [B, "Approved"], [X, "Approved"]] as const) {
-    await db.collection("vendors").add({ uid, email: `${uid}@example.com`, businessName: `Shop ${uid}`, status, kycStatus: status, taxProfile: { gstStatus: "UNREGISTERED" } });
+    // taxVerificationStatus differs per seller so the snapshot test (4b) can tell
+    // that confirm-order recorded each seller's OWN admin-review status.
+    await db.collection("vendors").add({ uid, email: `${uid}@example.com`, businessName: `Shop ${uid}`, status, kycStatus: status, taxProfile: { gstStatus: "UNREGISTERED" },
+      taxVerificationStatus: uid === A ? "VERIFIED" : "PENDING" });
   }
   for (const [id, vendorId, price] of [["pa", A, 300], ["pb", B, 250], ["px", X, 100]] as const) {
     await db.collection("products").doc(id).set({
@@ -246,8 +249,25 @@ try {
   const forbiddenNumbers = [Number(mOrder.finalTotal), Number(mOrder.total), 4321, 98765, 55555, 77, 500];
   const numberLeaks = numbersIn(v).filter((x) => forbiddenNumbers.includes(x));
   if (numberLeaks.length) leaks.push(`numbers ${numberLeaks.join(",")}`);
-  record("4  nothing private in A's view: no seller B (uid, item, name), no customer uid/email, no vendorIds, no payment references/amounts, no coupon/reward/commission/earning/whole-order totals, no delivery partner ids or names (multi-seller), no internal/tax fields",
+  record("4  nothing private in A's view: no seller B (uid, item, name), no customer uid/email, no vendorIds, no payment references/amounts, no coupon/reward/commission/earning/whole-order totals, no delivery partner ids or names (multi-seller), no internal fields or whole-order tax snapshot",
     leaks.length === 0, leaks.length ? `LEAKED: ${leaks.join(", ")}` : "clean");
+  // Phase 1 (invoices): A's view carries A's OWN slice of the recorded tax
+  // snapshot — the order's snapshot holds B's line too, and it must not leak.
+  const snapLines = Array.isArray(mOrder.taxSnapshot?.items) ? mOrder.taxSnapshot.items : [];
+  const snapA = snapLines.find((l: any) => l.productId === "pa");
+  record("4b A's tax slice: only A's own snapshot line (exact recorded values), A's own GST status; B's line in the order snapshot is not exposed",
+    snapLines.some((l: any) => l.productId === "pb") && !!snapA &&
+    v.tax?.lines?.length === 1 && v.tax.lines[0].productId === "pa" &&
+    v.tax.lines[0].grossValue === snapA.grossValue && v.tax.lines[0].taxableValue === snapA.taxableValue &&
+    v.tax.lines[0].gstAmount === snapA.gstAmount && v.tax.lines[0].gstRate === snapA.gstRate &&
+    v.tax.gstStatus === mOrder.taxSnapshot.sellers?.[A]?.gstStatus &&
+    !JSON.stringify(v.tax).includes("pb") && !JSON.stringify(v.tax).includes("vendorId"),
+    JSON.stringify(v.tax));
+  record("4c confirm-order recorded each seller's own taxVerificationStatus from the vendor record (A VERIFIED, B PENDING); A's slice carries A's only",
+    mOrder.taxSnapshot.sellers?.[A]?.taxVerificationStatus === "VERIFIED" &&
+    mOrder.taxSnapshot.sellers?.[B]?.taxVerificationStatus === "PENDING" &&
+    v.tax?.taxVerificationStatus === "VERIFIED" && !JSON.stringify(v.tax).includes("PENDING"),
+    JSON.stringify({ sellers: mOrder.taxSnapshot?.sellers, slice: v.tax?.taxVerificationStatus }));
 
   // ============ 5. Seller B's equivalent view ============
   const b = await detail(B, M);

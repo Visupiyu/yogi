@@ -3,7 +3,18 @@
 import Image from "next/image";
 import { SITE_HOST, SUPPORT_EMAIL } from "@/lib/siteConfig";
 
-export default function InvoiceHeader() {
+// The document title comes from lib/invoiceTax (TAX INVOICE / BILL OF SUPPLY /
+// ORDER SUMMARY, by the seller's recorded GST status). YOMICO is the
+// marketplace here, not the supplier — the seller's GSTIN, when one applies,
+// is printed in the seller block (InvoiceVendor). No GSTIN is printed for the
+// marketplace: none is configured, and a placeholder must never appear.
+export default function InvoiceHeader({
+  title = "ORDER SUMMARY",
+  subtitle = "Not a tax invoice",
+}: {
+  title?: string;
+  subtitle?: string;
+}) {
 
   return (
 
@@ -40,11 +51,11 @@ export default function InvoiceHeader() {
         <div className="text-center md:text-right mt-4 md:mt-0">
 
           <h2 className="text-base font-extrabold">
-            TAX INVOICE
+            {title}
           </h2>
 
           <p className="text-sm mt-2">
-            Original for Recipient
+            {subtitle}
           </p>
 
         </div>
@@ -60,7 +71,7 @@ export default function InvoiceHeader() {
           <tr>
 
             <td className="border border-black p-1 font-semibold w-1/6">
-              Company
+              Marketplace
             </td>
 
             <td className="border border-black p-1">
@@ -77,18 +88,6 @@ export default function InvoiceHeader() {
 
             <td className="border border-black p-1">
               Vadodara, Gujarat, India
-            </td>
-
-          </tr>
-
-          <tr>
-
-            <td className="border border-black p-1 font-semibold w-1/6">
-              GSTIN
-            </td>
-
-            <td className="border border-black p-1">
-              24ABCDE1234F1Z5
             </td>
 
           </tr>

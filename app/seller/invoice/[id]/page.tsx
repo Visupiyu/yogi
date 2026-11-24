@@ -8,6 +8,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import Invoice from "@/components/invoice/Invoice";
 import type { SellerOrderDetail } from "@/lib/sellerOrders/sellerOrderView";
 import { timestampLike } from "@/lib/sellerOrders/sellerOrdersClient";
+import { taxSnapshotFromSellerView } from "@/lib/invoiceTax";
 
 export default function SellerInvoicePage() {
 
@@ -63,7 +64,14 @@ export default function SellerInvoicePage() {
             customerName: view.customer.name,
             phone: view.customer.phone,
             address: view.customer.address,
-            items: view.items.map((item) => ({ ...item, id: item.productId })),
+            // This seller's own lines, tagged with their own uid (as on the
+            // seller order page) so the invoice keeps them with no snapshot too.
+            items: view.items.map((item) => ({ ...item, id: item.productId, vendorId: user.uid })),
+            // This seller's own recorded tax slice, for their invoice (lib/invoiceTax),
+            // and the confirmation instant the document is dated by.
+            confirmedAt: view.confirmedAt,
+            vendorId: user.uid,
+            taxSnapshot: taxSnapshotFromSellerView(view.tax, user.uid),
             total: vendorSubtotal,
             finalTotal: vendorSubtotal,
             // Shipping/coupon discount aren't split per vendor anywhere

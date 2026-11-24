@@ -88,7 +88,21 @@ export type SellerOrderSummary = {
   items: SellerOrderItemView[];
 };
 
+/**
+ * This seller's OWN slice of the order's immutable tax snapshot (frozen at
+ * confirmation): their GST status / GSTIN and their own lines only — never
+ * another seller's lines or identity. null when nothing was recorded.
+ */
+export type SellerOrderTax = {
+  gstStatus: string;
+  gstin: string;
+  /** As recorded at confirmation (admin GST review); "" when not recorded. */
+  taxVerificationStatus: string;
+  lines: { productId: string; name: string; qty: number; hsn: string; gstRate: number; grossValue: number; taxableValue: number; gstAmount: number }[];
+};
+
 export type SellerOrderDetail = SellerOrderSummary & {
+  tax: SellerOrderTax | null;
   invoiceNumber: string | null;
   confirmedAt: string | null;
   deliveryDeadlineAt: string | null;
@@ -114,6 +128,7 @@ export const SELLER_ORDER_SUMMARY_KEYS = [
 export const SELLER_ORDER_DETAIL_KEYS = [
   ...SELLER_ORDER_SUMMARY_KEYS,
   "invoiceNumber", "confirmedAt", "deliveryDeadlineAt", "deliveredAt", "customer", "shipping", "cancellable",
+  "tax",
 ] as const;
 export const SELLER_ORDER_ITEM_KEYS = [
   "itemKey", "productId", "name", "image", "qty", "price", "lineTotal", "size", "color",
@@ -271,5 +286,23 @@ export function buildSellerOrderDetail(params: {
       summary.isSoleSeller &&
       (summary.orderStatus === "Confirmed" || summary.orderStatus === "Packed") &&
       summary.items.every((i) => PRE_HANDOVER.has(i.status)),
+    tax: ownTaxSlice(order.taxSnapshot, params.vendorUid),
   };
+}
+
+function ownTaxSlice(snapshot: unknown, vendorUid: string): SellerOrderTax | null {
+  if (!snapshot || typeof snapshot !== "object") return null;
+  const snap = snapshot as { items?: unknown; sellers?: unknown };
+  if (!Array.isArray(snap.items)) return null;
+  const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const lines = (snap.items as Doc[])
+    .filter((l) => l && l.vendorId === vendorUid)
+    .map((l) => ({
+      productId: str(l.productId), name: str(l.name), qty: n(l.qty), hsn: str(l.hsn),
+      gstRate: n(l.gstRate), grossValue: n(l.grossValue), taxableValue: n(l.taxableValue), gstAmount: n(l.gstAmount),
+    }));
+  if (!lines.length) return null;
+  const sellers = snap.sellers && typeof snap.sellers === "object" ? (snap.sellers as Record<string, Doc>) : {};
+  const own = sellers[vendorUid] || {};
+  return { gstStatus: str(own.gstStatus), gstin: str(own.gstin), taxVerificationStatus: str(own.taxVerificationStatus), lines };
 }
