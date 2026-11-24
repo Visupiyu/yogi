@@ -810,9 +810,34 @@ service cloud.firestore {
       return !(field in d) || d[field] == 0;
     }
 
+    // A KYC document pointer on a new application (F-4): absent, empty (GST is
+    // optional), or the applicant's OWN Storage object path
+    // vendor-kyc/{auth.uid}/{file} — the same shape lib/sellerBusiness.ts
+    // isOwnKycDocumentPath accepts on resubmission. Never a download URL: a
+    // tokenized link works for anyone holding it and bypasses storage.rules.
+    function isOwnKycDocPointer(d, field) {
+      return !(field in d)
+        || d[field] == ''
+        || (
+          d[field] is string
+          && d[field].size() <= 300
+          && d[field].split('/').size() == 3
+          && d[field].split('/')[0] == 'vendor-kyc'
+          && d[field].split('/')[1] == request.auth.uid
+          && d[field].split('/')[2].size() > 0
+          // Exactly three segments already rules out traversal; a file name of
+          // '.' or '..' is the only dot form refused (a sanitized upload name
+          // such as "scan..pdf" is legitimate).
+          && !(d[field].split('/')[2] in ['.', '..'])
+        );
+    }
+
     function isValidVendorApplication() {
       let d = request.resource.data;
       return d.uid == request.auth.uid
+        && isOwnKycDocPointer(d, 'gstDocUrl')
+        && isOwnKycDocPointer(d, 'aadhaarDocUrl')
+        && isOwnKycDocPointer(d, 'chequeDocUrl')
         && d.status == 'Pending'
         && d.kycStatus == 'Pending'
         // Only the fields app/vendor-register writes. Everything a server

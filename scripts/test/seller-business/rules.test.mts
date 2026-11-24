@@ -56,7 +56,8 @@ const registration = (uid: string) => ({
   street: "1 Road", unit: "", zipCode: "380001", city: "Ahmedabad", state: "Gujarat",
   accountHolder: "New Seller", bankName: "Bank", accountNumber: "123456789012", ifsc: "TEST0001234",
   panNumber: "ABCDE1234F", aadhaarNumber: "123412341234",
-  gstDocUrl: "", aadhaarDocUrl: "https://example.invalid/a", chequeDocUrl: "https://example.invalid/c",
+  // The applicant's own Storage object paths — what app/vendor-register stores (F-4).
+  gstDocUrl: "", aadhaarDocUrl: `vendor-kyc/${uid}/aadhaar-1-a.pdf`, chequeDocUrl: `vendor-kyc/${uid}/cheque-1-c.pdf`,
   kycStatus: "Pending", agreed: true, storeLogo: "", storeBanner: "", rating: 0, totalProducts: 0,
   status: "Pending", commissionRate: 0, totalSales: 0, totalOrders: 0, totalRevenue: 0, pendingPayout: 0,
   createdAt: serverTimestamp(),
