@@ -19,6 +19,9 @@ const categories = [
   { name: "Mobiles", categoryName: "Mobiles", image: "https://cdn-icons-png.flaticon.com/512/545/545245.png", bg: "bg-red-100" },
   { name: "Appliances", categoryName: "Appliances", image: "https://cdn-icons-png.flaticon.com/512/3659/3659898.png", bg: "bg-gray-100" },
   { name: "Books", categoryName: "Books", image: "https://cdn-icons-png.flaticon.com/512/3145/3145765.png", bg: "bg-indigo-100" },
+  { name: "Sports", categoryName: "Sports", image: "https://cdn-icons-png.flaticon.com/512/857/857455.png", bg: "bg-lime-100" },
+  { name: "Health Care", categoryName: "Health Care", image: "https://cdn-icons-png.flaticon.com/512/2966/2966327.png", bg: "bg-teal-100" },
+  { name: "Stationery", categoryName: "Stationery", image: "https://cdn-icons-png.flaticon.com/512/3534/3534033.png", bg: "bg-amber-100" },
 ];
 
 export default function CategoryStrip() {

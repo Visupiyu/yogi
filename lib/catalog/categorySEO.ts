@@ -185,6 +185,50 @@ export const CATEGORY_SEO: Record<string, CategorySEO> = {
   },
 
   // ------------------------------------------
+  // Health Care
+  // ------------------------------------------
+
+  HEALTH_CARE: {
+
+    title: "Health Care | Health Devices, First Aid & Supplements | YOMICO",
+
+    description:
+      "Shop BP monitors, glucometers, thermometers, first aid, vitamins, supplements and orthopaedic supports.",
+
+    keywords: [
+      "health care",
+      "bp monitor",
+      "glucometer",
+      "thermometer",
+      "first aid",
+      "vitamins"
+    ]
+
+  },
+
+  // ------------------------------------------
+  // Stationery
+  // ------------------------------------------
+
+  STATIONERY: {
+
+    title: "Stationery | Office, School & Art Supplies | YOMICO",
+
+    description:
+      "Shop pens, pencils, notebooks, office supplies, art and craft materials and school stationery.",
+
+    keywords: [
+      "stationery",
+      "pens",
+      "notebooks",
+      "office supplies",
+      "art supplies",
+      "school supplies"
+    ]
+
+  },
+
+  // ------------------------------------------
   // Automotive
   // ------------------------------------------
 

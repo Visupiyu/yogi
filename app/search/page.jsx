@@ -40,6 +40,9 @@ const CATEGORIES = [
   { label: "Grocery", value: "Grocery" },
   { label: "Mobiles", value: "Mobiles" },
   { label: "Books", value: "Books" },
+  { label: "Sports", value: "Sports" },
+  { label: "Health Care", value: "Health Care" },
+  { label: "Stationery", value: "Stationery" },
 ];
 
 const PAGE_STEP = 48;

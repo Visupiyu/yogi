@@ -64,6 +64,9 @@ const CATEGORIES = [
   "Appliances",
   "Furniture",
   "Books",
+  "Sports",
+  "Health Care",
+  "Stationery",
 ];
 
 const INQUIRY_TOPICS = [
