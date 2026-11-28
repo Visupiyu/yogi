@@ -195,6 +195,29 @@ async function mobileIntent(uid: string, opts: { coupon?: boolean } = {}) {
 const mobileFinalize = (i: { razorpayOrderId: string; intent: any }, paymentId: string, source = "mobile-app") =>
   finalizeMobileOnlineOrder({ razorpayPaymentId: paymentId, razorpayOrderId: i.razorpayOrderId, intent: i.intent, capturedAmountPaise: i.intent.expectedAmountPaise, source });
 
+// The race scenarios (C, E, LF) run two finalize transactions at once on the
+// same intent. Under that contention the Firestore EMULATOR's lock manager has
+// no deadlock detection: it times the locks out ("Transaction lock timeout")
+// and then reports the transaction as "Transaction is invalid or closed"
+// (gRPC INVALID_ARGUMENT), which the Admin SDK does not retry. Production
+// Firestore resolves the same contention by aborting one transaction with the
+// retryable ABORTED, which the SDK retries automatically. This replays exactly
+// that retry for the emulator-only error: the transaction committed nothing,
+// and a retry re-reads everything, so every invariant asserted afterwards
+// (one normal order, inert duplicates, effects exactly once) is unchanged.
+// Any other error still fails the harness.
+const EMULATOR_CONTENTION = /Transaction is invalid or closed|Transaction lock timeout/;
+async function racing<T>(run: () => Promise<T>, attempts = 5): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run();
+    } catch (error) {
+      if (attempt >= attempts || !EMULATOR_CONTENTION.test(String((error as Error)?.message))) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+    }
+  }
+}
+
 async function main() {
   await clearAll();
   await seed();
@@ -233,7 +256,7 @@ async function main() {
     const uidC = `buyer_${platform}_c`;
     const iC = await create(uidC, opts);
     const beforeC = await snapshot(uidC, iC.razorpayOrderId);
-    const [r1, r2] = await Promise.all([finalize(iC, `pay_${P}_C_first`), finalize(iC, `pay_${P}_C_second`)]);
+    const [r1, r2] = await Promise.all([racing(() => finalize(iC, `pay_${P}_C_first`)), racing(() => finalize(iC, `pay_${P}_C_second`))]);
     const c = await snapshot(uidC, iC.razorpayOrderId);
     const winner = c.intent?.finalizedPaymentId;
     const loser = winner === `pay_${P}_C_first` ? `pay_${P}_C_second` : `pay_${P}_C_first`;
@@ -274,7 +297,7 @@ async function main() {
     const iE1 = await create(uidE, {});
     const iE2 = await create(uidE, {});
     const beforeE = await snapshot(uidE, iE1.razorpayOrderId);
-    const [e1, e2] = await Promise.all([finalize(iE1, `pay_${P}_E1`), finalize(iE2, `pay_${P}_E2`)]);
+    const [e1, e2] = await Promise.all([racing(() => finalize(iE1, `pay_${P}_E1`)), racing(() => finalize(iE2, `pay_${P}_E2`))]);
     const e = await snapshot(uidE, iE1.razorpayOrderId);
     const e2Intent = (await db.collection("paymentIntents").doc(iE2.razorpayOrderId).get()).data() as any;
     record(`${P}.E two separate intents -> two legitimate orders, no false duplicate`,
@@ -361,7 +384,7 @@ async function main() {
     await finalize(iF, `pay_${P}_F1`);
     await makeLegacy(iF);
     const f0 = await snapshot(uidF, iF.razorpayOrderId);
-    const [f1r, f2r] = await Promise.all([finalize(iF, `pay_${P}_F2`), finalize(iF, `pay_${P}_F3`)]);
+    const [f1r, f2r] = await Promise.all([racing(() => finalize(iF, `pay_${P}_F2`)), racing(() => finalize(iF, `pay_${P}_F3`))]);
     const f1 = await snapshot(uidF, iF.razorpayOrderId);
     record(`${P}.LF two new payments racing on a legacy intent -> both inert duplicates, legacy stays the one normal order`,
       f1r.kind === "already" && f2r.kind === "already" && f1.normal.length === 1 && f1.normal[0].id === `pay_${P}_F1` &&

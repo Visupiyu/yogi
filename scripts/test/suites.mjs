@@ -68,6 +68,8 @@ export const suites = [
   { name: "seller-orders", file: "scripts/test/seller-orders/run.mts", ...fs("firestore"), harness: true },
   { name: "seller-products-rules", file: "scripts/test/seller-products/rules.test.mts", ...fs("firestore") },
   { name: "seller-products", file: "scripts/test/seller-products/run.mts", ...fs("firestore"), harness: true },
+  { name: "bulk-upload-rules", file: "scripts/test/bulk-upload/run.test.mts", emulators: "" },
+  { name: "bulk-upload", file: "scripts/test/bulk-upload/route.mts", ...fs("firestore"), harness: true },
   { name: "product-mrp-rules", file: "scripts/test/product-mrp/rules.test.mts", ...fs("firestore") },
   { name: "product-mrp", file: "scripts/test/product-mrp/run.mts", ...fs("firestore"), harness: true },
   { name: "seller-settlement-rules", file: "scripts/test/seller-settlement/rules.test.mts", ...fs("firestore") },
