@@ -270,13 +270,23 @@ export default function SellerProductsPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => router.push("/seller/products/add")}
-          className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white transition hover:bg-indigo-700"
-        >
-          + Add Product
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => router.push("/seller/products/bulk-upload")}
+            className="rounded-xl border border-indigo-200 bg-white px-5 py-3 font-semibold text-indigo-700 transition hover:bg-indigo-50"
+          >
+            Bulk Upload (Excel)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/seller/products/add")}
+            className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white transition hover:bg-indigo-700"
+          >
+            + Add Product
+          </button>
+        </div>
       </div>
 
       {/* SUMMARY */}
