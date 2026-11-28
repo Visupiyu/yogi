@@ -78,6 +78,7 @@ const { POST: cancelOrder } = await import("../../../app/api/cancel-order/route.
 const { GET: listRoute } = await import("../../../app/api/seller/orders/route.ts");
 const { GET: detailRoute } = await import("../../../app/api/seller/orders/[orderId]/route.ts");
 const { POST: shippingRoute } = await import("../../../app/api/seller/orders/[orderId]/shipping/route.ts");
+const { POST: taxVerificationRoute } = await import("../../../app/api/admin/seller-tax-verification/route.ts");
 const {
   SELLER_ORDER_DETAIL_KEYS,
   SELLER_ORDER_SUMMARY_KEYS,
@@ -104,6 +105,7 @@ const ADMIN_UID = "admin_view_1";
 const A = "seller_view_a";
 const B = "seller_view_b";
 const X = "seller_view_blocked";
+const DUP = "seller_view_duplicate";
 const BUYER = "buyer_view_1";
 const BUYER_EMAIL = "buyer.private@example.com";
 
@@ -183,7 +185,14 @@ async function seed() {
     await db.collection("vendors").add({ uid, email: `${uid}@example.com`, businessName: `Shop ${uid}`, status, kycStatus: status, taxProfile: { gstStatus: "UNREGISTERED" },
       taxVerificationStatus: uid === A ? "VERIFIED" : "PENDING" });
   }
-  for (const [id, vendorId, price] of [["pa", A, 300], ["pb", B, 250], ["px", X, 100]] as const) {
+  // F4: one seller uid with TWO vendor records (e.g. a retried registration),
+  // one of them claiming a verified registered GSTIN. Both Approved, so the
+  // order can be placed; confirmation must not guess between them.
+  await db.collection("vendors").add({ uid: DUP, email: `${DUP}@example.com`, businessName: `Shop ${DUP}`, status: "Approved", kycStatus: "Approved",
+    taxProfile: { gstStatus: "REGISTERED", gstin: "27AAPFU0939F1ZV" }, taxVerificationStatus: "VERIFIED" });
+  await db.collection("vendors").add({ uid: DUP, email: `${DUP}@example.com`, businessName: `Shop ${DUP}`, status: "Approved", kycStatus: "Approved",
+    taxProfile: { gstStatus: "UNREGISTERED" }, taxVerificationStatus: "PENDING" });
+  for (const [id, vendorId, price] of [["pa", A, 300], ["pb", B, 250], ["px", X, 100], ["pdup", DUP, 80]] as const) {
     await db.collection("products").doc(id).set({
       title: `Item ${id}`, name: `Item ${id}`, price, sellingPrice: price, mrp: price * 2, gstRate: 0, gstPercent: 0,
       stock: 50, sales: 0, active: true, approvalStatus: "approved", approved: true, vendorId, vendorName: `Shop ${vendorId}`,
@@ -263,11 +272,15 @@ try {
     v.tax.gstStatus === mOrder.taxSnapshot.sellers?.[A]?.gstStatus &&
     !JSON.stringify(v.tax).includes("pb") && !JSON.stringify(v.tax).includes("vendorId"),
     JSON.stringify(v.tax));
-  record("4c confirm-order recorded each seller's own taxVerificationStatus from the vendor record (A VERIFIED, B PENDING); A's slice carries A's only",
-    mOrder.taxSnapshot.sellers?.[A]?.taxVerificationStatus === "VERIFIED" &&
-    mOrder.taxSnapshot.sellers?.[B]?.taxVerificationStatus === "PENDING" &&
-    v.tax?.taxVerificationStatus === "VERIFIED" && !JSON.stringify(v.tax).includes("PENDING"),
-    JSON.stringify({ sellers: mOrder.taxSnapshot?.sellers, slice: v.tax?.taxVerificationStatus }));
+  // F2: the order (readable by the customer and the delivery partner) carries
+  // only whether each seller's GSTIN was verified — never the raw review state.
+  const snapSellersText = JSON.stringify(mOrder.taxSnapshot?.sellers || {});
+  record("4c confirm-order recorded each seller's own verification from the vendor record as a boolean only (A true, B false); no raw review state on the order; A's slice carries A's only",
+    mOrder.taxSnapshot.sellers?.[A]?.gstinVerified === true &&
+    mOrder.taxSnapshot.sellers?.[B]?.gstinVerified === false &&
+    !snapSellersText.includes("taxVerificationStatus") && !snapSellersText.includes("PENDING") && !snapSellersText.includes("VERIFIED") &&
+    v.tax?.gstinVerified === true && !JSON.stringify(v.tax).includes("PENDING") && !JSON.stringify(v.tax).includes("taxVerificationStatus"),
+    JSON.stringify({ sellers: mOrder.taxSnapshot?.sellers, slice: v.tax?.gstinVerified }));
 
   // ============ 5. Seller B's equivalent view ============
   const b = await detail(B, M);
@@ -394,6 +407,28 @@ try {
   await db.collection("rateLimits").doc(`seller-order-shipping_${A}`).set({ windowStart: Date.now(), count: 60 });
   const rl = [(await detail(A, M)).status, (await list(A)).status, (await ship(A, S, { trackingNumber: "Z" })).status];
   record("15 rate limits: detail 240, list 120, shipping 60 per seller per 10 min -> 429", rl.every((x) => x === 429), rl.join(","));
+
+  // ============ 16. F4: duplicate vendor records -> no guessed tax profile ============
+  const DO = await place([{ id: "pdup", qty: 1 }]);
+  const dOrder = (await db.collection("orders").doc(DO).get()).data() as any;
+  const dupTax = dOrder?.taxSnapshot?.sellers?.[DUP];
+  record("16 a seller uid with two vendor records: the order is still confirmed, but its snapshot records NO GST facts for that seller (UNKNOWN, no GSTIN, not verified) — never one record's claims picked arbitrarily",
+    dOrder?.status === "Confirmed" && dupTax?.gstStatus === "UNKNOWN" && dupTax?.gstin === "" && dupTax?.gstinVerified === false,
+    JSON.stringify({ status: dOrder?.status, dupTax }));
+
+  // ============ 17. F3: the audited server route still verifies a GSTIN ============
+  // firestore.rules now refuses tax-field writes from every browser, admin
+  // included; the dedicated Admin SDK route must be unaffected.
+  const tRef = await db.collection("vendors").add({ uid: "seller_view_tax", email: "t@example.com", businessName: "Shop T", status: "Approved", kycStatus: "Approved",
+    taxProfile: { gstStatus: "REGISTERED", gstin: "27AAPFU0939F1ZV" }, taxVerificationStatus: "PENDING" });
+  const tRes = await taxVerificationRoute(post("http://x/api/admin/seller-tax-verification", { vendorId: tRef.id, action: "VERIFY" }, ADMIN_UID, ADMIN_EMAIL));
+  const tAfter = (await tRef.get()).data() as any;
+  const tAudit = (await db.collection("audit_logs").get()).docs.map((d) => d.data()).filter((a) => JSON.stringify(a).includes(tRef.id));
+  const tDenied = await taxVerificationRoute(post("http://x/api/admin/seller-tax-verification", { vendorId: tRef.id, action: "REJECT", reason: "x" }, A));
+  record("17 the admin GST-review route still sets VERIFIED (Admin SDK) and writes its audit entry; a non-admin is refused",
+    tRes.status === 200 && tAfter?.taxVerificationStatus === "VERIFIED" && !!tAfter?.taxVerifiedBy && tAudit.length >= 1 &&
+    tDenied.status === 403 && ((await tRef.get()).data() as any)?.taxVerificationStatus === "VERIFIED",
+    JSON.stringify({ status: tRes.status, after: tAfter?.taxVerificationStatus, audits: tAudit.length, denied: tDenied.status }));
 } catch (error) {
   record("HARNESS ERROR", false, (error as Error)?.stack || String(error));
 }

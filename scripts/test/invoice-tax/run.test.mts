@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildInvoiceTax, invoiceDocumentsFor, taxSnapshotFromSellerView, documentLabels, supplierDisplayName,
   PLACE_OF_SUPPLY_NOTE, NO_SNAPSHOT_NOTE, STATUS_NOT_RECORDED_NOTE, GST_NOT_VERIFIED_NOTE, COMPOSITION_GSTIN_NOT_VERIFIED_NOTE,
-  FORMAL_TAX_DOCUMENTS_ENABLED, INTERIM_NOT_TAX_DOCUMENT_NOTE,
+  FORMAL_TAX_DOCUMENTS_ENABLED, INTERIM_NOT_TAX_DOCUMENT_NOTE, recordedGstinVerified,
 } from "../../../lib/invoiceTax.ts";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -101,7 +101,7 @@ const orderWith = (sellers: Record<string, unknown>, items = [lineA, lineA2, lin
 // 9. seller-view round trip
 {
   const full = buildInvoiceTax(orderWith({ A: { gstStatus: "REGISTERED", gstin: REG, taxVerificationStatus: "VERIFIED" } }, [lineA, lineA2]), { vendorId: "A" });
-  const viewTax = { gstStatus: "REGISTERED", gstin: REG, taxVerificationStatus: "VERIFIED", lines: [lineA, lineA2].map(({ vendorId: _v, ...rest }) => rest) };
+  const viewTax = { gstStatus: "REGISTERED", gstin: REG, gstinVerified: true, lines: [lineA, lineA2].map(({ vendorId: _v, ...rest }) => rest) };
   const fromView = buildInvoiceTax({ items: [], taxSnapshot: taxSnapshotFromSellerView(viewTax, "A") }, { vendorId: "A" });
   check("9 seller page (own tax slice) renders the same document as the full snapshot does for that seller",
     JSON.stringify(fromView.suppliers) === JSON.stringify(full.suppliers));
@@ -142,22 +142,47 @@ const orderWith = (sellers: Record<string, unknown>, items = [lineA, lineA2, lin
       s.lines[0].gstAmount === null && s.notes.includes(GST_NOT_VERIFIED_NOTE) && !s.notes.includes(STATUS_NOT_RECORDED_NOTE)));
   const verified = reg("VERIFIED");
   check("12b REGISTERED + well-formed GSTIN + recorded VERIFIED -> TAX INVOICE with the GSTIN and the recorded verification status",
-    verified.kind === "TAX_INVOICE" && verified.gstin === REG && verified.taxVerificationStatus === "VERIFIED");
+    verified.kind === "TAX_INVOICE" && verified.gstin === REG && verified.gstinVerified === true);
   const fakeFormat = buildInvoiceTax(orderWith({ A: { gstStatus: "REGISTERED", gstin: "24ABCDE1234", taxVerificationStatus: "VERIFIED" } }, [lineA]), FORMAL).suppliers[0];
   check("12c a VERIFIED status never rescues a malformed GSTIN (still ORDER SUMMARY, no GSTIN)",
     fakeFormat.kind === "ORDER_SUMMARY" && fakeFormat.gstin === null);
   const compUnverified = buildInvoiceTax(orderWith({ A: { gstStatus: "COMPOSITION", gstin: COMP, taxVerificationStatus: "PENDING" } }, [lineA]), FORMAL).suppliers[0];
   check("12d COMPOSITION not verified -> still a BILL OF SUPPLY (no tax either way) but its GSTIN is NOT printed, with a note",
     compUnverified.kind === "BILL_OF_SUPPLY" && compUnverified.gstin === null && compUnverified.notes.includes(COMPOSITION_GSTIN_NOT_VERIFIED_NOTE));
-  const viewTax = { gstStatus: "REGISTERED", gstin: REG, taxVerificationStatus: "PENDING", lines: [lineA].map(({ vendorId: _v, ...rest }) => rest) };
+  const viewTax = { gstStatus: "REGISTERED", gstin: REG, gstinVerified: false, lines: [lineA].map(({ vendorId: _v, ...rest }) => rest) };
   const fromView = buildInvoiceTax({ items: [], taxSnapshot: taxSnapshotFromSellerView(viewTax, "A") }, { vendorId: "A" }).suppliers[0];
+  const fromViewFormal = buildInvoiceTax({ items: [], taxSnapshot: taxSnapshotFromSellerView(viewTax, "A") }, { vendorId: "A", ...FORMAL }).suppliers[0];
   check("12e seller page carries the recorded verification too: an unverified seller's own document is not a tax invoice",
-    fromView.kind === "ORDER_SUMMARY" && fromView.taxVerificationStatus === "PENDING");
+    fromView.kind === "ORDER_SUMMARY" && fromView.gstinVerified === false &&
+    fromViewFormal.kind === "ORDER_SUMMARY" && fromViewFormal.notes.includes(GST_NOT_VERIFIED_NOTE));
   const confirmSrc = fs.readFileSync(path.join(REPO, "app/api/confirm-order/route.ts"), "utf8");
-  check("12f confirm-order records taxVerificationStatus from the vendor record it reads (Admin SDK), not from the request",
-    confirmSrc.includes(`typeof d.taxVerificationStatus === "string"`) &&
-    confirmSrc.includes("? d.taxVerificationStatus") &&
+  check("12f confirm-order derives gstinVerified from the vendor record it reads (Admin SDK), not from the request, and no longer copies the raw review state",
+    confirmSrc.includes(`gstinVerified: d.taxVerificationStatus === "VERIFIED"`) &&
+    !/taxVerificationStatus:\s*\n?\s*typeof d\.taxVerificationStatus/.test(confirmSrc) &&
     !confirmSrc.includes("body.taxVerificationStatus"));
+  check("12g F4: confirm-order resolves each seller through the duplicate-refusing findSellerVendor (never an arbitrary limit(1) record)",
+    confirmSrc.includes("findSellerVendor(db, vid, tx)") && !confirmSrc.includes(`.where("uid", "==", vid).limit(1)`));
+}
+
+// F2. The snapshot records only a boolean; older snapshots (raw status) still read safely
+{
+  const withBool = (gstinVerified: unknown) =>
+    buildInvoiceTax(orderWith({ A: { gstStatus: "REGISTERED", gstin: REG, gstinVerified } }, [lineA]), FORMAL).suppliers[0];
+  check("V2a gstinVerified true -> TAX INVOICE (formal); false -> ORDER SUMMARY with the not-verified note",
+    withBool(true).kind === "TAX_INVOICE" && withBool(true).gstinVerified === true &&
+    withBool(false).kind === "ORDER_SUMMARY" && withBool(false).gstinVerified === false && withBool(false).notes.includes(GST_NOT_VERIFIED_NOTE));
+  check("V2b a non-boolean gstinVerified ('true', 1) is never treated as verified",
+    ["true", 1, "VERIFIED"].every((x) => withBool(x).kind === "ORDER_SUMMARY"));
+  const both = buildInvoiceTax(orderWith({ A: { gstStatus: "REGISTERED", gstin: REG, gstinVerified: false, taxVerificationStatus: "VERIFIED" } }, [lineA]), FORMAL).suppliers[0];
+  check("V2c the recorded boolean wins over a legacy raw status (false + 'VERIFIED' -> not verified)", both.kind === "ORDER_SUMMARY");
+  check("V2d recordedGstinVerified: boolean as recorded; legacy 'VERIFIED' -> true, other raw -> false; nothing -> null",
+    recordedGstinVerified({ gstinVerified: true }) === true && recordedGstinVerified({ gstinVerified: false }) === false &&
+    recordedGstinVerified({ taxVerificationStatus: "verified" }) === true && recordedGstinVerified({ taxVerificationStatus: "REJECTED" }) === false &&
+    recordedGstinVerified({}) === null && recordedGstinVerified(null) === null);
+  check("V2e the seller view slice passes only the boolean on (a raw status in the slice is dropped)",
+    JSON.stringify(taxSnapshotFromSellerView({ gstStatus: "REGISTERED", gstin: REG, gstinVerified: true, lines: [] }, "A")?.sellers) ===
+      JSON.stringify({ A: { gstStatus: "REGISTERED", gstin: REG, gstinVerified: true } }) &&
+    !JSON.stringify(taxSnapshotFromSellerView({ gstStatus: "REGISTERED", gstin: REG, taxVerificationStatus: "REJECTED", lines: [] } as never, "A")).includes("REJECTED"));
 }
 
 // 13. C-3: wording follows the document kind; the supplier, never YOMICO, signs
@@ -269,6 +294,86 @@ const orderWith = (sellers: Record<string, unknown>, items = [lineA, lineA2, lin
   check("R6 empty-items row spans the visible columns: ORDER SUMMARY 4, BILL OF SUPPLY 5 (unchanged), TAX INVOICE 8 (unchanged)",
     emptyOf(regOrder, {}) === "4" && emptyOf(compOrder, FORMAL) === "5" && emptyOf(regOrder, FORMAL) === "8",
     `${emptyOf(regOrder, {})}/${emptyOf(compOrder, FORMAL)}/${emptyOf(regOrder, FORMAL)}`);
+}
+
+// F1. One product on the order twice, in two variants: each document line
+// shows ITS OWN variant — customer, admin and seller views (the seller view
+// built through the real seller-order transforms).
+{
+  const React = (await import("react")).default;
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const InvoiceItems = (await import("../../../components/invoice/InvoiceItems.tsx")).default;
+  const { buildSellerOrderSeed } = await import("../../../lib/sellerOrderRecord.ts");
+  const { buildSellerOrderDetail } = await import("../../../lib/sellerOrders/sellerOrderView.ts");
+
+  const shirtM = { id: "shirt", vendorId: "A", vendorName: "Shop A", name: "Shirt", price: 500, qty: 1, variantId: "v-m", attributes: { Size: "M" } };
+  const mugB = { id: "pb", vendorId: "B", vendorName: "Shop B", name: "Mug", price: 118, qty: 1, attributes: { Colour: "Blue" } };
+  const shirtL = { id: "shirt", vendorId: "A", vendorName: "Shop A", name: "Shirt", price: 500, qty: 2, variantId: "v-l", attributes: { Size: "L" } };
+  // Built exactly as app/api/confirm-order builds it: one line per order line, in order.
+  const snapLine = (it: any) => ({ productId: it.id, vendorId: it.vendorId, name: it.name, qty: it.qty, hsn: "6205",
+    gstRate: 5, grossValue: it.price * it.qty, taxableValue: 0, gstAmount: 0 });
+  const items = [shirtM, mugB, shirtL]; // seller B's line interleaved between A's two
+  const order = {
+    status: "Confirmed", customerName: "C", items,
+    taxSnapshot: { items: items.map(snapLine), sellers: { A: { gstStatus: "REGISTERED", gstin: REG, gstinVerified: true }, B: { gstStatus: "UNREGISTERED", gstin: "", gstinVerified: false } } },
+  };
+  // The variant text of each "Shirt" row, in row order.
+  const shirtRows = (html: string) => html.split("<tr").filter((r) => r.includes("Shirt"))
+    .map((r) => (r.includes("Size: M") ? "M" : "") + (r.includes("Size: L") ? "L" : "")).join(",");
+  const renderA = (o: any, viewer: "customer" | "admin" | "seller", opts = {}) => {
+    const docs = viewer === "seller" ? invoiceDocumentsFor(o, "seller") : { suppliers: buildInvoiceTax(o, opts).suppliers };
+    const s = docs.suppliers.find((x) => x.vendorId === "A")!;
+    return { s, html: renderToStaticMarkup(React.createElement(InvoiceItems, { order: o, supplier: s })) };
+  };
+
+  const cust = renderA(order, "customer");
+  const custFormal = renderA(order, "customer", FORMAL);
+  const admin = { s: invoiceDocumentsFor(order, "admin").suppliers.find((x) => x.vendorId === "A")! };
+  const adminHtml = renderToStaticMarkup(React.createElement(InvoiceItems, { order, supplier: admin.s }));
+  check("V1a customer view: Shirt M and Shirt L each show their own variant (interim and formal), with their own amounts",
+    shirtRows(cust.html) === "M,L" && shirtRows(custFormal.html) === "M,L" &&
+    cust.s.lines.map((l) => l.orderItemIndex).join() === "0,2" && cust.s.lines.map((l) => l.grossValue).join() === "500,1000",
+    `${shirtRows(cust.html)} / ${shirtRows(custFormal.html)} / ${cust.s.lines.map((l) => l.orderItemIndex).join()}`);
+  check("V1b admin view: same per-line variants", shirtRows(adminHtml) === "M,L", shirtRows(adminHtml));
+  const bDoc = buildInvoiceTax(order).suppliers.find((x) => x.vendorId === "B")!;
+  check("V1c the other seller's line pairs with its own order line (index 1), unaffected by A's two shirts",
+    bDoc.lines.length === 1 && bDoc.lines[0].orderItemIndex === 1 &&
+    renderToStaticMarkup(React.createElement(InvoiceItems, { order, supplier: bDoc })).includes("Colour: Blue"));
+
+  // Seller A's page, exactly as app/seller/orders/[id] and app/seller/invoice/[id] build it.
+  const record = buildSellerOrderSeed("o1", order as never, "A")!;
+  const view = buildSellerOrderDetail({ orderId: "o1", order: order as never, record: record as never, vendorUid: "A" })!;
+  const pageOrder = {
+    items: view.items.map((item) => ({ ...item, id: item.productId, vendorId: "A" })),
+    vendorId: "A",
+    taxSnapshot: taxSnapshotFromSellerView(view.tax, "A"),
+  };
+  const seller = renderA(pageOrder, "seller");
+  check("V1d seller view (own tax slice + own items): Shirt M and Shirt L each show their own variant",
+    shirtRows(seller.html) === "M,L" && seller.s.lines.map((l) => l.orderItemIndex).join() === "0,1",
+    `${shirtRows(seller.html)} / ${seller.s.lines.map((l) => l.orderItemIndex).join()}`);
+  check("V1e seller view still carries nothing of seller B (no Mug, no B line, no B id)",
+    !JSON.stringify(pageOrder).includes("Mug") && !JSON.stringify(pageOrder).includes("Colour") &&
+    !JSON.stringify(view.tax).includes("\"B\"") && !seller.html.includes("Mug"));
+
+  // Fail safe: when the pairing cannot be established, an ambiguous product
+  // shows NO variant rather than a wrong one; an unambiguous product still does.
+  const broken = { items: [shirtM, shirtL, mugB], taxSnapshot: { items: [snapLine(shirtM), snapLine(mugB)], sellers: {} } };
+  const brokenA = buildInvoiceTax(broken).suppliers.find((x) => x.vendorId === "A")!;
+  const brokenHtml = renderToStaticMarkup(React.createElement(InvoiceItems, { order: broken, supplier: brokenA }));
+  const brokenB = buildInvoiceTax(broken).suppliers.find((x) => x.vendorId === "B")!;
+  check("V1f line counts disagree (2 order lines, 1 snapshot line for A) -> no pairing and no variant guessed for the ambiguous shirt",
+    brokenA.lines[0].orderItemIndex === null && !brokenHtml.includes("Size: M") && !brokenHtml.includes("Size: L"), brokenHtml);
+  check("V1g an unambiguous product still shows its variant without a pairing (B's mug)",
+    brokenB.lines[0].orderItemIndex === 2 && renderToStaticMarkup(React.createElement(InvoiceItems, { order: broken, supplier: brokenB })).includes("Colour: Blue"));
+  const swapped = { items: [shirtM, mugB], taxSnapshot: { items: [{ ...snapLine(mugB), vendorId: "A" }, { ...snapLine(shirtM), vendorId: "B" }], sellers: {} } };
+  check("V1h a product-id mismatch at the paired position -> no pairing (never another line's variant)",
+    buildInvoiceTax(swapped).suppliers.every((s) => s.lines.every((l) => l.orderItemIndex === null)));
+  const noSnap = { items: [shirtM, mugB, shirtL] };
+  const noSnapA = buildInvoiceTax(noSnap, { vendorId: "A" }).suppliers[0];
+  check("V1i no snapshot: each order-line row keeps its own variant (seller filter keeps the original indices)",
+    noSnapA.lines.map((l) => l.orderItemIndex).join() === "0,2" &&
+    shirtRows(renderToStaticMarkup(React.createElement(InvoiceItems, { order: noSnap, supplier: noSnapA }))) === "M,L");
 }
 
 console.log(`\n${pass}/${pass + fail} invoice-tax checks passed`);

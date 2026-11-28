@@ -13,6 +13,7 @@ import {
   buildSellerOrderSeeds,
   sellerOrderRecordId,
 } from "@/lib/sellerOrderRecord";
+import { findSellerVendor } from "@/lib/sellerBusinessServer";
 
 // ---------------------------------------------------------------------------
 // Admin confirmation of a Pending order.
@@ -205,22 +206,27 @@ export async function POST(request: Request) {
       });
 
       const vendorIds = seeds.map((seed) => seed.vendorId);
-      const vendorQuerySnaps = await Promise.all(
-        vendorIds.map((vid) =>
-          tx.get(db.collection("vendors").where("uid", "==", vid).limit(1))
-        )
+      // The seller's ONE vendor record (lib/sellerBusinessServer). Two records
+      // for one uid are not guessed between: the snapshot then records no GST
+      // facts for that seller (UNKNOWN, unverified), so their document can only
+      // ever be an order summary. Confirmation itself is never refused here.
+      const vendorLookups = await Promise.all(
+        vendorIds.map((vid) => findSellerVendor(db, vid, tx))
       );
-      // taxVerificationStatus is read from the vendor record (Admin SDK) — it
-      // is written only by the admin GST review route (and reset to PENDING by
-      // the seller's own profile edit), and firestore.rules pins it against
-      // every client. Recorded as-is so an invoice never treats an unverified
-      // GSTIN as verified (lib/invoiceTax).
+      // The vendor's taxVerificationStatus is written only by the admin GST
+      // review route (app/api/admin/seller-tax-verification — and reset to
+      // PENDING by the seller's own profile edit); firestore.rules pins it, and
+      // taxProfile, against every browser write, admin included. Only whether it
+      // is VERIFIED is recorded: this order is readable by the customer and the
+      // assigned delivery partner, who have no use for the internal review state
+      // (PENDING / REJECTED). lib/invoiceTax never treats anything but
+      // `gstinVerified === true` as verified.
       const sellerTaxByVendor: Record<
         string,
-        { gstStatus: string; gstin: string; taxVerificationStatus: string }
+        { gstStatus: string; gstin: string; gstinVerified: boolean }
       > = {};
-      vendorQuerySnaps.forEach((qs, i) => {
-        const d = (qs.docs[0]?.data() || {}) as {
+      vendorLookups.forEach((lookup, i) => {
+        const d = (lookup.kind === "ok" ? lookup.data : {}) as {
           taxProfile?: { gstStatus?: unknown; gstin?: unknown };
           taxVerificationStatus?: unknown;
         };
@@ -231,10 +237,7 @@ export async function POST(request: Request) {
               : "UNKNOWN",
           gstin:
             typeof d.taxProfile?.gstin === "string" ? d.taxProfile.gstin : "",
-          taxVerificationStatus:
-            typeof d.taxVerificationStatus === "string"
-              ? d.taxVerificationStatus
-              : "UNKNOWN",
+          gstinVerified: d.taxVerificationStatus === "VERIFIED",
         };
       });
 

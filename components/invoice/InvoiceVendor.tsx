@@ -27,9 +27,9 @@ export default function InvoiceVendor({
   const verificationLabel =
     supplier?.gstStatus === "UNREGISTERED"
       ? "Not applicable"
-      : supplier?.taxVerificationStatus === "VERIFIED"
+      : supplier?.gstinVerified === true
       ? "Verified by YOMICO review"
-      : supplier?.taxVerificationStatus
+      : supplier?.gstinVerified === false
       ? "Not verified"
       : "Not recorded";
   // Interim (CX-01): an ORDER SUMMARY is not a tax document, so it carries no

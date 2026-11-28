@@ -20,9 +20,17 @@ export default function InvoiceItems({
 }: InvoiceItemsProps) {
   const showTax = supplier.kind === "TAX_INVOICE";
   const orderItems: InvoiceOrderItem[] = Array.isArray(order.items) ? order.items : [];
-  // Which variant was bought, from the order line for the same product.
-  const variantOf = (productId: string) => {
-    const item = orderItems.find((it) => (it?.productId || it?.id) === productId);
+  // Which variant was bought, from THIS document line's own order line
+  // (line.orderItemIndex, established by lib/invoiceTax). One product can be on
+  // an order twice in two variants, so a product-id lookup is used only when it
+  // is unambiguous (exactly one order line carries that product).
+  const variantOf = (line: SupplierInvoice["lines"][number]) => {
+    let item: InvoiceOrderItem | undefined =
+      line.orderItemIndex !== null ? orderItems[line.orderItemIndex] : undefined;
+    if (!item) {
+      const same = orderItems.filter((it) => (it?.id || it?.productId) === line.productId);
+      item = same.length === 1 ? same[0] : undefined;
+    }
     if (!item) return "";
     if (item.attributes && Object.keys(item.attributes).length > 0) {
       return Object.entries(item.attributes)
@@ -61,7 +69,7 @@ export default function InvoiceItems({
           <tbody>
             {supplier.lines.length ? (
               supplier.lines.map((line, index) => {
-                const variant = variantOf(line.productId);
+                const variant = variantOf(line);
                 return (
                   <tr key={index}>
                     <td className="border border-black p-1">{index + 1}</td>

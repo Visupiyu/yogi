@@ -40,6 +40,7 @@ import {
   type ItemFulfilmentMap,
 } from "@/lib/itemFulfilment";
 import { vendorsOnOrder } from "@/lib/sellerOrderRecord";
+import { recordedGstinVerified } from "@/lib/invoiceTax";
 
 export type SellerOrderItemView = {
   itemKey: string;
@@ -96,8 +97,12 @@ export type SellerOrderSummary = {
 export type SellerOrderTax = {
   gstStatus: string;
   gstin: string;
-  /** As recorded at confirmation (admin GST review); "" when not recorded. */
-  taxVerificationStatus: string;
+  /**
+   * Whether YOMICO's admin GST review had verified this seller's GSTIN at
+   * confirmation; null when not recorded. Only the boolean is exposed (the
+   * same field the order snapshot carries), never the raw review state.
+   */
+  gstinVerified: boolean | null;
   lines: { productId: string; name: string; qty: number; hsn: string; gstRate: number; grossValue: number; taxableValue: number; gstAmount: number }[];
 };
 
@@ -304,5 +309,5 @@ function ownTaxSlice(snapshot: unknown, vendorUid: string): SellerOrderTax | nul
   if (!lines.length) return null;
   const sellers = snap.sellers && typeof snap.sellers === "object" ? (snap.sellers as Record<string, Doc>) : {};
   const own = sellers[vendorUid] || {};
-  return { gstStatus: str(own.gstStatus), gstin: str(own.gstin), taxVerificationStatus: str(own.taxVerificationStatus), lines };
+  return { gstStatus: str(own.gstStatus), gstin: str(own.gstin), gstinVerified: recordedGstinVerified(own), lines };
 }

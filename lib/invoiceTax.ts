@@ -20,11 +20,15 @@
 //   UNREGISTERED                   -> BILL OF SUPPLY, no tax shown
 //   anything else / no snapshot    -> ORDER SUMMARY, explicitly NOT a tax
 //                                     document (the facts were not recorded)
-// "VERIFIED" is the seller's taxVerificationStatus as recorded at confirmation
-// (set only by YOMICO's admin GST review — app/api/admin/seller-tax-verification;
-// never by the seller, never inferred from GSTIN format). isValidGstin() checks
-// FORMAT only. Snapshots from before verification was recorded carry none, so
-// they are never treated as verified.
+// "VERIFIED" is the snapshot's per-seller `gstinVerified === true`, recorded at
+// confirmation from the vendor's taxVerificationStatus (set only by YOMICO's
+// admin GST review — app/api/admin/seller-tax-verification; never by the
+// seller, never inferred from GSTIN format). Only that boolean is recorded:
+// the order is readable by the customer and the assigned delivery partner, so
+// the internal review state (PENDING / REJECTED) is not copied onto it.
+// Snapshots written before this carry the raw `taxVerificationStatus` and are
+// still read (VERIFIED -> true); snapshots with neither are never verified.
+// isValidGstin() checks FORMAT only.
 // The CGST/SGST vs IGST split needs the place of supply, which orders store
 // only as free-text addresses — so the split is not shown, and every tax
 // document says so (an explicit limitation, not a guess).
@@ -45,6 +49,16 @@ export type InvoiceLine = {
   gstRate: number | null;
   taxableValue: number | null;
   gstAmount: number | null;
+  /**
+   * Index into the order's `items` of the order line this document line is,
+   * or null when that cannot be established with certainty. Snapshot lines are
+   * built 1:1, in order, from order.items (app/api/confirm-order), and a
+   * seller's lines keep that order (lib/sellerOrderRecord), so the k-th line of
+   * a seller here is the k-th order line of that seller — checked against the
+   * product id and the seller's line count, never guessed by product id alone
+   * (one product can be on an order twice, in two variants).
+   */
+  orderItemIndex: number | null;
 };
 
 export type SupplierInvoice = {
@@ -53,8 +67,11 @@ export type SupplierInvoice = {
   title: string;
   subtitle: string;
   gstStatus: string | null;
-  /** The seller's taxVerificationStatus as recorded at confirmation, or null. */
-  taxVerificationStatus: string | null;
+  /**
+   * Whether the seller's GSTIN was recorded as verified by YOMICO's admin GST
+   * review at confirmation: true / false, or null when nothing was recorded.
+   */
+  gstinVerified: boolean | null;
   gstin: string | null;
   supplierStateCode: string | null;
   lines: InvoiceLine[];
@@ -119,6 +136,58 @@ function classify(gstStatus: string, gstin: string, verified: boolean): Pick<Sup
 }
 
 /**
+ * The recorded verification of one seller entry of the snapshot: the minimal
+ * `gstinVerified` boolean, or — for snapshots written before it — the raw
+ * `taxVerificationStatus` (only "VERIFIED" counts). null when neither exists.
+ */
+export function recordedGstinVerified(seller: unknown): boolean | null {
+  const s = (seller && typeof seller === "object" ? seller : {}) as Record<string, unknown>;
+  if (typeof s.gstinVerified === "boolean") return s.gstinVerified;
+  const raw = str(s.taxVerificationStatus).trim().toUpperCase();
+  return raw ? raw === "VERIFIED" : null;
+}
+
+/** The product id an order line is recorded under (the snapshot uses `id`). */
+const orderLineProductId = (it: Record<string, unknown> | null | undefined) =>
+  str(it?.id) || str(it?.productId);
+
+/**
+ * For each snapshot line, the index of the order line it was built from, or
+ * null. The k-th snapshot line of a seller pairs with the k-th order line of
+ * that seller — only when the seller has the same number of lines in both and
+ * the product ids agree; otherwise none of that seller's lines are paired.
+ */
+function alignSnapshotToOrder(snapItems: SnapshotLine[], orderItems: Record<string, unknown>[]): (number | null)[] {
+  const orderIdx = new Map<string, number[]>();
+  orderItems.forEach((it, i) => {
+    const vid = str(it?.vendorId);
+    if (!orderIdx.has(vid)) orderIdx.set(vid, []);
+    orderIdx.get(vid)!.push(i);
+  });
+  const snapCount = new Map<string, number>();
+  for (const line of snapItems) {
+    const vid = str(line?.vendorId);
+    snapCount.set(vid, (snapCount.get(vid) || 0) + 1);
+  }
+  const seen = new Map<string, number>();
+  const pairs = snapItems.map((line) => {
+    const vid = str(line?.vendorId);
+    const k = seen.get(vid) || 0;
+    seen.set(vid, k + 1);
+    const candidates = orderIdx.get(vid) || [];
+    if (candidates.length !== snapCount.get(vid)) return null;
+    const idx = candidates[k];
+    const pid = str(line?.productId);
+    return idx !== undefined && pid && orderLineProductId(orderItems[idx]) === pid ? idx : null;
+  });
+  // One mismatch on a seller means the pairing is not trustworthy for any of
+  // that seller's lines.
+  const broken = new Set<string>();
+  snapItems.forEach((line, i) => { if (pairs[i] === null) broken.add(str(line?.vendorId)); });
+  return pairs.map((p, i) => (broken.has(str(snapItems[i]?.vendorId)) ? null : p));
+}
+
+/**
  * The supply documents for an order. `vendorId` restricts the result to one
  * seller (the seller's own invoice); without it every seller on the order gets
  * their own document (customer / admin view).
@@ -135,19 +204,22 @@ export function buildInvoiceTax(
   if (!snapItems) {
     // No recorded tax facts: an order summary from the order lines, no tax at all.
     const items = Array.isArray(o.items) ? (o.items as Record<string, unknown>[]) : [];
-    const own = opts.vendorId ? items.filter((it) => str(it.vendorId) === opts.vendorId) : items;
-    const lines: InvoiceLine[] = own.map((it) => {
+    const own = items
+      .map((it, index) => ({ it, index }))
+      .filter(({ it }) => !opts.vendorId || str(it?.vendorId) === opts.vendorId);
+    const lines: InvoiceLine[] = own.map(({ it, index }) => {
       const qty = num(it.qty ?? it.quantity);
       return {
         productId: str(it.productId) || str(it.id), name: str(it.name), hsn: str(it.hsn), qty,
         grossValue: round2(num(it.price) * qty), gstRate: null, taxableValue: null, gstAmount: null,
+        orderItemIndex: index,
       };
     });
     return {
       snapshotPresent: false,
       suppliers: [{
         vendorId: opts.vendorId || "", kind: "ORDER_SUMMARY", title: "ORDER SUMMARY", subtitle: "Not a tax invoice",
-        gstStatus: null, taxVerificationStatus: null, gstin: null, supplierStateCode: null, lines,
+        gstStatus: null, gstinVerified: null, gstin: null, supplierStateCode: null, lines,
         totals: { gross: round2(lines.reduce((s, l) => s + l.grossValue, 0)), taxable: null, gst: null },
         notes: [NO_SNAPSHOT_NOTE],
       }],
@@ -155,27 +227,29 @@ export function buildInvoiceTax(
   }
 
   const sellers = snap && snap.sellers && typeof snap.sellers === "object" ? (snap.sellers as Record<string, unknown>) : {};
+  const orderItems = Array.isArray(o.items) ? (o.items as Record<string, unknown>[]) : [];
+  const orderIndexOf = alignSnapshotToOrder(snapItems, orderItems);
   const vendorOrder: string[] = [];
-  const byVendor = new Map<string, SnapshotLine[]>();
-  for (const line of snapItems) {
+  const byVendor = new Map<string, { line: SnapshotLine; orderItemIndex: number | null }[]>();
+  snapItems.forEach((line, i) => {
     const vid = str(line?.vendorId);
-    if (opts.vendorId && vid !== opts.vendorId) continue;
+    if (opts.vendorId && vid !== opts.vendorId) return;
     if (!byVendor.has(vid)) { byVendor.set(vid, []); vendorOrder.push(vid); }
-    byVendor.get(vid)!.push(line);
-  }
+    byVendor.get(vid)!.push({ line, orderItemIndex: orderIndexOf[i] });
+  });
 
   const suppliers: SupplierInvoice[] = vendorOrder.map((vid) => {
     const seller = (sellers[vid] && typeof sellers[vid] === "object" ? sellers[vid] : {}) as Record<string, unknown>;
     const gstStatus = str(seller.gstStatus).toUpperCase();
     const gstinRaw = str(seller.gstin).trim().toUpperCase();
-    const verification = str(seller.taxVerificationStatus).toUpperCase();
-    const verified = verification === "VERIFIED";
+    const gstinVerified = recordedGstinVerified(seller);
+    const verified = gstinVerified === true;
     const gstin = isValidGstin(gstinRaw) ? gstinRaw : null;
     const cls: Pick<SupplierInvoice, "kind" | "title" | "subtitle"> = formal
       ? classify(gstStatus, gstinRaw, verified)
       : { kind: "ORDER_SUMMARY", title: "ORDER SUMMARY", subtitle: "Not a tax invoice" };
     const taxDoc = cls.kind === "TAX_INVOICE";
-    const lines: InvoiceLine[] = byVendor.get(vid)!.map((l) => ({
+    const lines: InvoiceLine[] = byVendor.get(vid)!.map(({ line: l, orderItemIndex }) => ({
       productId: str(l.productId),
       name: str(l.name),
       hsn: str(l.hsn),
@@ -184,6 +258,7 @@ export function buildInvoiceTax(
       gstRate: taxDoc ? num(l.gstRate) : null,
       taxableValue: taxDoc ? round2(num(l.taxableValue)) : null,
       gstAmount: taxDoc ? round2(num(l.gstAmount)) : null,
+      orderItemIndex,
     }));
     const notes: string[] = [];
     if (!formal) {
@@ -199,7 +274,7 @@ export function buildInvoiceTax(
       vendorId: vid,
       ...cls,
       gstStatus: gstStatus || null,
-      taxVerificationStatus: verification || null,
+      gstinVerified,
       // A GSTIN is printed only when it is well-formed, recorded as VERIFIED,
       // AND the document is one a GSTIN belongs on (a tax invoice, or a
       // composition bill of supply).
@@ -242,18 +317,21 @@ export function invoiceDocumentsFor(
  * so the seller's invoice runs through exactly the same buildInvoiceTax().
  */
 export function taxSnapshotFromSellerView(
-  tax: { gstStatus?: unknown; gstin?: unknown; taxVerificationStatus?: unknown; lines?: unknown } | null | undefined,
+  tax: { gstStatus?: unknown; gstin?: unknown; gstinVerified?: unknown; lines?: unknown } | null | undefined,
   vendorUid: string
 ): {
   items: Record<string, unknown>[];
-  sellers: Record<string, { gstStatus: string; gstin: string; taxVerificationStatus: string }>;
+  sellers: Record<string, { gstStatus: string; gstin: string; gstinVerified?: boolean }>;
 } | undefined {
   if (!tax || !Array.isArray(tax.lines) || !vendorUid) return undefined;
   return {
+    // The slice keeps the seller's lines in order-line order, so the page's
+    // own items (the same lines, same order) pair with them by position.
     items: (tax.lines as Record<string, unknown>[]).map((l) => ({ ...l, vendorId: vendorUid })),
     sellers: {
       [vendorUid]: {
-        gstStatus: str(tax.gstStatus), gstin: str(tax.gstin), taxVerificationStatus: str(tax.taxVerificationStatus),
+        gstStatus: str(tax.gstStatus), gstin: str(tax.gstin),
+        ...(typeof tax.gstinVerified === "boolean" ? { gstinVerified: tax.gstinVerified } : {}),
       },
     },
   };

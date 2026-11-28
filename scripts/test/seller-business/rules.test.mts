@@ -21,7 +21,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { initializeTestEnvironment, assertFails, assertSucceeds } from "@firebase/rules-unit-testing";
 import {
-  addDoc, collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where,
+  addDoc, collection, deleteDoc, deleteField, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where,
 } from "firebase/firestore";
 
 const hostPort = process.env.FIRESTORE_EMULATOR_HOST;
@@ -76,6 +76,16 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   const f = ctx.firestore();
   await setDoc(doc(f, "vendors", "v_approved"), APPROVED);
   await setDoc(doc(f, "vendors", "v_pending"), { ...APPROVED, uid: "sellerP", status: "Pending", kycStatus: "Pending" });
+  // A seller whose GST profile was submitted (app/api/seller/tax-profile) and
+  // rejected once by the admin review route — every tax field present.
+  await setDoc(doc(f, "vendors", "v_tax"), {
+    ...APPROVED, uid: "sellerT", email: "tax@example.com",
+    taxProfile: { gstStatus: "REGISTERED", gstin: "27AAPFU0939F1ZV" },
+    taxVerificationStatus: "REJECTED", taxVerifiedAt: new Date("2026-11-01T00:00:00Z"), taxVerifiedBy: "adminUid",
+    taxRejectionReason: "Certificate unreadable",
+  });
+  // A seller with no tax profile yet.
+  await setDoc(doc(f, "vendors", "v_notax"), { ...APPROVED, uid: "sellerN", email: "notax@example.com" });
   await setDoc(doc(f, "vendors_public", "sellerA"), {
     uid: "sellerA", businessName: "Asha Traders", fullName: "Asha", email: "asha@example.com", businessPhone: "9876543210",
     businessType: "Sole Proprietorship", city: "Ahmedabad", state: "Gujarat", storeLogo: "", storeBanner: "",
@@ -139,6 +149,54 @@ await check("F5  pending applicant can still correct business name and address (
   assertSucceeds(updateDoc(doc(as("sellerP"), "vendors", "v_pending"), { businessName: "Fixed Name", street: "2 Road" })));
 await check("F6  admin can still update business fields directly (admin access unchanged)", () =>
   assertSucceeds(updateDoc(doc(adminDb(), "vendors", "v_approved"), { businessName: "Admin Fix" })));
+
+// ---------- GST profile & verification: server routes only, admin browser included (F3) ----------
+const taxDoc = (db = adminDb()) => doc(db, "vendors", "v_tax");
+for (const [label, change] of [
+  ["set taxVerificationStatus VERIFIED", { taxVerificationStatus: "VERIFIED" }],
+  ["set taxVerificationStatus PENDING", { taxVerificationStatus: "PENDING" }],
+  ["remove taxVerificationStatus", { taxVerificationStatus: deleteField() }],
+  ["set taxVerifiedAt", { taxVerifiedAt: new Date() }],
+  ["set taxVerifiedBy", { taxVerifiedBy: "someoneElse" }],
+  ["clear taxRejectionReason", { taxRejectionReason: deleteField() }],
+  ["rewrite taxRejectionReason", { taxRejectionReason: "" }],
+  ["change taxProfile.gstStatus", { "taxProfile.gstStatus": "COMPOSITION" }],
+  ["change taxProfile.gstin", { "taxProfile.gstin": "24AAACC1206D1ZM" }],
+  ["replace taxProfile", { taxProfile: { gstStatus: "UNREGISTERED" } }],
+  ["remove taxProfile", { taxProfile: deleteField() }],
+] as const) {
+  await check(`T1  admin browser CANNOT ${label}`, () => assertFails(updateDoc(taxDoc(), change as never)));
+}
+await check("T2  admin browser CANNOT add a taxProfile or a VERIFIED status to a seller that has none", async () => {
+  await assertFails(updateDoc(doc(adminDb(), "vendors", "v_notax"), { taxProfile: { gstStatus: "REGISTERED", gstin: "27AAPFU0939F1ZV" } }));
+  await assertFails(updateDoc(doc(adminDb(), "vendors", "v_notax"), { taxVerificationStatus: "VERIFIED", taxVerifiedBy: "adminUid" }));
+});
+await check("T3  admin browser CANNOT slip a VERIFIED status into an otherwise legitimate block", () =>
+  assertFails(updateDoc(taxDoc(), { status: "Blocked", taxVerificationStatus: "VERIFIED" })));
+await check("T4  legitimate admin vendor updates on a seller WITH tax fields still allowed: business fix, block, unblock, whole-document save with tax fields unchanged", async () => {
+  await assertSucceeds(updateDoc(taxDoc(), { businessName: "Admin Fix T" }));
+  await assertSucceeds(updateDoc(taxDoc(), { status: "Blocked" }));
+  await assertSucceeds(updateDoc(taxDoc(), { status: "Approved" }));
+  let data: any;
+  await env.withSecurityRulesDisabled(async (ctx) => { data = (await getDoc(doc(ctx.firestore(), "vendors", "v_tax"))).data(); });
+  await assertSucceeds(setDoc(taxDoc(), { ...data, aboutStore: "Admin whole save" }));
+});
+await check("T5  admin browser still CANNOT decide KYC (unchanged)", () =>
+  assertFails(updateDoc(taxDoc(), { kycStatus: "Rejected" })));
+await check("T6  the seller still CANNOT change their own taxProfile / verification fields (owner restriction unchanged)", async () => {
+  const own = doc(as("sellerT", "tax@example.com"), "vendors", "v_tax");
+  await assertFails(updateDoc(own, { taxVerificationStatus: "VERIFIED" }));
+  await assertFails(updateDoc(own, { "taxProfile.gstStatus": "UNREGISTERED" }));
+  await assertFails(updateDoc(own, { taxVerifiedBy: "sellerT" }));
+  await assertFails(updateDoc(own, { taxRejectionReason: deleteField() }));
+  await assertSucceeds(updateDoc(own, { aboutStore: "Seller still edits presentation" }));
+});
+await check("T7  the stored tax fields are exactly as seeded after every attempt above", async () => {
+  let data: any;
+  await env.withSecurityRulesDisabled(async (ctx) => { data = (await getDoc(doc(ctx.firestore(), "vendors", "v_tax"))).data(); });
+  if (data.taxVerificationStatus !== "REJECTED" || data.taxProfile?.gstStatus !== "REGISTERED" || data.taxProfile?.gstin !== "27AAPFU0939F1ZV" ||
+    data.taxVerifiedBy !== "adminUid" || data.taxRejectionReason !== "Certificate unreadable") throw new Error(JSON.stringify(data));
+});
 
 // ---------- vendors_public ----------
 const pub = () => doc(as("sellerA", "asha@example.com"), "vendors_public", "sellerA");
