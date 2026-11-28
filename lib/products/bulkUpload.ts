@@ -201,7 +201,7 @@ const text = (v: unknown) => (isBlank(v) ? "" : String(v).replace(/\s+/g, " ").t
 const longText = (v: unknown) => (isBlank(v) ? "" : String(v).replace(/\r\n?/g, "\n").trim());
 
 /** A number from a cell: a real number, or text like "1,299" / "₹799" / "18%". */
-function numberCell(v: unknown): number | null {
+export function numberCell(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   if (typeof v !== "string") return null;
   const s = v.trim().replace(/^₹\s*/, "").replace(/\s*%$/, "").replace(/,/g, "");

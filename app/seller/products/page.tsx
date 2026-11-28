@@ -281,6 +281,14 @@ export default function SellerProductsPage() {
 
           <button
             type="button"
+            onClick={() => router.push("/seller/products/bulk-edit")}
+            className="rounded-xl border border-indigo-200 bg-white px-5 py-3 font-semibold text-indigo-700 transition hover:bg-indigo-50"
+          >
+            Bulk Edit (Excel)
+          </button>
+
+          <button
+            type="button"
             onClick={() => router.push("/seller/products/add")}
             className="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white transition hover:bg-indigo-700"
           >
