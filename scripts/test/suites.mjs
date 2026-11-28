@@ -21,6 +21,7 @@ const fs = (emulators, project = "demo-yomico-test") => ({ emulators, project })
 export const suites = [
   { name: "config", file: "scripts/test/config/preview-isolation.test.mts", emulators: "" },
   { name: "observability", file: "scripts/test/observability/run.test.mts", emulators: "" },
+  { name: "invoice-tax", file: "scripts/test/invoice-tax/run.test.mts", emulators: "" },
   { name: "product-approval-surfaces", file: "scripts/test/product-approval/surfaces.test.mts", ...fs("firestore") },
   { name: "phase6-storefront", file: "scripts/test/phase6/storefront.test.mts", emulators: "" },
   { name: "preview-test-catalogue", file: "scripts/test/preview-test-catalogue/run.mts", ...fs("firestore", "demo-yomico-catalogue") },

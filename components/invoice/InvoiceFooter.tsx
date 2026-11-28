@@ -4,11 +4,18 @@ import { useRouter } from "next/navigation";
 interface InvoiceFooterProps {
   grandTotal: number;
   type: "customer" | "seller" | "admin";
+  /**
+   * The supplier (seller) of each document that is issued in a supplier's name
+   * (a tax invoice or bill of supply). An order summary is not signed, so it
+   * contributes nothing here. YOMICO is the marketplace, never the signatory.
+   */
+  signatories?: string[];
 }
 
 export default function InvoiceFooter({
   grandTotal,
   type,
+  signatories = [],
 }: InvoiceFooterProps) {
 
   function amountToWords(amount: number): string {
@@ -105,9 +112,9 @@ const router = useRouter();
 
         <li>Goods sold are subject to the return policy.</li>
 
-        <li>This is a computer-generated invoice.</li>
+        <li>This is a computer-generated document.</li>
 
-        <li>Please keep this invoice for warranty and returns.</li>
+        <li>Please keep this document for warranty and returns.</li>
 
       </ul>
 
@@ -121,11 +128,13 @@ const router = useRouter();
         Customer Signature
       </div>
 
-      <div className="border-t border-black pt-1 text-right">
-        <div>Authorized Signatory</div>
-        <div className="font-semibold">
-          YOMICO Marketplace
-        </div>
+      <div className="text-right space-y-2">
+        {signatories.map((name, i) => (
+          <div key={i} className="border-t border-black pt-1">
+            <div className="font-semibold">For {name}</div>
+            <div>Authorised signatory of the supplier</div>
+          </div>
+        ))}
       </div>
 
     </div>

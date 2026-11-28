@@ -34,6 +34,7 @@ import { sellerOrderRecordId } from "@/lib/sellerOrderRecord";
 import { formatIst } from "@/lib/orderTiming";
 import { useVendor } from "@/hooks/useVendor";
 import { mapsSearchUrl } from "@/lib/maps";
+import { taxSnapshotFromSellerView } from "@/lib/invoiceTax";
 
 import { useRef } from "react";
 
@@ -110,6 +111,11 @@ function toPageOrder(view: SellerOrderDetail, vendorUid: string) {
     // This seller's own lines, tagged with their own uid so the existing
     // per-seller filters on this page keep working.
     items: view.items.map((item) => ({ ...item, id: item.productId, vendorId: vendorUid })),
+    // This seller's own recorded tax slice, for their invoice (lib/invoiceTax),
+    // and the confirmation instant the document is dated by.
+    confirmedAt: view.confirmedAt,
+    vendorId: vendorUid,
+    taxSnapshot: taxSnapshotFromSellerView(view.tax, vendorUid),
   };
 }
 

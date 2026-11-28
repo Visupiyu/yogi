@@ -1,213 +1,101 @@
 "use client";
 
+import type { InvoiceOrderItem, InvoiceOrderLike, SupplierInvoice } from "@/lib/invoiceTax";
+
 interface InvoiceItemsProps {
-  order: any;
+  order: InvoiceOrderLike;
+  /** This document's lines and tax facts (lib/invoiceTax) — never re-derived here. */
+  supplier: SupplierInvoice;
 }
 
+const money = (n: number) =>
+  n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Lines come from the order's recorded tax snapshot (or, with no snapshot, from
+// the order lines with no tax at all). GST columns appear only on a TAX INVOICE;
+// nothing here assumes a rate.
 export default function InvoiceItems({
   order,
+  supplier,
 }: InvoiceItemsProps) {
+  const showTax = supplier.kind === "TAX_INVOICE";
+  const orderItems: InvoiceOrderItem[] = Array.isArray(order.items) ? order.items : [];
+  // Which variant was bought, from THIS document line's own order line
+  // (line.orderItemIndex, established by lib/invoiceTax). One product can be on
+  // an order twice in two variants, so a product-id lookup is used only when it
+  // is unambiguous (exactly one order line carries that product).
+  const variantOf = (line: SupplierInvoice["lines"][number]) => {
+    let item: InvoiceOrderItem | undefined =
+      line.orderItemIndex !== null ? orderItems[line.orderItemIndex] : undefined;
+    if (!item) {
+      const same = orderItems.filter((it) => (it?.id || it?.productId) === line.productId);
+      item = same.length === 1 ? same[0] : undefined;
+    }
+    if (!item) return "";
+    if (item.attributes && Object.keys(item.attributes).length > 0) {
+      return Object.entries(item.attributes)
+        .map(([dimension, value]) => dimension + ": " + String(value))
+        .join("  |  ");
+    }
+    return [item.color ? "Color: " + item.color : "", item.size ? "Size: " + item.size : ""]
+      .filter(Boolean)
+      .join("  |  ");
+  };
+  // Interim (CX-01): HSN is a tax classification code, so it is not shown on an
+  // ORDER SUMMARY. Formal documents (TAX INVOICE / BILL OF SUPPLY) keep it.
+  const showHsn = supplier.kind !== "ORDER_SUMMARY";
+  // Sl, Product Name, Qty, Amount + HSN (formal) + GST %, Taxable Value, GST (tax invoice).
+  const columnCount = 4 + (showHsn ? 1 : 0) + (showTax ? 3 : 0);
 
   return (
-
-    <div className="mt-1">
-
-      <h2 className="text-base font-bold mb-2">
-        Invoice Items
+    <div className="border-2 border-black rounded-lg overflow-hidden">
+      <h2 className="bg-gray-100 border-b-2 border-black p-1 text-lg font-bold">
+        Items
       </h2>
-
       <div className="overflow-x-auto">
-      <table className="w-full border-2 border-black border-collapse">
-
-        <thead>
-
-          <tr className="bg-gray-100">
-
-            <th className="border border-black p-1 w-12">
-              Sl
-            </th>
-
-            <th className="border border-black p-1 text-left">
-              Product Name
-            </th>
-
-            <th className="border border-black p-1">
-              HSN / SKU
-            </th>
-
-            <th className="border border-black p-1">
-              Qty
-            </th>
-
-            <th className="border border-black p-1">
-              Unit Price
-            </th>
-
-            <th className="border border-black p-1">
-              GST %
-            </th>
-
-            <th className="border border-black p-1">
-              Discount
-            </th>
-
-            <th className="border border-black p-1">
-              Total
-            </th>
-
-          </tr>
-
-        </thead>
-
-        <tbody>
-
-          {order.items?.length ? (
-
-            order.items.map(
-              (
-                item: any,
-                index: number
-              ) => {
-
-                const qty =
-                  Number(item.qty || 1);
-
-                const price =
-                  Number(item.price || 0);
-
-                const gst =
-                  Number(item.gst || 18);
-
-                const discount =
-                  Number(item.discount || 0);
-
-                const total =
-                  (price * qty) - discount;
-
-                return (
-
-                  <tr
-                    key={index}
-                    className="hover:bg-gray-50"
-                  >
-
-                    <td className="border border-black p-1 text-center">
-                      {index + 1}
-                    </td>
-
-                    <td className="border border-black p-1">
-
-                      <div className="font-semibold">
-                        {item.name}
-                      </div>
-
-                      {/* Which variant was actually bought. Orders placed
-                          since variants became selectable carry the full
-                          attribute map, covering dimensions size/color could
-                          never express (Capacity, RAM, Storage, Processor,
-                          Material, Pack Size). Older orders carry only
-                          size/color, and orders with neither render nothing
-                          at all — exactly as before. */}
-                      {item.attributes &&
-                      Object.keys(item.attributes).length > 0 ? (
-
-                        <div className="text-xs text-gray-700 mt-1">
-                          {Object.entries(item.attributes)
-                            .map(
-                              ([dimension, value]) =>
-                                dimension + ": " + String(value)
-                            )
-                            .join("  |  ")}
-                        </div>
-
-                      ) : (
-                        (item.color || item.size) && (
-
-                          <div className="text-xs text-gray-700 mt-1">
-                            {[
-                              item.color ? "Color: " + item.color : "",
-                              item.size ? "Size: " + item.size : "",
-                            ]
-                              .filter(Boolean)
-                              .join("  |  ")}
-                          </div>
-
-                        )
-                      )}
-
-                      {item.description && (
-
-                        <div className="text-xs text-gray-500 mt-1">
-                          {item.description}
-                        </div>
-
-                      )}
-
-                    </td>
-
-                    <td className="border border-black p-1 text-center">
-                      {item.hsn || item.sku || "-"}
-                    </td>
-
-                    <td className="border border-black p-1 text-center">
-                      {qty}
-                    </td>
-
-                    <td className="border border-black p-1 text-right">
-                      ₹
-                      {price.toLocaleString(
-                        "en-IN"
-                      )}
-                    </td>
-
-                    <td className="border border-black p-1 text-center">
-                      {gst}%
-                    </td>
-
-                    <td className="border border-black p-1 text-right">
-                      ₹
-                      {discount.toLocaleString(
-                        "en-IN"
-                      )}
-                    </td>
-
-                    <td className="border border-black p-1 text-right font-bold">
-                      ₹
-                      {total.toLocaleString(
-                        "en-IN"
-                      )}
-                    </td>
-
-                  </tr>
-
-                );
-
-              }
-
-            )
-
-          ) : (
-
-            <tr>
-
-              <td
-                colSpan={8}
-                className="border border-black p-1 text-center text-gray-500"
-              >
-                No items found.
-              </td>
-
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="border border-black p-1 text-left">Sl</th>
+              <th className="border border-black p-1 text-left">Product Name</th>
+              {showHsn && <th className="border border-black p-1 text-left">HSN</th>}
+              <th className="border border-black p-1 text-right">Qty</th>
+              {showTax && <th className="border border-black p-1 text-right">GST %</th>}
+              {showTax && <th className="border border-black p-1 text-right">Taxable Value</th>}
+              {showTax && <th className="border border-black p-1 text-right">GST</th>}
+              <th className="border border-black p-1 text-right">Amount</th>
             </tr>
-
-          )}
-
-        </tbody>
-
-      </table>
+          </thead>
+          <tbody>
+            {supplier.lines.length ? (
+              supplier.lines.map((line, index) => {
+                const variant = variantOf(line);
+                return (
+                  <tr key={index}>
+                    <td className="border border-black p-1">{index + 1}</td>
+                    <td className="border border-black p-1">
+                      <div className="font-medium">{line.name}</div>
+                      {variant && <div className="text-xs text-gray-600">{variant}</div>}
+                    </td>
+                    {showHsn && <td className="border border-black p-1">{line.hsn || "-"}</td>}
+                    <td className="border border-black p-1 text-right">{line.qty}</td>
+                    {showTax && <td className="border border-black p-1 text-right">{line.gstRate ?? 0}%</td>}
+                    {showTax && <td className="border border-black p-1 text-right">₹{money(line.taxableValue ?? 0)}</td>}
+                    {showTax && <td className="border border-black p-1 text-right">₹{money(line.gstAmount ?? 0)}</td>}
+                    <td className="border border-black p-1 text-right">₹{money(line.grossValue)}</td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan={columnCount} className="border border-black p-2 text-center text-gray-500">
+                  No items found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-
     </div>
-
   );
-
 }

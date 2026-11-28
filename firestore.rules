@@ -893,12 +893,25 @@ service cloud.firestore {
         );
     }
 
+    // An admin BROWSER never writes a seller's GST profile or its verification
+    // either. taxProfile is written only by app/api/seller/tax-profile
+    // (validated, resets verification to PENDING) and the verification result
+    // only by app/api/admin/seller-tax-verification (admin-only, audited) —
+    // both Admin SDK, unaffected here. Without this an admin session could mark
+    // a GSTIN VERIFIED with no audit entry, and confirmation would record it on
+    // every order (app/api/confirm-order -> taxSnapshot.sellers.gstinVerified).
+    function adminVendorTaxUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'taxProfile', 'taxVerificationStatus', 'taxVerifiedAt', 'taxVerifiedBy', 'taxRejectionReason'
+      ]);
+    }
+
     match /vendors/{vendorDocId} {
       allow read: if isAdmin() || isOwnerUid(resource.data.uid);
 
       allow create: if isSignedIn() && isValidVendorApplication();
 
-      allow update: if (isAdmin() && adminVendorKycUnchanged())
+      allow update: if (isAdmin() && adminVendorKycUnchanged() && adminVendorTaxUnchanged())
         || (
           isOwnerUid(resource.data.uid)
           && unchanged('uid')

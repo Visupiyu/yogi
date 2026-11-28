@@ -1,12 +1,42 @@
 "use client";
 
+import { supplierDisplayName, type InvoiceOrderLike, type SupplierInvoice } from "@/lib/invoiceTax";
+
 interface InvoiceVendorProps {
-  order: any;
+  order: InvoiceOrderLike;
+  /** The seller's recorded tax identity for THIS document (lib/invoiceTax). */
+  supplier?: SupplierInvoice;
 }
+
+const GST_STATUS_LABEL: Record<string, string> = {
+  REGISTERED: "Registered (Regular)",
+  COMPOSITION: "Composition",
+  UNREGISTERED: "Not registered under GST",
+};
 
 export default function InvoiceVendor({
   order,
+  supplier,
 }: InvoiceVendorProps) {
+  // The seller of this document (the supplier): the name on one of their own
+  // order lines, falling back to the order-level name.
+  const vendorName = supplierDisplayName(order, supplier?.vendorId || "");
+  // What YOMICO's admin GST review recorded at confirmation — a review of the
+  // seller's documents, not a government registry check. Not applicable to a
+  // seller who is not registered.
+  const verificationLabel =
+    supplier?.gstStatus === "UNREGISTERED"
+      ? "Not applicable"
+      : supplier?.gstinVerified === true
+      ? "Verified by YOMICO review"
+      : supplier?.gstinVerified === false
+      ? "Not verified"
+      : "Not recorded";
+  // Interim (CX-01): an ORDER SUMMARY is not a tax document, so it carries no
+  // GST registration status, GSTIN or verification statement. Formal documents
+  // (TAX INVOICE / BILL OF SUPPLY) render these rows exactly as before. With no
+  // supplier there is no recorded tax identity to show either.
+  const showTaxIdentity = !!supplier && supplier.kind !== "ORDER_SUMMARY";
 
   return (
 
@@ -31,7 +61,18 @@ export default function InvoiceVendor({
     Vendor Name
   </td>
   <td className="border border-black p-1 w-full break-words">
-    {order.vendorName || "YOMICO Seller"}
+    {vendorName}
+  </td>
+</tr>
+
+{showTaxIdentity && (
+<>
+<tr>
+  <td className="border border-black p-1 font-semibold w-28 sm:w-40">
+    GST status
+  </td>
+  <td className="border border-black p-1 w-full break-words">
+    {(supplier?.gstStatus && GST_STATUS_LABEL[supplier.gstStatus]) || "Not recorded"}
   </td>
 </tr>
 
@@ -40,9 +81,20 @@ export default function InvoiceVendor({
     GSTIN
   </td>
   <td className="border border-black p-1 w-full break-words">
-    {order.vendorGST || "-"}
+    {supplier?.gstin || "-"}
   </td>
 </tr>
+
+<tr>
+  <td className="border border-black p-1 font-semibold w-28 sm:w-40">
+    GSTIN verification
+  </td>
+  <td className="border border-black p-1 w-full break-words">
+    {verificationLabel}
+  </td>
+</tr>
+</>
+)}
 
 <tr>
   <td className="border border-black p-1 font-semibold w-28 sm:w-40">
